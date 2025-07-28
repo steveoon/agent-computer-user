@@ -16,32 +16,32 @@ export class DulidayErrorFormatter {
       
       switch (issue.code) {
         case 'invalid_type':
-          return `字段 ${path}: 期望 ${issue.expected}，实际收到 ${issue.received}`;
+          return `• 字段 "${path}"\n  期望类型: ${issue.expected}\n  实际收到: ${issue.received}`;
         
         case 'invalid_union':
-          return `字段 ${path}: 数据不符合任何预期的格式`;
+          return `• 字段 "${path}"\n  数据不符合任何预期的格式`;
         
         case 'invalid_enum_value':
-          return `字段 ${path}: 值必须是以下之一: ${issue.options?.join(', ')}`;
+          return `• 字段 "${path}"\n  值必须是以下之一: ${issue.options?.join(', ')}`;
         
         case 'unrecognized_keys':
-          return `字段 ${path}: 包含未识别的键: ${issue.keys?.join(', ')}`;
+          return `• 字段 "${path}"\n  包含未识别的键: ${issue.keys?.join(', ')}`;
         
         case 'invalid_string':
-          return `字段 ${path}: 字符串格式无效 (${issue.validation})`;
+          return `• 字段 "${path}"\n  字符串格式无效 (${issue.validation})`;
         
         case 'too_small':
-          return `字段 ${path}: 值太小（最小值: ${issue.minimum}）`;
+          return `• 字段 "${path}"\n  值太小（最小值: ${issue.minimum}）`;
         
         case 'too_big':
-          return `字段 ${path}: 值太大（最大值: ${issue.maximum}）`;
+          return `• 字段 "${path}"\n  值太大（最大值: ${issue.maximum}）`;
         
         default:
-          return `字段 ${path}: ${issue.message}`;
+          return `• 字段 "${path}"\n  ${issue.message}`;
       }
     });
 
-    return `数据格式验证失败:\n${errorDetails.join('\n')}`;
+    return `数据格式验证失败：\n${errorDetails.join('\n\n')}`;
   }
 
   /**
@@ -164,7 +164,7 @@ export class DulidayErrorFormatter {
       ? `组织 "${organizationName}" (ID: ${organizationId})`
       : `组织 ID: ${organizationId}`;
     
-    return `${orgContext} 同步失败:\n${error}`;
+    return `${orgContext} 同步失败：\n${error}`;
   }
 }
 

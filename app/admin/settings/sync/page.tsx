@@ -21,6 +21,7 @@ import { useSyncStore, formatDuration, getSyncStatusText } from "@/lib/stores/sy
 import { BrandSelector } from "@/components/admin/sync/brand-selector";
 import { SyncProgress } from "@/components/admin/sync/sync-progress";
 import { SyncHistory } from "@/components/admin/sync/sync-history";
+import { SyncErrorDisplay, SyncErrorList } from "@/components/sync/sync-error-display";
 
 export default function SyncPage() {
   const router = useRouter();
@@ -198,11 +199,7 @@ export default function SyncPage() {
                       .map((result, index) => (
                         <div key={index} className="p-3 bg-red-50 border border-red-200 rounded-lg">
                           <div className="font-medium text-red-900">{result.brandName}</div>
-                          {result.errors.map((error, errorIndex) => (
-                            <div key={errorIndex} className="text-sm text-red-700 mt-1">
-                              • {error}
-                            </div>
-                          ))}
+                          <SyncErrorList errors={result.errors} />
                         </div>
                       ))}
                   </div>
@@ -221,7 +218,9 @@ export default function SyncPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-red-700 bg-red-50 p-3 rounded-lg">{error}</div>
+                <div className="text-red-700 bg-red-50 p-4 rounded-lg">
+                  <SyncErrorDisplay error={error} />
+                </div>
               </CardContent>
             </Card>
           )}
