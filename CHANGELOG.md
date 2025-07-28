@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.0.1](https://github.com/steveoon/agent-computer-user/compare/v1.0.0...v1.0.1) (2025-07-28)
+
+
+### Bug Fixes
+
+* use pinned GitHub Actions versions for security ([6d5a4b0](https://github.com/steveoon/agent-computer-user/commit/6d5a4b070fbd059ce16e0722c3f70bce642b991b))
+
 # 1.0.0 (2025-07-28)
 
 
