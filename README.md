@@ -44,7 +44,7 @@
 ### 💼 招聘业务定制
 
 - **Boss直聘集成**：完整的招聘流程自动化，包含反检测措施
-- **度利得HR系统**：职位管理、面试预约等功能集成
+- **DulidayHR系统**：职位管理、面试预约等功能集成
 - **职位信息生成**：智能生成格式化的招聘信息，支持多种岗位类型
 - **多品牌支持**：动态品牌检测和切换，支持多租户架构
 
@@ -126,7 +126,7 @@
    FEISHU_BOT_WEBHOOK=your_feishu_webhook      # 飞书机器人
    WECHAT_BOT_WEBHOOK=your_wechat_webhook      # 企微机器人
    WECHAT_BOT_ACCESS_TOKEN=your_wechat_token
-   DULIDAY_TOKEN=your_duliday_token            # 度利得HR系统
+   DULIDAY_TOKEN=your_duliday_token            # DulidayHR系统
 
    # MCP集成（可选）
    EXA_API_KEY=your_exa_search_key             # Exa搜索
@@ -420,4 +420,21 @@ chore: 构建或辅助工具变动
 
 ## 许可证
 
-本项目基于 MIT 许可证开源。详见 [LICENSE](./LICENSE) 文件。
+本项目采用双重许可模式：
+
+### 非商业用途
+本项目对个人学习、研究和非商业用途免费开放，遵循 Apache License 2.0。
+
+### 商业用途
+任何商业用途（包括但不限于）：
+- 将本软件集成到商业产品或服务中
+- 使用本软件为客户提供付费服务
+- 在商业环境中部署使用本软件
+
+**必须获得我们的商业授权许可**。
+
+如需商业授权，请联系：rensiwen@duliday.com
+
+未经授权的商业使用将被视为侵权行为。
+
+详见 [LICENSE](./LICENSE) 文件。

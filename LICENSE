@@ -1,0 +1,55 @@
+双重许可协议 / Dual License Agreement
+
+版权所有 (c) 2024 AI智能招聘与办公自动化平台
+
+本软件采用双重许可模式：
+
+## 1. 非商业许可（Apache License 2.0）
+
+对于个人学习、研究、教育或其他非商业用途，本软件遵循 Apache License 2.0 许可证。
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+## 2. 商业许可
+
+任何商业用途必须获得专门的商业授权许可。
+
+商业用途包括但不限于：
+- 将本软件或其衍生作品集成到商业产品或服务中
+- 使用本软件为第三方提供付费服务
+- 在任何以盈利为目的的环境中部署或使用本软件
+- 将本软件作为SaaS（软件即服务）产品的一部分
+- 使用本软件处理商业数据或商业流程
+
+### 商业授权申请
+
+如需获得商业授权，请通过以下方式联系我们：
+- 邮箱：rensiwen@duliday.com
+
+### 违反许可的后果
+
+未经授权的商业使用将被视为侵犯版权，我们保留采取法律行动的权利。
+
+## 3. 贡献者协议
+
+向本项目提交代码的所有贡献者同意：
+1. 其贡献的代码将遵循本双重许可协议
+2. 授予项目维护者在两种许可模式下使用其贡献的权利
+
+## 4. 免责声明
+
+本软件按"原样"提供，不提供任何明示或暗示的保证，包括但不限于适销性、特定用途的适用性和不侵权的保证。在任何情况下，作者或版权持有人均不对任何索赔、损害或其他责任负责。
+
+---
+
+注意：本许可证的最终解释权归项目维护者所有。如有任何疑问，请联系我们。
