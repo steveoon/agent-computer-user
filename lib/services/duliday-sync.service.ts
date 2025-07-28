@@ -1,5 +1,7 @@
 import { DulidayRaw, ZhipinData } from "@/types/zhipin";
 import { convertDulidayListToZhipinData } from "@/lib/mappers/duliday-to-zhipin.mapper";
+import { DulidayErrorFormatter, formatDulidayError, formatHttpError } from "@/lib/utils/duliday-error-formatter";
+import { getBrandNameByOrgId } from "@/lib/constants/organization-mapping";
 // 注意：服务器端不使用 configService，数据保存逻辑在客户端处理
 
 /**
@@ -83,9 +85,7 @@ export class DulidaySyncService {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(
-          `API request failed: ${response.status} ${response.statusText}`
-        );
+        throw new Error(formatHttpError(response.status, response.statusText));
       }
 
       const data = await response.json();
@@ -95,28 +95,24 @@ export class DulidaySyncService {
         return DulidayRaw.ListResponseSchema.parse(data);
       } catch (validationError) {
         console.error("API response validation failed:", validationError);
-        throw new Error("Invalid API response format");
+        throw new Error(formatDulidayError(validationError));
       }
     } catch (error) {
       clearTimeout(timeoutId);
       
       // 处理不同类型的错误
       if (error instanceof Error) {
-        // 连接被重置或中断的错误
-        if (error.message.includes('ECONNRESET') || 
-            error.message.includes('ETIMEDOUT') ||
-            error.message.includes('EPIPE') ||
-            error.name === 'AbortError') {
-          
-          // 最多重试3次
-          if (retryCount < 3) {
-            console.warn(`连接错误，正在重试 (${retryCount + 1}/3)...`, error.message);
-            // 延迟后重试，避免过快的重试
-            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-            return this.fetchJobList(organizationIds, pageSize, retryCount + 1);
-          }
-          
-          throw new Error(`网络连接错误（已重试${retryCount}次）: ${error.message}`);
+        // 检查是否是网络相关错误并需要重试
+        if (DulidayErrorFormatter.isNetworkError(error) && retryCount < 3) {
+          console.warn(`网络错误，正在重试 (${retryCount + 1}/3)...`, error.message);
+          // 延迟后重试，避免过快的重试
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+          return this.fetchJobList(organizationIds, pageSize, retryCount + 1);
+        }
+        
+        // 格式化网络错误信息
+        if (retryCount >= 3) {
+          throw new Error(`${formatDulidayError(error)}（已重试${retryCount}次）`);
         }
       }
       
@@ -171,9 +167,15 @@ export class DulidaySyncService {
         convertedData: zhipinData, // 返回转换后的数据，但不保存
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      errors.push(errorMessage);
+      const brandName = getBrandNameByOrgId(organizationId);
+      const errorMessage = formatDulidayError(error);
+      const contextualError = DulidayErrorFormatter.formatWithOrganizationContext(
+        organizationId,
+        errorMessage,
+        brandName
+      );
+      
+      errors.push(contextualError);
 
       const duration = Date.now() - startTime;
 
@@ -182,7 +184,7 @@ export class DulidaySyncService {
         totalRecords: 0,
         processedRecords: 0,
         storeCount: 0,
-        brandName: "同步失败",
+        brandName: brandName || `组织 ${organizationId}`,
         errors,
         duration,
       };
@@ -224,13 +226,21 @@ export class DulidaySyncService {
 
         results.push(result);
       } catch (error) {
+        const brandName = getBrandNameByOrgId(orgId);
+        const errorMessage = formatDulidayError(error);
+        const contextualError = DulidayErrorFormatter.formatWithOrganizationContext(
+          orgId,
+          errorMessage,
+          brandName
+        );
+        
         results.push({
           success: false,
           totalRecords: 0,
           processedRecords: 0,
           storeCount: 0,
-          brandName: `组织 ${orgId}`,
-          errors: [error instanceof Error ? error.message : String(error)],
+          brandName: brandName || `组织 ${orgId}`,
+          errors: [contextualError],
           duration: 0,
         });
       }
