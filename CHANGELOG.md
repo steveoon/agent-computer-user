@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.0.2-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.0.1...v1.0.2-develop.1) (2025-07-28)
+
+
+### Bug Fixes
+
+* 创建通用的 Duliday 错误格式化工具 ([41af4e3](https://github.com/steveoon/agent-computer-user/commit/41af4e32bde535bdf2cfddf6e8274892b8aa611d))
+
 ## [1.0.1](https://github.com/steveoon/agent-computer-user/compare/v1.0.0...v1.0.1) (2025-07-28)
 
 
