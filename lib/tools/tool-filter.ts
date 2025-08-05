@@ -42,6 +42,15 @@ const TOOL_GROUPS = {
     "zhipin_get_chat_details",
     "zhipin_exchange_wechat",
     "zhipin_get_username"
+  ],
+  
+  // Yupao Puppeteer自动化工具集
+  yupaoPuppeteer: [
+    "yupao_get_unread_messages",
+    "yupao_open_candidate_chat",
+    "yupao_get_chat_details",
+    "yupao_send_message",
+    "yupao_exchange_wechat"
   ]
 } as const;
 
@@ -59,7 +68,8 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     ...TOOL_GROUPS.universal,
     ...TOOL_GROUPS.puppeteer,
     ...TOOL_GROUPS.zhipinBusiness,
-    ...TOOL_GROUPS.zhipinPuppeteer
+    ...TOOL_GROUPS.zhipinPuppeteer,
+    ...TOOL_GROUPS.yupaoPuppeteer
   ],
   
   // 通用计算机使用 - 包含E2B和Puppeteer，但不包含Boss直聘业务工具
