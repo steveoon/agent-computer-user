@@ -50,7 +50,8 @@ const TOOL_GROUPS = {
     "yupao_open_candidate_chat",
     "yupao_get_chat_details",
     "yupao_send_message",
-    "yupao_exchange_wechat"
+    "yupao_exchange_wechat",
+    "yupao_get_username"
   ]
 } as const;
 

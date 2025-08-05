@@ -137,6 +137,22 @@ export const YUPAO_EXCHANGE_WECHAT_SELECTORS = {
   innerBox: '._inner-box_fdply_124',
 } as const;
 
+// User info selectors
+export const YUPAO_USER_SELECTORS = {
+  // Avatar box container
+  avatarBox: '._avatar-box_1o1k9_17',
+  
+  // Username
+  userName: '._name_1o1k9_11',
+  
+  // Avatar image
+  avatarImage: '._avatar_1o1k9_17 img',
+  
+  // Alternative selectors
+  userNameAlt: '[class*="_name_"][class*="_1o1k9_"]',
+  avatarBoxAlt: '[class*="_avatar-box_"]',
+} as const;
+
 // Timing constants
 export const YUPAO_TIMING = {
   // Wait timeouts (ms)

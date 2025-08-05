@@ -14,7 +14,8 @@ lib/tools/yupao/
 ├── open-candidate-chat.tool.ts  # 打开候选人聊天窗口
 ├── get-chat-details.tool.ts     # 获取聊天详情
 ├── send-message.tool.ts         # 发送消息
-└── exchange-wechat.tool.ts      # 交换微信
+├── exchange-wechat.tool.ts      # 交换微信
+└── get-username.tool.ts         # 获取用户名
 ```
 
 ## 🔧 工具概览
@@ -26,6 +27,7 @@ lib/tools/yupao/
 | **getChatDetails** | 获取聊天详情和候选人信息 | 提取岗位信息、完整聊天记录、自动识别发送者、返回格式与zhipin一致 |
 | **sendMessage** | 发送消息到聊天窗口 | 支持fb-editor输入、自动清空输入框、多行消息、发送验证 |
 | **exchangeWechat** | 交换微信号 | 两步操作：点击换微信按钮、确认对话框、反检测延迟 |
+| **getUsername** | 获取当前登录用户名 | 多选择器查找、返回格式与zhipin一致、包含验证逻辑 |
 
 ## 🛡️ 反检测机制
 
@@ -161,6 +163,18 @@ if (result.success) {
 }
 ```
 
+### 获取用户名
+
+```typescript
+// 获取当前登录的用户名
+const result = await yupaoTools.getUsername.execute({});
+
+// 结果格式与 zhipin 一致
+console.log(result);
+// 成功: { type: "text", text: "✅ 成功获取Yupao用户名：李先生\n🔍 使用选择器：._name_1o1k9_11" }
+// 失败: { type: "text", text: "❌ 获取用户名失败：未找到用户名元素\n💡 提示：请确保已登录Yupao账号" }
+```
+
 ### 结果示例
 
 ```javascript
@@ -251,6 +265,13 @@ export const YUPAO_EXCHANGE_WECHAT_SELECTORS = {
   exchangeButton: '._exchange-tel-btn_fdply_71._exchange-active_fdply_84',
   exchangeTipPop: '._exchangeTipPop_fdply_91._wechatPop_fdply_155',
   confirmButton: '._btn_1fwp4_11._primary_1fwp4_21',
+  // ... 更多选择器
+};
+
+export const YUPAO_USER_SELECTORS = {
+  userName: '._name_1o1k9_11',
+  avatarBox: '._avatar-box_1o1k9_17',
+  avatarImage: '._avatar_1o1k9_17 img',
   // ... 更多选择器
 };
 ```

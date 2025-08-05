@@ -168,6 +168,7 @@ export async function POST(req: Request) {
       yupao_get_chat_details: yupaoTools.getChatDetails,
       yupao_send_message: yupaoTools.sendMessage,
       yupao_exchange_wechat: yupaoTools.exchangeWechat,
+      yupao_get_username: yupaoTools.getUsername,
     };
 
     // 根据系统提示词过滤工具
