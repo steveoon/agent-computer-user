@@ -182,27 +182,18 @@ export const yupaoSendMessageTool = () =>
         const fillData = parseEvaluateResult(fillResult);
         
         if (!fillData?.filled) {
-          // 降级方案：使用 type 方法（如果可用）
-          if (tools.puppeteer_type && typeof tools.puppeteer_type === 'object' && 'execute' in tools.puppeteer_type) {
-            try {
-              await (tools.puppeteer_type as any).execute({ 
-                selector: YUPAO_INPUT_SELECTORS.fbEditor, 
-                text: message 
-              });
-            } catch (error) {
-              return {
-                success: false,
-                error: `Failed to fill message: ${error instanceof Error ? error.message : "Unknown error"}`,
-                message: "填充消息失败",
-              };
+          // 对于contenteditable元素，puppeteer_fill不适用
+          // 直接返回错误，需要检查页面状态
+          return {
+            success: false,
+            error: "Failed to fill message in contenteditable div. Please check if the page is loaded correctly.",
+            message: "填充消息失败，请检查页面是否正确加载",
+            details: {
+              selector: YUPAO_INPUT_SELECTORS.fbEditor,
+              attemptedMessage: message,
+              hint: "fb-editor is a contenteditable div, not a standard input field"
             }
-          } else {
-            return {
-              success: false,
-              error: "Failed to fill message and puppeteer_type not available",
-              message: "填充消息失败，且备用方法不可用",
-            };
-          }
+          };
         }
 
         // 随机等待确保文本已填充
