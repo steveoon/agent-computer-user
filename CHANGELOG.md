@@ -2,6 +2,20 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.1.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.0.2-develop.1...v1.1.0-develop.1) (2025-08-06)
+
+
+### Bug Fixes
+
+* 修复yupao send-message工具的降级方案问题 ([316093b](https://github.com/steveoon/agent-computer-user/commit/316093b885d15e6bdebc8299a94160b030dc52ca))
+* 修复智能回复生成的数组限制问题并优化系统提示词 ([b548ace](https://github.com/steveoon/agent-computer-user/commit/b548ace7f554e2fa44b2372c0f35b797667d30f8))
+
+
+### Features
+
+* 添加 Yupao (鱼泡网) 自动化工具集 ([3c01ee8](https://github.com/steveoon/agent-computer-user/commit/3c01ee83080f8fd09026ae0400743a2d55e3d737))
+* 添加 Yupao get-username 工具 ([ec8fb30](https://github.com/steveoon/agent-computer-user/commit/ec8fb30497b1014b4104864fae18b77624a5812a))
+
 ## [1.0.2-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.0.1...v1.0.2-develop.1) (2025-07-28)
 
 
