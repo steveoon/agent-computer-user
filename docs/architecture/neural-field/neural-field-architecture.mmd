@@ -1,0 +1,101 @@
+graph TB
+    %% 定义样式
+    classDef atomStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef moleculeStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef cellStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef tissueStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef fieldStyle fill:#fce4ec,stroke:#880e4f,stroke-width:3px
+    classDef dataFlow stroke:#2196f3,stroke-width:2px,stroke-dasharray: 5 5
+    classDef resonanceFlow stroke:#f44336,stroke-width:3px,stroke-dasharray: 3 3
+
+    %% 神经场层 - 最高层
+    subgraph NF["🧠 神经场层 Neural Field Layer"]
+        SF[SemanticField<br/>统一语义场]
+        FE[Field Evolution<br/>场演化机制]
+        SC[Stability Check<br/>稳定性检测]
+        
+        SF -.-> FE
+        FE -.-> SC
+        SC -.-> SF
+    end
+
+    %% 组织层
+    subgraph TL["🏗️ 组织层 Tissue Layer"]
+        FAO[FieldAgentOrchestrator<br/>场编排器]
+        RM[Resonance Mechanism<br/>共振机制]
+        PP[Parallel Processing<br/>并行处理]
+        
+        FAO --> RM
+        FAO --> PP
+        RM <--> PP
+    end
+
+    %% 细胞层 - Agent层
+    subgraph CL["🦠 细胞层 Cell Layer"]
+        IR[IntentRecognizer<br/>意图识别Agent<br/>0-384维]
+        RG[ReplyGenerator<br/>回复生成Agent<br/>384-1152维]
+        QV[QualityValidator<br/>质量验证Agent<br/>1152-1536维]
+        
+        IR -.共振.-> RG
+        RG -.共振.-> QV
+        QV -.反馈.-> IR
+    end
+
+    %% 分子层
+    subgraph ML["🧪 分子层 Molecule Layer"]
+        FO[FieldOperations<br/>场操作工具]
+        T2V[Text to Vector<br/>文本向量化]
+        VO[Vector Operations<br/>向量运算]
+        CS[Cosine Similarity<br/>余弦相似度]
+        
+        FO --> T2V
+        FO --> VO
+        VO --> CS
+    end
+
+    %% 原子层
+    subgraph AL["⚛️ 原子层 Atom Layer"]
+        TI[Text Input<br/>文本输入]
+        VA[Vector Arrays<br/>向量数组<br/>Float32Array]
+        EM[Embeddings<br/>嵌入向量<br/>1536维]
+        BM[Basic Math<br/>基础数学运算]
+        
+        TI --> VA
+        VA --> EM
+        EM --> BM
+    end
+
+    %% 层间连接
+    AL ==> ML
+    ML ==> CL
+    CL ==> TL
+    TL ==> NF
+
+    %% 数据流
+    User[用户输入] --> TI
+    SF --> Result[智能回复]
+
+    %% 具体的数据流路径
+    TI -.-> T2V
+    T2V -.-> IR
+    T2V -.-> RG
+    T2V -.-> QV
+    
+    IR --> FAO
+    RG --> FAO
+    QV --> FAO
+    
+    FAO --> SF
+    
+    %% 应用样式
+    class TI,VA,EM,BM atomStyle
+    class FO,T2V,VO,CS moleculeStyle
+    class IR,RG,QV cellStyle
+    class FAO,RM,PP tissueStyle
+    class SF,FE,SC fieldStyle
+
+    %% 添加关键参数标注
+    SF -.- Config{dimensions: 1536<br/>resonanceDecay: 0.1<br/>stabilityThreshold: 0.01<br/>maxIterations: 20}
+    
+    %% 添加性能指标
+    NF -.- Perf[性能目标<br/>响应时间: 50-80ms<br/>并行处理: 3 Agents<br/>共振迭代: 6-10次]
