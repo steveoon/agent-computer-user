@@ -1,0 +1,121 @@
+graph LR
+    %% 定义样式
+    classDef inputStyle fill:#bbdefb,stroke:#1976d2,stroke-width:2px
+    classDef agentStyle fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    classDef fieldStyle fill:#ffccbc,stroke:#d84315,stroke-width:2px
+    classDef processStyle fill:#d1c4e9,stroke:#512da8,stroke-width:2px
+    classDef outputStyle fill:#b2dfdb,stroke:#00796b,stroke-width:2px
+
+    %% 输入阶段
+    subgraph Input["Input Layer"]
+        U["User Message<br/>Salary inquiry"]
+        C["Context Info"]
+    end
+
+    %% 原子级处理
+    subgraph Atomic["Atomic Processing"]
+        E["Embedding<br/>Text Embedding<br/>1536 dimensions"]
+        V["Vector<br/>Vectorization"]
+    end
+
+    %% 分子级处理
+    subgraph Molecular["Molecular Processing"]
+        FO["FieldOperations<br/>Vector Ops"]
+        N["Normalize"]
+        S["Similarity<br/>Calculation"]
+    end
+
+    %% 细胞级 - Agent并行处理
+    subgraph Cellular["Cellular - Agent Parallel Processing"]
+        subgraph IR_Process["IntentRecognizer"]
+            IR1["Feature Extract"]
+            IR2["Intent Classify<br/>Salary Query"]
+            IR3["Activation<br/>0-384 dim"]
+        end
+        
+        subgraph RG_Process["ReplyGenerator"]
+            RG1["Sense Intent"]
+            RG2["Select Template"]
+            RG3["Generate<br/>384-1152 dim"]
+        end
+        
+        subgraph QV_Process["QualityValidator"]
+            QV1["Compliance Check"]
+            QV2["Salary Rules"]
+            QV3["Validation<br/>1152-1536 dim"]
+        end
+    end
+
+    %% 组织级 - 共振协作
+    subgraph Tissue["Tissue - Resonance Collaboration"]
+        R1["Round 1<br/>Agent Activation"]
+        R2["Round 2<br/>Signal Amplify"]
+        R3["Round 3<br/>Consensus"]
+    end
+
+    %% 神经场
+    subgraph Field["Neural Field"]
+        SF["SemanticField<br/>Field State"]
+        EV["Evolution"]
+        ST["Stability<br/>Detection"]
+    end
+
+    %% 输出
+    subgraph Output["Output Layer"]
+        FR["Final Reply<br/>Salary negotiable<br/>based on experience"]
+        M["Metadata<br/>Confidence: 0.92"]
+    end
+
+    %% 连接关系
+    U --> E
+    C --> E
+    E --> V
+    V --> FO
+    
+    FO --> N
+    FO --> S
+    
+    V --> IR1
+    V --> RG1
+    V --> QV1
+    
+    IR1 --> IR2 --> IR3
+    RG1 --> RG2 --> RG3
+    QV1 --> QV2 --> QV3
+    
+    IR3 --> R1
+    RG3 --> R1
+    QV3 --> R1
+    
+    R1 --> R2
+    R2 --> R3
+    
+    R1 --> SF
+    R2 --> SF
+    R3 --> SF
+    
+    SF --> EV
+    EV --> ST
+    ST -->|Stable| FR
+    ST -->|Unstable| EV
+    
+    FR --> M
+
+    %% 共振反馈
+    R1 -.-> RG1
+    R2 -.-> QV1
+    R3 -.-> IR1
+
+    %% 应用样式
+    class U,C inputStyle
+    class IR1,IR2,IR3,RG1,RG2,RG3,QV1,QV2,QV3 agentStyle
+    class SF,EV,ST fieldStyle
+    class R1,R2,R3 processStyle
+    class FR,M outputStyle
+
+    %% 时间标注
+    U -.- T1[0ms]
+    R1 -.- T2[5ms]
+    R2 -.- T3[10ms]
+    R3 -.- T4[15ms]
+    FR -.- T5[50-80ms]

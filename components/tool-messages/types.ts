@@ -94,4 +94,12 @@ export const themes = {
     textColor: "text-indigo-800 dark:text-indigo-200",
     loaderColor: "text-indigo-500",
   },
+  amber: {
+    bgColor: "bg-amber-50 dark:bg-amber-900/20",
+    borderColor: "border-amber-200 dark:border-amber-800",
+    iconBgColor: "bg-amber-100 dark:bg-amber-800",
+    iconColor: "text-amber-600 dark:text-amber-400",
+    textColor: "text-amber-800 dark:text-amber-200",
+    loaderColor: "text-amber-500",
+  },
 } as const;

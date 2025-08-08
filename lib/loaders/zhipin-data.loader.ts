@@ -359,10 +359,10 @@ export async function classifyUserMessage(
                 confidence: z.number().min(0).max(1).describe("地点识别置信度 0-1"),
               })
             )
-            .max(3)
+            .max(10)
             .nullable()
             .optional()
-            .describe("提到的具体位置（按置信度排序，最多3个）"),
+            .describe("提到的具体位置（按置信度排序，最多10个）"),
           mentionedDistricts: z
             .array(
               z.object({
@@ -370,11 +370,11 @@ export async function classifyUserMessage(
                 confidence: z.number().min(0).max(1).describe("区域识别置信度 0-1"),
               })
             )
-            .max(3)
+            .max(10)
             .nullable()
             .optional()
             .describe(
-              "提到的区域 (按置信度排序,最多3个), 如果没有提到区域, 依据Location给出多个距离最近的区域"
+              "提到的区域 (按置信度排序,最多10个), 如果没有提到区域, 依据Location给出多个距离最近的区域"
             ),
           specificAge: z.number().nullable().optional().describe("提到的具体年龄"),
           hasUrgency: z.boolean().nullable().optional().describe("是否表达紧急需求"),

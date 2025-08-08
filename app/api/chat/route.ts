@@ -7,9 +7,12 @@ import { weChatBotTool } from "@/lib/tools/wechat-bot-tool";
 import { jobPostingGeneratorTool } from "@/lib/tools/job-posting-generator-tool";
 import { zhipinReplyTool } from "@/lib/tools/zhipin-reply-tool";
 import { zhipinTools } from "@/lib/tools/zhipin";
+import { yupaoTools } from "@/lib/tools/yupao";
 import { dulidayJobListTool } from "@/lib/tools/duliday/duliday-job-list-tool";
 import { dulidayJobDetailsTool } from "@/lib/tools/duliday/duliday-job-details-tool";
 import { dulidayInterviewBookingTool } from "@/lib/tools/duliday/duliday-interview-booking-tool";
+import { dulidayBiReportTool } from "@/lib/tools/duliday/bi-report-tool";
+import { dulidayBiRefreshTool } from "@/lib/tools/duliday/bi-refresh-tool";
 import { filterToolsBySystemPrompt } from "@/lib/tools/tool-filter";
 import { prunedMessages, shouldCleanupSandbox } from "@/lib/utils";
 import { getDynamicRegistry } from "@/lib/model-registry/dynamic-registry";
@@ -161,6 +164,15 @@ export async function POST(req: Request) {
       duliday_job_list: dulidayJobListTool(dulidayToken, preferredBrand),
       duliday_job_details: dulidayJobDetailsTool(dulidayToken),
       duliday_interview_booking: dulidayInterviewBookingTool(dulidayToken),
+      duliday_bi_report: dulidayBiReportTool(),
+      duliday_bi_refresh: dulidayBiRefreshTool(),
+      // Yupao automation tools
+      yupao_get_unread_messages: yupaoTools.getUnreadMessages,
+      yupao_open_candidate_chat: yupaoTools.openCandidateChat,
+      yupao_get_chat_details: yupaoTools.getChatDetails,
+      yupao_send_message: yupaoTools.sendMessage,
+      yupao_exchange_wechat: yupaoTools.exchangeWechat,
+      yupao_get_username: yupaoTools.getUsername,
     };
 
     // 根据系统提示词过滤工具
