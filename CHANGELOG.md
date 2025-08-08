@@ -2,6 +2,23 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.1.0](https://github.com/steveoon/agent-computer-user/compare/v1.0.1...v1.1.0) (2025-08-08)
+
+
+### Bug Fixes
+
+* 修复 semantic-release 无法推送到受保护分支的问题 ([a60d2de](https://github.com/steveoon/agent-computer-user/commit/a60d2de09f1bf66cb97c82663140c4f0d313f600))
+* 修复yupao send-message工具的降级方案问题 ([316093b](https://github.com/steveoon/agent-computer-user/commit/316093b885d15e6bdebc8299a94160b030dc52ca))
+* 修复智能回复生成的数组限制问题并优化系统提示词 ([b548ace](https://github.com/steveoon/agent-computer-user/commit/b548ace7f554e2fa44b2372c0f35b797667d30f8))
+* 创建通用的 Duliday 错误格式化工具 ([41af4e3](https://github.com/steveoon/agent-computer-user/commit/41af4e32bde535bdf2cfddf6e8274892b8aa611d))
+
+
+### Features
+
+* 添加 Duliday BI 报表数据获取和刷新工具 ([521f4e9](https://github.com/steveoon/agent-computer-user/commit/521f4e9cd9e681b1042dacccfe5c3d66adb64105))
+* 添加 Yupao (鱼泡网) 自动化工具集 ([3c01ee8](https://github.com/steveoon/agent-computer-user/commit/3c01ee83080f8fd09026ae0400743a2d55e3d737))
+* 添加 Yupao get-username 工具 ([ec8fb30](https://github.com/steveoon/agent-computer-user/commit/ec8fb30497b1014b4104864fae18b77624a5812a))
+
 # [1.1.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.1.0-develop.2...v1.1.0-develop.3) (2025-08-08)
 
 
