@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.1.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.1.0-develop.2...v1.1.0-develop.3) (2025-08-08)
+
+
+### Bug Fixes
+
+* 修复 semantic-release 无法推送到受保护分支的问题 ([a60d2de](https://github.com/steveoon/agent-computer-user/commit/a60d2de09f1bf66cb97c82663140c4f0d313f600))
+
 # [1.1.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.1.0-develop.1...v1.1.0-develop.2) (2025-08-08)
 
 
