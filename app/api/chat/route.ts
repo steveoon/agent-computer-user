@@ -11,6 +11,8 @@ import { yupaoTools } from "@/lib/tools/yupao";
 import { dulidayJobListTool } from "@/lib/tools/duliday/duliday-job-list-tool";
 import { dulidayJobDetailsTool } from "@/lib/tools/duliday/duliday-job-details-tool";
 import { dulidayInterviewBookingTool } from "@/lib/tools/duliday/duliday-interview-booking-tool";
+import { dulidayBiReportTool } from "@/lib/tools/duliday/bi-report-tool";
+import { dulidayBiRefreshTool } from "@/lib/tools/duliday/bi-refresh-tool";
 import { filterToolsBySystemPrompt } from "@/lib/tools/tool-filter";
 import { prunedMessages, shouldCleanupSandbox } from "@/lib/utils";
 import { getDynamicRegistry } from "@/lib/model-registry/dynamic-registry";
@@ -162,6 +164,8 @@ export async function POST(req: Request) {
       duliday_job_list: dulidayJobListTool(dulidayToken, preferredBrand),
       duliday_job_details: dulidayJobDetailsTool(dulidayToken),
       duliday_interview_booking: dulidayInterviewBookingTool(dulidayToken),
+      duliday_bi_report: dulidayBiReportTool(),
+      duliday_bi_refresh: dulidayBiRefreshTool(),
       // Yupao automation tools
       yupao_get_unread_messages: yupaoTools.getUnreadMessages,
       yupao_open_candidate_chat: yupaoTools.openCandidateChat,

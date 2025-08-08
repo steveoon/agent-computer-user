@@ -11,7 +11,9 @@ import {
   UserCheck,
   Building2,
   FileText,
-  Calendar
+  Calendar,
+  ChartBarIcon,
+  RefreshCwIcon
 } from "lucide-react";
 import { ComputerToolMessage } from "./computer-tool";
 import { BashToolMessage } from "./bash-tool";
@@ -28,6 +30,8 @@ import { ZhipinGetUsernameTool } from "./zhipin-get-username-tool";
 import { DulidayJobListToolMessage } from "./duliday-job-list-tool";
 import { DulidayJobDetailsToolMessage } from "./duliday-job-details-tool";
 import { DulidayInterviewBookingToolMessage } from "./duliday-interview-booking-tool";
+import { DulidayBiReportToolMessage } from "./duliday-bi-report-tool";
+import { DulidayBiRefreshTool } from "./duliday-bi-refresh-tool";
 import { themes, type ToolConfig } from "./types";
 
 // 工具注册表
@@ -113,6 +117,16 @@ export const toolRegistry: Record<string, ToolConfig> = {
     icon: Calendar,
     defaultTheme: themes.green,
     render: DulidayInterviewBookingToolMessage,
+  },
+  duliday_bi_report: {
+    icon: ChartBarIcon,
+    defaultTheme: themes.indigo,
+    render: DulidayBiReportToolMessage,
+  },
+  duliday_bi_refresh: {
+    icon: RefreshCwIcon,
+    defaultTheme: themes.amber,
+    render: DulidayBiRefreshTool,
   },
 };
 

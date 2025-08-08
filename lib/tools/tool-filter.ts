@@ -28,7 +28,9 @@ const TOOL_GROUPS = {
     "zhipin_reply_generator",
     "duliday_job_list",
     "duliday_job_details",
-    "duliday_interview_booking"
+    "duliday_interview_booking",
+    "duliday_bi_report",
+    "duliday_bi_refresh"
   ],
   
   // Puppeteer本地自动化工具
