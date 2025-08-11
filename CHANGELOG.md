@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.1.0-develop.4](https://github.com/steveoon/agent-computer-user/compare/v1.1.0-develop.3...v1.1.0-develop.4) (2025-08-11)
+
+
+### Features
+
+* 添加 Duliday BI 报表查询建议模板并修复编辑器字段消失问题 ([40a281b](https://github.com/steveoon/agent-computer-user/commit/40a281b59b09f1e1b246b4adea30fe1fc5ed8739))
+
 # [1.1.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.1.0-develop.2...v1.1.0-develop.3) (2025-08-08)
 
 
