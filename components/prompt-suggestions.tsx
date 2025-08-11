@@ -14,6 +14,39 @@ export interface PromptSuggestion {
 
 const suggestions: PromptSuggestion[] = [
   {
+    text: "查询Duliday BI报表数据",
+    prompt:
+      "获取 Duliday BI 报表数据，查一下订单归属日期从2025-08-08到2025-08-15，上海必胜客的订单，归属大区是浦东新区，数据范围100条",
+    editable: true,
+    editableFields: [
+      {
+        key: "开始日期",
+        pattern: /2025-08-08/g,
+        defaultValue: "2025-08-08",
+      },
+      {
+        key: "结束日期",
+        pattern: /2025-08-15/g,
+        defaultValue: "2025-08-15",
+      },
+      {
+        key: "品牌门店",
+        pattern: /上海必胜客/g,
+        defaultValue: "上海必胜客",
+      },
+      {
+        key: "归属大区",
+        pattern: /浦东新区/g,
+        defaultValue: "浦东新区",
+      },
+      {
+        key: "数据范围",
+        pattern: /100/g,
+        defaultValue: "100",
+      },
+    ],
+  },
+  {
     text: "发送前厅岗位空缺通知",
     prompt: "生成前厅岗位空缺的通知消息，并用Wechat发送",
     editable: true,
@@ -24,12 +57,6 @@ const suggestions: PromptSuggestion[] = [
         defaultValue: "前厅",
       },
     ],
-  },
-  {
-    text: "测试中文逐字符编码输入",
-    prompt:
-      "测试中文逐字符Unicode编码输入功能：输入一段中文文本 '您好，这是Unicode编码测试。我正在寻找工作机会，希望能够了解贵公司的职位详情。谢谢！' 来验证逐字符Unicode编码输入是否正常工作，系统会使用Ctrl+Shift+U快捷键逐个输入Unicode字符。",
-    editable: false,
   },
   {
     text: "预约面试",
