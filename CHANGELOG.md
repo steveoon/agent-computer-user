@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.2.1](https://github.com/steveoon/agent-computer-user/compare/v1.2.0...v1.2.1) (2025-08-12)
+
+
+### Bug Fixes
+
+* 改进类型安全性和 hydration 处理 ([cbaa456](https://github.com/steveoon/agent-computer-user/commit/cbaa456a17a662cb13f992940c10d4ba9996bc09))
+
 ## [1.2.1-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.2.0...v1.2.1-develop.1) (2025-08-12)
 
 
