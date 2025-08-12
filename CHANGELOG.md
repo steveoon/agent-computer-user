@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.2.2-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.2.1...v1.2.2-develop.1) (2025-08-12)
+
+
+### Bug Fixes
+
+* handle null return from execSync when using stdio inherit ([b671f94](https://github.com/steveoon/agent-computer-user/commit/b671f9457e55ef05d77c79f39f6782f605ed4170))
+
 ## [1.2.1](https://github.com/steveoon/agent-computer-user/compare/v1.2.0...v1.2.1) (2025-08-12)
 
 
