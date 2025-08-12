@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useLayoutEffect } from "react";
 import { toast } from "sonner";
 import { ABORTED } from "@/lib/utils";
 import { useSmartClean } from "./useSmartClean";
@@ -16,6 +16,11 @@ import {
   detectEnvironment,
 } from "@/lib/utils/environment";
 import type { ChatRequestOptions } from "@/types";
+import type { ToolPart } from "@/types/tool-common";
+
+// 同构 useLayoutEffect，避免 SSR 问题
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 interface UseCustomChatProps {
   sandboxId: string | null;
@@ -52,7 +57,7 @@ export function useCustomChat({
   // 🛡️ 防止短时间内重复处理载荷错误的时间戳
   const [lastPayloadErrorTime, setLastPayloadErrorTime] = useState<number>(0);
 
-  // 🌍 环境信息状态 - 避免 hydration 不匹配
+  // 🌍 环境信息状态 - 使用 isomorphic effect 避免 hydration 不匹配
   const [envInfo, setEnvInfo] = useState(() => {
     // 初始值使用安全的默认值
     return {
@@ -62,8 +67,8 @@ export function useCustomChat({
     };
   });
 
-  // 🌍 在客户端 hydration 后更新正确的环境信息
-  useEffect(() => {
+  // 🌍 使用 useIsomorphicLayoutEffect 在客户端同步更新环境信息
+  useIsomorphicLayoutEffect(() => {
     const actualEnv = detectEnvironment();
     const actualLimits = getEnvironmentLimits();
     const actualDescription = {
@@ -307,7 +312,7 @@ export function useCustomChat({
               ...lastMessageLastPart,
               state: 'output-available' as const,
               output: ABORTED,
-            } as any, // Tool part 类型复杂，使用 any 暂时绕过
+            } as ToolPart,
           ],
         },
       ]);

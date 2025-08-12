@@ -50,6 +50,8 @@ module.exports = {
         assets: ['package.json', 'pnpm-lock.yaml', 'CHANGELOG.md'],
         message: 'chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}'
       }
-    ]
+    ],
+    // 自定义插件：自动同步 main 到 develop
+    './scripts/semantic-release-sync-branches.js'
   ]
 };

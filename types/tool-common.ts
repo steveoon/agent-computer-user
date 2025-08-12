@@ -38,20 +38,27 @@ export type ToolCategory =
 /**
  * 工具定义
  * 描述工具的元信息和创建函数
+ * Note: AI SDK 使用类型推断而非显式泛型，Tool 类型由 tool() 函数推断
  */
 export interface ToolDefinition {
   name: string;
   description: string;
   category: ToolCategory;
   requiresSandbox: boolean;
-  create: (context: ToolCreationContext) => Tool<any, any> | null;
+  // AI SDK 的 Tool 类型是通过 tool() 函数推断的，我们不约束具体类型
+  create: (context: ToolCreationContext) => Tool | null;
+  // 可选的上下文验证器
+  validateContext?: (context: ToolCreationContext) => boolean;
+  // 可选的必需字段
+  requiredContext?: (keyof ToolCreationContext)[];
 }
 
 /**
  * AI SDK ToolSet 类型
  * 工具名称到工具实例的映射
+ * Note: 遵循 AI SDK 的类型模式
  */
-export type ToolSet = Record<string, Tool<any, any>>;
+export type ToolSet = Record<string, Tool>;
 
 /**
  * 系统提示词类型
@@ -291,6 +298,66 @@ export function normalizeToolOutput(output: unknown): ToolOutput {
     type: "text",
     text: typeof output === "string" ? output : JSON.stringify(output, null, 2),
   };
+}
+
+// ========== 工具上下文验证 ==========
+
+/**
+ * 验证工具上下文是否包含必需的字段
+ */
+export function validateToolContext(
+  context: ToolCreationContext,
+  requiredFields: (keyof ToolCreationContext)[]
+): boolean {
+  for (const field of requiredFields) {
+    if (context[field] === undefined || context[field] === null) {
+      console.warn(`⚠️ 工具上下文缺少必需字段: ${field}`);
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * 创建带验证的工具定义
+ */
+export function createToolDefinition(
+  definition: ToolDefinition
+): ToolDefinition {
+  // 如果定义了必需字段，自动添加验证器
+  if (definition.requiredContext && !definition.validateContext) {
+    definition.validateContext = (context) => 
+      validateToolContext(context, definition.requiredContext!);
+  }
+  return definition;
+}
+
+/**
+ * 类型安全的工具创建包装器
+ */
+export function safeCreateTool(
+  definition: ToolDefinition,
+  context: ToolCreationContext
+): Tool | null {
+  // 验证上下文
+  if (definition.validateContext && !definition.validateContext(context)) {
+    console.error(`❌ 工具 ${definition.name} 上下文验证失败`);
+    return null;
+  }
+  
+  // 检查沙盒需求
+  if (definition.requiresSandbox && !context.sandboxId) {
+    console.log(`⏭️ 跳过工具 ${definition.name}: 需要sandboxId`);
+    return null;
+  }
+  
+  // 创建工具
+  try {
+    return definition.create(context);
+  } catch (error) {
+    console.error(`❌ 创建工具 ${definition.name} 失败:`, error);
+    return null;
+  }
 }
 
 // ========== 导出常用的创建函数 ==========
