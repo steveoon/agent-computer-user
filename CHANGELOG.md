@@ -2,6 +2,14 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.1.0-develop.5](https://github.com/steveoon/agent-computer-user/compare/v1.1.0-develop.4...v1.1.0-develop.5) (2025-08-12)
+
+
+### Features
+
+* 优化 Yupao 工具的 CSS 选择器适配能力 ([13b4d43](https://github.com/steveoon/agent-computer-user/commit/13b4d43376ba6f683147def927659762aff3ddef))
+* 升级 AI SDK 到 v5 和 Zod 到 v4 ([bee9212](https://github.com/steveoon/agent-computer-user/commit/bee9212739e7161f4ace4a8f80b44333522c8892))
+
 # [1.1.0-develop.4](https://github.com/steveoon/agent-computer-user/compare/v1.1.0-develop.3...v1.1.0-develop.4) (2025-08-11)
 
 

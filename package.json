@@ -1,6 +1,6 @@
 {
   "name": "ai-sdk-computer-use",
-  "version": "1.1.0-develop.4",
+  "version": "1.1.0-develop.5",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
