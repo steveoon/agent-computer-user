@@ -82,7 +82,14 @@ describe('Chat API Route', () => {
   })
 
   it.skip('should handle tool invocations', async () => {
-    // TODO: Fix tool mock for AI SDK v5 - the mock format needs updating for v5's tool call stream chunks
+    // 跳过原因：AI SDK v5 的 streamText 会验证工具是否存在
+    // 即使模拟返回了正确格式的工具调用 chunks，但因为没有实际提供工具定义，
+    // 会抛出 NoSuchToolError: "Model tried to call unavailable tool 'wechat'"
+    // 
+    // 解决方案：
+    // 1. 在测试中实际提供工具定义（需要重构测试架构）
+    // 2. 或者测试其他不需要工具调用的功能
+    // 3. 或者直接测试工具执行逻辑而不是端到端的流式响应
     const mockModel = createMockToolCallStream(
       'wechat',
       { 
@@ -135,11 +142,14 @@ describe('Chat API Route', () => {
     }
     
     const responseText = chunks.join('')
-    // AI SDK 流式响应格式检查
+    // AI SDK v5 流式响应格式检查
     expect(responseText).toBeTruthy()
-    // 验证响应中包含工具调用相关内容
-    expect(responseText).toMatch(/tool.*(call|wechat)/i)
-    expect(responseText).toContain('已发送消息到微信群')
+    // 验证响应中包含工具调用相关的流事件
+    // 应该包含 tool-input-start, tool-call, tool-result 等事件
+    expect(responseText).toContain('tool-input-start')
+    expect(responseText).toContain('tool-call')
+    expect(responseText).toContain('wechat')
+    expect(responseText).toContain('测试消息')
   })
 
   it('should handle error gracefully', async () => {

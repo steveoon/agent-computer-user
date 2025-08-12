@@ -90,14 +90,17 @@ export function createMockToolCallStream(
   resultText: string = "Tool executed successfully",
   delay: number = 100
 ): MockLanguageModelV2 {
-  // For now, simplify to just return text mentioning the tool was called
-  // This avoids the complexity of mocking the exact tool call format v5 expects
+  const toolCallId = mockId({ prefix: "call" })();
+  const toolInputId = mockId({ prefix: "tool" })();
+  
   return new MockLanguageModelV2({
     doGenerate: async _options => ({
       content: [
         {
-          type: "text" as const,
-          text: `[Simulated tool call: ${toolName}(${JSON.stringify(args)})] Result: ${resultText}`,
+          type: "tool-call" as const,
+          toolCallId,
+          toolName,
+          input: JSON.stringify(args),
         }
       ],
       finishReason: "stop" as const,
@@ -110,10 +113,36 @@ export function createMockToolCallStream(
     }),
     doStream: async _options => {
       const streamChunks: any[] = [
-        // Text response mentioning tool call
+        // Tool input start - matches LanguageModelV2StreamPart definition
         {
-          type: "text-delta",
-          textDelta: `[Simulated tool call: ${toolName}(${JSON.stringify(args)})] Result: ${resultText}`,
+          type: "tool-input-start",
+          id: toolInputId,
+          toolName,
+        },
+        // Tool input delta - stream the arguments
+        {
+          type: "tool-input-delta",
+          id: toolInputId,
+          delta: JSON.stringify(args),
+        },
+        // Tool input end
+        {
+          type: "tool-input-end",
+          id: toolInputId,
+        },
+        // Tool call - matches LanguageModelV2ToolCall
+        {
+          type: "tool-call",
+          toolCallId,
+          toolName,
+          input: JSON.stringify(args),
+        },
+        // Tool result - matches LanguageModelV2ToolResult
+        {
+          type: "tool-result",
+          toolCallId,
+          toolName,
+          result: { message: resultText },
         },
         // Finish event
         {
