@@ -2,10 +2,10 @@
 
 import { PreviewMessage } from "@/components/message";
 import { ProjectInfo } from "@/components/project-info";
-import type { Message } from "@ai-sdk/react";
+import type { UIMessage } from "@ai-sdk/react";
 
 interface ChatMessagesProps {
-  messages: Message[];
+  messages: UIMessage[];
   isLoading: boolean;
   status: "ready" | "error" | "submitted" | "streaming";
   containerRef: React.RefObject<HTMLDivElement | null>;

@@ -5,16 +5,19 @@ import { getDesktop, withTimeout } from "./utils";
 import { mapKeySequence } from "../utils";
 import { diagnoseE2BEnvironment } from "./diagnostic";
 import { compressImageServerV2 } from "../image-optimized";
-import {
-  loadZhipinData,
-  generateSmartReplyWithLLM,
-} from "../loaders/zhipin-data.loader";
+import { loadZhipinData, generateSmartReplyWithLLM } from "../loaders/zhipin-data.loader";
 import type { Store } from "../../types/zhipin";
 import type { ModelConfig } from "../config/models";
 import type { ZhipinData, ReplyPromptsConfig } from "@/types";
 
+// 定义工具执行的返回类型
+type E2BToolResult = 
+  | { type: "image"; data: string }
+  | { type: "text"; text: string }
+  | string;
+
 const wait = async (seconds: number) => {
-  await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+  await new Promise(resolve => setTimeout(resolve, seconds * 1000));
 };
 
 // 改进的鼠标移动函数，确保指针可见性
@@ -50,9 +53,7 @@ const handleChineseInput = async (
   text: string
 ): Promise<string> => {
   // 检测是否包含中文字符
-  const containsChinese = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/.test(
-    text
-  );
+  const containsChinese = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/.test(text);
 
   if (containsChinese) {
     console.log("🔤 检测到中文字符，选择最优输入策略...");
@@ -181,11 +182,7 @@ const handleChineseInput = async (
       return `Typed: ${text}`;
     } catch (error) {
       console.warn("⚠️ 常规输入失败:", error);
-      throw new Error(
-        `Input failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
+      throw new Error(`Input failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 };
@@ -222,9 +219,7 @@ export const computerTool35 = (sandboxId: string) =>
           const image = await desktop.screenshot();
           const base64Data = Buffer.from(image).toString("base64");
 
-          console.log(
-            `🖼️ 截图原始大小: ${(base64Data.length / 1024).toFixed(2)}KB`
-          );
+          console.log(`🖼️ 截图原始大小: ${(base64Data.length / 1024).toFixed(2)}KB`);
 
           const compressedData = await compressImageServerV2(base64Data, {
             targetSizeKB: 350,
@@ -234,9 +229,7 @@ export const computerTool35 = (sandboxId: string) =>
           });
 
           console.log(
-            `✅ 服务端压缩完成，当前大小: ${(
-              compressedData.length / 1024
-            ).toFixed(2)}KB`
+            `✅ 服务端压缩完成，当前大小: ${(compressedData.length / 1024).toFixed(2)}KB`
           );
 
           return {
@@ -286,8 +279,7 @@ export const computerTool35 = (sandboxId: string) =>
           };
         }
         case "mouse_move": {
-          if (!coordinate)
-            throw new Error("Coordinate required for mouse move action");
+          if (!coordinate) throw new Error("Coordinate required for mouse move action");
           const [x, y] = coordinate;
           await desktop.moveMouse(x, y);
           return { type: "text" as const, text: `Moved mouse to ${x}, ${y}` };
@@ -316,8 +308,7 @@ export const computerTool35 = (sandboxId: string) =>
           };
         }
         case "left_click_drag": {
-          if (!coordinate)
-            throw new Error("Coordinate required for drag action");
+          if (!coordinate) throw new Error("Coordinate required for drag action");
           const [x, y] = coordinate;
           await desktop.moveMouse(x, y);
           return {
@@ -329,21 +320,31 @@ export const computerTool35 = (sandboxId: string) =>
           throw new Error(`Unsupported action: ${action}`);
       }
     },
-    experimental_toToolResultContent(result) {
+    toModelOutput(result: E2BToolResult) {
+      // AI SDK v5 格式：返回带有 type: 'content' 的对象
       if (typeof result === "string") {
-        return [{ type: "text", text: result }];
+        return {
+          type: "content" as const,
+          value: [{ type: "text" as const, text: result }],
+        };
       }
       if (result.type === "image" && result.data) {
-        return [
-          {
-            type: "image",
-            data: result.data,
-            mimeType: "image/jpeg",
-          },
-        ];
+        return {
+          type: "content" as const,
+          value: [
+            {
+              type: "media" as const,
+              data: result.data,
+              mediaType: "image/jpeg",
+            },
+          ],
+        };
       }
       if (result.type === "text" && result.text) {
-        return [{ type: "text", text: result.text }];
+        return {
+          type: "content" as const,
+          value: [{ type: "text" as const, text: result.text }],
+        };
       }
       throw new Error("Invalid result format");
     },
@@ -372,9 +373,7 @@ export const anthropicComputerTool = (sandboxId: string) =>
           const base64Data = Buffer.from(image).toString("base64");
 
           // 直接使用服务端压缩函数以减少 token 使用
-          console.log(
-            `🖼️ 截图原始大小: ${(base64Data.length / 1024).toFixed(2)}KB`
-          );
+          console.log(`🖼️ 截图原始大小: ${(base64Data.length / 1024).toFixed(2)}KB`);
           const compressedData = await compressImageServerV2(base64Data, {
             targetSizeKB: 350,
             maxSizeKB: 400,
@@ -382,9 +381,7 @@ export const anthropicComputerTool = (sandboxId: string) =>
             preserveText: true,
           });
           console.log(
-            `✅ 服务端压缩完成，当前大小: ${(
-              compressedData.length / 1024
-            ).toFixed(2)}KB`
+            `✅ 服务端压缩完成，当前大小: ${(compressedData.length / 1024).toFixed(2)}KB`
           );
 
           return {
@@ -402,16 +399,14 @@ export const anthropicComputerTool = (sandboxId: string) =>
           };
         }
         case "left_click": {
-          if (!coordinate)
-            throw new Error("Coordinate required for left click action");
+          if (!coordinate) throw new Error("Coordinate required for left click action");
           const [x, y] = coordinate;
           await desktop.moveMouse(x, y);
           await desktop.leftClick();
           return { type: "text" as const, text: `Left clicked at ${x}, ${y}` };
         }
         case "double_click": {
-          if (!coordinate)
-            throw new Error("Coordinate required for double click action");
+          if (!coordinate) throw new Error("Coordinate required for double click action");
           const [x, y] = coordinate;
           await desktop.moveMouse(x, y);
           await desktop.doubleClick();
@@ -421,16 +416,14 @@ export const anthropicComputerTool = (sandboxId: string) =>
           };
         }
         case "right_click": {
-          if (!coordinate)
-            throw new Error("Coordinate required for right click action");
+          if (!coordinate) throw new Error("Coordinate required for right click action");
           const [x, y] = coordinate;
           await desktop.moveMouse(x, y);
           await desktop.rightClick();
           return { type: "text" as const, text: `Right clicked at ${x}, ${y}` };
         }
         case "mouse_move": {
-          if (!coordinate)
-            throw new Error("Coordinate required for mouse move action");
+          if (!coordinate) throw new Error("Coordinate required for mouse move action");
           const [x, y] = coordinate;
           await desktop.moveMouse(x, y);
           return { type: "text" as const, text: `Moved mouse to ${x}, ${y}` };
@@ -445,15 +438,10 @@ export const anthropicComputerTool = (sandboxId: string) =>
           return { type: "text" as const, text: `Pressed key: ${text}` };
         }
         case "scroll": {
-          if (!scroll_direction)
-            throw new Error("Scroll direction required for scroll action");
-          if (!scroll_amount)
-            throw new Error("Scroll amount required for scroll action");
+          if (!scroll_direction) throw new Error("Scroll direction required for scroll action");
+          if (!scroll_amount) throw new Error("Scroll amount required for scroll action");
 
-          await desktop.scroll(
-            scroll_direction as "up" | "down",
-            scroll_amount
-          );
+          await desktop.scroll(scroll_direction as "up" | "down", scroll_amount);
           return { type: "text" as const, text: `Scrolled ${text}` };
         }
         case "left_click_drag": {
@@ -472,21 +460,31 @@ export const anthropicComputerTool = (sandboxId: string) =>
           throw new Error(`Unsupported action: ${action}`);
       }
     },
-    experimental_toToolResultContent(result) {
+    toModelOutput(result: E2BToolResult) {
+      // AI SDK v5 格式：返回带有 type: 'content' 的对象
       if (typeof result === "string") {
-        return [{ type: "text", text: result }];
+        return {
+          type: "content" as const,
+          value: [{ type: "text" as const, text: result }],
+        };
       }
       if (result.type === "image" && result.data) {
-        return [
-          {
-            type: "image",
-            data: result.data,
-            mimeType: "image/jpeg",
-          },
-        ];
+        return {
+          type: "content" as const,
+          value: [
+            {
+              type: "media" as const,
+              data: result.data,
+              mediaType: "image/jpeg",
+            },
+          ],
+        };
       }
       if (result.type === "text" && result.text) {
-        return [{ type: "text", text: result.text }];
+        return {
+          type: "content" as const,
+          value: [{ type: "text" as const, text: result.text }],
+        };
       }
       throw new Error("Invalid result format");
     },
@@ -500,9 +498,7 @@ export const bashTool35 = (sandboxId?: string) =>
 
       try {
         const result = await desktop.commands.run(command);
-        return (
-          result.stdout || "(Command executed successfully with no output)"
-        );
+        return result.stdout || "(Command executed successfully with no output)";
       } catch (error) {
         console.error("Bash command failed:", error);
         if (error instanceof Error) {
@@ -522,9 +518,7 @@ export const anthropicBashTool = (sandboxId?: string) =>
 
       try {
         const result = await desktop.commands.run(command);
-        return (
-          result.stdout || "(Command executed successfully with no output)"
-        );
+        return result.stdout || "(Command executed successfully with no output)";
       } catch (error) {
         console.error("Bash command failed:", error);
         if (error instanceof Error) {
@@ -547,7 +541,7 @@ export const computerTool = (
   tool({
     description:
       "Use a computer to interact with applications and websites. Takes screenshots, clicks, types, and performs other computer actions.",
-    parameters: z.object({
+    inputSchema: z.object({
       action: z
         .enum([
           "screenshot",
@@ -584,10 +578,7 @@ export const computerTool = (
         .optional()
         .describe("The [x, y] start coordinates for drag actions"),
       text: z.string().optional().describe("Text to type or key to press"),
-      duration: z
-        .number()
-        .optional()
-        .describe("Duration in seconds for wait/hold actions"),
+      duration: z.number().optional().describe("Duration in seconds for wait/hold actions"),
       scroll_direction: z
         .enum(["up", "down", "left", "right"])
         .optional()
@@ -607,9 +598,7 @@ export const computerTool = (
       auto_input: z
         .boolean()
         .optional()
-        .describe(
-          "Whether to automatically input the generated reply into the chat interface"
-        ),
+        .describe("Whether to automatically input the generated reply into the chat interface"),
       conversation_history: z
         .array(z.string())
         .optional()
@@ -638,13 +627,9 @@ export const computerTool = (
           const base64Data = Buffer.from(image).toString("base64");
 
           // 直接使用服务端压缩函数以减少 token 使用
-          console.log(
-            `🖼️ 截图原始大小: ${(base64Data.length / 1024).toFixed(2)}KB`
-          );
+          console.log(`🖼️ 截图原始大小: ${(base64Data.length / 1024).toFixed(2)}KB`);
           // 🌍 根据环境动态调整压缩参数
-          const { getEnvironmentLimits } = await import(
-            "@/lib/utils/environment"
-          );
+          const { getEnvironmentLimits } = await import("@/lib/utils/environment");
           const envLimits = getEnvironmentLimits();
 
           const compressedData = await compressImageServerV2(base64Data, {
@@ -656,9 +641,7 @@ export const computerTool = (
             preserveText: true,
           });
           console.log(
-            `✅ 服务端压缩完成，当前大小: ${(
-              compressedData.length / 1024
-            ).toFixed(2)}KB`
+            `✅ 服务端压缩完成，当前大小: ${(compressedData.length / 1024).toFixed(2)}KB`
           );
 
           // 返回结构化的图片数据，让 AI SDK 处理
@@ -751,15 +734,10 @@ export const computerTool = (
           };
         }
         case "mouse_move": {
-          if (!coordinate)
-            throw new Error("Coordinate required for mouse move action");
+          if (!coordinate) throw new Error("Coordinate required for mouse move action");
           const [x, y] = coordinate;
 
-          const { x: finalX, y: finalY } = await moveMouseWithVisualUpdate(
-            desktop,
-            x,
-            y
-          );
+          const { x: finalX, y: finalY } = await moveMouseWithVisualUpdate(desktop, x, y);
           await wait(0.1);
           return {
             type: "text" as const,
@@ -851,8 +829,7 @@ export const computerTool = (
         }
         case "hold_key": {
           if (!text) throw new Error("Key required for hold key action");
-          if (!duration)
-            throw new Error("Duration required for hold key action");
+          if (!duration) throw new Error("Duration required for hold key action");
           const actualDuration = Math.min(duration, 5); // 限制最大5秒
 
           // 使用键映射函数处理特殊字符
@@ -874,10 +851,8 @@ export const computerTool = (
           };
         }
         case "scroll": {
-          if (!scroll_direction)
-            throw new Error("Scroll direction required for scroll action");
-          if (!scroll_amount)
-            throw new Error("Scroll amount required for scroll action");
+          if (!scroll_direction) throw new Error("Scroll direction required for scroll action");
+          if (!scroll_amount) throw new Error("Scroll amount required for scroll action");
 
           try {
             await withTimeout(
@@ -894,8 +869,7 @@ export const computerTool = (
             console.warn("Scroll operation failed:", error);
             // 如果滚动失败，尝试使用键盘滚动作为备选方案
             try {
-              const scrollKey =
-                scroll_direction === "up" ? "Page_Up" : "Page_Down";
+              const scrollKey = scroll_direction === "up" ? "Page_Up" : "Page_Down";
               for (let i = 0; i < Math.min(scroll_amount, 3); i++) {
                 await desktop.press(scrollKey);
                 await wait(0.1);
@@ -909,9 +883,7 @@ export const computerTool = (
               return {
                 type: "text" as const,
                 text: `Scroll attempt failed: ${
-                  fallbackError instanceof Error
-                    ? fallbackError.message
-                    : "Unknown error"
+                  fallbackError instanceof Error ? fallbackError.message : "Unknown error"
                 }`,
               };
             }
@@ -928,31 +900,20 @@ export const computerTool = (
         }
         case "left_click_drag": {
           if (!start_coordinate || !coordinate)
-            throw new Error(
-              "Start and end coordinates required for drag action"
-            );
+            throw new Error("Start and end coordinates required for drag action");
           const [startX, startY] = start_coordinate;
           const [endX, endY] = coordinate;
 
           try {
             // 确保坐标在有效范围内
-            const clampedStartX = Math.max(
-              0,
-              Math.min(startX, resolution.x - 1)
-            );
-            const clampedStartY = Math.max(
-              0,
-              Math.min(startY, resolution.y - 1)
-            );
+            const clampedStartX = Math.max(0, Math.min(startX, resolution.x - 1));
+            const clampedStartY = Math.max(0, Math.min(startY, resolution.y - 1));
             const clampedEndX = Math.max(0, Math.min(endX, resolution.x - 1));
             const clampedEndY = Math.max(0, Math.min(endY, resolution.y - 1));
 
             // 添加超时保护
             await withTimeout(
-              desktop.drag(
-                [clampedStartX, clampedStartY],
-                [clampedEndX, clampedEndY]
-              ),
+              desktop.drag([clampedStartX, clampedStartY], [clampedEndX, clampedEndY]),
               10000,
               "Drag"
             );
@@ -983,25 +944,17 @@ export const computerTool = (
         case "check_fonts": {
           // 检查和诊断字体状态
           try {
-            const { getFontStatus, detectAvailableFontPackages } = await import(
-              "./font-packages"
-            );
+            const { getFontStatus, detectAvailableFontPackages } = await import("./font-packages");
 
             const status = await getFontStatus(desktop);
             const available = await detectAvailableFontPackages(desktop);
 
             let report = "📊 字体状态报告:\n";
-            report += `• 字体工具: ${
-              status.hasFontTools ? "✅ 可用" : "❌ 不可用"
-            }\n`;
+            report += `• 字体工具: ${status.hasFontTools ? "✅ 可用" : "❌ 不可用"}\n`;
             report += `• 系统字体总数: ${status.totalFonts}\n`;
             report += `• 中文字体数量: ${status.chineseFonts}\n`;
-            report += `• 已安装字体包: ${
-              status.installedPackages.join(", ") || "无"
-            }\n`;
-            report += `• 可安装字体包: ${
-              available.map((p) => p.description).join(", ") || "无"
-            }`;
+            report += `• 已安装字体包: ${status.installedPackages.join(", ") || "无"}\n`;
+            report += `• 可安装字体包: ${available.map(p => p.description).join(", ") || "无"}`;
 
             return {
               type: "text" as const,
@@ -1010,9 +963,7 @@ export const computerTool = (
           } catch (error) {
             return {
               type: "text" as const,
-              text: `字体检查失败: ${
-                error instanceof Error ? error.message : "未知错误"
-              }`,
+              text: `字体检查失败: ${error instanceof Error ? error.message : "未知错误"}`,
             };
           }
         }
@@ -1078,21 +1029,17 @@ export const computerTool = (
 
               // 检查字体状态
               try {
-                const fontResult = await desktop.commands.run(
-                  "fc-list | wc -l",
-                  { timeoutMs: 5000 }
-                );
+                const fontResult = await desktop.commands.run("fc-list | wc -l", {
+                  timeoutMs: 5000,
+                });
                 const fontCount = parseInt(fontResult.stdout?.trim() || "0");
                 report += `📊 系统字体总数: ${fontCount}\n`;
 
                 if (fontCount > 0) {
-                  const chineseFontResult = await desktop.commands.run(
-                    "fc-list :lang=zh | wc -l",
-                    { timeoutMs: 5000 }
-                  );
-                  const chineseFontCount = parseInt(
-                    chineseFontResult.stdout?.trim() || "0"
-                  );
+                  const chineseFontResult = await desktop.commands.run("fc-list :lang=zh | wc -l", {
+                    timeoutMs: 5000,
+                  });
+                  const chineseFontCount = parseInt(chineseFontResult.stdout?.trim() || "0");
                   report += `🇨🇳 中文字体数量: ${chineseFontCount}\n`;
                 }
               } catch (fontError) {
@@ -1118,9 +1065,8 @@ export const computerTool = (
             report += "```\n";
 
             // 标记配置完成
-            (
-              desktop as unknown as { _chineseInputConfigured?: boolean }
-            )._chineseInputConfigured = true;
+            (desktop as unknown as { _chineseInputConfigured?: boolean })._chineseInputConfigured =
+              true;
 
             report += "\n🎉 中文输入环境配置指南生成完成！\n";
 
@@ -1128,9 +1074,7 @@ export const computerTool = (
           } catch (error) {
             return {
               type: "text" as const,
-              text: `中文输入环境配置失败: ${
-                error instanceof Error ? error.message : "未知错误"
-              }`,
+              text: `中文输入环境配置失败: ${error instanceof Error ? error.message : "未知错误"}`,
             };
           }
         }
@@ -1203,13 +1147,9 @@ export const computerTool = (
                 resultText += "\n\n🚀 正在自动输入回复内容...";
 
                 // 自动输入生成的回复
-                const inputResult = await handleChineseInput(
-                  desktop,
-                  replyResult.text
-                );
+                const inputResult = await handleChineseInput(desktop, replyResult.text);
                 resultText += `\n✅ 自动输入完成: ${inputResult}`;
-                resultText +=
-                  "\n\n💡 提示: 现在可以按回车键发送消息，或手动检查后发送";
+                resultText += "\n\n💡 提示: 现在可以按回车键发送消息，或手动检查后发送";
               } catch (inputError) {
                 console.error("自动输入失败:", inputError);
                 resultText += `\n❌ 自动输入失败: ${
@@ -1229,9 +1169,7 @@ export const computerTool = (
             console.error("❌ Boss直聘回复生成失败:", error);
             return {
               type: "text" as const,
-              text: `Boss直聘回复生成失败: ${
-                error instanceof Error ? error.message : "未知错误"
-              }`,
+              text: `Boss直聘回复生成失败: ${error instanceof Error ? error.message : "未知错误"}`,
             };
           }
         }
@@ -1239,21 +1177,31 @@ export const computerTool = (
           throw new Error(`Unsupported action: ${action}`);
       }
     },
-    experimental_toToolResultContent(result) {
+    toModelOutput(result: E2BToolResult) {
+      // AI SDK v5 格式：返回带有 type: 'content' 的对象
       if (typeof result === "string") {
-        return [{ type: "text", text: result }];
+        return {
+          type: "content" as const,
+          value: [{ type: "text" as const, text: result }],
+        };
       }
       if (result.type === "image" && result.data) {
-        return [
-          {
-            type: "image",
-            data: result.data,
-            mimeType: "image/jpeg",
-          },
-        ];
+        return {
+          type: "content" as const,
+          value: [
+            {
+              type: "media" as const,
+              data: result.data,
+              mediaType: "image/jpeg",
+            },
+          ],
+        };
       }
       if (result.type === "text" && result.text) {
-        return [{ type: "text", text: result.text }];
+        return {
+          type: "content" as const,
+          value: [{ type: "text" as const, text: result.text }],
+        };
       }
       throw new Error("Invalid result format");
     },
@@ -1263,10 +1211,10 @@ export const computerTool = (
 // Universal bash tool - supports both E2B sandbox and local execution
 export const bashTool = (sandboxId?: string) =>
   tool({
-    description: sandboxId 
+    description: sandboxId
       ? "Execute bash commands in the E2B sandbox"
       : "Execute bash commands on the local system (requires confirmation in development)",
-    parameters: z.object({
+    inputSchema: z.object({
       command: z.string().describe("The bash command to execute"),
     }),
     execute: async ({ command }) => {
@@ -1275,9 +1223,7 @@ export const bashTool = (sandboxId?: string) =>
         const desktop = await getDesktop(sandboxId);
         try {
           const result = await desktop.commands.run(command);
-          return (
-            result.stdout || "(Command executed successfully with no output)"
-          );
+          return result.stdout || "(Command executed successfully with no output)";
         } catch (error) {
           console.error("Bash command failed in sandbox:", error);
           if (error instanceof Error) {
@@ -1287,15 +1233,13 @@ export const bashTool = (sandboxId?: string) =>
           }
         }
       }
-      
+
       // 本地执行模式
       try {
         // 安全检查：禁止危险命令
         const dangerousCommands = ["rm -rf /", "dd if=", "mkfs", "format", ":(){ :|:& };:"];
-        const isDangerous = dangerousCommands.some(cmd => 
-          command.toLowerCase().includes(cmd)
-        );
-        
+        const isDangerous = dangerousCommands.some(cmd => command.toLowerCase().includes(cmd));
+
         if (isDangerous) {
           return `❌ 拒绝执行：检测到潜在危险命令\n\n命令: ${command}\n\n请使用更安全的命令或在 E2B 沙箱环境中执行。`;
         }

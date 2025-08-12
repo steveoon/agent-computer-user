@@ -34,11 +34,11 @@ const actionLabels: Record<string, string> = {
 };
 
 export function PuppeteerToolMessage(props: ToolMessageProps) {
-  const { args, state, result, isLatestMessage, status, messageId, partIndex } = props;
-  const action = (args.action as string) || "navigate";
-  const url = args.url as string | undefined;
-  const selector = args.selector as string | undefined;
-  const value = args.value as string | undefined;
+  const { input, state, output, isLatestMessage, status, messageId, partIndex } = props;
+  const action = (input.action as string) || "navigate";
+  const url = input.url as string | undefined;
+  const selector = input.selector as string | undefined;
+  const value = input.value as string | undefined;
 
   const Icon = actionIcons[action] || Globe;
   const label = actionLabels[action] || action;
@@ -66,7 +66,8 @@ export function PuppeteerToolMessage(props: ToolMessageProps) {
         label={label}
         theme={themes.purple}
         state={state}
-        result={result}
+        input={input}
+        output={output}
         isLatestMessage={isLatestMessage}
         status={status}
         messageId={messageId}
@@ -84,7 +85,7 @@ export function PuppeteerToolMessage(props: ToolMessageProps) {
       detail={detail}
       theme={themes.purple}
       state={state}
-      result={result}
+      output={output}
       isLatestMessage={isLatestMessage}
       status={status}
       messageId={messageId}

@@ -18,7 +18,7 @@ export const dulidayBiRefreshTool = () =>
   tool({
     description:
       "刷新Duliday BI报表的数据源，确保数据是最新的。此操作通常需要30秒以上才能完成，刷新后需要等待一段时间再使用bi_report工具获取数据。建议在发现数据过时或需要最新数据时使用。",
-    parameters: z.object({
+    inputSchema: z.object({
       waitReminder: z
         .boolean()
         .optional()

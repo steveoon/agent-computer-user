@@ -8,12 +8,14 @@ import { ToolMessageProps } from "./types";
  * BOSS直聘获取用户名工具的显示组件
  */
 export function ZhipinGetUsernameTool(props: ToolMessageProps) {
-  const { result, state, isLatestMessage, messageId, partIndex } = props;
-  
+  const { state, output, isLatestMessage, messageId, partIndex } = props;
+
   // 类型安全的结果
-  const typedResult = result as {
-    text?: string;
-  } | undefined;
+  const typedResult = output as
+    | {
+        text?: string;
+      }
+    | undefined;
 
   // 解析结果文本
   const parseResult = (text: string = "") => {
@@ -21,13 +23,13 @@ export function ZhipinGetUsernameTool(props: ToolMessageProps) {
     const usernameMatch = text.match(/用户名：(.+?)(?:\n|$)/);
     const selectorMatch = text.match(/使用选择器：(.+?)(?:\n|$)/);
     const isPatternMatch = text.includes("通过模式匹配找到");
-    
+
     return {
       isSuccess,
       username: usernameMatch?.[1]?.trim() || "",
       selector: selectorMatch?.[1]?.trim() || "",
       isPatternMatch,
-      fullText: text
+      fullText: text,
     };
   };
 
@@ -52,7 +54,7 @@ export function ZhipinGetUsernameTool(props: ToolMessageProps) {
         loaderColor: "text-amber-600 dark:text-amber-400",
       };
 
-  if (state === "call" || state === "partial-call") {
+  if (state === "input-streaming" || state === "input-available") {
     return (
       <BaseToolMessage
         icon={UserCheck}
@@ -74,7 +76,7 @@ export function ZhipinGetUsernameTool(props: ToolMessageProps) {
       detail={parsedResult?.isSuccess ? "成功获取用户名" : "获取失败"}
       theme={theme}
       state={state}
-      result={typedResult}
+      output={typedResult}
       messageId={messageId}
       partIndex={partIndex}
       isLatestMessage={isLatestMessage}
@@ -89,19 +91,19 @@ export function ZhipinGetUsernameTool(props: ToolMessageProps) {
               </span>
             </div>
           )}
-          
+
           {parsedResult.selector && (
             <div className="text-xs text-gray-500 dark:text-gray-400">
               使用选择器：{parsedResult.selector}
             </div>
           )}
-          
+
           {parsedResult.isPatternMatch && (
             <div className="text-xs text-amber-600 dark:text-amber-400">
               ⚠️ 通过模式匹配找到，可能需要确认
             </div>
           )}
-          
+
           {!parsedResult.isSuccess && (
             <div className="text-sm text-red-600 dark:text-red-400">
               {typedResult?.text || "获取用户名失败"}

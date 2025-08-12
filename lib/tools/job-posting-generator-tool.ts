@@ -40,7 +40,7 @@ export const jobPostingGeneratorTool = (preferredBrand?: string, configData?: Zh
   tool({
     description:
       "生成岗位空缺推送消息。根据指定的岗位类型，从品牌数据中筛选匹配的门店和岗位信息，生成格式化的微信群推送消息。",
-    parameters: z.object({
+    inputSchema: z.object({
       positionType: positionTypeSchema,
       brand: z.string().optional().describe("品牌名称，如果不指定则使用当前默认品牌"),
       limit: z.number().optional().default(10).describe("最多显示的门店数量，默认10个"),
@@ -99,13 +99,13 @@ export const jobPostingGeneratorTool = (preferredBrand?: string, configData?: Zh
         const salaryMemo = displayStores[0]?.position.salary.memo || "";
 
         // 使用 AI 解析阶梯薪资信息
-        let stepSalaryInfo: typeof stepSalarySchema._type | null = null;
+        let stepSalaryInfo: z.infer<typeof stepSalarySchema> | null = null;
 
         if (salaryMemo) {
           try {
             const dynamicRegistry = getDynamicRegistry(DEFAULT_PROVIDER_CONFIGS);
             const { object } = await generateObject({
-              model: dynamicRegistry.languageModel("gpt-4o"),
+              model: dynamicRegistry.languageModel("openai/gpt-4o"),
               schema: stepSalarySchema,
               prompt: `请从以下薪资备注信息中提取阶梯工时薪资信息：
 

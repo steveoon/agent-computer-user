@@ -44,6 +44,24 @@ const replyPromptsConfig: ReplyPromptsConfig = {
   followup_chat: `跟进聊天，参考这个话术模板保持联系: "门店除了{position1}还有{position2}也空缺的，可以和店长商量"。营造机会丰富的感觉。`,
 
   general_chat: `通用回复，引导到具体咨询。重新询问位置或工作意向，保持专业。`,
+
+  // 新增：出勤要求相关回复
+  attendance_inquiry: `出勤要求咨询，参考话术: "出勤要求{attendance_description}，{minimum_days}天起"。强调灵活性。`,
+
+  // 新增：排班灵活性相关回复
+  flexibility_inquiry: `排班灵活性咨询，参考话术: "排班{schedule_type}，{can_swap_shifts}换班"。强调人性化。`,
+
+  // 新增：考勤政策相关回复
+  attendance_policy_inquiry: `考勤政策咨询，参考话术: "考勤要求{punctuality_required}准时到岗"。说明迟到政策。`,
+
+  // 新增：工时要求相关回复
+  work_hours_inquiry: `工时要求咨询，参考话术: "每周工作{min_hours_per_week}-{max_hours_per_week}小时"。强调灵活安排。`,
+
+  // 新增：时间段可用性相关回复
+  availability_inquiry: `时间段可用性咨询，参考话术: "{time_slot}班次还有{available_spots}个位置"。说明优先级。`,
+
+  // 新增：兼职支持相关回复
+  part_time_support: `兼职支持咨询，参考话术: "完全支持兼职，{part_time_allowed}"。强调时间错开安排。`,
 };
 
 /**

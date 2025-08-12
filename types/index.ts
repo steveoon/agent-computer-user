@@ -42,3 +42,65 @@ export { CONFIG_STORAGE_KEY, CONFIG_VERSION } from "./config";
 // 导出其他类型
 export * from "./image-optimize-type";
 export * from "./feishu";
+
+// 从tool-common.ts导出工具相关类型
+export type {
+  // 工具注册表类型
+  ToolCreationContext,
+  ToolDefinition,
+  ToolCategory,
+  SystemPromptType,
+  ToolSet,
+  // 工具输出类型
+  ToolOutput,
+  TextOutput,
+  ImageOutput,
+  ExtendedToolOutput,
+  // 工具部分类型
+  ToolPart,
+  ToolPartState,
+  StructuredToolOutput,
+} from "./tool-common";
+
+export {
+  // 工具输出模式
+  ToolOutputSchema,
+  TextOutputSchema,
+  ImageOutputSchema,
+  ExtendedToolOutputSchema,
+  // 工具辅助函数
+  isTextOutput,
+  isImageOutput,
+  isToolPart,
+  extractToolName,
+  getToolPartState,
+  getToolPartInput,
+  getToolPartOutput,
+  getToolPartErrorText,
+  hasToolOutput,
+  hasToolError,
+  getToolCallId,
+  parseToolOutput,
+  normalizeToolOutput,
+  createTextOutput,
+  createImageOutput,
+  createErrorOutput,
+} from "./tool-common";
+
+// 从api.ts导出API相关类型
+export type {
+  ChatRequestBody,
+  ChatRequestOptions,
+  SyncRequestBody,
+  SyncResponseBody,
+  TestLLMReplyRequestBody,
+  TestLLMReplyResponseBody,
+  APIErrorResponse,
+  APISuccessResponse,
+} from "./api";
+
+export { 
+  ChatRequestBodySchema,
+  isChatRequestBody,
+  validateChatRequestBody,
+} from "./api";

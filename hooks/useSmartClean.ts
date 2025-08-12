@@ -2,11 +2,11 @@
 
 import { useCallback } from "react";
 import { toast } from "sonner";
-import type { Message } from "@ai-sdk/react";
+import type { UIMessage } from "@ai-sdk/react";
 
 interface UseSmartCleanProps {
-  messages: Message[];
-  setMessages: (messages: Message[]) => void;
+  messages: UIMessage[];
+  setMessages: (messages: UIMessage[]) => void;
   envLimits: {
     maxSizeMB: number;
     maxMessageCount: number;
@@ -20,26 +20,30 @@ interface UseSmartCleanProps {
   };
 }
 
-export function useSmartClean({
-  messages,
-  setMessages,
-  envLimits,
-  envInfo,
-}: UseSmartCleanProps) {
+export function useSmartClean({ messages, setMessages, envLimits, envInfo }: UseSmartCleanProps) {
   // 🖼️ 智能图片清理 - 移除历史图片，保留最近的5个
   const cleanHistoricalImages = useCallback(() => {
     let imageCount = 0;
     const imageIndices: number[] = [];
     const keepImageCount = 5; // 增加保留的图片数量
-    
+
     // 统计图片数量和位置（从后往前遍历）
     for (let i = messages.length - 1; i >= 0; i--) {
       const message = messages[i];
       if (message.parts) {
         for (const part of message.parts) {
-          if (part.type === 'tool-invocation' && 
-              part.toolInvocation?.state === 'result' &&
-              part.toolInvocation?.result?.type === 'image') {
+          // AI SDK v5: 检查工具部分 (type 是 `tool-${string}` 格式)
+          if (
+            typeof part.type === "string" &&
+            part.type.startsWith("tool-") &&
+            "state" in part &&
+            part.state === "output-available" &&
+            "output" in part &&
+            typeof part.output === "object" &&
+            part.output !== null &&
+            "type" in part.output &&
+            (part.output as any).type === "image"
+          ) {
             imageCount++;
             if (imageCount > keepImageCount) {
               imageIndices.push(i);
@@ -56,10 +60,12 @@ export function useSmartClean({
 
     // 清理包含历史图片的消息
     const cleanedMessages = messages.filter((_, index) => !imageIndices.includes(index));
-    
-    console.log(`🖼️ 清理了${imageIndices.length}条包含历史图片的消息，保留最近的${keepImageCount}张图片`);
+
+    console.log(
+      `🖼️ 清理了${imageIndices.length}条包含历史图片的消息，保留最近的${keepImageCount}张图片`
+    );
     setMessages(cleanedMessages);
-    
+
     toast.success(`已清理${imageIndices.length}张历史图片`, {
       description: `保留了最近的${keepImageCount}张图片，请重新提交您的请求`,
       richColors: true,
@@ -88,7 +94,7 @@ export function useSmartClean({
     // 🎯 优先尝试清理历史图片
     console.log("🖼️ 优先尝试清理历史图片以减少载荷大小");
     const imageCleanSuccess = cleanHistoricalImages();
-    
+
     if (imageCleanSuccess) {
       console.log("✅ 图片清理成功，可能已解决载荷过大问题");
       return true; // 图片清理成功，先尝试这个解决方案
@@ -96,15 +102,13 @@ export function useSmartClean({
 
     // 🔄 如果没有图片可清理，则进行常规消息清理
     console.log("📝 没有历史图片可清理，执行常规消息清理");
-    
+
     // 计算需要保留的消息数量（保留最近的40%，至少5条）
     const keepCount = Math.max(5, Math.floor(messageCount * 0.4));
     const removeCount = messageCount - keepCount;
 
     // 🎯 自动执行清理，不需要用户确认
-    console.log(
-      `🔄 自动清理${removeCount}条历史消息，保留最近的${keepCount}条`
-    );
+    console.log(`🔄 自动清理${removeCount}条历史消息，保留最近的${keepCount}条`);
 
     const recentMessages = messages.slice(-keepCount);
     setMessages(recentMessages);
@@ -137,10 +141,7 @@ export function useSmartClean({
       const recentMessages = messages.slice(-keepCount);
 
       // 🎯 自动清理模式或用户确认手动清理
-      if (
-        autoClean ||
-        window.confirm(`保留最近的${keepCount}条消息，清理其余历史记录？`)
-      ) {
+      if (autoClean || window.confirm(`保留最近的${keepCount}条消息，清理其余历史记录？`)) {
         setMessages(recentMessages);
 
         const actionText = autoClean ? "已自动清理" : "已清理";
@@ -219,18 +220,11 @@ export function useSmartClean({
     const estimatedSizeMB = messageSize / (1024 * 1024);
     const messageCount = messages.length;
 
-    console.log(
-      `📊 消息历史大小: ${estimatedSizeMB.toFixed(2)}MB (${messageCount}条消息)`
-    );
+    console.log(`📊 消息历史大小: ${estimatedSizeMB.toFixed(2)}MB (${messageCount}条消息)`);
 
     // 仅记录日志，不再自动清理或显示提示
-    if (
-      estimatedSizeMB > envLimits.maxSizeMB ||
-      messageCount > envLimits.maxMessageCount
-    ) {
-      console.warn(
-        `⚠️ 消息历史超过${envInfo.environment}环境建议限制，但不会自动清理`
-      );
+    if (estimatedSizeMB > envLimits.maxSizeMB || messageCount > envLimits.maxMessageCount) {
+      console.warn(`⚠️ 消息历史超过${envInfo.environment}环境建议限制，但不会自动清理`);
     }
 
     return false; // 始终返回 false，不触发清理

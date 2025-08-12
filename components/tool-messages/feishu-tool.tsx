@@ -21,11 +21,11 @@ const notificationLabels: Record<string, string> = {
 };
 
 export function FeishuToolMessage(props: ToolMessageProps) {
-  const { args, state, result, isLatestMessage, status, messageId, partIndex } = props;
-  const notification_type = args.notification_type as string | undefined;
-  const msgContent = args.message as string | undefined;
-  const candidate_name = args.candidate_name as string | undefined;
-  const wechat_id = args.wechat_id as string | undefined;
+  const { input, state, output, isLatestMessage, status, messageId, partIndex } = props;
+  const notification_type = input.notification_type as string | undefined;
+  const msgContent = input.message as string | undefined;
+  const candidate_name = input.candidate_name as string | undefined;
+  const wechat_id = input.wechat_id as string | undefined;
 
   const theme = (notification_type && notificationThemes[notification_type]) || themes.blue;
   const label = (notification_type && notificationLabels[notification_type]) || "发送飞书消息";
@@ -54,7 +54,7 @@ export function FeishuToolMessage(props: ToolMessageProps) {
       detail={detail}
       theme={theme}
       state={state}
-      result={result}
+      output={output}
       isLatestMessage={isLatestMessage}
       status={status}
       messageId={messageId}

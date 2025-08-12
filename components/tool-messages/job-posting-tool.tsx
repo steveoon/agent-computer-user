@@ -5,10 +5,10 @@ import { BaseToolMessage } from "./base-tool-message";
 import { themes, type ToolMessageProps } from "./types";
 
 export function JobPostingToolMessage(props: ToolMessageProps) {
-  const { args, state, result, isLatestMessage, status, messageId, partIndex } = props;
-  const positionType = args.positionType as string | undefined;
-  const brand = args.brand as string | undefined;
-  const limit = args.limit as number | undefined;
+  const { input, state, output, isLatestMessage, status, messageId, partIndex } = props;
+  const positionType = input.positionType as string | undefined;
+  const brand = input.brand as string | undefined;
+  const limit = input.limit as number | undefined;
 
   const details: string[] = [];
   if (positionType) details.push(`${positionType}岗位`);
@@ -24,7 +24,7 @@ export function JobPostingToolMessage(props: ToolMessageProps) {
       detail={detail}
       theme={themes.indigo}
       state={state}
-      result={result}
+      output={output}
       isLatestMessage={isLatestMessage}
       status={status}
       messageId={messageId}

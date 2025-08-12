@@ -7,7 +7,7 @@ export const feishuBotTool = () =>
   tool({
     description:
       "向飞书机器人发送通知消息，支持候选人微信信息推送、系统警告、任务完成提醒等多种场景",
-    parameters: z.object({
+    inputSchema: z.object({
       notification_type: z
         .enum([
           "candidate_wechat", // 候选人微信信息

@@ -264,8 +264,18 @@ export const ReplyContextSchema = z.enum([
   "part_time_support", // 兼职支持咨询
 ]);
 
-// 模板Schema（仅支持标准回复类型）
-export const TemplatesSchema = z.record(ReplyContextSchema, z.array(z.string())).optional();
+// 基础模板Schema（仅支持标准回复类型）
+export const BaseTemplatesSchema = z.record(ReplyContextSchema, z.array(z.string()));
+
+// 可选的模板Schema
+export const OptionalTemplatesSchema = BaseTemplatesSchema.optional();
+
+// 必需的模板Schema（用于品牌配置）
+export const RequiredTemplatesSchema = BaseTemplatesSchema.refine(val => {
+  return val !== undefined && typeof val === 'object';
+}, {
+  message: "品牌配置必须包含templates字段",
+});
 
 // 筛选规则Schema
 export const ScreeningRulesSchema = z.object({
@@ -280,9 +290,7 @@ export const ScreeningRulesSchema = z.object({
 
 // 品牌配置Schema
 export const BrandConfigSchema = z.object({
-  templates: TemplatesSchema.refine(val => val !== undefined, {
-    message: "品牌配置必须包含templates字段",
-  }),
+  templates: RequiredTemplatesSchema,
   screening: ScreeningRulesSchema,
 });
 
@@ -290,7 +298,7 @@ export const BrandConfigSchema = z.object({
 export const ZhipinDataSchema = z.object({
   city: z.string(),
   stores: z.array(StoreSchema),
-  brands: z.record(BrandConfigSchema),
+  brands: z.record(z.string(), BrandConfigSchema),
   defaultBrand: z.string().optional(),
 });
 
@@ -350,7 +358,7 @@ export const MessageClassificationSchema = z.object({
     hasUrgency: z.boolean().nullable().optional(),
     preferredSchedule: z.string().nullable().optional(),
   }),
-  reasoning: z.string(),
+  reasoningText: z.string(),
 });
 
 // 🔧 通过 z.infer 生成 TypeScript 类型
@@ -364,7 +372,7 @@ export type TimeSlotAvailability = z.infer<typeof TimeSlotAvailabilitySchema>;
 export type SchedulingFlexibility = z.infer<typeof SchedulingFlexibilitySchema>;
 export type Position = z.infer<typeof PositionSchema>;
 export type Store = z.infer<typeof StoreSchema>;
-export type Templates = z.infer<typeof TemplatesSchema>;
+export type Templates = z.infer<typeof BaseTemplatesSchema>;
 export type ScreeningRules = z.infer<typeof ScreeningRulesSchema>;
 export type BrandConfig = z.infer<typeof BrandConfigSchema>;
 export type ZhipinData = z.infer<typeof ZhipinDataSchema>;

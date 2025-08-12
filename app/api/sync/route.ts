@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: "请求参数验证失败",
-          details: error.errors,
+          details: error.issues,
           code: "VALIDATION_ERROR",
         },
         { status: 400 }

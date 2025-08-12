@@ -6,12 +6,12 @@ import { ChatInputForm } from "./ChatInputForm";
 import { ChatStatusBar } from "./ChatStatusBar";
 import { useScrollToBottom } from "@/lib/use-scroll-to-bottom";
 import { Button } from "@/components/ui/button";
-import type { Message } from "@ai-sdk/react";
+import type { UIMessage } from "@ai-sdk/react";
 import type { ModelId } from "@/lib/config/models";
 
 interface ChatPanelProps {
   // 来自 useCustomChat
-  messages: Message[];
+  messages: UIMessage[];
   input: string;
   status: "ready" | "error" | "submitted" | "streaming";
   error: Error | undefined;

@@ -150,7 +150,7 @@ describe("配置导入数据格式校验", () => {
       const result = AppConfigDataSchema.safeParse(invalidConfig);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const errors = result.error.errors;
+        const errors = result.error.issues;
         expect(errors.some(e => e.path.includes("city"))).toBe(true);
       }
     });
@@ -193,9 +193,11 @@ describe("配置导入数据格式校验", () => {
       const result = AppConfigDataSchema.safeParse(configWithInvalidReplyPromptKey);
       expect(result.success).toBe(false);
       if (!result.success) {
-        const errors = result.error.errors;
+        const errors = result.error.issues;
         // 应该有关于无效键的错误
-        expect(errors.some(e => e.message.includes("Invalid") || e.message.includes("invalid"))).toBe(true);
+        expect(
+          errors.some(e => e.message.includes("Invalid") || e.message.includes("invalid"))
+        ).toBe(true);
       }
     });
 
@@ -279,7 +281,7 @@ describe("配置导入数据格式校验", () => {
       const brandNames = Object.keys(configWithMismatchedBrand.brandData.brands);
       const storeBrands = configWithMismatchedBrand.brandData.stores.map(s => s.brand);
       const invalidBrands = storeBrands.filter(brand => !brandNames.includes(brand));
-      
+
       expect(invalidBrands.length).toBeGreaterThan(0);
       expect(invalidBrands).toContain("品牌B");
     });
@@ -375,12 +377,12 @@ describe("配置导入数据格式校验", () => {
 
       const result = AppConfigDataSchema.safeParse(configWithCustomBrand);
       expect(result.success).toBe(true);
-      
+
       if (result.success) {
         // 验证自定义品牌被正确解析
         expect(Object.keys(result.data.brandData.brands)).toContain("自定义品牌");
         expect(Object.keys(result.data.brandData.brands)).toContain("肯德基");
-        
+
         // 验证品牌数量
         expect(Object.keys(result.data.brandData.brands)).toHaveLength(2);
       }

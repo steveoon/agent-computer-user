@@ -27,7 +27,7 @@ export const yupaoChatDetailsTool = () =>
     - 需要先打开候选人聊天窗口
     - 返回结构化的候选人信息和聊天记录`,
 
-    parameters: z.object({
+    inputSchema: z.object({
       includeHtml: z.boolean().optional().default(false).describe("是否包含原始HTML（用于调试）"),
       maxMessages: z.number().optional().default(100).describe("返回的最大消息数量，默认100条"),
       maxDataSizeKB: z.number().optional().default(300).describe("返回数据的最大大小（KB），默认300KB"),

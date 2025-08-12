@@ -26,7 +26,7 @@ export const zhipinExchangeWechatTool = () =>
     - 需要确保当前聊天对象支持交换微信
     - 操作有先后顺序，会自动等待弹窗出现`,
 
-    parameters: z.object({
+    inputSchema: z.object({
       waitBetweenClicksMin: z
         .number()
         .optional()

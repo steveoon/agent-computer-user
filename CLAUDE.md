@@ -20,6 +20,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pnpm format` - Format code with Prettier
 - `pnpm format:check` - Check code formatting
 - `npx tsc --noEmit` - Run TypeScript type checking without emitting files
+- `pnpm test -- path/to/test.spec.ts` - Run a specific test file
+- `pnpm test -- -t "test name"` - Run tests matching a pattern
+- `pnpm test:ui -- path/to/test.spec.ts` - Debug specific tests in UI mode
 
 ### Docker Deployment Commands
 
@@ -85,6 +88,15 @@ type SchemaType = z.infer<typeof schema>
 API Response → Zod Schema Validation → TypeScript Types → React Components
 ```
 
+**Dynamic CSS Selector Pattern:**
+- Handles CSS modules with changing hash values
+- `lib/tools/yupao/dynamic-selector-utils.ts` provides adaptive selectors
+- Multi-strategy fallback for element finding:
+  1. CSS module pattern matching `[class*="_className_"]`
+  2. DOM structure-based selectors
+  3. Content-based selection
+- Critical for automation tools (Yupao, Zhipin integrations)
+
 ### File Organization
 
 - **Components**: `components/` with subdirectories for domain-specific components
@@ -127,6 +139,10 @@ API Response → Zod Schema Validation → TypeScript Types → React Components
   - `duliday_job_list` - Fetch job listings
   - `duliday_job_details` - Get detailed job information
   - `duliday_interview_booking` - Schedule interviews
+- **yupao** tools - Integration with Yupao recruitment platform
+  - `get_unread_messages` - Fetch unread candidate messages with dynamic selectors
+  - `exchange_wechat` - Exchange WeChat contacts with candidates
+  - Anti-detection measures and dynamic CSS selector handling
 - **zhipin** tools - Integration with BOSS直聘 recruitment platform
   - Complete recruitment workflow automation
   - Anti-detection measures built-in
@@ -155,6 +171,7 @@ API Response → Zod Schema Validation → TypeScript Types → React Components
 - **Timeouts**: 10-second timeouts for tests and hooks
 - **Organization**: Test files in `__tests__` directories
 - **Utilities**: AI SDK test utilities in `lib/__tests__/test-utils/ai-mocks.ts`
+- **Dynamic Selector Testing**: Test utilities for CSS module hash changes in `lib/tools/yupao/__tests__/`
 
 ### Testing Endpoints
 
@@ -209,7 +226,7 @@ The application has comprehensive Chinese language support as primary language:
 - Runtime variables (API keys) passed via environment variables
 - Tool filtering based on environment and configuration
 - Production environment has additional safety restrictions
-- Use `lib/tools/tool-filter.ts` for conditional tool availability
+- Use `lib/tools/tool-registry.ts` for tool creation, registration, and conditional availability
 
 ## Environment Configuration
 
@@ -396,6 +413,12 @@ EXA_API_KEY=your_exa_search_key
 - Check `configData` is passed from route handler to tool
 - Verify environment variables are loaded correctly
 
+**CSS Module Selector Issues:**
+- Check if CSS module hash values have changed
+- Use dynamic selectors from `lib/tools/yupao/dynamic-selector-utils.ts`
+- Test with sample HTML files in `docs/sample-data/`
+- Update constants in `lib/tools/yupao/constants.ts` if needed
+
 ## Data Flow Patterns
 
 1. **Configuration Loading**: `ConfigInitializer` → `configService.getConfig()` → Components
@@ -420,6 +443,12 @@ EXA_API_KEY=your_exa_search_key
 - Progress tracking with real-time updates
 - History management in localStorage for audit trails
 
+### Yupao Platform Integration
+- Dynamic CSS selector handling for resilient automation
+- Exchange WeChat functionality with multi-strategy element finding
+- Anti-detection measures integrated
+- Test utilities for verifying selector adaptability
+
 ### Semantic Release Integration
 - **Branches**: `main` (production), `develop` (pre-release), `beta` (pre-release)
 - **Commit convention**: Use conventional commits (feat:, fix:, chore:, etc.)
@@ -434,3 +463,6 @@ When working with this codebase:
 - Follow the two-phase AI pattern for new intelligent features
 - Test Chinese input scenarios when modifying desktop automation
 - Follow the error formatting patterns established in the codebase
+- Use dynamic selectors for web automation to handle CSS module hash changes
+- Run type checking with `npx tsc --noEmit` before committing
+- Test with multiple AI providers to ensure fallback mechanisms work

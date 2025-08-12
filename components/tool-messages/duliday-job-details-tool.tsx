@@ -5,8 +5,8 @@ import { BaseToolMessage } from "./base-tool-message";
 import { themes, type ToolMessageProps } from "./types";
 
 export function DulidayJobDetailsToolMessage(props: ToolMessageProps) {
-  const { args, state, result, isLatestMessage, status, messageId, partIndex } = props;
-  const jobBasicInfoId = args.jobBasicInfoId as number | undefined;
+  const { input, state, output, isLatestMessage, status, messageId, partIndex } = props;
+  const jobBasicInfoId = input.jobBasicInfoId as number | undefined;
 
   const detail = jobBasicInfoId ? `岗位ID: ${jobBasicInfoId}` : "查询岗位详情";
 
@@ -17,7 +17,7 @@ export function DulidayJobDetailsToolMessage(props: ToolMessageProps) {
       detail={detail}
       theme={themes.purple}
       state={state}
-      result={result}
+      output={output}
       isLatestMessage={isLatestMessage}
       status={status}
       messageId={messageId}

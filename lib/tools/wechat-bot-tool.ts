@@ -13,7 +13,7 @@ export const weChatBotTool = () =>
   tool({
     description:
       "发送WeChat群机器人通知。支持多种通知类型和消息格式（text、markdown、markdown_v2）。当需要发送通知到WeChat群时使用此工具。",
-    parameters: z.object({
+    inputSchema: z.object({
       notification_type: weChatNotificationTypeSchema.describe("通知类型"),
       candidate_name: z
         .string()

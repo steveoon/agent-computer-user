@@ -137,7 +137,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
                       </Badge>
                     </div>
                     <div className="text-sm text-muted-foreground space-y-1">
-                      <div>模板：{Object.keys(brandConfig.templates).length} 类</div>
+                      <div>模板：{brandConfig.templates ? Object.keys(brandConfig.templates).length : 0} 类</div>
                       <div>
                         筛选：年龄 {brandConfig.screening.age.min}-{brandConfig.screening.age.max}
                       </div>
