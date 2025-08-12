@@ -51,7 +51,7 @@ export const zhipinSendMessageTool = () =>
     - 支持多行消息（使用\\n分隔）
     - 会自动等待消息发送完成`,
 
-    parameters: z.object({
+    inputSchema: z.object({
       message: z.string().describe("要发送的消息内容"),
       clearBefore: z.boolean().optional().default(true).describe("发送前是否清空输入框"),
       waitAfterSend: z.number().optional().default(1000).describe("发送后等待时间（毫秒）"),

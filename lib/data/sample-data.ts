@@ -482,6 +482,11 @@ export const sampleData: SampleData = {
           ],
           // 新增缺失的模板
           general_chat: ["好的，有什么其他问题可以问我，方便的话可以加个微信"],
+          age_concern: [
+            "您的年龄没问题的，听店长安排。",
+            "年龄要求比较灵活，您的情况可以考虑。",
+          ],
+          insurance_inquiry: ["有商业保险的。", "六姐门店有商业保险保障。"],
         },
         screening: {
           age: { min: 18, max: 50, preferred: [20, 30, 40] },

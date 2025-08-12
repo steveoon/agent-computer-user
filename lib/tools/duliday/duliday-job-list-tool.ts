@@ -15,7 +15,7 @@ export const dulidayJobListTool = (customToken?: string, defaultBrand?: string) 
   tool({
     description:
       "获取品牌在招岗位列表。根据品牌名称、门店名称、地理位置、工作类型、岗位速记名等条件查询在招岗位。返回的岗位信息包含jobId（用于预约面试）和jobBasicInfoId（用于查询岗位详情）。",
-    parameters: z.object({
+    inputSchema: z.object({
       brandName: z
         .string()
         .optional()

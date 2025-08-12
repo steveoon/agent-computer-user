@@ -9,39 +9,41 @@ import type { CandidateInfo } from "@/lib/tools/zhipin/types";
  * BOSS直聘聊天详情工具的显示组件
  */
 export function ZhipinChatDetailsTool(props: ToolMessageProps) {
-  const { result, state, isLatestMessage, messageId, partIndex } = props;
-  
+  const { state, output, isLatestMessage, messageId, partIndex } = props;
+
   // 类型安全的结果
-  const typedResult = result as {
-    success?: boolean;
-    message?: string;
-    error?: string;
-    data?: {
-      candidateInfo?: CandidateInfo;
-      chatMessages?: Array<{
-        index: number;
-        sender: 'candidate' | 'recruiter' | 'system' | 'unknown';
-        messageType: 'text' | 'system' | 'resume';
-        content: string;
-        time: string;
-        hasTime: boolean;
-      }>;
-      stats?: {
-        totalMessages: number;
-        candidateMessages: number;
-        recruiterMessages: number;
-        systemMessages: number;
-        messagesWithTime: number;
-      };
-    };
-    summary?: {
-      candidateName: string;
-      candidatePosition: string;
-      totalMessages: number;
-      lastMessageTime: string;
-    };
-    formattedHistory?: string[];
-  } | undefined;
+  const typedResult = output as
+    | {
+        success?: boolean;
+        message?: string;
+        error?: string;
+        data?: {
+          candidateInfo?: CandidateInfo;
+          chatMessages?: Array<{
+            index: number;
+            sender: "candidate" | "recruiter" | "system" | "unknown";
+            messageType: "text" | "system" | "resume";
+            content: string;
+            time: string;
+            hasTime: boolean;
+          }>;
+          stats?: {
+            totalMessages: number;
+            candidateMessages: number;
+            recruiterMessages: number;
+            systemMessages: number;
+            messagesWithTime: number;
+          };
+        };
+        summary?: {
+          candidateName: string;
+          candidatePosition: string;
+          totalMessages: number;
+          lastMessageTime: string;
+        };
+        formattedHistory?: string[];
+      }
+    | undefined;
 
   // 选择合适的主题
   const theme = typedResult?.success
@@ -65,18 +67,18 @@ export function ZhipinChatDetailsTool(props: ToolMessageProps) {
   // 格式化消息发送者
   const getSenderDisplay = (sender: string) => {
     switch (sender) {
-      case 'candidate':
-        return { label: '候选人', color: 'text-blue-600 dark:text-blue-400' };
-      case 'recruiter':
-        return { label: '招聘者', color: 'text-green-600 dark:text-green-400' };
-      case 'system':
-        return { label: '系统', color: 'text-gray-500 dark:text-gray-400' };
+      case "candidate":
+        return { label: "候选人", color: "text-blue-600 dark:text-blue-400" };
+      case "recruiter":
+        return { label: "招聘者", color: "text-green-600 dark:text-green-400" };
+      case "system":
+        return { label: "系统", color: "text-gray-500 dark:text-gray-400" };
       default:
-        return { label: '未知', color: 'text-gray-400 dark:text-gray-500' };
+        return { label: "未知", color: "text-gray-400 dark:text-gray-500" };
     }
   };
 
-  if (state === "call" || state === "partial-call") {
+  if (state === "input-streaming" || state === "input-available") {
     return (
       <BaseToolMessage
         icon={FileText}
@@ -102,7 +104,7 @@ export function ZhipinChatDetailsTool(props: ToolMessageProps) {
       detail={typedResult?.message || (typedResult?.success ? "成功获取聊天详情" : "获取失败")}
       theme={theme}
       state={state}
-      result={typedResult}
+      output={typedResult}
       messageId={messageId}
       partIndex={partIndex}
       isLatestMessage={isLatestMessage}
@@ -119,28 +121,44 @@ export function ZhipinChatDetailsTool(props: ToolMessageProps) {
                   <div className="space-y-1 text-sm">
                     <div className="flex gap-2">
                       <span className="text-gray-500 dark:text-gray-400 min-w-[60px]">姓名：</span>
-                      <span className="text-gray-700 dark:text-gray-300">{candidateInfo.name || '未知'}</span>
+                      <span className="text-gray-700 dark:text-gray-300">
+                        {candidateInfo.name || "未知"}
+                      </span>
                     </div>
                     <div className="flex gap-2">
                       <span className="text-gray-500 dark:text-gray-400 min-w-[60px]">职位：</span>
-                      <span className="text-gray-700 dark:text-gray-300">{candidateInfo.position || '未知'}</span>
+                      <span className="text-gray-700 dark:text-gray-300">
+                        {candidateInfo.position || "未知"}
+                      </span>
                     </div>
                     {candidateInfo.age && (
                       <div className="flex gap-2">
-                        <span className="text-gray-500 dark:text-gray-400 min-w-[60px]">年龄：</span>
-                        <span className="text-gray-700 dark:text-gray-300">{candidateInfo.age}岁</span>
+                        <span className="text-gray-500 dark:text-gray-400 min-w-[60px]">
+                          年龄：
+                        </span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          {candidateInfo.age}岁
+                        </span>
                       </div>
                     )}
                     {candidateInfo.experience && (
                       <div className="flex gap-2">
-                        <span className="text-gray-500 dark:text-gray-400 min-w-[60px]">经验：</span>
-                        <span className="text-gray-700 dark:text-gray-300">{candidateInfo.experience}</span>
+                        <span className="text-gray-500 dark:text-gray-400 min-w-[60px]">
+                          经验：
+                        </span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          {candidateInfo.experience}
+                        </span>
                       </div>
                     )}
                     {candidateInfo.education && (
                       <div className="flex gap-2">
-                        <span className="text-gray-500 dark:text-gray-400 min-w-[60px]">学历：</span>
-                        <span className="text-gray-700 dark:text-gray-300">{candidateInfo.education}</span>
+                        <span className="text-gray-500 dark:text-gray-400 min-w-[60px]">
+                          学历：
+                        </span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          {candidateInfo.education}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -160,7 +178,10 @@ export function ZhipinChatDetailsTool(props: ToolMessageProps) {
                     {chatMessages.map((msg, index) => {
                       const senderInfo = getSenderDisplay(msg.sender);
                       return (
-                        <div key={index} className="border-b border-gray-100 dark:border-gray-700 pb-2 last:border-0">
+                        <div
+                          key={index}
+                          className="border-b border-gray-100 dark:border-gray-700 pb-2 last:border-0"
+                        >
                           <div className="flex items-start gap-2 text-sm">
                             {msg.time && (
                               <span className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
@@ -214,9 +235,7 @@ export function ZhipinChatDetailsTool(props: ToolMessageProps) {
 
       {/* 错误信息 */}
       {typedResult?.error && (
-        <div className="mt-3 text-sm text-red-600 dark:text-red-400">
-          错误: {typedResult.error}
-        </div>
+        <div className="mt-3 text-sm text-red-600 dark:text-red-400">错误: {typedResult.error}</div>
       )}
     </BaseToolMessage>
   );

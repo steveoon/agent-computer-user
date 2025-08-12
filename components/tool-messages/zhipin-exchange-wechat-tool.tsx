@@ -8,21 +8,23 @@ import { ToolMessageProps } from "./types";
  * BOSS直聘交换微信工具的显示组件
  */
 export function ZhipinExchangeWechatTool(props: ToolMessageProps) {
-  const { result, state, isLatestMessage, messageId, partIndex } = props;
-  
+  const { state, output, isLatestMessage, messageId, partIndex } = props;
+
   // 类型安全的结果
-  const typedResult = result as {
-    success?: boolean;
-    message?: string;
-    error?: string;
-    details?: {
-      exchangeButtonSelector?: string;
-      confirmButtonSelector?: string;
-      waitTime?: number;
-    };
-    exchangeButtonClicked?: boolean;
-    triedSelectors?: string[];
-  } | undefined;
+  const typedResult = output as
+    | {
+        success?: boolean;
+        message?: string;
+        error?: string;
+        details?: {
+          exchangeButtonSelector?: string;
+          confirmButtonSelector?: string;
+          waitTime?: number;
+        };
+        exchangeButtonClicked?: boolean;
+        triedSelectors?: string[];
+      }
+    | undefined;
 
   // 选择合适的主题
   const theme = typedResult?.success
@@ -43,7 +45,7 @@ export function ZhipinExchangeWechatTool(props: ToolMessageProps) {
         loaderColor: "text-red-600 dark:text-red-400",
       };
 
-  if (state === "call" || state === "partial-call") {
+  if (state === "input-streaming" || state === "input-available") {
     return (
       <BaseToolMessage
         icon={Smartphone}
@@ -65,7 +67,7 @@ export function ZhipinExchangeWechatTool(props: ToolMessageProps) {
       detail={typedResult?.message || (typedResult?.success ? "交换成功" : "交换失败")}
       theme={theme}
       state={state}
-      result={typedResult}
+      output={typedResult}
       messageId={messageId}
       partIndex={partIndex}
       isLatestMessage={isLatestMessage}
@@ -76,7 +78,7 @@ export function ZhipinExchangeWechatTool(props: ToolMessageProps) {
           <span>微信交换成功，可以在聊天窗口查看对方微信号</span>
         </div>
       )}
-      
+
       {typedResult?.error && (
         <div className="mt-3 space-y-2">
           <div className="flex items-start gap-2 text-sm text-red-600 dark:text-red-400">

@@ -9,6 +9,22 @@ import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import { CandidateInfoSchema } from "@/lib/tools/zhipin/types";
 
 /**
+ * 智能回复工具的执行结果类型
+ */
+type ZhipinReplyToolResult = {
+  reply: string;
+  replyType: string;
+  reasoningText: string;
+  candidateMessage: string;
+  historyCount: number;
+  stats?: {
+    totalStores: number;
+    totalPositions: number;
+    brand: string;
+  };
+};
+
+/**
  * Boss直聘智能回复工具
  *
  * 功能特性：
@@ -46,7 +62,7 @@ export const zhipinReplyTool = (
       - 批量处理候选人咨询
       - 招聘聊天机器人
     `,
-    parameters: z.object({
+    inputSchema: z.object({
       candidate_message: z.string().describe("候选人发送的消息内容"),
 
       conversation_history: z
@@ -115,24 +131,13 @@ export const zhipinReplyTool = (
         console.log(`✅ 回复生成成功`);
         console.log(`📝 回复内容: ${replyResult.text}`);
         console.log(`🎯 回复类型: ${replyResult.replyType}`);
-        console.log(`📊 分类依据: ${replyResult.reasoning}`);
+        console.log(`📊 分类依据: ${replyResult.reasoningText}`);
 
         // 构建响应
-        const response: {
-          reply: string;
-          replyType: string;
-          reasoning: string;
-          candidateMessage: string;
-          historyCount: number;
-          stats?: {
-            totalStores: number;
-            totalPositions: number;
-            brand: string;
-          };
-        } = {
+        const response: ZhipinReplyToolResult = {
           reply: replyResult.text,
           replyType: replyResult.replyType,
-          reasoning: replyResult.reasoning || "未提供分类依据",
+          reasoningText: replyResult.reasoningText || "未提供分类依据",
           candidateMessage: candidate_message,
           historyCount: processedHistory.length,
         };
@@ -159,7 +164,7 @@ export const zhipinReplyTool = (
       }
     },
 
-    experimental_toToolResultContent(result) {
+    toModelOutput(result: ZhipinReplyToolResult) {
       // 格式化输出结果
       let content = `✅ 智能回复已生成\n\n`;
       content += `📝 回复内容:\n"${result.reply}"\n\n`;
@@ -174,7 +179,11 @@ export const zhipinReplyTool = (
         content += `• 岗位数: ${result.stats.totalPositions}个`;
       }
 
-      return [{ type: "text" as const, text: content }];
+      // AI SDK v5 格式
+      return {
+        type: "content" as const,
+        value: [{ type: "text" as const, text: content }],
+      };
     },
   });
 

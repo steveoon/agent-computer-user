@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       success: true,
       reply: reply.text,
       replyType: reply.replyType,
-      reasoning: reply.reasoning,
+      reasoningText: reply.reasoningText,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

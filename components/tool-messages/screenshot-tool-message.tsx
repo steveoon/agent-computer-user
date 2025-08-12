@@ -6,18 +6,22 @@ import {
   CircleSlash,
   Loader2,
   StopCircle,
+  AlertCircle,
   type LucideIcon,
 } from "lucide-react";
 import { ABORTED } from "@/lib/utils";
 import Image from "next/image";
 import type { ToolTheme } from "./types";
+import type { ToolPartState } from "@/types/tool-common";
 
 interface ScreenshotToolMessageProps {
   icon: LucideIcon;
   label: string;
   theme: ToolTheme;
-  state: "call" | "result" | "partial-call";
-  result?: unknown;
+  state: ToolPartState;
+  input?: Record<string, unknown>;
+  output?: unknown;
+  errorText?: string;
   isLatestMessage?: boolean;
   status?: string;
   messageId: string;
@@ -31,7 +35,8 @@ export function ScreenshotToolMessage({
   label,
   theme,
   state,
-  result,
+  output,
+  errorText: _errorText,
   isLatestMessage,
   status,
   messageId,
@@ -39,20 +44,20 @@ export function ScreenshotToolMessage({
   imageFormat = "png",
   maxHeight = "500px",
 }: ScreenshotToolMessageProps) {
-  // 检查 result 是否是图片类型
+  // 检查 output 是否是图片类型
   const isImageResult =
-    result &&
-    typeof result === "object" &&
-    "type" in result &&
-    result.type === "image" &&
-    "data" in result;
+    output &&
+    typeof output === "object" &&
+    "type" in output &&
+    output.type === "image" &&
+    "data" in output;
 
   const content =
-    state === "result" && isImageResult ? (
+    state === "output-available" && isImageResult ? (
       <div className="mt-2 relative w-full" style={{ maxHeight }}>
         <div className="relative w-full" style={{ aspectRatio: "16/9" }}>
           <Image
-            src={`data:image/${imageFormat};base64,${result.data}`}
+            src={`data:image/${imageFormat};base64,${output.data}`}
             alt="Screenshot"
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -61,8 +66,10 @@ export function ScreenshotToolMessage({
           />
         </div>
       </div>
-    ) : state === "call" ? (
-      <div className={`w-full aspect-video rounded-sm ${theme.iconBgColor.replace('bg-', 'bg-opacity-20 bg-')} animate-pulse mt-2`}></div>
+    ) : state === "input-available" || state === "input-streaming" ? (
+      <div
+        className={`w-full aspect-video rounded-sm ${theme.iconBgColor.replace("bg-", "bg-opacity-20 bg-")} animate-pulse mt-2`}
+      ></div>
     ) : null;
 
   return (
@@ -81,18 +88,20 @@ export function ScreenshotToolMessage({
         </div>
         <span className={`font-medium ${theme.textColor} leading-5`}>{label}</span>
         <div className="ml-auto w-4 h-4 flex items-center justify-center">
-          {state === "call" ? (
+          {state === "input-streaming" || state === "input-available" ? (
             isLatestMessage && status !== "ready" ? (
               <Loader2 className={`animate-spin h-4 w-4 ${theme.loaderColor}`} />
             ) : (
               <StopCircle className="h-4 w-4 text-red-500" />
             )
-          ) : state === "result" ? (
-            result === ABORTED ? (
+          ) : state === "output-available" ? (
+            output === ABORTED ? (
               <CircleSlash className="h-4 w-4 text-amber-600" />
             ) : (
               <CheckCircle size={14} className="text-green-600" />
             )
+          ) : state === "output-error" ? (
+            <AlertCircle className="h-4 w-4 text-red-500" />
           ) : null}
         </div>
       </div>

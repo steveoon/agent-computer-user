@@ -60,7 +60,7 @@ function parseEvaluateResult(result: unknown): Record<string, unknown> | null {
  */
 export const zhipinGetUsername = tool({
   description: "获取BOSS直聘当前登录账号的用户名",
-  parameters: z.object({}),
+  inputSchema: z.object({}),
   execute: async () => {
     try {
       const client = await getPuppeteerMCPClient();

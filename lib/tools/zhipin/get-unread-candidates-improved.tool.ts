@@ -19,7 +19,7 @@ export const getUnreadCandidatesImprovedTool = tool({
   - 支持过滤和排序选项
   `,
 
-  parameters: z.object({
+  inputSchema: z.object({
     selector: z
       .string()
       .optional()

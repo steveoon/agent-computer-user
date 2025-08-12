@@ -1,31 +1,22 @@
-import { streamText, UIMessage } from "ai";
+import { streamText, convertToModelMessages, stepCountIs } from "ai";
 import { killDesktop } from "@/lib/e2b/utils";
-import { bashTool, computerTool } from "@/lib/e2b/tool";
-import { feishuBotTool } from "@/lib/tools/feishu-bot-tool";
-import { puppeteerTool } from "@/lib/tools/puppeteer-tool";
-import { weChatBotTool } from "@/lib/tools/wechat-bot-tool";
-import { jobPostingGeneratorTool } from "@/lib/tools/job-posting-generator-tool";
-import { zhipinReplyTool } from "@/lib/tools/zhipin-reply-tool";
-import { zhipinTools } from "@/lib/tools/zhipin";
-import { yupaoTools } from "@/lib/tools/yupao";
-import { dulidayJobListTool } from "@/lib/tools/duliday/duliday-job-list-tool";
-import { dulidayJobDetailsTool } from "@/lib/tools/duliday/duliday-job-details-tool";
-import { dulidayInterviewBookingTool } from "@/lib/tools/duliday/duliday-interview-booking-tool";
-import { dulidayBiReportTool } from "@/lib/tools/duliday/bi-report-tool";
-import { dulidayBiRefreshTool } from "@/lib/tools/duliday/bi-refresh-tool";
-import { filterToolsBySystemPrompt } from "@/lib/tools/tool-filter";
+import { createAndFilterTools } from "@/lib/tools/tool-registry";
 import { prunedMessages, shouldCleanupSandbox } from "@/lib/utils";
 import { getDynamicRegistry } from "@/lib/model-registry/dynamic-registry";
 import { getBossZhipinSystemPrompt } from "@/lib/loaders/system-prompts.loader";
 import { DEFAULT_PROVIDER_CONFIGS, DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
-import type { ModelConfig } from "@/lib/config/models";
-import type { ZhipinData, SystemPromptsConfig, ReplyPromptsConfig } from "@/types";
+import type { ChatRequestBody } from "@/types";
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 300;
 
 // 清理沙箱的公共函数
-async function cleanupSandboxIfNeeded(sandboxId: string, error: unknown, context: string) {
+async function cleanupSandboxIfNeeded(sandboxId: string | null, error: unknown, context: string) {
+  // 如果没有sandboxId，无需清理
+  if (!sandboxId) {
+    return;
+  }
+  
   if (shouldCleanupSandbox(error)) {
     try {
       console.log(`🧹 开始清理沙箱: ${sandboxId} (${context})`);
@@ -50,17 +41,7 @@ export async function POST(req: Request) {
     replyPrompts,
     activeSystemPrompt,
     dulidayToken,
-  }: {
-    messages: UIMessage[];
-    sandboxId: string;
-    preferredBrand: string;
-    modelConfig?: ModelConfig;
-    configData?: ZhipinData; // Boss直聘配置数据
-    systemPrompts?: SystemPromptsConfig; // 系统提示词配置
-    replyPrompts?: ReplyPromptsConfig; // 回复指令配置
-    activeSystemPrompt?: keyof SystemPromptsConfig; // 活动系统提示词类型
-    dulidayToken?: string; // Duliday API token
-  } = await req.json();
+  }: ChatRequestBody = await req.json();
 
   try {
     // 🎯 获取配置的模型和provider设置
@@ -117,7 +98,7 @@ export async function POST(req: Request) {
 
     // 🎯 对历史消息应用智能Token优化 (10K tokens阈值)
     const processedMessages = await prunedMessages(messages, {
-      maxTokens: 15000, // 硬限制：15K tokens
+      maxOutputTokens: 15000, // 硬限制：15K tokens
       targetTokens: 8000, // 目标：8K tokens时开始优化
       preserveRecentMessages: 2, // 保护最近2条消息
     });
@@ -133,60 +114,29 @@ export async function POST(req: Request) {
       )}KB (节省 ${savedPercent}%) | 消息数: ${messages.length} -> ${processedMessages.length}`
     );
 
-    // 定义所有可用的工具
-    const allTools = {
-      computer: computerTool(
+    // 使用新的工具注册表系统创建和过滤工具
+    // 这替代了之前手动创建每个工具的复杂逻辑
+    const filteredTools = createAndFilterTools(
+      {
         sandboxId,
         preferredBrand,
-        modelConfig || DEFAULT_MODEL_CONFIG,
-        configData, // 传递配置数据
-        replyPrompts // 传递回复指令
-      ),
-      bash: bashTool(sandboxId),
-      feishu: feishuBotTool(),
-      wechat: weChatBotTool(),
-      job_posting_generator: jobPostingGeneratorTool(preferredBrand, configData),
-      zhipin_reply_generator: zhipinReplyTool(
-        preferredBrand,
-        modelConfig || DEFAULT_MODEL_CONFIG,
+        modelConfig,
         configData,
-        replyPrompts
-      ),
-      puppeteer: puppeteerTool(),
-      // Zhipin automation tools
-      zhipin_get_unread_candidates_improved: zhipinTools.getUnreadCandidatesImproved,
-      zhipin_open_candidate_chat_improved: zhipinTools.openCandidateChatImproved,
-      zhipin_send_message: zhipinTools.sendMessage(),
-      zhipin_get_chat_details: zhipinTools.getChatDetails(),
-      zhipin_exchange_wechat: zhipinTools.exchangeWechat(),
-      zhipin_get_username: zhipinTools.getUsername,
-      // Duliday interview booking tools
-      duliday_job_list: dulidayJobListTool(dulidayToken, preferredBrand),
-      duliday_job_details: dulidayJobDetailsTool(dulidayToken),
-      duliday_interview_booking: dulidayInterviewBookingTool(dulidayToken),
-      duliday_bi_report: dulidayBiReportTool(),
-      duliday_bi_refresh: dulidayBiRefreshTool(),
-      // Yupao automation tools
-      yupao_get_unread_messages: yupaoTools.getUnreadMessages,
-      yupao_open_candidate_chat: yupaoTools.openCandidateChat,
-      yupao_get_chat_details: yupaoTools.getChatDetails,
-      yupao_send_message: yupaoTools.sendMessage,
-      yupao_exchange_wechat: yupaoTools.exchangeWechat,
-      yupao_get_username: yupaoTools.getUsername,
-    };
-
-    // 根据系统提示词过滤工具
-    const filteredTools = filterToolsBySystemPrompt(allTools, promptType);
+        replyPrompts,
+        dulidayToken,
+      },
+      promptType
+    );
 
     const result = streamText({
       model: dynamicRegistry.languageModel(chatModel), // 使用配置的模型
       system: systemPrompt,
-      messages: processedMessages,
+      messages: convertToModelMessages(processedMessages),
       tools: filteredTools,
       providerOptions: {
         anthropic: { cacheControl: { type: "ephemeral" } },
       },
-      maxSteps: 30,
+      stopWhen: stepCountIs(30),
       onFinish: async ({ usage, toolResults }) => {
         console.log("📊 usage", usage);
         // Note: toolResults is typically empty in streaming mode as results are sent immediately
@@ -196,7 +146,7 @@ export async function POST(req: Request) {
       },
       onError: async error => {
         console.error("Stream generation error:", error);
-        
+
         // 记录详细错误信息
         if (error && typeof error === "object") {
           const errorObj = error as Record<string, unknown>;
@@ -216,8 +166,8 @@ export async function POST(req: Request) {
     });
 
     // Create response stream with proper error handling
-    const response = result.toDataStreamResponse({
-      getErrorMessage(error: unknown) {
+    const response = result.toUIMessageStreamResponse({
+      onError(error: unknown) {
         console.error("Stream error:", error);
 
         // 记录详细的错误信息
@@ -248,7 +198,7 @@ export async function POST(req: Request) {
         // 处理结构化错误对象（如 overloaded_error）
         if (error && typeof error === "object") {
           const errorObj = error as Record<string, unknown>;
-          
+
           // 记录完整的错误对象
           console.error("Structured error object:", {
             type: errorObj.type,
@@ -257,28 +207,28 @@ export async function POST(req: Request) {
             error: errorObj.error,
             cause: errorObj.cause,
           });
-          
+
           const nestedError = errorObj.error as Record<string, unknown> | undefined;
-          
+
           // 处理 overloaded_error
           if (nestedError?.type === "overloaded_error") {
             return "AI服务当前负载过高，请稍后重试";
           }
-          
+
           // 处理其他已知错误类型
           if (nestedError?.type === "rate_limit_error") {
             return "请求频率过高，请稍后重试";
           }
-          
+
           if (nestedError?.type === "authentication_error") {
             return "认证失败，请检查API密钥配置";
           }
-          
+
           // 返回错误消息
           if (errorObj.message) {
             return String(errorObj.message);
           }
-          
+
           if (nestedError?.message) {
             return String(nestedError.message);
           }
@@ -287,7 +237,7 @@ export async function POST(req: Request) {
         if (typeof error === "string") {
           return error;
         }
-        
+
         return "发生未知错误，请重试";
       },
     });

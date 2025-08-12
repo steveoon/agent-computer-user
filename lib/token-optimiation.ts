@@ -1,4 +1,6 @@
-import type { Message, ToolInvocation } from "ai";
+import type { UIMessage, UIMessagePart, UIDataTypes, UITools } from "ai";
+import type { ToolPart } from "@/types/tool-common";
+import { parseToolOutput } from "@/types/tool-common";
 import { encodeTextServer, cleanupEncodingServer } from "./token-server";
 
 // 🧠 智能Token分析器 v2.3 (服务端优化版)
@@ -30,9 +32,7 @@ export class TokenAnalyzer {
   /**
    * 🛠️ 精确计算工具调用的Token消耗
    */
-  private async calculateToolInvocationTokens(
-    toolInvocation: ToolInvocation
-  ): Promise<{
+  private async calculateToolInvocationTokens(part: UIMessagePart<UIDataTypes, UITools>): Promise<{
     tokens: number;
     imageTokens: number;
   }> {
@@ -40,38 +40,57 @@ export class TokenAnalyzer {
     let imageTokens = 0;
 
     try {
-      // 1. 🏷️ 工具名称 tokens
-      if (toolInvocation.toolName) {
-        tokens += await this.safeEncode(toolInvocation.toolName);
+      // 检查是否为工具调用部分
+      if (!part.type.startsWith("tool-")) {
+        return { tokens: 0, imageTokens: 0 };
       }
 
-      // 2. 📝 工具参数 tokens
-      if (toolInvocation.args) {
+      // 使用类型守卫来确保是工具部分
+      const toolPart = part as ToolPart;
+
+      // 1. 🏷️ 工具名称 tokens (从 type 中提取)
+      const toolName = part.type.replace("tool-", "");
+      tokens += await this.safeEncode(toolName);
+
+      // 2. 📝 工具参数 tokens (input 阶段)
+      if (
+        "state" in toolPart &&
+        (toolPart.state === "input-streaming" || toolPart.state === "input-available") &&
+        "input" in toolPart &&
+        toolPart.input
+      ) {
         try {
-          const argsString = JSON.stringify(toolInvocation.args);
-          tokens += await this.safeEncode(argsString);
+          const inputString = JSON.stringify(toolPart.input);
+          tokens += await this.safeEncode(inputString);
         } catch (error) {
           console.warn("⚠️ 序列化工具参数失败:", error);
-          // 降级估算: 假设args占用约20个token
+          // 降级估算: 假设input占用约20个token
           tokens += 20;
         }
       }
 
       // 3. 📊 工具调用ID和状态的结构开销
-      tokens += 10; // 固定开销：tool_call_id, state等字段
+      tokens += 10; // 固定开销：toolCallId, state等字段
 
       // 4. 🎯 工具结果 tokens (最重要的部分)
-      if (toolInvocation.state === "result" && toolInvocation.result) {
-        const result = toolInvocation.result;
+      if (
+        "state" in toolPart &&
+        toolPart.state === "output-available" &&
+        "output" in toolPart &&
+        toolPart.output
+      ) {
+        const output = toolPart.output;
 
-        if (typeof result === "string") {
+        if (typeof output === "string") {
           // 简单字符串结果 (如bash命令输出)
-          tokens += await this.safeEncode(result);
-        } else if (result && typeof result === "object") {
+          tokens += await this.safeEncode(output);
+        } else if (output && typeof output === "object") {
           // 结构化结果对象
-          if (result.type === "image" && result.data) {
+          const outputObj = parseToolOutput(output);
+          if (outputObj && outputObj.type === "image" && outputObj.data) {
             // 🖼️ 图片结果处理
-            const base64Data = result.data as string;
+            // 验证 data 是字符串类型（base64编码的图片）
+            const base64Data = String(outputObj.data);
             const imageKB = (base64Data.length * 3) / 4 / 1024;
             const imageTokens_calc = Math.round(imageKB * 15); // 约15 tokens per KB
 
@@ -80,14 +99,14 @@ export class TokenAnalyzer {
 
             // 图片元数据的少量token开销
             tokens += 5;
-          } else if (result.type === "text" && result.data) {
+          } else if (outputObj && outputObj.type === "text" && outputObj.data) {
             // 📝 文本结果处理
-            tokens += await this.safeEncode(result.data);
+            tokens += await this.safeEncode(String(outputObj.data));
             tokens += 3; // type字段等结构开销
           } else {
             // 其他类型的结构化结果
             try {
-              const resultString = JSON.stringify(result);
+              const resultString = JSON.stringify(output);
               tokens += await this.safeEncode(resultString);
             } catch (error) {
               console.warn("⚠️ 序列化工具结果失败:", error);
@@ -95,7 +114,19 @@ export class TokenAnalyzer {
             }
           }
         }
-      } else if (toolInvocation.state === "call") {
+      } else if (
+        "state" in toolPart &&
+        toolPart.state === "output-error" &&
+        "errorText" in toolPart &&
+        toolPart.errorText
+      ) {
+        // 错误信息的tokens
+        tokens += await this.safeEncode(toolPart.errorText);
+        tokens += 5; // 错误结构开销
+      } else if (
+        "state" in toolPart &&
+        (toolPart.state === "input-streaming" || toolPart.state === "input-available")
+      ) {
         // 工具调用请求阶段(还没有结果)
         tokens += 2; // state字段开销
       }
@@ -112,7 +143,7 @@ export class TokenAnalyzer {
    * 📊 估算消息的Token使用情况 (服务端版本)
    */
   async estimateMessageTokens(
-    messages: Message[],
+    messages: UIMessage[],
     optimizationThreshold: number = 80000
   ): Promise<{
     totalTokens: number;
@@ -131,12 +162,7 @@ export class TokenAnalyzer {
 
     try {
       for (const message of messages) {
-        // 📝 基础文本内容
-        if (message.content && typeof message.content === "string") {
-          const tokens = await this.safeEncode(message.content);
-          textTokens += tokens;
-          totalTokens += tokens;
-        }
+        // 📝 在 v5 中，所有内容都在 parts 数组中，不再使用 content 属性
 
         // 🔍 分析parts中的内容
         if (message.parts) {
@@ -145,11 +171,9 @@ export class TokenAnalyzer {
               const tokens = await this.safeEncode(part.text);
               textTokens += tokens;
               totalTokens += tokens;
-            } else if (part.type === "tool-invocation") {
+            } else if (part.type.startsWith("tool-")) {
               // 🛠️ 精确计算工具调用tokens
-              const toolResult = await this.calculateToolInvocationTokens(
-                part.toolInvocation
-              );
+              const toolResult = await this.calculateToolInvocationTokens(part);
 
               toolTokens += toolResult.tokens;
               totalTokens += toolResult.tokens;
@@ -200,32 +224,34 @@ export class TokenAnalyzer {
   /**
    * 🆘 降级token估算方法 (改进版)
    */
-  private fallbackTokenEstimation(messages: Message[]): number {
+  private fallbackTokenEstimation(messages: UIMessage[]): number {
     let totalChars = 0;
 
-    messages.forEach((message) => {
-      // 基础内容
-      if (message.content && typeof message.content === "string") {
-        totalChars += message.content.length;
-      }
+    messages.forEach(message => {
+      // 在 v5 中，所有内容都在 parts 数组中，不再使用 content 属性
 
       if (message.parts) {
-        message.parts.forEach((part) => {
+        message.parts.forEach(part => {
           if (part.type === "text" && part.text) {
             totalChars += part.text.length;
-          } else if (part.type === "tool-invocation") {
+          } else if (part.type.startsWith("tool-")) {
             // 改进的工具调用估算
             let toolChars = 50; // 基础结构
+            const toolPart = part as ToolPart;
 
             // 工具名称
-            if (part.toolInvocation.toolName) {
-              toolChars += part.toolInvocation.toolName.length;
-            }
+            const toolName = part.type.replace("tool-", "");
+            toolChars += toolName.length;
 
             // 工具参数
-            if (part.toolInvocation.args) {
+            if (
+              "state" in toolPart &&
+              (toolPart.state === "input-streaming" || toolPart.state === "input-available") &&
+              "input" in toolPart &&
+              toolPart.input
+            ) {
               try {
-                toolChars += JSON.stringify(part.toolInvocation.args).length;
+                toolChars += JSON.stringify(toolPart.input).length;
               } catch {
                 toolChars += 100; // 估算
               }
@@ -233,26 +259,45 @@ export class TokenAnalyzer {
 
             // 工具结果
             if (
-              part.toolInvocation.state === "result" &&
-              part.toolInvocation.result
+              "state" in toolPart &&
+              toolPart.state === "output-available" &&
+              "output" in toolPart &&
+              toolPart.output
             ) {
-              const result = part.toolInvocation.result;
-              if (typeof result === "string") {
-                toolChars += result.length;
-              } else if (result && typeof result === "object") {
-                if (result.type === "image" && result.data) {
-                  const imageKB = (result.data.length * 3) / 4 / 1024;
+              const output = toolPart.output;
+              if (typeof output === "string") {
+                toolChars += output.length;
+              } else if (output && typeof output === "object") {
+                // 定义工具输出的可能结构
+                const outputObj = parseToolOutput(output);
+                if (outputObj && outputObj.type === "image" && outputObj.data) {
+                  // 对于图片数据，假设是 base64 字符串
+                  const dataLength = typeof outputObj.data === 'string' 
+                    ? outputObj.data.length 
+                    : String(outputObj.data).length;
+                  const imageKB = (dataLength * 3) / 4 / 1024;
                   toolChars += imageKB * 60; // 粗略估算图片字符数
-                } else if (result.type === "text" && result.data) {
-                  toolChars += result.data.length;
+                } else if (outputObj && outputObj.type === "text" && outputObj.data) {
+                  // 对于文本数据，获取字符串长度
+                  const textLength = typeof outputObj.data === 'string'
+                    ? outputObj.data.length
+                    : String(outputObj.data).length;
+                  toolChars += textLength;
                 } else {
                   try {
-                    toolChars += JSON.stringify(result).length;
+                    toolChars += JSON.stringify(output).length;
                   } catch {
                     toolChars += 200; // 估算
                   }
                 }
               }
+            } else if (
+              "state" in toolPart &&
+              toolPart.state === "output-error" &&
+              "errorText" in toolPart &&
+              toolPart.errorText
+            ) {
+              toolChars += toolPart.errorText.length;
             }
 
             totalChars += toolChars;

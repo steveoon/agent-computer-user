@@ -5,14 +5,14 @@ import { BaseToolMessage } from "./base-tool-message";
 import { themes, type ToolMessageProps } from "./types";
 
 export function DulidayBiReportToolMessage(props: ToolMessageProps) {
-  const { args, state, result, isLatestMessage, status, messageId, partIndex } = props;
-  const startDate = args.startDate as string | undefined;
-  const endDate = args.endDate as string | undefined;
-  const orderStatus = args.orderStatus as string | undefined;
-  const storeName = args.storeName as string | undefined;
-  const regionName = args.regionName as string | undefined;
-  const formatType = args.formatType as string | undefined;
-  const limit = args.limit as number | undefined;
+  const { input, state, output, isLatestMessage, status, messageId, partIndex } = props;
+  const startDate = input.startDate as string | undefined;
+  const endDate = input.endDate as string | undefined;
+  const orderStatus = input.orderStatus as string | undefined;
+  const storeName = input.storeName as string | undefined;
+  const regionName = input.regionName as string | undefined;
+  const formatType = input.formatType as string | undefined;
+  const limit = input.limit as number | undefined;
 
   const details: string[] = [];
   
@@ -46,7 +46,7 @@ export function DulidayBiReportToolMessage(props: ToolMessageProps) {
       detail={detail}
       theme={themes.indigo}
       state={state}
-      result={result}
+      output={output}
       isLatestMessage={isLatestMessage}
       status={status}
       messageId={messageId}

@@ -390,7 +390,7 @@ export const dulidayBiReportTool = () =>
   tool({
     description:
       "获取Duliday BI报表数据。支持按日期范围、订单状态、门店、地区等多维度筛选订单数据。返回的数据包含订单详情、服务时间、预计收入等信息，适合生成报表和通知。",
-    parameters: z.object({
+    inputSchema: z.object({
       startDate: z
         .string()
         .optional()

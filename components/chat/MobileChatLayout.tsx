@@ -1,12 +1,12 @@
 "use client";
 
 import { ChatPanel } from "./ChatPanel";
-import type { Message } from "@ai-sdk/react";
+import type { UIMessage } from "@ai-sdk/react";
 import type { ModelId } from "@/lib/config/models";
 
 interface MobileChatLayoutProps {
   // 来自 useCustomChat
-  messages: Message[];
+  messages: UIMessage[];
   input: string;
   status: "ready" | "error" | "submitted" | "streaming";
   error: Error | undefined;
