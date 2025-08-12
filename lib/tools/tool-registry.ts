@@ -26,20 +26,23 @@ import type {
   SystemPromptType,
   ToolSet,
 } from "@/types/tool-common";
+import { safeCreateTool, createToolDefinition } from "@/types/tool-common";
 
 // ========== 工具注册表 ==========
 
 /**
  * 工具注册表
- * 所有工具的定义都在这里
+ * 所有工具的定义都在这里，使用类型安全的定义
+ * Note: 使用 ToolDefinition 而不指定泛型，允许工具有各自的输入输出类型
  */
 const TOOL_REGISTRY: Record<string, ToolDefinition> = {
   // ===== 沙盒工具 =====
-  computer: {
+  computer: createToolDefinition({
     name: "computer",
     description: "E2B沙盒中的计算机控制工具",
     category: "sandbox",
     requiresSandbox: true,
+    requiredContext: ["sandboxId"],
     create: (ctx) => {
       // 只有当 sandboxId 存在时才创建
       if (!ctx.sandboxId) return null;
@@ -51,16 +54,16 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
         ctx.replyPrompts
       );
     },
-  },
+  }),
 
   // ===== 通用工具 =====
-  bash: {
+  bash: createToolDefinition({
     name: "bash",
     description: "Bash命令执行工具",
     category: "universal",
     requiresSandbox: false,
     create: (ctx) => bashTool(ctx.sandboxId || undefined),
-  },
+  }),
 
   // ===== 通信工具 =====
   feishu: {
@@ -317,21 +320,15 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
 
 /**
  * 创建并获取所有工具
- * 这是主要的入口函数，取代了在route.ts中手动创建工具的逻辑
+ * 这是主要的入口函数，使用类型安全的工具创建
  */
 export function createTools(context: ToolCreationContext): ToolSet {
   const tools: ToolSet = {};
   
   // 遍历注册表，创建所有工具
   for (const [toolName, definition] of Object.entries(TOOL_REGISTRY)) {
-    // 如果工具需要沙盒但没有提供sandboxId，跳过
-    if (definition.requiresSandbox && !context.sandboxId) {
-      console.log(`⏭️ 跳过工具 ${toolName}: 需要sandboxId`);
-      continue;
-    }
-    
-    // 创建工具
-    const tool = definition.create(context);
+    // 使用类型安全的创建包装器
+    const tool = safeCreateTool(definition, context);
     if (tool !== null) {
       tools[toolName] = tool;
     }
