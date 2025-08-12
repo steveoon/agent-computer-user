@@ -2,6 +2,15 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.2.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.1.0...v1.2.0-develop.1) (2025-08-12)
+
+
+### Features
+
+* 优化 Yupao 工具的 CSS 选择器适配能力 ([13b4d43](https://github.com/steveoon/agent-computer-user/commit/13b4d43376ba6f683147def927659762aff3ddef))
+* 升级 AI SDK 到 v5 和 Zod 到 v4 ([bee9212](https://github.com/steveoon/agent-computer-user/commit/bee9212739e7161f4ace4a8f80b44333522c8892))
+* 添加 Duliday BI 报表查询建议模板并修复编辑器字段消失问题 ([40a281b](https://github.com/steveoon/agent-computer-user/commit/40a281b59b09f1e1b246b4adea30fe1fc5ed8739))
+
 # [1.1.0-develop.5](https://github.com/steveoon/agent-computer-user/compare/v1.1.0-develop.4...v1.1.0-develop.5) (2025-08-12)
 
 
