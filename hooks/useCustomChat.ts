@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { ABORTED } from "@/lib/utils";
@@ -14,6 +15,7 @@ import {
   getEnvironmentLimits,
   detectEnvironment,
 } from "@/lib/utils/environment";
+import type { ChatRequestOptions } from "@/types";
 
 interface UseCustomChatProps {
   sandboxId: string | null;
@@ -108,38 +110,30 @@ export function useCustomChat({
     setDulidayToken(token);
   }, []);
 
+  // 🎯 AI SDK v5: 手动管理 input 状态
+  const [input, setInput] = useState('');
+  
+  // 🎯 生成稳定的聊天 ID（如果没有 sandboxId）
+  const [stableChatId] = useState(() => `chat-${crypto.randomUUID()}`);
+  const chatId = sandboxId || stableChatId;
+  
+  // 🎯 AI SDK v5: 使用 DefaultChatTransport 配置
   const {
     messages,
-    input,
-    handleInputChange,
-    handleSubmit,
     status,
     stop: stopGeneration,
-    append,
+    sendMessage,
     setMessages,
     error,
-    reload,
+    regenerate,
   } = useChat({
-    api: "/api/chat",
-    id: sandboxId ?? undefined,
-    body: {
-      sandboxId,
-      preferredBrand: currentBrand,
-      modelConfig: {
-        chatModel,
-        classifyModel,
-        replyModel,
-        providerConfigs,
-      },
-      // 🔧 传递配置数据到服务端
-      configData,
-      systemPrompts,
-      replyPrompts,
-      activeSystemPrompt,
-      dulidayToken,
-    },
-    maxSteps: 30,
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      credentials: "include",
+    }),
+    id: chatId,
   });
+  
 
   // 使用智能清理 Hook
   const {
@@ -155,7 +149,33 @@ export function useCustomChat({
   });
 
   // 使用飞书通知 Hook
-  const { sendFeishuNotification } = useFeishuNotification({ append });
+  const { sendFeishuNotification } = useFeishuNotification({ 
+    append: async (message: { role: "user"; content: string }) => {
+      // 构建简化的请求体
+      const requestBody: any = { sandboxId: sandboxId || null };
+      
+      // 构建 modelConfig 对象
+      const modelConfig = {
+        chatModel,
+        classifyModel,
+        replyModel,
+        providerConfigs,
+      };
+      
+      if (currentBrand) requestBody.preferredBrand = currentBrand;
+      if (modelConfig) requestBody.modelConfig = modelConfig;
+      if (configData) requestBody.configData = configData;
+      if (systemPrompts) requestBody.systemPrompts = systemPrompts;
+      if (replyPrompts) requestBody.replyPrompts = replyPrompts;
+      if (activeSystemPrompt) requestBody.activeSystemPrompt = activeSystemPrompt;
+      if (dulidayToken) requestBody.dulidayToken = dulidayToken;
+      
+      await sendMessage(
+        { text: message.content },
+        { body: requestBody }
+      );
+    }
+  });
 
   // 设置 onError 和 onFinish 回调
   useEffect(() => {
@@ -200,7 +220,7 @@ export function useCustomChat({
         setTimeout(() => {
           console.log("🔄 载荷过大错误处理完成，自动重试请求");
           setIsProcessingError(false);
-          reload();
+          regenerate();
         }, 1000);
       } else {
         // 🚨 清理失败，现在发送通知并显示错误
@@ -262,7 +282,7 @@ export function useCustomChat({
     messages,
     sendFeishuNotification,
     handlePayloadTooLargeError,
-    reload,
+    regenerate,
     clearMessages,
   ]);
 
@@ -274,8 +294,9 @@ export function useCustomChat({
     const lastMessageLastPart = lastMessage?.parts.at(-1);
     if (
       lastMessage?.role === "assistant" &&
-      lastMessageLastPart?.type === "tool-invocation"
+      lastMessageLastPart?.type?.startsWith('tool-')
     ) {
+      // AI SDK v5 tool part 格式 - 需要保留 toolCallId
       setMessages((prev) => [
         ...prev.slice(0, -1),
         {
@@ -284,24 +305,27 @@ export function useCustomChat({
             ...lastMessage.parts.slice(0, -1),
             {
               ...lastMessageLastPart,
-              toolInvocation: {
-                ...lastMessageLastPart.toolInvocation,
-                state: "result",
-                result: ABORTED,
-              },
-            },
+              state: 'output-available' as const,
+              output: ABORTED,
+            } as any, // Tool part 类型复杂，使用 any 暂时绕过
           ],
         },
       ]);
     }
   }, [stopGeneration, messages, setMessages]);
 
-  // 自定义提交处理器
-  const customSubmit = useCallback(
+  // 🎯 AI SDK v5: 手动实现 handleInputChange
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+  }, []);
+
+  // 🎯 AI SDK v5: 手动实现 handleSubmit
+  const handleSubmit = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      
       // 🔐 检查用户认证状态
       if (!isAuthenticated) {
-        event.preventDefault();
         toast.error("请先登录", {
           description: "您需要登录后才能使用AI助手功能",
           richColors: true,
@@ -310,7 +334,7 @@ export function useCustomChat({
         return;
       }
 
-      // 移除预防性检查，只在真正遇到错误时才清理
+      if (!input.trim()) return;
 
       if (error != null) {
         console.log("Removing last message due to error before retry");
@@ -318,13 +342,11 @@ export function useCustomChat({
         // 对于某些错误类型，不应该立即重试
         if (isPayloadTooLargeError(error)) {
           console.log("🚫 载荷过大错误，跳过重试以避免重复错误");
-          event.preventDefault();
           return;
         }
         
         if (isOverloadedError(error)) {
           console.log("🚫 服务过载错误，请稍后重试");
-          event.preventDefault();
           toast.info("请稍等片刻", {
             description: "AI服务正在恢复中，请稍后再试",
             position: "top-center",
@@ -334,7 +356,6 @@ export function useCustomChat({
         
         if (isRateLimitError(error)) {
           console.log("🚫 频率限制错误，请稍后重试");
-          event.preventDefault();
           toast.info("请慢一点", {
             description: "请求过于频繁，请稍后再试",
             position: "top-center",
@@ -345,16 +366,119 @@ export function useCustomChat({
         setMessages(messages.slice(0, -1));
       }
 
-      handleSubmit(event);
+      // 发送消息 (AI SDK v5 格式 - sendMessage 使用简化格式)
+      // 简化 body 参数，只传递必要的数据
+      const requestBody: any = {
+        sandboxId: sandboxId || null,
+      };
+      
+      // 构建 modelConfig 对象
+      const modelConfig = {
+        chatModel,
+        classifyModel,
+        replyModel,
+        providerConfigs,
+      };
+      
+      // 只在数据存在时添加
+      if (currentBrand) requestBody.preferredBrand = currentBrand;
+      if (modelConfig) requestBody.modelConfig = modelConfig;
+      if (configData) requestBody.configData = configData;
+      if (systemPrompts) requestBody.systemPrompts = systemPrompts;
+      if (replyPrompts) requestBody.replyPrompts = replyPrompts;
+      if (activeSystemPrompt) requestBody.activeSystemPrompt = activeSystemPrompt;
+      if (dulidayToken) requestBody.dulidayToken = dulidayToken;
+      
+      sendMessage(
+        { text: input },
+        { body: requestBody }
+      );
+      
+      // 清空输入
+      setInput('');
     },
     [
       isAuthenticated,
       error,
-      handleSubmit,
+      sendMessage,
       messages,
       setMessages,
+      input,
+      sandboxId,
+      currentBrand,
+      chatModel,
+      classifyModel,
+      replyModel,
+      providerConfigs,
+      configData,
+      systemPrompts,
+      replyPrompts,
+      activeSystemPrompt,
+      dulidayToken,
+      chatId,
     ]
   );
+
+  // 🎯 AI SDK v5: 实现 append 方法（兼容层）
+  const append = useCallback(async (message: { role: 'user' | 'assistant', content: string }) => {
+    // sendMessage 只支持 user 角色，assistant 消息需要通过 setMessages 添加
+    if (message.role === 'user') {
+      // 构建类型安全的请求体
+      const requestBody: ChatRequestOptions = { sandboxId: sandboxId || null };
+      
+      // 构建 modelConfig 对象
+      const modelConfig = {
+        chatModel,
+        classifyModel,
+        replyModel,
+        providerConfigs,
+      };
+      
+      if (currentBrand) requestBody.preferredBrand = currentBrand;
+      if (modelConfig) requestBody.modelConfig = modelConfig;
+      if (configData) requestBody.configData = configData;
+      if (systemPrompts) requestBody.systemPrompts = systemPrompts;
+      if (replyPrompts) requestBody.replyPrompts = replyPrompts;
+      if (activeSystemPrompt) requestBody.activeSystemPrompt = activeSystemPrompt;
+      if (dulidayToken) requestBody.dulidayToken = dulidayToken;
+      
+      await sendMessage(
+        { text: message.content },
+        { body: requestBody }
+      );
+    } else {
+      // 对于 assistant 消息，直接添加到 messages
+      // AI SDK v5 要求使用 parts 数组而不是 content 字符串
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          parts: [
+            {
+              type: 'text',
+              text: message.content,
+            }
+          ],
+          // Note: createdAt is not part of the UIMessage interface in v5
+        } as UIMessage,
+      ]);
+    }
+  }, [
+    sendMessage,
+    setMessages,
+    sandboxId,
+    currentBrand,
+    chatModel,
+    classifyModel,
+    replyModel,
+    providerConfigs,
+    configData,
+    systemPrompts,
+    replyPrompts,
+    activeSystemPrompt,
+    dulidayToken,
+  ]);
 
   // 监听消息数量变化
   useEffect(() => {
@@ -396,10 +520,10 @@ export function useCustomChat({
 
     // 方法
     handleInputChange,
-    handleSubmit: customSubmit,
+    handleSubmit,
     stop,
     append,
-    reload,
+    reload: regenerate, // 兼容旧 API
 
     // 清理相关
     clearMessages,

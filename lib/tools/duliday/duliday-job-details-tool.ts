@@ -13,7 +13,7 @@ export const dulidayJobDetailsTool = (customToken?: string) =>
   tool({
     description:
       "根据jobBasicInfoId获取岗位详情。获取指定岗位的详细信息，包括面试时间安排、面试地址等重要信息。",
-    parameters: z.object({
+    inputSchema: z.object({
       jobBasicInfoId: z
         .number()
         .describe("岗位基础信息ID，可以从岗位列表中获取"),

@@ -48,7 +48,7 @@ export const puppeteerTool = () =>
       
       注意：使用前请确保Chrome浏览器已启动并开启远程调试模式。
     `,
-    parameters: z.object({
+    inputSchema: z.object({
       action: z
         .enum([
           "connect_active_tab",
@@ -296,28 +296,40 @@ export const puppeteerTool = () =>
         return PuppeteerResultSchema.parse(errorResult);
       }
     },
-    experimental_toToolResultContent(result: unknown) {
+    toModelOutput(result: unknown) {
       try {
         // 如果result是字符串，将其包装为text类型的结果
         if (typeof result === "string") {
           console.warn("⚠️ Puppeteer工具返回了字符串而非对象，自动包装为text类型");
-          return [{ type: "text" as const, text: result }];
+          // AI SDK v5 格式
+          return {
+            type: "content" as const,
+            value: [{ type: "text" as const, text: result }],
+          };
         }
 
         // 验证结果类型
         const validatedResult = PuppeteerResultSchema.parse(result);
 
         if (isPuppeteerTextResult(validatedResult)) {
-          return [{ type: "text" as const, text: validatedResult.text }];
+          // AI SDK v5 格式
+          return {
+            type: "content" as const,
+            value: [{ type: "text" as const, text: validatedResult.text }],
+          };
         }
         if (isPuppeteerImageResult(validatedResult)) {
-          return [
-            {
-              type: "image" as const,
-              data: validatedResult.data,
-              mimeType: "image/jpeg",
-            },
-          ];
+          // AI SDK v5 格式
+          return {
+            type: "content" as const,
+            value: [
+              {
+                type: "media" as const,
+                mediaType: "image/jpeg",
+                data: validatedResult.data,
+              },
+            ],
+          };
         }
         throw new Error("Invalid Puppeteer result format");
       } catch (error) {
@@ -328,7 +340,11 @@ export const puppeteerTool = () =>
         const fallbackText =
           typeof result === "string" ? result : `Puppeteer操作完成，但结果格式异常: ${errorText}`;
 
-        return [{ type: "text" as const, text: fallbackText }];
+        // AI SDK v5 格式
+        return {
+          type: "content" as const,
+          value: [{ type: "text" as const, text: fallbackText }],
+        };
       }
     },
   });

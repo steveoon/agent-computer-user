@@ -8,6 +8,10 @@ import {
   performInitialScrollPattern,
   performRandomScroll 
 } from "../zhipin/anti-detection-utils";
+import { 
+  getAdaptiveSelectors,
+  generateFindElementScript 
+} from "./dynamic-selector-utils";
 
 export const getUnreadMessagesTool = tool({
   description: `获取Yupao聊天列表中所有未读消息候选人
@@ -19,7 +23,7 @@ export const getUnreadMessagesTool = tool({
   - 包含反检测机制
   `,
 
-  parameters: z.object({
+  inputSchema: z.object({
     selector: z
       .string()
       .optional()
@@ -45,47 +49,52 @@ export const getUnreadMessagesTool = tool({
       // 在获取候选人列表前执行初始滚动模式
       await performInitialScrollPattern(client);
 
-      // 创建分批处理的脚本
+      // 创建分批处理的脚本 - 使用动态选择器策略
       const processingLogic = `
-        // 使用Yupao的选择器查找名字
-        const nameElement = element.querySelector('${YUPAO_UNREAD_SELECTORS.candidateName}');
+        // 注入查找元素的函数
+        ${generateFindElementScript()}
+        
+        // 使用预定义的自适应选择器
+        const nameSelectors = ${JSON.stringify(getAdaptiveSelectors('candidateName'))};
+        const positionSelectors = ${JSON.stringify(getAdaptiveSelectors('jobTitle'))};
+        const unreadNumSelectors = ${JSON.stringify(getAdaptiveSelectors('unreadNum'))};
+        const statusSelectors = ${JSON.stringify(getAdaptiveSelectors('statusUnread'))};
+        const timeSelectors = ${JSON.stringify(getAdaptiveSelectors('messageTime'))};
+        const msgSelectors = ${JSON.stringify(getAdaptiveSelectors('msgText'))};
+        
+        // 查找各个元素
+        const nameElement = findElement(element, nameSelectors);
         const name = nameElement ? nameElement.textContent.trim() : '';
         
         if (!name) return; // 跳过没有名字的元素
         
-        // 获取职位信息
-        const positionElement = element.querySelector('${YUPAO_UNREAD_SELECTORS.jobTitle}');
+        const positionElement = findElement(element, positionSelectors);
         const position = positionElement ? positionElement.textContent.trim() : '';
         
-        // 检查未读状态 - 检查未读数字或状态标签
-        // 未读数字在imageBox内，需要在imageBox内查找
-        const unreadNumElement = element.querySelector('${YUPAO_UNREAD_SELECTORS.imageBox} ${YUPAO_UNREAD_SELECTORS.unreadNum}');
-        const statusElement = element.querySelector('${YUPAO_UNREAD_SELECTORS.statusUnread}');
+        // 检查未读状态
+        const unreadNumElement = findElement(element, unreadNumSelectors);
+        const statusElement = findElement(element, statusSelectors);
         
         let unreadCount = 0;
         let hasUnread = false;
         let messageStatus = '';
         
-        // 检查未读数字（在头像容器内，如<span class="_unreadNum_1rm6c_97">2</span>）
         if (unreadNumElement) {
           const unreadText = unreadNumElement.textContent?.trim();
-          if (unreadText) {
+          if (unreadText && /^\\d+$/.test(unreadText)) {
             unreadCount = parseInt(unreadText, 10) || 0;
             hasUnread = unreadCount > 0;
           }
         }
         
-        // 获取状态标签（[送达]、[新招呼]等）- 仅用于显示，不影响未读状态
         if (statusElement) {
           messageStatus = statusElement.textContent?.trim() || '';
         }
         
-        // 获取时间
-        const timeElement = element.querySelector('${YUPAO_UNREAD_SELECTORS.messageTime}');
+        const timeElement = findElement(element, timeSelectors);
         const time = timeElement ? timeElement.textContent.trim() : '';
         
-        // 获取最新消息内容
-        const msgElement = element.querySelector('${YUPAO_UNREAD_SELECTORS.msgText}');
+        const msgElement = findElement(element, msgSelectors);
         const lastMessage = msgElement ? msgElement.textContent.trim() : '';
         
         // 根据条件添加候选人
@@ -111,8 +120,30 @@ export const getUnreadMessagesTool = tool({
         const onlyUnread = ${onlyUnread};
         const sortBy = '${sortBy}';
         
+        // 动态查找对话项 - 尝试多种选择器策略
+        const findConvItems = () => {
+          const selectors = [
+            selector, // 首先尝试传入的选择器
+            ...${JSON.stringify(getAdaptiveSelectors('convItem'))} // 使用预定义的自适应选择器
+          ];
+          
+          for (const sel of selectors) {
+            try {
+              const items = document.querySelectorAll(sel);
+              if (items.length > 0) {
+                console.log(\`Found \${items.length} items with selector: \${sel}\`);
+                return Array.from(items);
+              }
+            } catch (e) {
+              // 某些选择器可能不被支持
+            }
+          }
+          
+          return [];
+        };
+        
         // 获取所有对话项
-        const elements = Array.from(document.querySelectorAll(selector));
+        const elements = findConvItems();
         
         ${generateBatchProcessingScript(processingLogic, 5)}
         

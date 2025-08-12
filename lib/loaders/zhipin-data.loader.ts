@@ -381,7 +381,7 @@ export async function classifyUserMessage(
           preferredSchedule: z.string().nullable().optional().describe("偏好的工作时间"),
         })
         .describe("从消息中提取的关键信息"),
-      reasoning: z.string().describe("分类依据和分析过程"),
+      reasoningText: z.string().describe("分类依据和分析过程"),
     }),
     system: `你是一个专业的招聘助手分类专家，负责准确分析求职者消息的意图并提取关键信息。
 
@@ -499,7 +499,7 @@ export async function generateSmartReplyWithLLM(
   configData?: ZhipinData,
   replyPrompts?: ReplyPromptsConfig,
   candidateInfo?: CandidateInfo
-): Promise<{ replyType: string; text: string; reasoning: string }> {
+): Promise<{ replyType: string; text: string; reasoningText: string }> {
   try {
     // 🎯 获取配置的模型和provider设置
     const replyModel = modelConfig?.replyModel || DEFAULT_MODEL_CONFIG.replyModel;
@@ -583,7 +583,7 @@ export async function generateSmartReplyWithLLM(
       # LLM分析过程
       - 回复类型: ${classification.replyType}
       - 提取信息: ${JSON.stringify(classification.extractedInfo, null, 2)}
-      - 分析依据: ${classification.reasoning}
+      - 分析依据: ${classification.reasoningText}
 
       📋 核心要求:
       - 严格遵循回复规则的优先级。
@@ -603,7 +603,7 @@ export async function generateSmartReplyWithLLM(
     return {
       replyType: classification.replyType,
       text: finalReply.text,
-      reasoning: classification.reasoning,
+      reasoningText: classification.reasoningText,
     };
   } catch (error) {
     console.error("LLM智能回复生成失败:", error);
@@ -634,7 +634,7 @@ export async function generateSmartReplyWithLLM(
         return {
           replyType: replyContext,
           text: generateSmartReply(data, message, replyContext),
-          reasoning: "降级模式：使用规则引擎生成回复",
+          reasoningText: "降级模式：使用规则引擎生成回复",
         };
       } else {
         // 服务端环境降级：返回错误回复
@@ -642,7 +642,7 @@ export async function generateSmartReplyWithLLM(
         return {
           replyType: "error",
           text: "抱歉，当前系统繁忙，请稍后再试或直接联系我们的客服。",
-          reasoning: "系统错误：服务端环境缺少必要的配置数据",
+          reasoningText: "系统错误：服务端环境缺少必要的配置数据",
         };
       }
     } catch (dataError) {
@@ -651,7 +651,7 @@ export async function generateSmartReplyWithLLM(
       return {
         replyType: "error",
         text: "抱歉，当前系统繁忙，请稍后再试或直接联系我们的客服。",
-        reasoning: "系统错误：数据加载失败",
+        reasoningText: "系统错误：数据加载失败",
       };
     }
   }

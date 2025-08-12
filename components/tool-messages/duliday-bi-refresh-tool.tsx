@@ -5,21 +5,22 @@ import { BaseToolMessage } from "./base-tool-message";
 import { themes, type ToolMessageProps } from "./types";
 
 export function DulidayBiRefreshTool(props: ToolMessageProps) {
-  const { state, result, isLatestMessage, messageId, partIndex } = props;
-  
+  const { state, output, isLatestMessage, messageId, partIndex, status } = props;
+
   // 解析结果
-  const resultText = typeof result === "object" && result !== null && "text" in result 
-    ? (result as { text?: string }).text 
-    : typeof result === "string" 
-    ? result 
-    : "";
+  const resultText =
+    typeof output === "object" && output !== null && "text" in output
+      ? (output as { text?: string }).text
+      : typeof output === "string"
+        ? output
+        : "";
 
   // 根据状态显示不同的信息
   let displayStatus = "";
 
-  if (state === "partial-call" || state === "call") {
+  if (state === "input-streaming" || state === "input-available") {
     displayStatus = "数据源刷新已启动";
-  } else if (state === "result" && resultText) {
+  } else if (state === "output-available" && resultText) {
     // 从结果中提取任务ID
     const taskIdMatch = resultText.match(/任务ID: ([a-f0-9-]+)/);
     if (taskIdMatch) {
@@ -38,10 +39,11 @@ export function DulidayBiRefreshTool(props: ToolMessageProps) {
       detail={displayStatus}
       theme={themes.amber}
       state={state}
-      result={result}
+      output={output}
       messageId={messageId}
       partIndex={partIndex}
       isLatestMessage={isLatestMessage}
+      status={status}
     />
   );
 }

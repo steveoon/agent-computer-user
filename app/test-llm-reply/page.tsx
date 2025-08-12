@@ -136,7 +136,7 @@ export default function TestLLMReplyPage() {
       const replyText = typeof data.reply === 'string' ? data.reply : data.reply?.text || '';
       setReply(replyText);
       setReplyType(data.replyType || '');
-      setReasoning(data.reasoning || '');
+      setReasoning(data.reasoningText || '');
     } catch (error) {
       console.error("测试失败:", error);
       setError(error instanceof Error ? error.message : "未知错误");

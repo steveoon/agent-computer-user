@@ -1,10 +1,9 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { createOpenAI } from "@ai-sdk/openai";
 import { createProviderRegistry } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createQwen } from "qwen-ai-provider";
 import { createCustomOpenRouter } from "./providers/openrouter-custom";
+import { createCustomOpenAI } from "./providers/openai-custom";
 import type { ProviderConfig } from "@/lib/config/models";
 
 /**
@@ -21,8 +20,8 @@ export function createDynamicRegistry(providerConfigs: Record<string, ProviderCo
         baseURL: providerConfigs.anthropic?.baseURL || "https://c-z0-api-01.hash070.com/v1",
       }),
 
-      // OpenAI provider (复用Anthropic的配置)
-      openai: createOpenAI({
+      // OpenAI provider (使用自定义实现以兼容代理服务器)
+      openai: createCustomOpenAI({
         apiKey: process.env.ANTHROPIC_API_KEY,
         baseURL: providerConfigs.openai?.baseURL || "https://c-z0-api-01.hash070.com/v1",
       }),
@@ -54,7 +53,8 @@ export function createDynamicRegistry(providerConfigs: Record<string, ProviderCo
       }),
 
       // Qwen provider
-      qwen: createQwen({
+      qwen: createOpenAICompatible({
+        name: "qwen",
         apiKey: process.env.DASHSCOPE_API_KEY,
         baseURL:
           providerConfigs.qwen?.baseURL || "https://dashscope.aliyuncs.com/compatible-mode/v1",

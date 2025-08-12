@@ -1,9 +1,9 @@
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { Provider } from "ai";
+import { createOpenRouter, type OpenRouterProvider } from "@openrouter/ai-sdk-provider";
 
 /**
  * 自定义 OpenRouter provider
- * 修复某些模型（如 Kimi K2）的响应格式问题
+ * 基于官方 @openrouter/ai-sdk-provider 包
+ * 为某些模型（如 Kimi K2）提供特殊处理
  */
 
 // 创建自定义的 fetch 函数来拦截和修改响应
@@ -99,37 +99,79 @@ function createCustomFetch(modelId: string): typeof fetch {
   };
 }
 
+/**
+ * 扩展的 Provider 接口，包含 AI SDK 要求的所有方法
+ */
+interface ExtendedProvider extends OpenRouterProvider {
+  textEmbeddingModel(modelId: string): never;
+  imageModel(modelId: string): never;
+}
+
+/**
+ * 创建自定义的 OpenRouter provider
+ * 使用官方包，并为特定模型提供自定义处理
+ */
 export function createCustomOpenRouter(config: {
   apiKey: string | undefined;
   baseURL?: string;
-}): Provider {
-  const baseProvider = createOpenAICompatible({
-    name: "openrouter",
+}): ExtendedProvider {
+  // 基础配置
+  const baseConfig = {
+    apiKey: config.apiKey || '',
     baseURL: config.baseURL || "https://openrouter.ai/api/v1",
-    apiKey: config.apiKey,
-  });
+  };
 
-  // 创建代理来拦截 languageModel 调用
-  return new Proxy(baseProvider, {
-    get(target, prop) {
-      if (prop === 'languageModel') {
+  // 创建默认的 OpenRouter provider 实例作为基础
+  const defaultProvider = createOpenRouter(baseConfig);
+
+  // 创建代理来拦截模型调用
+  return new Proxy(defaultProvider, {
+    get(target, prop: string | symbol): unknown {
+      if (prop === 'languageModel' || prop === 'chat' || prop === 'completion') {
         return (modelId: string) => {
           // 对于 Kimi K2，使用自定义 fetch
-          if (modelId.includes('kimi-k2')) {
-            return createOpenAICompatible({
-              name: "openrouter",
-              baseURL: config.baseURL || "https://openrouter.ai/api/v1",
-              apiKey: config.apiKey,
-              fetch: createCustomFetch(modelId),
-            }).languageModel(modelId);
-          }
+          const customFetch = modelId.includes('kimi-k2') 
+            ? createCustomFetch(modelId) 
+            : undefined;
           
-          // 其他模型使用原始实现
-          return target.languageModel(modelId);
+          // 创建配置了自定义 fetch 的 provider
+          const provider = createOpenRouter({
+            ...baseConfig,
+            fetch: customFetch,
+          });
+          
+          // 根据方法名调用相应的方法
+          if (prop === 'chat') {
+            return provider.chat(modelId);
+          } else if (prop === 'completion') {
+            return provider.completion(modelId);
+          } else {
+            return provider.languageModel(modelId);
+          }
         };
       }
       
-      return target[prop as keyof typeof target];
+      // OpenRouter 不支持 textEmbeddingModel 和 imageModel，返回会抛出错误的函数
+      if (prop === 'textEmbeddingModel') {
+        return (_modelId: string) => {
+          throw new Error('OpenRouter does not support text embedding models');
+        };
+      }
+      
+      if (prop === 'imageModel') {
+        return (_modelId: string) => {
+          throw new Error('OpenRouter does not support image models');
+        };
+      }
+      
+      // 其他属性直接传递给原始 provider
+      return target[prop as keyof OpenRouterProvider];
     }
-  });
+  }) as ExtendedProvider;
 }
+
+/**
+ * 导出类型兼容的 Provider（用于向后兼容）
+ * @deprecated 使用 createCustomOpenRouter 替代
+ */
+export const createOpenRouterProvider = createCustomOpenRouter;

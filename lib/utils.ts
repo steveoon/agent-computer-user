@@ -1,7 +1,9 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { Message } from "ai";
+import type { UIMessage, UIMessagePart, UIDataTypes, UITools } from "ai";
 import { analyzer, TokenAnalyzer } from "./token-optimiation";
+import type { ToolPart } from "@/types/tool-common";
+import { isToolPart, getToolPartState, extractToolName } from "@/types/tool-common";
 
 export const cn = (...inputs: ClassValue[]) => {
   return twMerge(clsx(inputs));
@@ -11,25 +13,13 @@ export const ABORTED = "User aborted";
 
 // 🎯 Token优化配置接口
 interface TokenConfig {
-  maxTokens: number;
+  maxOutputTokens: number;
   targetTokens: number;
   preserveRecentMessages: number;
 }
 
-// 🔧 消息部分类型定义 (基于AI SDK)
-interface MessagePart {
-  type: string;
-  text?: string;
-  toolInvocation?: {
-    state?: string;
-    args?: Record<string, unknown>;
-    result?: {
-      type?: string;
-      data?: string;
-    };
-    toolName?: string;
-  };
-}
+// 🔧 使用 AI SDK v5 的标准类型
+// MessagePart 现在使用 UIMessagePart<UIDataTypes, UITools> 代替
 
 // 🎯 优化策略类型定义
 interface OptimizationStrategy {
@@ -45,10 +35,10 @@ interface OptimizationStrategy {
 
 // 🔧 处理器函数类型
 type ProcessorFunction = (
-  messages: Message[],
+  messages: UIMessage[],
   config?: TokenConfig,
   analyzer?: TokenAnalyzer
-) => Promise<Message[]> | Message[];
+) => Promise<UIMessage[]> | UIMessage[];
 
 // 🎯 Token分析结果接口
 interface TokenAnalysis {
@@ -62,11 +52,11 @@ interface TokenAnalysis {
  * 基于动态策略选择和管道式处理的高级优化系统
  */
 export const prunedMessages = async (
-  messages: Message[],
+  messages: UIMessage[],
   config: Partial<TokenConfig> = {}
-): Promise<Message[]> => {
+): Promise<UIMessage[]> => {
   const finalConfig: TokenConfig = {
-    maxTokens: config.maxTokens || 100000,
+    maxOutputTokens: config.maxOutputTokens || 100000,
     targetTokens: config.targetTokens || 80000,
     preserveRecentMessages: config.preserveRecentMessages || 3,
     ...config,
@@ -111,9 +101,9 @@ export const prunedMessages = async (
         `${finalAnalysis.needsOptimization ? " ⚠️ 仍需优化" : " ✅ 达标"}`
     );
 
-    if (finalAnalysis.totalTokens > finalConfig.maxTokens) {
+    if (finalAnalysis.totalTokens > finalConfig.maxOutputTokens) {
       console.warn(
-        `⚠️ 优化后仍超过最大限制 (${finalAnalysis.totalTokens} > ${finalConfig.maxTokens})`
+        `⚠️ 优化后仍超过最大限制 (${finalAnalysis.totalTokens} > ${finalConfig.maxOutputTokens})`
       );
     }
 
@@ -199,11 +189,11 @@ function selectOptimizationStrategy(
  * 🚀 执行优化策略
  */
 async function executeStrategy(
-  messages: Message[],
+  messages: UIMessage[],
   strategy: OptimizationStrategy,
   config: TokenConfig,
   analyzer: TokenAnalyzer
-): Promise<Message[]> {
+): Promise<UIMessage[]> {
   console.log(`🎯 执行策略: ${strategy.type} - ${strategy.reason}`);
 
   switch (strategy.type) {
@@ -254,10 +244,10 @@ async function executeStrategy(
 const pipeline =
   (processors: ProcessorFunction[]) =>
   async (
-    messages: Message[],
+    messages: UIMessage[],
     config: TokenConfig,
     analyzer: TokenAnalyzer
-  ): Promise<Message[]> => {
+  ): Promise<UIMessage[]> => {
     let currentMessages = messages;
 
     for (const processor of processors) {
@@ -328,47 +318,41 @@ const removeOldImages: ProcessorFunction = async (
 };
 
 /**
- * 🔧 从消息中移除图片
+ * 🔧 从消息中移除图片 (AI SDK v5 版本)
  */
-function removeImagesFromMessage(message: Message): Message {
+function removeImagesFromMessage(message: UIMessage): UIMessage {
   if (!message.parts) return message;
 
-  const optimizedParts = message.parts.map((part: MessagePart) => {
-    if (part.type === "tool-invocation") {
-      // 对于call状态的截图请求，保留但标记
+  const optimizedParts = message.parts.map((part) => {
+    if (isToolPart(part)) {
+      const toolPart = part as ToolPart;
+      const state = getToolPartState(toolPart);
+      
+      // 对于输入阶段的截图请求，标记为文本
       if (
-        part.toolInvocation?.state === "call" &&
-        part.toolInvocation.args?.action === "screenshot"
+        (state === "input-streaming" || state === "input-available") &&
+        'input' in toolPart
       ) {
-        return {
-          ...part,
-          toolInvocation: {
-            ...part.toolInvocation,
-            result: {
-              type: "text",
-              text: "Screenshot request [token-optimized]",
-            },
-          },
-        };
+        const input = toolPart.input as Record<string, unknown>;
+        if (input?.action === "screenshot") {
+          return {
+            type: "text",
+            text: "Screenshot request [token-optimized]",
+          } as UIMessagePart<UIDataTypes, UITools>;
+        }
       }
 
-      // 对于已完成的截图结果，移除图片数据
-      if (
-        part.toolInvocation?.state === "result" &&
-        part.toolInvocation.result?.type === "image"
-      ) {
-        return {
-          ...part,
-          toolInvocation: {
-            ...part.toolInvocation,
-            result: {
-              type: "text",
-              text: `[图片已移除以节省tokens - 操作: ${
-                part.toolInvocation.args?.action || "screenshot"
-              }]`,
-            },
-          },
-        };
+      // 对于输出阶段的图片结果，移除图片数据
+      if (state === "output-available" && 'output' in toolPart) {
+        const output = toolPart.output as Record<string, unknown>;
+        if (output?.type === "image") {
+          const input = 'input' in toolPart ? toolPart.input as Record<string, unknown> : {};
+          const action = input?.action || "screenshot";
+          return {
+            type: "text",
+            text: `[图片已移除以节省tokens - 操作: ${action}]`,
+          } as UIMessagePart<UIDataTypes, UITools>;
+        }
       }
     }
     return part;
@@ -377,7 +361,7 @@ function removeImagesFromMessage(message: Message): Message {
   return {
     ...message,
     parts: optimizedParts,
-  } as Message;
+  } as UIMessage;
 }
 
 /**
@@ -392,39 +376,38 @@ const removeRedundantImages: ProcessorFunction = async (
 };
 
 /**
- * 🔧 压缩工具结果
+ * 🔧 压缩工具结果 (AI SDK v5 版本)
  */
 const compressToolResults: ProcessorFunction = async (messages) => {
   return messages.map((message) => {
     if (!message.parts) return message;
 
-    const compressedParts = message.parts.map((part: MessagePart) => {
-      if (part.type === "tool-invocation" && part.toolInvocation?.result) {
-        const result = part.toolInvocation.result;
-        if (
-          result.type === "text" &&
-          result.data &&
-          typeof result.data === "string"
-        ) {
+    const compressedParts = message.parts.map((part) => {
+      if (isToolPart(part)) {
+        const toolPart = part as ToolPart;
+        const state = getToolPartState(toolPart);
+        
+        // 只处理输出阶段的结果
+        if (state === "output-available" && 'output' in toolPart) {
+          const output = toolPart.output as Record<string, unknown>;
+          
           // 压缩长文本结果
-          if (result.data.length > 1000) {
-            return {
-              ...part,
-              toolInvocation: {
-                ...part.toolInvocation,
-                result: {
-                  ...result,
-                  data: result.data.substring(0, 500) + "...[truncated]",
-                },
-              },
-            };
+          if (output?.type === "text" && typeof output.data === "string") {
+            const textData = output.data as string;
+            if (textData.length > 1000) {
+              // 创建压缩后的文本部分
+              return {
+                type: "text",
+                text: textData.substring(0, 500) + "...[truncated]",
+              } as UIMessagePart<UIDataTypes, UITools>;
+            }
           }
         }
       }
       return part;
     });
 
-    return { ...message, parts: compressedParts } as Message;
+    return { ...message, parts: compressedParts } as UIMessage;
   });
 };
 
@@ -444,35 +427,43 @@ const summarizeOldMessages: ProcessorFunction = async (
 
   if (oldMessages.length === 0) return messages;
 
-  // 创建总结消息（简化实现）
-  const summaryMessage: Message = {
+  // 创建总结消息（AI SDK v5 格式）
+  const summaryMessage: UIMessage = {
     id: `summary-${Date.now()}`,
     role: "system",
-    content: `[对话历史总结: 包含${oldMessages.length}条消息的交互记录]`,
-    createdAt: new Date(),
+    parts: [
+      {
+        type: "text",
+        text: `[对话历史总结: 包含${oldMessages.length}条消息的交互记录]`,
+      } as UIMessagePart<UIDataTypes, UITools>,
+    ],
   };
 
   return [summaryMessage, ...recentMessages];
 };
 
 /**
- * 🔧 压缩冗长消息
+ * 🔧 压缩冗长消息 (AI SDK v5 版本)
  */
 const compressVerboseMessages: ProcessorFunction = async (messages) => {
   return messages.map((message) => {
-    if (
-      message.content &&
-      typeof message.content === "string" &&
-      message.content.length > 2000
-    ) {
-      return {
-        ...message,
-        content:
-          message.content.substring(0, 1000) +
-          "...[message truncated for token optimization]",
-      };
-    }
-    return message;
+    if (!message.parts) return message;
+    
+    const compressedParts = message.parts.map((part) => {
+      // 只处理文本部分
+      if (part.type === "text" && part.text && part.text.length > 2000) {
+        return {
+          ...part,
+          text: part.text.substring(0, 1000) + "...[message truncated for token optimization]",
+        } as UIMessagePart<UIDataTypes, UITools>;
+      }
+      return part;
+    });
+    
+    return {
+      ...message,
+      parts: compressedParts,
+    };
   });
 };
 
@@ -585,7 +576,7 @@ const truncateToTarget: ProcessorFunction = async (
  * 🧠 智能选择要移除的消息
  */
 function findBestRemovalIndex(
-  messages: Message[],
+  messages: UIMessage[],
   protectedCount: number
 ): number {
   const removableRange = messages.length - protectedCount;
@@ -609,14 +600,19 @@ function findBestRemovalIndex(
 }
 
 /**
- * 🔍 检查是否为纯截图消息
+ * 🔍 检查是否为纯截图消息 (AI SDK v5 版本)
  */
-function isPureScreenshotMessage(message: Message): boolean {
+function isPureScreenshotMessage(message: UIMessage): boolean {
   return (
     message.parts?.every(
-      (part) =>
-        part.type === "tool-invocation" &&
-        part.toolInvocation?.args?.action === "screenshot"
+      (part) => {
+        if (!isToolPart(part)) return false;
+        const toolPart = part as ToolPart;
+        const state = getToolPartState(toolPart);
+        if (!state || !('input' in toolPart)) return false;
+        const input = toolPart.input as Record<string, unknown>;
+        return input?.action === "screenshot";
+      }
     ) ?? false
   );
 }
@@ -625,48 +621,42 @@ function isPureScreenshotMessage(message: Message): boolean {
  * 🚨 降级策略 (当智能优化失败时)
  */
 function fallbackPrunedMessages(
-  messages: Message[],
+  messages: UIMessage[],
   protectedCount: number = 5
-): Message[] {
+): UIMessage[] {
   return messages.map((message, messageIndex) => {
     const isOldMessage = messageIndex < messages.length - protectedCount;
 
     if (!message.parts) return message;
 
-    const optimizedParts = message.parts.map((part: MessagePart) => {
-      if (
-        part.type === "tool-invocation" &&
-        part.toolInvocation?.toolName === "computer" &&
-        part.toolInvocation.args?.action === "screenshot"
-      ) {
-        if (part.toolInvocation.state === "call") {
-          return {
-            ...part,
-            toolInvocation: {
-              ...part.toolInvocation,
-              result: {
+    const optimizedParts = message.parts.map((part) => {
+      if (isToolPart(part)) {
+        const toolPart = part as ToolPart;
+        const toolName = extractToolName(toolPart);
+        const state = getToolPartState(toolPart);
+        
+        if (toolName === "computer" && 'input' in toolPart) {
+          const input = toolPart.input as Record<string, unknown>;
+          if (input?.action === "screenshot") {
+            // 如果是输入阶段，替换为文本
+            if (state === "input-streaming" || state === "input-available") {
+              return {
                 type: "text",
                 text: "Screenshot request redacted to save tokens",
-              },
-            },
-          };
-        }
-
-        if (
-          part.toolInvocation.state === "result" &&
-          part.toolInvocation.result?.type === "image" &&
-          isOldMessage
-        ) {
-          return {
-            ...part,
-            toolInvocation: {
-              ...part.toolInvocation,
-              result: {
-                type: "text",
-                text: "Screenshot removed to save tokens",
-              },
-            },
-          };
+              } as UIMessagePart<UIDataTypes, UITools>;
+            }
+            
+            // 如果是输出阶段且是旧消息，移除图片
+            if (state === "output-available" && isOldMessage && 'output' in toolPart) {
+              const output = toolPart.output as Record<string, unknown>;
+              if (output?.type === "image") {
+                return {
+                  type: "text",
+                  text: "Screenshot removed to save tokens",
+                } as UIMessagePart<UIDataTypes, UITools>;
+              }
+            }
+          }
         }
       }
       return part;
@@ -675,7 +665,7 @@ function fallbackPrunedMessages(
     return {
       ...message,
       parts: optimizedParts,
-    } as Message;
+    } as UIMessage;
   });
 }
 

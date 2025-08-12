@@ -5,12 +5,12 @@ import { BaseToolMessage } from "./base-tool-message";
 import { themes, type ToolMessageProps } from "./types";
 
 export function DulidayJobListToolMessage(props: ToolMessageProps) {
-  const { args, state, result, isLatestMessage, status, messageId, partIndex } = props;
-  const brandName = args.brandName as string | undefined;
-  const storeName = args.storeName as string | undefined;
-  const regionName = args.regionName as string | undefined;
-  const laborForm = args.laborForm as string | undefined;
-  const jobNickName = args.jobNickName as string | undefined;
+  const { input, state, output, isLatestMessage, status, messageId, partIndex } = props;
+  const brandName = input.brandName as string | undefined;
+  const storeName = input.storeName as string | undefined;
+  const regionName = input.regionName as string | undefined;
+  const laborForm = input.laborForm as string | undefined;
+  const jobNickName = input.jobNickName as string | undefined;
 
   const details: string[] = [];
   if (brandName) details.push(brandName);
@@ -28,7 +28,7 @@ export function DulidayJobListToolMessage(props: ToolMessageProps) {
       detail={detail}
       theme={themes.blue}
       state={state}
-      result={result}
+      output={output}
       isLatestMessage={isLatestMessage}
       status={status}
       messageId={messageId}

@@ -66,11 +66,11 @@ const actionLabels: Record<string, string> = {
 };
 
 export function ComputerToolMessage(props: ToolMessageProps) {
-  const { args, state, result, isLatestMessage, status, messageId, partIndex } = props;
-  const action = (args.action as string) || "screenshot";
-  const coordinate = args.coordinate as number[] | undefined;
-  const text = args.text as string | undefined;
-  const duration = args.duration as number | undefined;
+  const { input, state, output, isLatestMessage, status, messageId, partIndex } = props;
+  const action = (input.action as string) || "screenshot";
+  const coordinate = input.coordinate as number[] | undefined;
+  const text = input.text as string | undefined;
+  const duration = input.duration as number | undefined;
 
   const Icon = actionIcons[action] || Camera;
   const label = actionLabels[action] || action;
@@ -94,7 +94,7 @@ export function ComputerToolMessage(props: ToolMessageProps) {
         label={label}
         theme={themes.zinc}
         state={state}
-        result={result}
+        output={output}
         isLatestMessage={isLatestMessage}
         status={status}
         messageId={messageId}
@@ -113,7 +113,7 @@ export function ComputerToolMessage(props: ToolMessageProps) {
       detail={detail}
       theme={themes.zinc}
       state={state}
-      result={result}
+      output={output}
       isLatestMessage={isLatestMessage}
       status={status}
       messageId={messageId}

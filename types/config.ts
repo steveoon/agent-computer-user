@@ -39,26 +39,7 @@ export const AppConfigDataSchema = z.object({
   }),
 });
 
-// 配置服务接口Schema（仅用于接口定义，不用于数据验证）
-export const ConfigServiceSchema = z.object({
-  getConfig: z.function().returns(z.promise(AppConfigDataSchema.nullable())),
-  saveConfig: z.function().args(AppConfigDataSchema).returns(z.promise(z.void())),
-  updateBrandData: z.function().args(ZhipinDataSchema).returns(z.promise(z.void())),
-  updateSystemPrompts: z.function().args(SystemPromptsConfigSchema).returns(z.promise(z.void())),
-  updateReplyPrompts: z.function().args(ReplyPromptsConfigSchema).returns(z.promise(z.void())),
-  updateActiveSystemPrompt: z
-    .function()
-    .args(
-      z.enum([
-        "bossZhipinSystemPrompt",
-        "generalComputerSystemPrompt",
-        "bossZhipinLocalSystemPrompt",
-      ])
-    )
-    .returns(z.promise(z.void())),
-  clearConfig: z.function().returns(z.promise(z.void())),
-  isConfigured: z.function().returns(z.promise(z.boolean())),
-});
+// 注意：Zod v4 不再支持函数模式验证，ConfigService 接口直接定义在下方
 
 // 🔧 通过 z.infer 生成 TypeScript 类型
 

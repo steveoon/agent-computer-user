@@ -3,16 +3,8 @@
 import React from "react";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
-import {
-  configService,
-  migrateFromHardcodedData,
-} from "@/lib/services/config.service";
-import type {
-  AppConfigData,
-  ZhipinData,
-  ReplyPromptsConfig,
-  SystemPromptsConfig,
-} from "@/types";
+import { configService, migrateFromHardcodedData } from "@/lib/services/config.service";
+import type { AppConfigData, ZhipinData, ReplyPromptsConfig, SystemPromptsConfig } from "@/types";
 // 🔧 导入预定义的 Zod Schema，避免重复定义
 import { AppConfigDataSchema } from "@/types/config";
 
@@ -27,9 +19,7 @@ interface ConfigState {
   updateBrandData: (brandData: ZhipinData) => Promise<void>;
   updateReplyPrompts: (replyPrompts: ReplyPromptsConfig) => Promise<void>;
   updateSystemPrompts: (systemPrompts: SystemPromptsConfig) => Promise<void>;
-  updateActiveSystemPrompt: (
-    promptType: keyof SystemPromptsConfig
-  ) => Promise<void>;
+  updateActiveSystemPrompt: (promptType: keyof SystemPromptsConfig) => Promise<void>;
   exportConfig: () => void;
   importConfig: (file: File) => Promise<void>;
   resetConfig: () => Promise<void>;
@@ -48,16 +38,18 @@ const useConfigStore = create<ConfigState>()(
 
         try {
           console.log("🔄 开始加载应用配置...");
-          
+
           // 首先检查是否需要升级
-          const { needsDataUpgrade, migrateFromHardcodedData } = await import("../lib/services/config.service");
+          const { needsDataUpgrade, migrateFromHardcodedData } = await import(
+            "../lib/services/config.service"
+          );
           const needsUpgradeResult = await needsDataUpgrade();
           if (needsUpgradeResult) {
             console.log("🔄 检测到需要数据升级，开始自动升级...");
             await migrateFromHardcodedData();
             console.log("✅ 数据升级完成");
           }
-          
+
           const config = await configService.getConfig();
 
           if (!config) {
@@ -179,9 +171,7 @@ const useConfigStore = create<ConfigState>()(
         }
       },
 
-      updateActiveSystemPrompt: async (
-        promptType: keyof SystemPromptsConfig
-      ) => {
+      updateActiveSystemPrompt: async (promptType: keyof SystemPromptsConfig) => {
         const { config } = get();
         if (!config) {
           set({ error: "配置未加载，无法更新活动系统提示词" });
@@ -207,8 +197,8 @@ const useConfigStore = create<ConfigState>()(
               promptType === "bossZhipinSystemPrompt"
                 ? "Boss直聘"
                 : promptType === "bossZhipinLocalSystemPrompt"
-                ? "Boss直聘(本地版)"
-                : "通用计算机"
+                  ? "Boss直聘(本地版)"
+                  : "通用计算机"
             } 系统提示词`
           );
         } catch (error) {
@@ -231,9 +221,7 @@ const useConfigStore = create<ConfigState>()(
 
           const link = document.createElement("a");
           link.href = url;
-          link.download = `app-config-${
-            new Date().toISOString().split("T")[0]
-          }.json`;
+          link.download = `app-config-${new Date().toISOString().split("T")[0]}.json`;
           link.click();
 
           URL.revokeObjectURL(url);
@@ -268,10 +256,9 @@ const useConfigStore = create<ConfigState>()(
             console.error("❌ 数据格式校验失败:", validationResult.error);
 
             // 生成用户友好的错误信息
-            const errorMessages = validationResult.error.errors
-              .map((err) => {
-                const path =
-                  err.path.length > 0 ? err.path.join(".") : "根级别";
+            const errorMessages = validationResult.error.issues
+              .map(err => {
+                const path = err.path.length > 0 ? err.path.join(".") : "根级别";
                 return `• ${path}: ${err.message}`;
               })
               .slice(0, 10); // 限制显示前10个错误
@@ -279,10 +266,8 @@ const useConfigStore = create<ConfigState>()(
             const errorSummary = [
               `配置文件数据格式校验失败，发现以下问题:`,
               ...errorMessages,
-              validationResult.error.errors.length > 10
-                ? `... 还有 ${
-                    validationResult.error.errors.length - 10
-                  } 个其他错误`
+              validationResult.error.issues.length > 10
+                ? `... 还有 ${validationResult.error.issues.length - 10} 个其他错误`
                 : "",
             ]
               .filter(Boolean)
@@ -310,15 +295,11 @@ const useConfigStore = create<ConfigState>()(
           });
 
           // 检查品牌一致性
-          const storesBrands = [...new Set(stores.map((store) => store.brand))];
-          const missingBrands = storesBrands.filter(
-            (brand) => !brands.includes(brand)
-          );
+          const storesBrands = [...new Set(stores.map(store => store.brand))];
+          const missingBrands = storesBrands.filter(brand => !brands.includes(brand));
 
           if (missingBrands.length > 0) {
-            throw new Error(
-              `门店数据中引用了未定义的品牌: ${missingBrands.join(", ")}`
-            );
+            throw new Error(`门店数据中引用了未定义的品牌: ${missingBrands.join(", ")}`);
           }
 
           // 检查必要的回复指令
@@ -341,11 +322,8 @@ const useConfigStore = create<ConfigState>()(
             "part_time_support",
           ];
 
-          const missingPrompts = requiredReplyPrompts.filter((prompt) => {
-            const replyPromptsRecord = importedConfig.replyPrompts as Record<
-              string,
-              string
-            >;
+          const missingPrompts = requiredReplyPrompts.filter(prompt => {
+            const replyPromptsRecord = importedConfig.replyPrompts as Record<string, string>;
             const promptValue = replyPromptsRecord[prompt];
             return !promptValue || !promptValue.trim();
           });
@@ -369,8 +347,7 @@ const useConfigStore = create<ConfigState>()(
           console.log("✅ 配置导入成功", {
             brands: Object.keys(configWithTimestamp.brandData.brands).length,
             stores: configWithTimestamp.brandData.stores.length,
-            systemPrompts: Object.keys(configWithTimestamp.systemPrompts)
-              .length,
+            systemPrompts: Object.keys(configWithTimestamp.systemPrompts).length,
             replyPrompts: Object.keys(configWithTimestamp.replyPrompts).length,
           });
         } catch (error) {

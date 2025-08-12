@@ -1,11 +1,12 @@
 "use client";
 
-import type { Message } from "@ai-sdk/react";
+import type { UIMessage } from "ai";
+import { isToolPart, getToolPartState, extractToolName, getToolPartInput, getToolPartOutput, getToolPartErrorText } from "@/types/tool-common";
 import { toolRegistry } from "./tool-messages";
 import { Markdown } from "./markdown";
 
 interface MessagePartsAdapterProps {
-  message: Message;
+  message: UIMessage;
   isLatestMessage?: boolean;
   status?: string;
 }
@@ -37,10 +38,14 @@ export function MessagePartsAdapter({
             );
           }
 
-          // 工具调用消息 - 使用新的 tool-invocation 类型
-          if (part.type === "tool-invocation" && part.toolInvocation) {
-            const toolInvocation = part.toolInvocation;
-            const { toolName, toolCallId, args, state } = toolInvocation;
+          // 工具调用消息 - AI SDK v5 格式
+          if (isToolPart(part)) {
+            const toolName = extractToolName(part);
+            const state = getToolPartState(part);
+            const input = getToolPartInput(part);
+            const output = getToolPartOutput(part);
+            const errorText = getToolPartErrorText(part);
+            const toolCallId = 'toolCallId' in part ? (part as unknown as { toolCallId: string }).toolCallId : `tool-${i}`;
 
             // 查找对应的工具配置
             const toolConfig = toolRegistry[toolName];
@@ -58,15 +63,16 @@ export function MessagePartsAdapter({
               );
             }
 
-            // 使用工具配置渲染
+            // 使用工具配置渲染 - AI SDK v5 格式
             const ToolComponent = toolConfig.render;
             return (
               <div key={`${toolCallId}-${i}`} className="mb-3">
                 <ToolComponent
                   toolName={toolName}
-                  args={args}
-                  state={state}
-                  result={"result" in toolInvocation ? toolInvocation.result : undefined}
+                  input={(input || {}) as Record<string, unknown>}
+                  state={state || "input-available"}
+                  output={output}
+                  errorText={errorText}
                   isLatestMessage={isLatestMessage}
                   status={status}
                   messageId={message.id}
@@ -83,10 +89,7 @@ export function MessagePartsAdapter({
     );
   }
 
-  // 回退到字符串 content（用户消息或旧格式）
-  if (typeof message.content === "string") {
-    return <Markdown>{message.content}</Markdown>;
-  }
+  // AI SDK v5 不再使用 content 属性，所有内容都在 parts 中
 
   // 无内容
   return null;

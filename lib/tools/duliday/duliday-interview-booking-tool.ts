@@ -14,7 +14,7 @@ export const dulidayInterviewBookingTool = (customToken?: string) =>
   tool({
     description:
       "预约面试。为求职者预约指定岗位的面试，需要提供完整的个人信息包括姓名、电话、性别、年龄、岗位ID和面试时间。",
-    parameters: z.object({
+    inputSchema: z.object({
       name: z.string().describe("求职者姓名"),
       phone: z.string().describe("联系电话"),
       age: z.string().describe("年龄，以字符串形式提供"),

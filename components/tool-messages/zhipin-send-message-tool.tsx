@@ -8,16 +8,16 @@ import { ToolMessageProps } from "./types";
  * BOSS直聘发送消息工具的显示组件
  */
 export function ZhipinSendMessageTool(props: ToolMessageProps) {
-  const { args, result, state, isLatestMessage, messageId, partIndex } = props;
+  const { input, state, output, isLatestMessage, messageId, partIndex } = props;
 
   // 类型安全的参数和结果
-  const typedArgs = args as {
+  const typedArgs = input as {
     message: string;
     clearBefore?: boolean;
     waitAfterSend?: number;
   };
 
-  const typedResult = result as
+  const typedResult = output as
     | {
         success?: boolean;
         message?: string;
@@ -50,7 +50,7 @@ export function ZhipinSendMessageTool(props: ToolMessageProps) {
         loaderColor: "text-red-600 dark:text-red-400",
       };
 
-  if (state === "call" || state === "partial-call") {
+  if (state === "input-streaming" || state === "input-available") {
     return (
       <BaseToolMessage
         icon={Send}
@@ -72,7 +72,7 @@ export function ZhipinSendMessageTool(props: ToolMessageProps) {
       detail={typedResult?.success ? typedArgs.message : typedResult?.error ? "失败" : undefined}
       theme={theme}
       state={state}
-      result={typedResult}
+      output={typedResult}
       messageId={messageId}
       partIndex={partIndex}
       isLatestMessage={isLatestMessage}

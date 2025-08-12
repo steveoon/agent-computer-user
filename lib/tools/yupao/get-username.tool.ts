@@ -61,7 +61,7 @@ function parseEvaluateResult(result: unknown): Record<string, unknown> | null {
  */
 export const yupaoGetUsername = tool({
   description: "获取Yupao当前登录账号的用户名",
-  parameters: z.object({}),
+  inputSchema: z.object({}),
   execute: async () => {
     try {
       const client = await getPuppeteerMCPClient();

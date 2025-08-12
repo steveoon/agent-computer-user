@@ -11,37 +11,48 @@ export class DulidayErrorFormatter {
    * @returns 格式化后的错误消息
    */
   static formatValidationError(error: z.ZodError): string {
-    const errorDetails = error.issues.map((issue: z.ZodIssue) => {
-      const path = issue.path.join('.');
-      
+    const errorDetails = error.issues.map(issue => {
+      const path = issue.path.join(".");
+
       switch (issue.code) {
-        case 'invalid_type':
-          return `• 字段 "${path}"\n  期望类型: ${issue.expected}\n  实际收到: ${issue.received}`;
-        
-        case 'invalid_union':
-          return `• 字段 "${path}"\n  数据不符合任何预期的格式`;
-        
-        case 'invalid_enum_value':
-          return `• 字段 "${path}"\n  值必须是以下之一: ${issue.options?.join(', ')}`;
-        
-        case 'unrecognized_keys':
-          return `• 字段 "${path}"\n  包含未识别的键: ${issue.keys?.join(', ')}`;
-        
-        case 'invalid_string':
-          return `• 字段 "${path}"\n  字符串格式无效 (${issue.validation})`;
-        
-        case 'too_small':
-          return `• 字段 "${path}"\n  值太小（最小值: ${issue.minimum}）`;
-        
-        case 'too_big':
-          return `• 字段 "${path}"\n  值太大（最大值: ${issue.maximum}）`;
-        
+        case "invalid_type":
+          // In Zod v4, the issue object has `expected` property but not `received`
+          // We can extract the expected type from the issue
+          const expectedType = issue.expected || "未知类型";
+          return `• 字段 "${path}"\n  期望类型: ${expectedType}\n  ${issue.message}`;
+
+        case "invalid_union":
+          return `• 字段 "${path}"\n  数据不符合任何预期的格式\n  ${issue.message}`;
+
+        case "unrecognized_keys":
+          // In Zod v4, unrecognized_keys issues have a `keys` property
+          const keys = issue.keys;
+          const keysList = keys && Array.isArray(keys) ? keys.join(", ") : "未知键";
+          return `• 字段 "${path}"\n  包含未识别的键: ${keysList}`;
+
+        case "invalid_format":
+          // In Zod v4, string format validation uses "invalid_format" instead of "invalid_string"
+          return `• 字段 "${path}"\n  字符串格式无效\n  ${issue.message}`;
+
+        case "too_small":
+          // Access minimum value safely
+          const minimum = issue.minimum;
+          return `• 字段 "${path}"\n  值太小${minimum !== undefined ? `（最小值: ${minimum}）` : ""}\n  ${issue.message}`;
+
+        case "too_big":
+          // Access maximum value safely
+          const maximum = issue.maximum;
+          return `• 字段 "${path}"\n  值太大${maximum !== undefined ? `（最大值: ${maximum}）` : ""}\n  ${issue.message}`;
+
+        case "custom":
+          return `• 字段 "${path}"\n  自定义验证失败\n  ${issue.message}`;
+
         default:
           return `• 字段 "${path}"\n  ${issue.message}`;
       }
     });
 
-    return `数据格式验证失败：\n${errorDetails.join('\n\n')}`;
+    return `数据格式验证失败：\n${errorDetails.join("\n\n")}`;
   }
 
   /**
@@ -53,24 +64,22 @@ export class DulidayErrorFormatter {
     const errorMessage = error.message;
 
     // 连接错误
-    if (errorMessage.includes('ECONNRESET') || 
-        errorMessage.includes('EPIPE')) {
-      return '网络连接被重置，请检查网络状态后重试';
+    if (errorMessage.includes("ECONNRESET") || errorMessage.includes("EPIPE")) {
+      return "网络连接被重置，请检查网络状态后重试";
     }
 
     // 超时错误
-    if (errorMessage.includes('ETIMEDOUT') || 
-        error.name === 'AbortError') {
-      return 'API 请求超时，请稍后重试';
+    if (errorMessage.includes("ETIMEDOUT") || error.name === "AbortError") {
+      return "API 请求超时，请稍后重试";
     }
 
     // DNS 错误
-    if (errorMessage.includes('ENOTFOUND')) {
-      return '无法访问 Duliday API 服务器，请检查网络连接';
+    if (errorMessage.includes("ENOTFOUND")) {
+      return "无法访问 Duliday API 服务器，请检查网络连接";
     }
 
     // 其他网络错误
-    if (errorMessage.includes('网络连接错误')) {
+    if (errorMessage.includes("网络连接错误")) {
       return errorMessage;
     }
 
@@ -86,17 +95,17 @@ export class DulidayErrorFormatter {
   static formatHttpError(status: number, statusText: string): string {
     switch (status) {
       case 401:
-        return 'Duliday Token 无效或已过期，请检查 Token 设置';
+        return "Duliday Token 无效或已过期，请检查 Token 设置";
       case 403:
-        return '没有权限访问该资源，请联系管理员';
+        return "没有权限访问该资源，请联系管理员";
       case 404:
-        return '请求的资源不存在';
+        return "请求的资源不存在";
       case 429:
-        return 'API 请求过于频繁，请稍后重试';
+        return "API 请求过于频繁，请稍后重试";
       case 500:
       case 502:
       case 503:
-        return 'Duliday 服务器暂时不可用，请稍后重试';
+        return "Duliday 服务器暂时不可用，请稍后重试";
       default:
         return `API 请求失败: ${status} ${statusText}`;
     }
@@ -133,18 +142,18 @@ export class DulidayErrorFormatter {
    */
   static isNetworkError(error: Error): boolean {
     const networkErrorPatterns = [
-      'ECONNRESET',
-      'ETIMEDOUT',
-      'EPIPE',
-      'ENOTFOUND',
-      'EHOSTUNREACH',
-      'ECONNREFUSED',
-      'AbortError',
-      '网络连接错误'
+      "ECONNRESET",
+      "ETIMEDOUT",
+      "EPIPE",
+      "ENOTFOUND",
+      "EHOSTUNREACH",
+      "ECONNREFUSED",
+      "AbortError",
+      "网络连接错误",
     ];
 
-    return networkErrorPatterns.some(pattern => 
-      error.message.includes(pattern) || error.name === pattern
+    return networkErrorPatterns.some(
+      pattern => error.message.includes(pattern) || error.name === pattern
     );
   }
 
@@ -160,10 +169,10 @@ export class DulidayErrorFormatter {
     error: string,
     organizationName?: string
   ): string {
-    const orgContext = organizationName 
+    const orgContext = organizationName
       ? `组织 "${organizationName}" (ID: ${organizationId})`
       : `组织 ID: ${organizationId}`;
-    
+
     return `${orgContext} 同步失败：\n${error}`;
   }
 }
@@ -172,6 +181,8 @@ export class DulidayErrorFormatter {
  * 导出便捷函数
  */
 export const formatDulidayError = DulidayErrorFormatter.formatError.bind(DulidayErrorFormatter);
-export const formatValidationError = DulidayErrorFormatter.formatValidationError.bind(DulidayErrorFormatter);
-export const formatNetworkError = DulidayErrorFormatter.formatNetworkError.bind(DulidayErrorFormatter);
+export const formatValidationError =
+  DulidayErrorFormatter.formatValidationError.bind(DulidayErrorFormatter);
+export const formatNetworkError =
+  DulidayErrorFormatter.formatNetworkError.bind(DulidayErrorFormatter);
 export const formatHttpError = DulidayErrorFormatter.formatHttpError.bind(DulidayErrorFormatter);

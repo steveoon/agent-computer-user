@@ -112,7 +112,7 @@ export const MCPClientConfigSchema = z.object({
   description: z.string().describe("客户端描述"),
   command: z.string().describe("启动命令"),
   args: z.array(z.string()).optional().default([]).describe("命令参数"),
-  env: z.record(z.string()).optional().describe("环境变量"),
+  env: z.record(z.string(), z.string()).optional().describe("环境变量"),
   enabled: z.boolean().default(true).describe("是否启用"),
 });
 
@@ -142,23 +142,95 @@ export const MCPManagerStatusSchema = z.object({
 export type MCPManagerStatus = z.infer<typeof MCPManagerStatusSchema>;
 
 /**
- * MCP工具定义
+ * MCP工具执行选项（参考AI SDK的ToolExecutionOptions）
  */
-export const MCPToolSchema = z.object({
-  name: z.string(),
-  description: z.string(),
-  inputSchema: z.record(z.any()).optional(),
-  execute: z.function().args(z.any()).returns(z.promise(z.any())),
+export const MCPToolExecutionOptionsSchema = z.object({
+  toolCallId: z.string().optional().describe("工具调用ID"),
+  messages: z.array(z.unknown()).optional().describe("消息历史"),
+  abortSignal: z.any().optional().describe("中断信号"),
 });
 
-export type MCPTool = z.infer<typeof MCPToolSchema>;
+export type MCPToolExecutionOptions = z.infer<typeof MCPToolExecutionOptionsSchema>;
+
+/**
+ * MCP工具基础Schema
+ * 注意：由于Zod v4限制，execute字段使用z.any()，通过TypeScript类型系统提供类型安全
+ */
+export const MCPToolBaseSchema = z.object({
+  name: z.string().describe("工具名称"),
+  description: z.string().describe("工具描述"),
+  inputSchema: z.record(z.string(), z.unknown()).optional().describe("输入参数schema"),
+  outputSchema: z.record(z.string(), z.unknown()).optional().describe("输出结果schema"),
+});
+
+/**
+ * MCP工具完整Schema
+ * execute字段使用自定义验证确保是函数类型
+ */
+export const MCPToolSchema = MCPToolBaseSchema.extend({
+  execute: z.any()
+    .refine(
+      (val): val is Function => typeof val === 'function',
+      { message: "execute必须是一个函数" }
+    )
+    .describe("工具执行函数"),
+});
+
+/**
+ * MCP工具类型定义
+ * 提供精确的TypeScript类型，遵循AI SDK v5的模式
+ */
+export type MCPTool<TInput = unknown, TOutput = unknown> = z.infer<typeof MCPToolBaseSchema> & {
+  execute: (input: TInput, options?: MCPToolExecutionOptions) => Promise<TOutput>;
+};
+
+/**
+ * 通用MCP工具类型（输入输出类型未知）
+ */
+export type GenericMCPTool = MCPTool<unknown, unknown>;
 
 /**
  * MCP工具集合
  */
-export const MCPToolsSchema = z.record(MCPToolSchema);
+export const MCPToolsSchema = z.record(z.string(), MCPToolSchema);
 
-export type MCPTools = z.infer<typeof MCPToolsSchema>;
+export type MCPTools = Record<string, GenericMCPTool>;
+
+/**
+ * 创建类型安全的MCP工具辅助函数
+ * 类似AI SDK的tool()辅助函数，提供更好的类型推导
+ */
+export function createMCPTool<TInput = unknown, TOutput = unknown>(tool: {
+  name: string;
+  description: string;
+  inputSchema?: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  execute: (input: TInput, options?: MCPToolExecutionOptions) => Promise<TOutput>;
+}): MCPTool<TInput, TOutput> {
+  // 运行时验证，确保是有效的MCP工具
+  MCPToolSchema.parse(tool);
+  return tool as MCPTool<TInput, TOutput>;
+}
+
+/**
+ * 创建动态MCP工具（运行时类型未知）
+ * 参考AI SDK的dynamicTool模式
+ */
+export function createDynamicMCPTool(tool: {
+  name: string;
+  description: string;
+  inputSchema?: Record<string, unknown>;
+  execute: (input: unknown, options?: MCPToolExecutionOptions) => Promise<unknown>;
+}): GenericMCPTool {
+  return createMCPTool<unknown, unknown>(tool);
+}
+
+/**
+ * 类型守卫：检查是否为有效的MCP工具
+ */
+export function isMCPTool(value: unknown): value is GenericMCPTool {
+  return MCPToolSchema.safeParse(value).success;
+}
 
 /**
  * MCP客户端接口定义

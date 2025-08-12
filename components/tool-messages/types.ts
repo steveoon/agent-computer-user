@@ -1,10 +1,15 @@
 import type { LucideIcon } from "lucide-react";
+import type { ToolPartState } from "@/types/tool-common";
 
+/**
+ * AI SDK v5 工具消息属性
+ */
 export interface ToolMessageProps {
   toolName: string;
-  args: Record<string, unknown>;
-  state: "call" | "result" | "partial-call";
-  result?: unknown;
+  input: Record<string, unknown>;
+  state: ToolPartState;
+  output?: unknown;
+  errorText?: string;
   isLatestMessage?: boolean;
   status?: string;
   messageId: string;
