@@ -5,49 +5,49 @@
 // Unread messages selectors
 export const YUPAO_UNREAD_SELECTORS = {
   // Main container for conversation list
-  container: '._convList_1rm6c_27',
-  convListWrap: '._convListWrap_1rm6c_27',
+  container: '._convList_1qq7t_27',
+  convListWrap: '._convListWrap_1qq7t_27',
   
   // Individual conversation item
-  convItem: '._convItem_1rm6c_48',
+  convItem: '._convItem_1qq7t_48',
   
   // Unread badge/count
-  unreadNum: '._unreadNum_1rm6c_97',
+  unreadNum: '._unreadNum_1qq7t_98',
   
   // Image box container (contains avatar and unread badge)
-  imageBox: '._imageBox_1rm6c_81',
+  imageBox: '._imageBox_1qq7t_81',
   
   // Candidate name
-  candidateName: '._name-text_1rm6c_133',
+  candidateName: '._name-text_1qq7t_134',
   
   // Job position/title  
-  jobTitle: '._title-dec_1rm6c_136',
+  jobTitle: '._title-dec_1qq7t_137',
   
   // Message content area
-  content: '._content_1rm6c_111',
+  content: '._content_1qq7t_112',
   
   // Title wrap (contains name and time)
-  titleWrap: '._titleWrap_1rm6c_115',
-  nameWrap: '._nameWrap_1rm6c_120',
-  nameBox: '._nameBox_1rm6c_126',
+  titleWrap: '._titleWrap_1qq7t_116',
+  nameWrap: '._nameWrap_1qq7t_121',
+  nameBox: '._nameBox_1qq7t_127',
   
   // Time
-  messageTime: '._time_1rm6c_152',
+  messageTime: '._time_1qq7t_153',
   
   // Latest message info
-  latestMsgInfo: '._latestMsgInfo_1rm6c_160',
+  latestMsgInfo: '._latestMsgInfo_1qq7t_161',
   
   // Message status (送达、新招呼等)
-  statusUnread: '._status-unread_1rm6c_173',
+  statusUnread: '._status-unread_1qq7t_174',
   
   // Message text
-  msgText: '._msg-text_1rm6c_181',
+  msgText: '._msg-text_1qq7t_182',
   
   // More icon button
-  moreIconBtn: '._moreIconBtn_1rm6c_63',
+  moreIconBtn: '._moreIconBtn_1qq7t_63',
   
   // Finished indicator
-  finished: '._finished_1rm6c_290',
+  finished: '._finished_1qq7t_291',
 } as const;
 
 // Chat details selectors
@@ -119,22 +119,22 @@ export const YUPAO_INPUT_SELECTORS = {
 
 // Exchange WeChat selectors  
 export const YUPAO_EXCHANGE_WECHAT_SELECTORS = {
-  // Exchange button
-  exchangeButton: '._exchange-tel-btn_fdply_71._exchange-active_fdply_84',
+  // Exchange button - 更新为新的hash值
+  exchangeButton: '._exchange-tel-btn_1rf60_85._exchange-active_1rf60_101',
   exchangeButtonContains: '换微信',
   
-  // Confirmation dialog
-  exchangeTipPop: '._exchangeTipPop_fdply_91._wechatPop_fdply_155',
-  dialogTitle: '._title_fdply_102',
-  dialogContent: '._content_fdply_108',
+  // Confirmation dialog - 更新为新的hash值
+  exchangeTipPop: '._exchangeTipPop_1rf60_108._wechatPop_1rf60_171',
+  dialogTitle: '._title_1rf60_119',
+  dialogContent: '._content_1rf60_124',
   
   // Buttons
   confirmButton: '._btn_1fwp4_11._primary_1fwp4_21',
   cancelButton: '._btn_1fwp4_11._lightGreyStroke_1fwp4_90',
-  buttonBox: '._btns_fdply_119',
+  buttonBox: '._btns_1rf60_135',
   
-  // Inner box
-  innerBox: '._inner-box_fdply_124',
+  // Inner box  
+  innerBox: '._inner-box_1rf60_140',
 } as const;
 
 // User info selectors

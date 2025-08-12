@@ -15,7 +15,7 @@ export const openCandidateChatTool = tool({
   - 使用防检测机制和鼠标轨迹模拟
   `,
 
-  parameters: z.object({
+  inputSchema: z.object({
     candidateName: z.string().optional().describe("要打开的候选人姓名（支持部分匹配）"),
 
     index: z.number().optional().describe("要打开的候选人索引（0开始，如果不指定姓名）"),
