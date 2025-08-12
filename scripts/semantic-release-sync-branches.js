@@ -12,11 +12,15 @@ const { execSync } = require('child_process');
  */
 function execGit(command, options = {}) {
   try {
-    return execSync(`git ${command}`, {
+    const result = execSync(`git ${command}`, {
       encoding: 'utf8',
       stdio: options.silent ? 'pipe' : 'inherit',
       ...options
-    }).trim();
+    });
+    
+    // 当 stdio 是 'inherit' 时，result 是 null
+    // 当 stdio 是 'pipe' 时，result 是字符串
+    return result ? result.trim() : '';
   } catch (error) {
     if (!options.silent) {
       console.error(`Git command failed: git ${command}`);
@@ -73,7 +77,7 @@ async function success(pluginConfig, context) {
     
     // 切换到 develop 分支
     logger.log('Switching to develop branch...');
-    execGit('checkout develop');
+    execGit('checkout develop', { silent: true });
     
     // 尝试合并 main 分支
     logger.log(`Merging main (v${nextRelease.version}) into develop...`);
