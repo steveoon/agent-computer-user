@@ -56,6 +56,42 @@ export function getAdaptiveSelectors(elementType: string): string[] {
     msgText: [
       createDynamicClassSelector("_msg-text"),
       'div:last-child:not([class*="time"]):not([class*="name"])'
+    ],
+    // Say Hello page selectors
+    candidateCard: [
+      createDynamicClassSelector("_card"),
+      'div[class*="_card_"][style*="margin-top"]',
+      'div[data-index]:has(button:contains("聊一聊"))'
+    ],
+    sayHelloName: [
+      createDynamicClassSelector("_name_xejow"),
+      createDynamicClassSelector("_name") + ':not([class*="_nameR_"])',
+      'span[class*="_name_"]:not([class*="_nameR_"])'
+    ],
+    sayHelloButton: [
+      createDynamicClassSelector("_chatBtn"),
+      'button[class*="_btn_"][class*="_lightPrimaryStroke_"]',
+      'button:contains("聊一聊"), button:contains("继续聊")'
+    ],
+    candidateIntro: [
+      createDynamicClassSelector("_introduce"),
+      'p[class*="_introduce_"]',
+      'div[class*="_cardML_"] > p:last-child'
+    ],
+    candidateBaseInfo: [
+      createDynamicClassSelector("_baseInfoStr"),
+      'p[class*="_baseInfoStr_"]',
+      'div[class*="_cardML_"] > p:first-child'
+    ],
+    candidateSalary: [
+      createDynamicClassSelector("_salary"),
+      'span[class*="_salary_"]',
+      'span:matches(/\\d+[-~]\\d+元/)'
+    ],
+    candidateOnlineStatus: [
+      createDynamicClassSelector("_onlineYes"),
+      createDynamicClassSelector("_online"),
+      'p[class*="_online"]'
     ]
   };
 

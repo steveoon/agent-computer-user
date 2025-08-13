@@ -54,3 +54,49 @@ export interface YupaoAutomationResult<T = unknown> {
   error?: string;
   screenshot?: string;
 }
+
+/**
+ * Candidate card information for say hello feature
+ */
+export interface YupaoCandidateCard {
+  index: number;
+  name: string;
+  gender?: string;
+  age?: string;
+  experience?: string;
+  education?: string;
+  introduce?: string;
+  expectedPosition?: string;
+  expectedSalary?: string;
+  expectedLocation?: string;
+  onlineStatus?: 'online' | 'recently' | 'offline' | 'contacted';
+  buttonText?: string; // "聊一聊" or "继续聊"
+  tags?: string[];
+}
+
+/**
+ * Result of a single greeting attempt
+ */
+export interface YupaoSayHelloResult {
+  candidateName: string;
+  success: boolean;
+  message?: string;
+  error?: string;
+  greetingText?: string;
+  timestamp?: string;
+}
+
+/**
+ * Options for batch greeting
+ */
+export interface YupaoBatchGreetingOptions {
+  maxCandidates?: number; // Maximum number of candidates to greet
+  delayBetweenGreetings?: {
+    min: number;
+    max: number;
+  };
+  skipContacted?: boolean; // Skip candidates already contacted
+  customPrompt?: string; // Custom LLM prompt for generating greetings
+  useDefaultGreeting?: string; // Fallback greeting if LLM fails
+  scrollBehavior?: boolean; // Enable random scrolling between actions
+}

@@ -8,6 +8,8 @@ import { yupaoChatDetailsTool, GET_CHAT_DETAILS_ACTION } from "./get-chat-detail
 import { yupaoSendMessageTool, SEND_MESSAGE_ACTION } from "./send-message.tool";
 import { yupaoExchangeWechatTool, EXCHANGE_WECHAT_ACTION } from "./exchange-wechat.tool";
 import { yupaoGetUsername, GET_USERNAME_ACTION } from "./get-username.tool";
+import { yupaoGetCandidateListTool, GET_CANDIDATE_LIST_ACTION } from "./get-candidate-list.tool";
+import { yupaoSayHelloSimpleTool, SAY_HELLO_SIMPLE_ACTION } from "./say-hello-simple.tool";
 
 // Export all tools
 export const yupaoTools = {
@@ -17,6 +19,8 @@ export const yupaoTools = {
   sendMessage: yupaoSendMessageTool(),
   exchangeWechat: yupaoExchangeWechatTool(),
   getUsername: yupaoGetUsername,
+  getCandidateList: yupaoGetCandidateListTool(),
+  sayHello: yupaoSayHelloSimpleTool(),
 } as const;
 
 // Export action names
@@ -27,6 +31,8 @@ export const YUPAO_ACTIONS = {
   SEND_MESSAGE: SEND_MESSAGE_ACTION,
   EXCHANGE_WECHAT: EXCHANGE_WECHAT_ACTION,
   GET_USERNAME: GET_USERNAME_ACTION,
+  GET_CANDIDATE_LIST: GET_CANDIDATE_LIST_ACTION,
+  SAY_HELLO_SIMPLE: SAY_HELLO_SIMPLE_ACTION,
 } as const;
 
 // Export individual tools for convenience
@@ -36,6 +42,8 @@ export { yupaoChatDetailsTool } from "./get-chat-details.tool";
 export { yupaoSendMessageTool } from "./send-message.tool";
 export { yupaoExchangeWechatTool } from "./exchange-wechat.tool";
 export { yupaoGetUsername } from "./get-username.tool";
+export { yupaoGetCandidateListTool } from "./get-candidate-list.tool";
+export { yupaoSayHelloSimpleTool } from "./say-hello-simple.tool";
 
 // Re-export types
 export * from "./types";
