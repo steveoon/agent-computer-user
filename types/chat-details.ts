@@ -69,7 +69,7 @@ export const UnifiedCandidateInfoSchema = z.object({
   education: z.string().optional().describe("学历"),
   info: z.array(z.string()).optional().describe("其他信息标签"),
   fullText: z.string().optional().describe("完整文本信息"),
-}).passthrough(); // Allow additional fields for platform-specific data
+}).loose(); // Allow additional fields for platform-specific data
 
 /**
  * Chat details summary schema
@@ -98,8 +98,10 @@ export const ChatDetailsDataSchema = z.object({
 /**
  * Complete chat details result schema
  * The final output structure from chat details tools
+ * 
+ * Note: Using strictObject to reject unknown fields and ensure type safety
  */
-export const ChatDetailsResultSchema = z.object({
+export const ChatDetailsResultSchema = z.strictObject({
   success: z.boolean().optional().describe("操作是否成功"),
   message: z.string().optional().describe("操作消息"),
   error: z.string().optional().describe("错误信息"),
@@ -216,14 +218,42 @@ export function parseChatDetailsResult(value: unknown): ChatDetailsResult | null
     // If it has some expected properties but failed validation,
     // try to return a partial result with what we can salvage
     console.warn("Failed to fully parse chat details result, returning partial:", parsed.error);
-    return {
-      success: obj.success,
-      message: obj.message,
-      error: obj.error,
-      data: obj.data,
-      summary: obj.summary,
-      formattedHistory: obj.formattedHistory
-    };
+    
+    // Only return a partial object if at least one property is defined
+    const partialResult: any = {};
+    let hasDefinedValue = false;
+    
+    if (obj.success !== undefined) {
+      partialResult.success = obj.success;
+      hasDefinedValue = true;
+    }
+    if (obj.message !== undefined) {
+      partialResult.message = obj.message;
+      hasDefinedValue = true;
+    }
+    if (obj.error !== undefined) {
+      partialResult.error = obj.error;
+      hasDefinedValue = true;
+    }
+    if (obj.data !== undefined) {
+      partialResult.data = obj.data;
+      hasDefinedValue = true;
+    }
+    if (obj.summary !== undefined) {
+      partialResult.summary = obj.summary;
+      hasDefinedValue = true;
+    }
+    if (obj.formattedHistory !== undefined) {
+      partialResult.formattedHistory = obj.formattedHistory;
+      hasDefinedValue = true;
+    }
+    
+    // If no properties are defined, return null instead of an empty object
+    if (!hasDefinedValue) {
+      return null;
+    }
+    
+    return partialResult;
   }
   
   // For non-objects, return null
