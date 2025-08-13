@@ -2,6 +2,19 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.3.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.2.3...v1.3.0-develop.1) (2025-08-13)
+
+
+### Bug Fixes
+
+* make Claude Code Review intelligent about semantic-release commits ([9b1995c](https://github.com/steveoon/agent-computer-user/commit/9b1995c42e0cd734f0261b83a55a82107c866719))
+* 使用strictObject解决空对象验证问题 ([9f5cc85](https://github.com/steveoon/agent-computer-user/commit/9f5cc850c50d5122ca9945ea4ff09a337addd76f))
+
+
+### Features
+
+* 新增Yupao候选人列表和打招呼工具 ([fcefbfe](https://github.com/steveoon/agent-computer-user/commit/fcefbfe5228a05e984fe97ee0791f7758dfb5b6d))
+
 ## [1.2.3](https://github.com/steveoon/agent-computer-user/compare/v1.2.2...v1.2.3) (2025-08-13)
 
 
