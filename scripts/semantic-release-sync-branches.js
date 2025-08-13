@@ -71,9 +71,9 @@ async function success(pluginConfig, context) {
     execGit('config user.name "semantic-release-bot"', { silent: true });
     execGit('config user.email "semantic-release-bot@martynus.net"', { silent: true });
     
-    // 获取最新的 develop 分支
-    logger.log('Fetching latest develop branch...');
-    execGit('fetch origin develop:develop', { silent: true });
+    // 获取最新的远程分支信息
+    logger.log('Fetching latest branches...');
+    execGit('fetch origin', { silent: true });
     
     // 切换到 develop 分支
     logger.log('Switching to develop branch...');

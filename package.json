@@ -1,6 +1,6 @@
 {
   "name": "ai-sdk-computer-use",
-  "version": "1.2.2",
+  "version": "1.2.3-develop.1",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
@@ -14,6 +14,7 @@
     "test:coverage": "vitest run --coverage",
     "test:coverage:ui": "vitest --ui --coverage",
     "test:mcp-connection": "npx tsx examples/puppeteer-usage.ts",
+    "test:semantic-release": "node scripts/test-semantic-release-sync.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "semantic-release": "semantic-release",
