@@ -3,7 +3,11 @@
 import { BaseToolMessage } from "./base-tool-message";
 import { FileText, User, MessageSquare, Clock } from "lucide-react";
 import { ToolMessageProps } from "./types";
-import type { CandidateInfo } from "@/lib/tools/zhipin/types";
+import { 
+  getSenderDisplay,
+  parseChatDetailsResult,
+  type ChatMessageSender
+} from "@/types/chat-details";
 
 /**
  * BOSS直聘聊天详情工具的显示组件
@@ -11,39 +15,8 @@ import type { CandidateInfo } from "@/lib/tools/zhipin/types";
 export function ZhipinChatDetailsTool(props: ToolMessageProps) {
   const { state, output, isLatestMessage, messageId, partIndex } = props;
 
-  // 类型安全的结果
-  const typedResult = output as
-    | {
-        success?: boolean;
-        message?: string;
-        error?: string;
-        data?: {
-          candidateInfo?: CandidateInfo;
-          chatMessages?: Array<{
-            index: number;
-            sender: "candidate" | "recruiter" | "system" | "unknown";
-            messageType: "text" | "system" | "resume";
-            content: string;
-            time: string;
-            hasTime: boolean;
-          }>;
-          stats?: {
-            totalMessages: number;
-            candidateMessages: number;
-            recruiterMessages: number;
-            systemMessages: number;
-            messagesWithTime: number;
-          };
-        };
-        summary?: {
-          candidateName: string;
-          candidatePosition: string;
-          totalMessages: number;
-          lastMessageTime: string;
-        };
-        formattedHistory?: string[];
-      }
-    | undefined;
+  // 类型安全的结果 - 使用统一的类型定义
+  const typedResult = parseChatDetailsResult(output) ?? undefined;
 
   // 选择合适的主题
   const theme = typedResult?.success
@@ -64,18 +37,14 @@ export function ZhipinChatDetailsTool(props: ToolMessageProps) {
         loaderColor: "text-red-600 dark:text-red-400",
       };
 
-  // 格式化消息发送者
-  const getSenderDisplay = (sender: string) => {
-    switch (sender) {
-      case "candidate":
-        return { label: "候选人", color: "text-blue-600 dark:text-blue-400" };
-      case "recruiter":
-        return { label: "招聘者", color: "text-green-600 dark:text-green-400" };
-      case "system":
-        return { label: "系统", color: "text-gray-500 dark:text-gray-400" };
-      default:
-        return { label: "未知", color: "text-gray-400 dark:text-gray-500" };
+  // 格式化消息发送者 - 使用统一的工具函数，并自定义蓝色主题
+  const getSenderDisplayWithTheme = (sender: string) => {
+    const baseDisplay = getSenderDisplay(sender as ChatMessageSender);
+    // 对于 Zhipin，候选人使用蓝色主题
+    if (sender === "candidate") {
+      return { ...baseDisplay, color: "text-blue-600 dark:text-blue-400" };
     }
+    return { ...baseDisplay, color: baseDisplay.defaultColor };
   };
 
   if (state === "input-streaming" || state === "input-available") {
@@ -176,7 +145,7 @@ export function ZhipinChatDetailsTool(props: ToolMessageProps) {
                   <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-3">聊天记录</h3>
                   <div className="space-y-2 max-h-96 overflow-y-auto">
                     {chatMessages.map((msg, index) => {
-                      const senderInfo = getSenderDisplay(msg.sender);
+                      const senderInfo = getSenderDisplayWithTheme(msg.sender);
                       return (
                         <div
                           key={index}

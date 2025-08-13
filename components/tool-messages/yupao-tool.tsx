@@ -104,13 +104,23 @@ export function YupaoToolMessage(props: ToolMessageProps) {
 
   // 对于输出，更新detail以包含结果信息
   if (state === "output-available" && output) {
-    const result = output as any;
+    const result = output as {
+      data?: {
+        candidates?: unknown[];
+        filtered?: number;
+        summary?: {
+          total: number;
+          success: number;
+          failed: number;
+        };
+      };
+    };
     
     if (toolName === "yupao_get_candidate_list" && result.data?.candidates) {
       const candidates = result.data.candidates;
       const resultDetails: string[] = [];
       resultDetails.push(`找到 ${candidates.length} 个候选人`);
-      if (result.data.filtered > 0) {
+      if (result.data.filtered && result.data.filtered > 0) {
         resultDetails.push(`已过滤 ${result.data.filtered} 个已联系`);
       }
       detail = resultDetails.join(" · ");
