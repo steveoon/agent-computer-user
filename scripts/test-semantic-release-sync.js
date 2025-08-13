@@ -89,11 +89,12 @@ async function runTests() {
   
   // 测试 3: 模拟成功的同步（干运行）
   log('测试 3: 模拟成功的同步流程（干运行）', 'blue');
+  let originalBranch = null;
   try {
-    const currentBranch = git('branch --show-current');
+    originalBranch = git('branch --show-current');
     
     // 只有当前在 develop 分支时才测试
-    if (currentBranch === 'develop') {
+    if (originalBranch === 'develop') {
       log('  检测到当前在 develop 分支，模拟 main 分支同步...');
       
       // 创建模拟的 context
@@ -115,9 +116,16 @@ async function runTests() {
         log('  同步流程执行完成');
       } catch (syncError) {
         log(`  同步流程遇到预期错误: ${syncError.message}`, 'yellow');
+      } finally {
+        delete process.env.SEMANTIC_RELEASE_TEST_MODE;
+        // 恢复到原始分支
+        const currentBranch = git('branch --show-current');
+        if (currentBranch !== originalBranch) {
+          log(`  恢复到原始分支 ${originalBranch}...`);
+          git(`checkout ${originalBranch}`);
+        }
       }
       
-      delete process.env.SEMANTIC_RELEASE_TEST_MODE;
       log('✅ 模拟测试完成\n', 'green');
     } else {
       log('  跳过测试: 需要在 develop 分支执行', 'yellow');
@@ -125,6 +133,14 @@ async function runTests() {
     }
   } catch (error) {
     log(`❌ 模拟测试失败: ${error.message}\n`, 'red');
+    // 确保恢复到原始分支
+    if (originalBranch) {
+      const currentBranch = git('branch --show-current');
+      if (currentBranch !== originalBranch) {
+        log(`  恢复到原始分支 ${originalBranch}...`);
+        git(`checkout ${originalBranch}`);
+      }
+    }
   }
   
   // 测试 4: 验证 execSync 的 null 处理
