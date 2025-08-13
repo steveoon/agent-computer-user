@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.2.3](https://github.com/steveoon/agent-computer-user/compare/v1.2.2...v1.2.3) (2025-08-13)
+
+
+### Bug Fixes
+
+* improve semantic-release sync script reliability ([b532507](https://github.com/steveoon/agent-computer-user/commit/b53250717d529f95660f32f7463e85710344e2d3))
+
 ## [1.2.3-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.2.2...v1.2.3-develop.1) (2025-08-13)
 
 
