@@ -104,3 +104,38 @@ export {
   isChatRequestBody,
   validateChatRequestBody,
 } from "./api";
+
+// 从chat-details.ts导出聊天详情相关类型
+export type {
+  // 基础类型
+  ChatMessageSender,
+  ChatMessageType,
+  ChatMessage,
+  ChatStats,
+  UnifiedCandidateInfo,
+  ChatDetailsSummary,
+  ChatDetailsData,
+  ChatDetailsResult,
+} from "./chat-details";
+
+export {
+  // Zod Schemas
+  ChatMessageSenderSchema,
+  ChatMessageTypeSchema,
+  ChatMessageSchema,
+  ChatStatsSchema,
+  UnifiedCandidateInfoSchema,
+  ChatDetailsSummarySchema,
+  ChatDetailsDataSchema,
+  ChatDetailsResultSchema,
+  // Type Guards
+  isChatDetailsResult,
+  isSuccessfulChatDetailsResult,
+  isErrorChatDetailsResult,
+  // Utility Functions
+  parseChatDetailsResult,
+  extractCandidateName,
+  extractTotalMessages,
+  getSenderDisplay,
+  migrateToUnifiedType,
+} from "./chat-details";

@@ -211,6 +211,22 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     create: () => yupaoTools.getUsername,
   },
 
+  yupao_get_candidate_list: {
+    name: "yupao_get_candidate_list",
+    description: "获取约聘候选人列表",
+    category: "automation",
+    requiresSandbox: false,
+    create: () => yupaoTools.getCandidateList,
+  },
+
+  yupao_say_hello: {
+    name: "yupao_say_hello",
+    description: "约聘批量打招呼",
+    category: "automation",
+    requiresSandbox: false,
+    create: () => yupaoTools.sayHello,
+  },
+
   // ===== Duliday 业务工具 =====
   duliday_job_list: {
     name: "duliday_job_list",
@@ -303,6 +319,8 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "yupao_send_message",
     "yupao_exchange_wechat",
     "yupao_get_username",
+    "yupao_get_candidate_list",
+    "yupao_say_hello",
   ],
   
   // 通用计算机使用 - 包含E2B和Puppeteer，但不包含Boss直聘业务工具

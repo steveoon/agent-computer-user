@@ -10,23 +10,24 @@ import {
 } from "@/types/chat-details";
 
 /**
- * BOSS直聘聊天详情工具的显示组件
+ * Yupao聊天详情工具的显示组件
+ * 使用统一的类型定义，保持平台特色的紫色主题
  */
-export function ZhipinChatDetailsTool(props: ToolMessageProps) {
+export function YupaoChatDetailsTool(props: ToolMessageProps) {
   const { state, output, isLatestMessage, messageId, partIndex } = props;
 
   // 类型安全的结果 - 使用统一的类型定义
   const typedResult = parseChatDetailsResult(output) ?? undefined;
 
-  // 选择合适的主题
+  // 选择合适的主题 - 使用紫色主题保持Yupao一致性
   const theme = typedResult?.success
     ? {
-        bgColor: "bg-blue-50 dark:bg-blue-950/20",
-        borderColor: "border-blue-200 dark:border-blue-900",
-        iconBgColor: "bg-blue-100 dark:bg-blue-900/50",
-        iconColor: "text-blue-600 dark:text-blue-400",
-        textColor: "text-blue-800 dark:text-blue-200",
-        loaderColor: "text-blue-600 dark:text-blue-400",
+        bgColor: "bg-purple-50 dark:bg-purple-950/20",
+        borderColor: "border-purple-200 dark:border-purple-900",
+        iconBgColor: "bg-purple-100 dark:bg-purple-900/50",
+        iconColor: "text-purple-600 dark:text-purple-400",
+        textColor: "text-purple-800 dark:text-purple-200",
+        loaderColor: "text-purple-600 dark:text-purple-400",
       }
     : {
         bgColor: "bg-red-50 dark:bg-red-950/20",
@@ -37,12 +38,12 @@ export function ZhipinChatDetailsTool(props: ToolMessageProps) {
         loaderColor: "text-red-600 dark:text-red-400",
       };
 
-  // 格式化消息发送者 - 使用统一的工具函数，并自定义蓝色主题
+  // 格式化消息发送者 - 使用统一的工具函数，并自定义紫色主题
   const getSenderDisplayWithTheme = (sender: string) => {
     const baseDisplay = getSenderDisplay(sender as ChatMessageSender);
-    // 对于 Zhipin，候选人使用蓝色主题
+    // 对于 Yupao，候选人使用紫色主题
     if (sender === "candidate") {
-      return { ...baseDisplay, color: "text-blue-600 dark:text-blue-400" };
+      return { ...baseDisplay, color: "text-purple-600 dark:text-purple-400" };
     }
     return { ...baseDisplay, color: baseDisplay.defaultColor };
   };

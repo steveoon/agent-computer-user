@@ -153,6 +153,66 @@ export const YUPAO_USER_SELECTORS = {
   avatarBoxAlt: '[class*="_avatar-box_"]',
 } as const;
 
+// Say Hello page selectors (牛人打招呼页面)
+export const YUPAO_SAY_HELLO_SELECTORS = {
+  // Main container
+  container: '.ant-spin-container',
+  
+  // Candidate card - uses dynamic hash
+  candidateCard: '._card_xejow_11',
+  candidateCardAlt: '[class*="_card_"]',
+  
+  // Candidate info elements
+  candidateName: '._name_xejow_104',
+  candidateNameAlt: '[class*="_name_"]:not([class*="_nameR_"])',
+  
+  // Basic info (gender, age, experience)
+  baseInfoStr: '._baseInfoStr_xejow_168',
+  baseInfoStrAlt: '[class*="_baseInfoStr_"]',
+  
+  // Introduction text
+  introduce: '._introduce_xejow_182',
+  introduceAlt: '[class*="_introduce_"]',
+  
+  // Expected job info
+  expectedInfo: '._cardMRI_xejow_199',
+  expectedInfoAlt: '[class*="_cardMRI_"]',
+  expectedTitle: '._cardMRIT_xejow_208',
+  expectedTitleAlt: '[class*="_cardMRIT_"]',
+  salary: '._salary_xejow_217',
+  salaryAlt: '[class*="_salary_"]',
+  
+  // Online status
+  onlineYes: '._onlineYes_xejow_51',
+  online: '._online_xejow_51',
+  relation: '._relation_xejow_38',
+  onlineAlt: '[class*="_online"][class*="_xejow_"]',
+  
+  // Chat button
+  chatBtn: '._chatBtn_xejow_256',
+  chatBtnAlt: '[class*="_chatBtn_"]',
+  chatBtnText: '聊一聊',
+  continueChatText: '继续聊',
+  
+  // Call button
+  callBtn: '._callBtn_xejow_256',
+  callBtnAlt: '[class*="_callBtn_"]',
+  
+  // Button container
+  buttonBox: '._buttonBox_xejow_289',
+  buttonBoxAlt: '[class*="_buttonBox_"]',
+  
+  // Tags container (skills, preferences)
+  tagsR: '._tagsR_xejow_231',
+  tag: '._tag_xejow_116',
+  tagsAlt: '[class*="_tagsR_"]',
+  tagAlt: '[class*="_tag_"]:not([class*="_tagsR_"])',
+  
+  // Loading indicator
+  loadingBox: '._loading-box_1rmzv_11',
+  infiniteScroll: '._infinite-scroll_1951k_101',
+} as const;
+
 // Timing constants
 export const YUPAO_TIMING = {
   // Wait timeouts (ms)

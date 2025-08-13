@@ -12,12 +12,6 @@ on:
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-    
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,9 +23,40 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0  # Need full history to check commits
+
+      - name: Check if PR has non-semantic-release changes
+        id: check-changes
+        run: |
+          # Get all commits in this PR
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          
+          # Check if there are any commits that are NOT from semantic-release-bot
+          # and do NOT have [skip ci] in the message
+          NON_RELEASE_COMMITS=$(git log --format="%an|%s" $BASE_SHA..$HEAD_SHA 2>/dev/null | \
+            grep -v "semantic-release-bot" | \
+            grep -v "\[skip ci\]" | \
+            wc -l | tr -d ' ')
+          
+          # Also check if there are meaningful file changes beyond version/changelog
+          MEANINGFUL_CHANGES=$(git diff --name-only $BASE_SHA..$HEAD_SHA 2>/dev/null | \
+            grep -v "^CHANGELOG.md$" | \
+            grep -v "^package.json$" | \
+            grep -v "^package-lock.json$" | \
+            grep -v "^pnpm-lock.yaml$" | \
+            wc -l | tr -d ' ')
+          
+          if [ "$NON_RELEASE_COMMITS" -gt 0 ] || [ "$MEANINGFUL_CHANGES" -gt 0 ]; then
+            echo "should_review=true" >> $GITHUB_OUTPUT
+            echo "✅ Found code changes that need review"
+          else
+            echo "should_review=false" >> $GITHUB_OUTPUT
+            echo "⏭️ Only semantic-release changes, skipping review"
+          fi
 
       - name: Run Claude Code Review
+        if: steps.check-changes.outputs.should_review == 'true'
         id: claude-review
         uses: anthropics/claude-code-action@beta
         with:

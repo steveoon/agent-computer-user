@@ -13,7 +13,10 @@ import {
   FileText,
   Calendar,
   ChartBarIcon,
-  RefreshCwIcon
+  RefreshCwIcon,
+  ListChecks,
+  ClipboardList,
+  HandshakeIcon
 } from "lucide-react";
 import { ComputerToolMessage } from "./computer-tool";
 import { BashToolMessage } from "./bash-tool";
@@ -27,6 +30,8 @@ import { ZhipinSendMessageTool } from "./zhipin-send-message-tool";
 import { ZhipinChatDetailsTool } from "./zhipin-chat-details-tool";
 import { ZhipinExchangeWechatTool } from "./zhipin-exchange-wechat-tool";
 import { ZhipinGetUsernameTool } from "./zhipin-get-username-tool";
+import { YupaoToolMessage } from "./yupao-tool";
+import { YupaoChatDetailsTool } from "./yupao-chat-details-tool";
 import { DulidayJobListToolMessage } from "./duliday-job-list-tool";
 import { DulidayJobDetailsToolMessage } from "./duliday-job-details-tool";
 import { DulidayInterviewBookingToolMessage } from "./duliday-interview-booking-tool";
@@ -127,6 +132,47 @@ export const toolRegistry: Record<string, ToolConfig> = {
     icon: RefreshCwIcon,
     defaultTheme: themes.amber,
     render: DulidayBiRefreshTool,
+  },
+  // Yupao automation tools
+  yupao_get_unread_messages: {
+    icon: ListChecks,
+    defaultTheme: themes.purple,
+    render: YupaoToolMessage,
+  },
+  yupao_open_candidate_chat: {
+    icon: UserCheck,
+    defaultTheme: themes.purple,
+    render: YupaoToolMessage,
+  },
+  yupao_get_chat_details: {
+    icon: ScrollText,
+    defaultTheme: themes.purple,
+    render: YupaoChatDetailsTool,
+  },
+  yupao_send_message: {
+    icon: MessageSquare,
+    defaultTheme: themes.purple,
+    render: YupaoToolMessage,
+  },
+  yupao_exchange_wechat: {
+    icon: Smartphone,
+    defaultTheme: themes.green,
+    render: YupaoToolMessage,
+  },
+  yupao_get_username: {
+    icon: UserCheck,
+    defaultTheme: themes.purple,
+    render: YupaoToolMessage,
+  },
+  yupao_get_candidate_list: {
+    icon: ClipboardList,
+    defaultTheme: themes.purple,
+    render: YupaoToolMessage,
+  },
+  yupao_say_hello: {
+    icon: HandshakeIcon,
+    defaultTheme: themes.purple,
+    render: YupaoToolMessage,
   },
 };
 
