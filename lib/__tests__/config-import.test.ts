@@ -388,4 +388,194 @@ describe("配置导入数据格式校验", () => {
       }
     });
   });
+
+  describe("旧版本配置自动升级", () => {
+    it("应该自动升级缺少新字段的旧版本配置", async () => {
+      // 模拟旧版本配置（缺少新增的考勤相关模板字段）
+      const oldConfig = {
+        brandData: {
+          city: "上海市",
+          defaultBrand: "大米先生",
+          brands: {
+            大米先生: {
+              templates: {
+                // 只包含旧版本的模板字段
+                initial_inquiry: ["初始询问"],
+                location_inquiry: ["位置询问"],
+                no_location_match: ["无位置匹配"],
+                interview_request: ["面试请求"],
+                salary_inquiry: ["薪资询问"],
+                schedule_inquiry: ["排班询问"],
+                general_chat: ["通用聊天"],
+                age_concern: ["年龄关注"],
+                insurance_inquiry: ["保险询问"],
+                followup_chat: ["跟进聊天"],
+                // 缺少新增的6个字段
+              },
+              screening: {
+                age: { min: 18, max: 45, preferred: [25] },
+                blacklistKeywords: [],
+                preferredKeywords: [],
+              },
+            },
+          },
+          stores: [],
+        },
+        replyPrompts: {
+          // 只包含旧版本的回复指令
+          initial_inquiry: "初始询问回复",
+          location_inquiry: "位置询问回复",
+          no_location_match: "无位置匹配回复",
+          salary_inquiry: "薪资询问回复",
+          schedule_inquiry: "排班询问回复",
+          interview_request: "面试请求回复",
+          age_concern: "年龄关注回复",
+          insurance_inquiry: "保险询问回复",
+          followup_chat: "跟进聊天回复",
+          general_chat: "通用聊天回复",
+          // 缺少新增的6个字段
+        },
+        systemPrompts: {
+          bossZhipinSystemPrompt: "Boss直聘系统提示词",
+          bossZhipinLocalSystemPrompt: "Boss直聘本地系统提示词",
+          generalComputerSystemPrompt: "通用计算机系统提示词",
+        },
+        metadata: {
+          version: "1.0.0", // 旧版本号
+          lastUpdated: new Date().toISOString(),
+        },
+      };
+
+      // 初始验证应该失败
+      const initialResult = AppConfigDataSchema.safeParse(oldConfig);
+      expect(initialResult.success).toBe(false);
+
+      // 动态导入升级函数
+      const { upgradeConfigData } = await import("@/lib/services/config.service");
+      
+      // 升级配置（第三个参数 false 表示这是版本升级，不是修复）
+      const upgradedConfig = await upgradeConfigData(oldConfig as any, false, false);
+
+      // 验证升级后的配置
+      const finalResult = AppConfigDataSchema.safeParse(upgradedConfig);
+      expect(finalResult.success).toBe(true);
+
+      if (finalResult.success) {
+        // 验证品牌模板中新字段已添加
+        const brandTemplates = finalResult.data.brandData.brands["大米先生"].templates;
+        expect(brandTemplates.attendance_inquiry).toBeDefined();
+        expect(brandTemplates.flexibility_inquiry).toBeDefined();
+        expect(brandTemplates.attendance_policy_inquiry).toBeDefined();
+        expect(brandTemplates.work_hours_inquiry).toBeDefined();
+        expect(brandTemplates.availability_inquiry).toBeDefined();
+        expect(brandTemplates.part_time_support).toBeDefined();
+
+        // 验证回复指令中新字段已添加
+        expect(finalResult.data.replyPrompts.attendance_inquiry).toBeDefined();
+        expect(finalResult.data.replyPrompts.flexibility_inquiry).toBeDefined();
+        expect(finalResult.data.replyPrompts.attendance_policy_inquiry).toBeDefined();
+        expect(finalResult.data.replyPrompts.work_hours_inquiry).toBeDefined();
+        expect(finalResult.data.replyPrompts.availability_inquiry).toBeDefined();
+        expect(finalResult.data.replyPrompts.part_time_support).toBeDefined();
+      }
+    });
+
+    it("应该修复最新版本配置中缺失的字段而不改变版本号", async () => {
+      // 模拟最新版本但缺少某些模板字段的配置
+      const latestButIncompleteConfig = {
+        brandData: {
+          city: "上海市",
+          defaultBrand: "肯德基",
+          brands: {
+            肯德基: {
+              templates: {
+                // 包含大部分字段，但缺少一些
+                initial_inquiry: ["初始询问"],
+                location_inquiry: ["位置询问"],
+                no_location_match: ["无位置匹配"],
+                interview_request: ["面试请求"],
+                salary_inquiry: ["薪资询问"],
+                schedule_inquiry: ["排班询问"],
+                general_chat: ["通用聊天"],
+                age_concern: ["年龄关注"],
+                insurance_inquiry: ["保险询问"],
+                followup_chat: ["跟进聊天"],
+                attendance_inquiry: ["考勤询问"],
+                // 故意缺少这些字段
+                // flexibility_inquiry
+                // attendance_policy_inquiry
+                // work_hours_inquiry
+                // availability_inquiry
+                // part_time_support
+              },
+              screening: {
+                age: { min: 18, max: 45, preferred: [25] },
+                blacklistKeywords: [],
+                preferredKeywords: [],
+              },
+            },
+          },
+          stores: [],
+        },
+        replyPrompts: {
+          initial_inquiry: "初始询问回复",
+          location_inquiry: "位置询问回复",
+          no_location_match: "无位置匹配回复",
+          salary_inquiry: "薪资询问回复",
+          schedule_inquiry: "排班询问回复",
+          interview_request: "面试请求回复",
+          age_concern: "年龄关注回复",
+          insurance_inquiry: "保险询问回复",
+          followup_chat: "跟进聊天回复",
+          general_chat: "通用聊天回复",
+          attendance_inquiry: "考勤询问回复",
+          flexibility_inquiry: "灵活性询问回复",
+          attendance_policy_inquiry: "考勤政策询问回复",
+          work_hours_inquiry: "工时询问回复",
+          availability_inquiry: "可用性询问回复",
+          part_time_support: "兼职支持回复",
+        },
+        systemPrompts: {
+          bossZhipinSystemPrompt: "Boss直聘系统提示词",
+          bossZhipinLocalSystemPrompt: "Boss直聘本地系统提示词",
+          generalComputerSystemPrompt: "通用计算机系统提示词",
+        },
+        metadata: {
+          version: "1.2.0", // 最新版本号
+          lastUpdated: new Date().toISOString(),
+        },
+      };
+
+      // 初始验证应该失败（因为缺少某些模板字段）
+      const initialResult = AppConfigDataSchema.safeParse(latestButIncompleteConfig);
+      expect(initialResult.success).toBe(false);
+
+      // 动态导入升级函数
+      const { upgradeConfigData } = await import("@/lib/services/config.service");
+      
+      // 修复配置（第三个参数 true 表示这是修复，不是升级）
+      const repairedConfig = await upgradeConfigData(latestButIncompleteConfig as any, false, true);
+
+      // 验证修复后的配置
+      const finalResult = AppConfigDataSchema.safeParse(repairedConfig);
+      expect(finalResult.success).toBe(true);
+
+      if (finalResult.success) {
+        // 验证版本号没有改变
+        expect(finalResult.data.metadata.version).toBe("1.2.0");
+        
+        // 验证缺失的模板字段已补全
+        const brandTemplates = finalResult.data.brandData.brands["肯德基"].templates;
+        expect(brandTemplates.flexibility_inquiry).toBeDefined();
+        expect(brandTemplates.attendance_policy_inquiry).toBeDefined();
+        expect(brandTemplates.work_hours_inquiry).toBeDefined();
+        expect(brandTemplates.availability_inquiry).toBeDefined();
+        expect(brandTemplates.part_time_support).toBeDefined();
+        
+        // 验证元数据中有 repairedAt 而不是 upgradedAt
+        expect(finalResult.data.metadata).toHaveProperty("repairedAt");
+        expect(finalResult.data.metadata).not.toHaveProperty("upgradedAt");
+      }
+    });
+  });
 });

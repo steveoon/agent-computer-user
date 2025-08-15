@@ -250,30 +250,61 @@ const useConfigStore = create<ConfigState>()(
           console.log("🔍 开始严格数据格式校验...");
 
           // 🔧 使用Zod Schema进行严格校验
-          const validationResult = AppConfigDataSchema.safeParse(parsedData);
+          let validationResult = AppConfigDataSchema.safeParse(parsedData);
 
           if (!validationResult.success) {
-            console.error("❌ 数据格式校验失败:", validationResult.error);
+            console.log("⚠️ 初始校验失败，尝试升级数据格式...");
+            
+            // 尝试升级或修复数据（补全缺失字段）
+            try {
+              const { upgradeConfigData } = await import("../lib/services/config.service");
+              const { CONFIG_VERSION } = await import("../types/config");
+              
+              // 创建一个临时配置对象，尽可能保留原有数据
+              const tempConfig = parsedData as AppConfigData;
+              
+              // 检查是否是最新版本
+              const currentVersion = tempConfig.metadata?.version;
+              const isLatestVersion = currentVersion === CONFIG_VERSION;
+              
+              console.log(`🔧 ${isLatestVersion ? '修复' : '升级'}配置数据...`);
+              
+              // 调用升级函数
+              // 第二个参数: false = 不保存到存储
+              // 第三个参数: 如果是最新版本，则设置 forceRepair = true
+              const upgradedConfig = await upgradeConfigData(tempConfig, false, isLatestVersion);
+              
+              // 重新验证升级后的数据
+              validationResult = AppConfigDataSchema.safeParse(upgradedConfig);
+              
+              if (validationResult.success) {
+                console.log(`✅ 数据${isLatestVersion ? '修复' : '升级'}成功，已补全缺失字段`);
+              } else {
+                throw new Error(`数据${isLatestVersion ? '修复' : '升级'}后仍无法通过验证`);
+              }
+            } catch (upgradeError) {
+              console.error("❌ 数据升级失败:", upgradeError);
+              
+              // 生成用户友好的错误信息
+              const errorMessages = validationResult.error?.issues
+                ?.map(err => {
+                  const path = err.path.length > 0 ? err.path.join(".") : "根级别";
+                  return `• ${path}: ${err.message}`;
+                })
+                .slice(0, 10) || []; // 限制显示前10个错误
 
-            // 生成用户友好的错误信息
-            const errorMessages = validationResult.error.issues
-              .map(err => {
-                const path = err.path.length > 0 ? err.path.join(".") : "根级别";
-                return `• ${path}: ${err.message}`;
-              })
-              .slice(0, 10); // 限制显示前10个错误
+              const errorSummary = [
+                `配置文件数据格式校验失败，发现以下问题:`,
+                ...errorMessages,
+                validationResult.error?.issues && validationResult.error.issues.length > 10
+                  ? `... 还有 ${validationResult.error.issues.length - 10} 个其他错误`
+                  : "",
+              ]
+                .filter(Boolean)
+                .join("\n");
 
-            const errorSummary = [
-              `配置文件数据格式校验失败，发现以下问题:`,
-              ...errorMessages,
-              validationResult.error.issues.length > 10
-                ? `... 还有 ${validationResult.error.issues.length - 10} 个其他错误`
-                : "",
-            ]
-              .filter(Boolean)
-              .join("\n");
-
-            throw new Error(errorSummary);
+              throw new Error(errorSummary);
+            }
           }
 
           const importedConfig = validationResult.data;

@@ -1,8 +1,9 @@
 ---
 description: 当需要重构大型代码或者开发新的功能时阅读
-globs: 
+globs:
 alwaysApply: false
 ---
+
 # 🚨 重要提醒规则：General Notes 检查
 
 ## 📋 必读检查清单
@@ -10,7 +11,8 @@ alwaysApply: false
 在进行任何代码修改、新功能开发或问题解决前，**必须**先检查：
 
 ### 🎯 核心提醒
-- **Always check `@general-notes.mdc` first** 
+
+- **Always check `@general-notes.mdc` first**
 - 在开始编码前，确保已阅读并理解相关的通用注意事项
 - 避免重复已知问题或忽略重要的架构决策
 
@@ -43,8 +45,12 @@ flowchart TD
 - API设计模式
 - 代码风格统一
 - 已知问题解决方案
+- **Zod schema 定义**（提醒使用 v4 新语法）
+- **AI SDK 工具开发**（确保符合 v5 规范）
+- **错误处理实现**（使用 Zod v4 的 `error` 参数）
 
 **提醒格式：**
+
 ```
 ⚠️ 建议先查看 @general-notes.mdc 中关于 [具体主题] 的相关说明
 ```
@@ -54,7 +60,9 @@ flowchart TD
 - 当遇到重要经验或教训时，及时更新 `general-notes.mdc`
 - 项目架构调整时，同步更新相关记录
 - 新团队成员加入时，确保他们了解这个文件的重要性
+- **版本升级后**，及时更新相关的技术栈信息和已知问题记录
+- **依赖库重大更新**（如 Zod v4, AI SDK v5），记录迁移经验和注意事项
 
 ---
 
-*记住：`@general-notes.mdc` 是项目智慧的沉淀，忽略它可能导致重复劳动或引入已知问题！*
+_记住：`@general-notes.mdc` 是项目智慧的沉淀，忽略它可能导致重复劳动或引入已知问题！_

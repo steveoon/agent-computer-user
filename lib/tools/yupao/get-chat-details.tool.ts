@@ -63,11 +63,62 @@ export const yupaoChatDetailsTool = () =>
         // 创建获取聊天详情的脚本
         const script = wrapAntiDetectionScript(`
           // 获取候选人基本信息
-          // 在Yupao中，候选人信息通常需要从对话中提取，特别是岗位信息
           let candidateInfo = null;
           
-          // 尝试从岗位信息框中提取信息
+          // 优先从顶部候选人信息区域提取
+          const candidateNameEl = document.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.candidateName}');
+          const candidateName = candidateNameEl ? candidateNameEl.textContent.trim() : '候选人';
+          
+          // 获取活跃时间
+          const statsEl = document.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.candidateStats}');
+          const activeTime = statsEl ? statsEl.textContent.trim() : '';
+          
+          // 获取期望职位和薪资
+          const occNameEl = document.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.occName}');
+          const expectedPosition = occNameEl ? occNameEl.textContent.replace('期望：', '').trim() : '';
+          
+          const salaryEl = document.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.salary}');
+          const expectedSalary = salaryEl ? salaryEl.textContent.trim() : '';
+          
+          // 获取简历标签（性别、年龄、期望工作地）
+          const resumeTags = Array.from(document.querySelectorAll('${YUPAO_CHAT_DETAILS_SELECTORS.resumeTag}'));
+          let gender = '';
+          let age = '';
+          let expectedLocation = '';
+          
+          resumeTags.forEach(tag => {
+            const text = tag.textContent.trim();
+            if (text === '男' || text === '女') {
+              gender = text;
+            } else if (text.includes('岁')) {
+              age = text;
+            } else if (text.includes('期望工作地')) {
+              expectedLocation = text.replace('期望工作地：', '').trim();
+            }
+          });
+          
+          // 获取额外标签信息（身高、体重、健康证等）
+          const extraTags = Array.from(document.querySelectorAll('${YUPAO_CHAT_DETAILS_SELECTORS.tagValue}'));
+          let height = '';
+          let weight = '';
+          let hasHealthCertificate = false;
+          const additionalInfo = [];
+          
+          extraTags.forEach(tag => {
+            const text = tag.textContent.trim();
+            if (text.includes('身高')) {
+              height = text.replace('身高', '').trim();
+            } else if (text.includes('体重')) {
+              weight = text.replace('体重', '').trim();
+            } else if (text.includes('健康证')) {
+              hasHealthCertificate = true;
+            }
+            additionalInfo.push(text);
+          });
+          
+          // 尝试从岗位信息框中提取补充信息（如果顶部信息不完整）
           const jobBox = document.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.messageJobBox}');
+          let jobInfo = {};
           if (jobBox) {
             const jobTitle = jobBox.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.jobTitle}');
             const jobTags = Array.from(jobBox.querySelectorAll('${YUPAO_CHAT_DETAILS_SELECTORS.jobTags}'));
@@ -79,24 +130,36 @@ export const yupaoChatDetailsTool = () =>
             const address = jobAddress ? jobAddress.textContent.trim() : '';
             const description = jobDesc ? jobDesc.textContent.trim() : '';
             
-            // 从描述中尝试提取年龄要求
-            const ageMatch = description.match(/(\\d{2,3})[\u4e00-\u9fa5]*岁/);
-            const age = ageMatch ? ageMatch[1] + '岁' : '';
-            
-            // 从描述中提取经验要求
+            // 从描述中提取经验要求（如果还没有）
             const experienceMatch = description.match(/(\\d+年|\\d+年以上|应届生|在校生|经验优先)/);
             const experience = experienceMatch ? experienceMatch[1] : '';
             
-            candidateInfo = {
-              name: '候选人', // Yupao不直接显示候选人姓名在聊天详情中
-              position: position,
-              age: age,
-              experience: experience,
-              education: '', // Yupao通常不在岗位信息中显示学历要求
-              info: [...tags, address].filter(Boolean),
-              fullText: description
+            jobInfo = {
+              jobPosition: position,
+              jobTags: tags,
+              jobAddress: address,
+              jobDescription: description,
+              experience: experience
             };
           }
+          
+          // 组装候选人信息
+          candidateInfo = {
+            name: candidateName,
+            position: expectedPosition || jobInfo.jobPosition || '',
+            age: age,
+            gender: gender,
+            experience: jobInfo.experience || '',
+            education: '', // Yupao通常不在这里显示学历
+            expectedSalary: expectedSalary,
+            expectedLocation: expectedLocation,
+            height: height,
+            weight: weight,
+            healthCertificate: hasHealthCertificate,
+            activeTime: activeTime,
+            info: additionalInfo,
+            fullText: jobInfo.jobDescription || ''
+          };
           
           // 获取聊天记录
           const chatBody = document.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.chatRecordBody}');
@@ -281,6 +344,10 @@ export const yupaoChatDetailsTool = () =>
                   summary: {
                     candidateName: parsedResult.candidateInfo?.name || "未知",
                     candidatePosition: parsedResult.candidateInfo?.position || "未知职位",
+                    candidateGender: parsedResult.candidateInfo?.gender || "",
+                    candidateAge: parsedResult.candidateInfo?.age || "",
+                    candidateExpectedSalary: parsedResult.candidateInfo?.expectedSalary || "",
+                    candidateExpectedLocation: parsedResult.candidateInfo?.expectedLocation || "",
                     totalMessages: parsedResult.stats?.totalMessages || 0,
                     lastMessageTime:
                       parsedResult.chatMessages?.[parsedResult.chatMessages.length - 1]?.time ||

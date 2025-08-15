@@ -43,6 +43,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a Next.js 15 AI recruitment assistant platform with the following key components:
 
 **Multi-Provider AI Integration:**
+
 - Primary: Anthropic Claude Sonnet for computer use capabilities
 - Secondary: Qwen models via `qwen-ai-provider` for smart reply generation
 - Supports OpenAI, Google AI, and OpenRouter providers via AI SDK
@@ -50,6 +51,7 @@ This is a Next.js 15 AI recruitment assistant platform with the following key co
 - Provider caching to avoid recreating identical configurations
 
 **Configuration Management:**
+
 - Unified Config Service (`lib/services/config.service.ts`) using localforage
 - Three-tier data structure: Brand data, System prompts, Reply prompts
 - Migration system from hardcoded data to persistent storage
@@ -57,6 +59,7 @@ This is a Next.js 15 AI recruitment assistant platform with the following key co
 - LocalForage for browser-based persistence with IndexedDB fallback
 
 **Smart Reply System:**
+
 - Two-phase AI architecture: Classification (generateObject) → Reply generation (generateText)
 - 16 reply scenarios with intelligent intent recognition (10 recruitment + 6 attendance)
 - Multi-brand support with dynamic brand detection via React Context
@@ -66,29 +69,34 @@ This is a Next.js 15 AI recruitment assistant platform with the following key co
 ### Core Design Patterns
 
 **Singleton Pattern:**
+
 - Core services (`configService`, `mcpClientManager`) use singleton pattern
 - Ensures single instance for resource efficiency
 - Prevents memory leaks and duplicate connections
 
 **Zod Schema-First Architecture:**
 All data types and interfaces are derived from Zod schemas:
+
 ```typescript
 // Define schema first
 const schema = z.object({...})
 // Derive types
 type SchemaType = z.infer<typeof schema>
 ```
+
 - Runtime validation at all external data boundaries
 - Compile-time type safety throughout the application
 - Schema-derived types eliminating duplication
 - All data structures must derive from Zod schemas
 
 **Type Safety Flow:**
+
 ```
 API Response → Zod Schema Validation → TypeScript Types → React Components
 ```
 
 **Dynamic CSS Selector Pattern:**
+
 - Handles CSS modules with changing hash values
 - `lib/tools/yupao/dynamic-selector-utils.ts` provides adaptive selectors
 - Multi-strategy fallback for element finding:
@@ -183,6 +191,7 @@ API Response → Zod Schema Validation → TypeScript Types → React Components
 ### TypeScript Testing Configuration
 
 The project uses separate TypeScript configurations for production and testing:
+
 - `tsconfig.json` - Main configuration that includes all files for proper type inference
 - `tsconfig.test.json` - Test-specific configuration with test type definitions
 - ESLint configured to ignore test files via flat config `ignores` array
@@ -193,12 +202,14 @@ The project uses separate TypeScript configurations for production and testing:
 The application has comprehensive Chinese language support as primary language:
 
 ### General Support
+
 - Primary language is Chinese for recruitment scenarios
 - UTF-8 encoding throughout the application
 - All text operations handle Chinese characters properly
 - Supports conversation history for context-aware responses
 
 ### Desktop Automation
+
 - Special handling for Chinese IME in E2B environments
 - Screen resolution fixed at 1024x768 for consistency
 - All desktop interactions go through `lib/e2b/tool.ts`
@@ -206,6 +217,7 @@ The application has comprehensive Chinese language support as primary language:
 - Reference `docs/CHINESE_INPUT_GUIDE.md` for troubleshooting input issues
 
 ### Testing Requirements
+
 - Always test features with Chinese input
 - Test Chinese text encoding in all scenarios
 - Verify IME compatibility in desktop automation
@@ -213,6 +225,7 @@ The application has comprehensive Chinese language support as primary language:
 ## Authentication & Security
 
 ### Authentication System
+
 - Supabase integration for user authentication (optional)
 - App works without authentication in standalone mode
 - Cookie-based session management for SSR support
@@ -221,6 +234,7 @@ The application has comprehensive Chinese language support as primary language:
 - Always check if Supabase is configured before using auth features
 
 ### Security Features
+
 - `.env` files excluded from Docker images via `.dockerignore`
 - Build-time variables (`NEXT_PUBLIC_*`) injected during build
 - Runtime variables (API keys) passed via environment variables
@@ -264,17 +278,20 @@ EXA_API_KEY=your_exa_search_key
 ## Performance Optimization
 
 ### Development Performance
+
 - Use Turbopack in development for faster builds (`pnpm dev`)
 - React 19 features for improved runtime performance
 - Implement lazy loading for heavy components
 
 ### Runtime Optimization
+
 - Cache AI provider instances to avoid recreation
 - Singleton pattern for core services prevents duplicate instances
 - Lazy connection establishment for MCP servers
 - Automatic resource cleanup prevents memory leaks
 
 ### Production Optimization
+
 - Optimize images with Next.js Image component and Sharp
 - Build-time optimizations with proper environment variable handling
 - Health check endpoint `/api/health` for monitoring
@@ -282,6 +299,7 @@ EXA_API_KEY=your_exa_search_key
 ## Configuration Management
 
 ### Config Service Architecture
+
 - All configuration data flows through `configService` singleton
 - Components use `ConfigInitializer` for automatic migration on first use
 - Admin interface at `/admin/settings` for visual configuration management
@@ -290,25 +308,30 @@ EXA_API_KEY=your_exa_search_key
 - Configuration data stored in browser IndexedDB via LocalForage
 
 ### Admin Interfaces
+
 - Visit `/admin/settings` - Configuration management interface
 - Visit `/admin/config` - Legacy configuration interface (redirects to settings)
 
 ### Configuration Data Flow
+
 `ConfigInitializer` → `configService.getConfig()` → Components
 
 ## Docker Deployment
 
 ### Configuration Files
+
 - **`docker-compose.yml`** - Production image build (linux/amd64)
 - **`docker-compose.local.yml`** - Local development on macOS (ARM64)
 - **`docker-compose.prod.yml`** - VPS production deployment
 
 ### Deployment Workflow
+
 1. **Local Development**: Use `docker-compose.local.yml` or run `pnpm dev` directly
 2. **Production Build**: Use `./scripts/deploy.sh` to build and push to GitHub Container Registry
 3. **VPS Deployment**: Use `docker-compose.prod.yml` with environment variables from `.env`
 
 ### Common Issues
+
 - **macOS Puppeteer errors**: Use `docker-compose.local.yml` instead of `docker-compose.yml`
 - **Environment variable warnings**: Check `.env` file exists in same directory as docker-compose file
 - **Image architecture conflicts**: Ensure correct docker-compose file for your platform
@@ -318,11 +341,13 @@ EXA_API_KEY=your_exa_search_key
 ## Advanced Features
 
 ### Desktop Automation (E2B Integration)
+
 - `lib/e2b/tool.ts` - Computer use tools with screen capture and interaction
 - `@e2b/desktop` integration for sandbox environments
 - Automatic resource cleanup on process termination
 
 ### MCP (Model Context Protocol) Integration
+
 - Singleton manager pattern for MCP client lifecycle
 - Multiple MCP servers (Puppeteer, Google Maps, Exa) with unified interface
 - Tool schema validation and type safety
@@ -330,18 +355,21 @@ EXA_API_KEY=your_exa_search_key
 - Test MCP connections using `pnpm test:mcp-connection`
 
 ### Progressive Web App Capabilities
+
 - **Full mode**: With authentication, E2B desktop, and all features enabled
 - **Standalone mode**: Without Supabase authentication for local development
 - **Offline mode**: Using cached configurations from LocalForage
 - **Degraded mode**: Fallback to rule-based systems when AI providers fail
 
 ### AI SDK React Message Handling
+
 - `@ai-sdk/react` uses `message.parts` array instead of `message.content` array
 - Tool invocations are in `part.toolInvocation` not `part.toolCall`
 - Always check `parts` array first before falling back to string `content`
 - See `docs/AI_SDK_MESSAGE_MIGRATION.md` for detailed migration guide
 
 ### Tool Component Architecture
+
 - Tool messages use a registry pattern in `components/tool-messages/`
 - Each tool has its own component with theme configuration
 - Base component provides consistent structure and loading states
@@ -350,6 +378,7 @@ EXA_API_KEY=your_exa_search_key
 ## Development Guidelines
 
 ### Code Quality Standards
+
 - **Zero tolerance for `any` types** - Use `unknown` and type narrowing instead
 - **Strict TypeScript** - Enable strict null checks and exhaustive dependency checking
 - **Component props interfaces** - All components must have explicit prop type definitions
@@ -360,18 +389,21 @@ EXA_API_KEY=your_exa_search_key
 - **USE** explicit return types for all functions
 
 ### Component Development
+
 - **USE** the established component patterns in `components/ui/`
 - **FOLLOW** the registry pattern for tool components (`components/tool-messages/`)
 - **IMPLEMENT** proper loading and error states
 - **ENSURE** components are accessible with proper ARIA labels
 
 ### API Development
+
 - **VALIDATE** all inputs with Zod schemas
 - **RETURN** consistent error responses using established patterns
 - **USE** proper HTTP status codes
 - **IMPLEMENT** proper error boundaries and try-catch blocks
 
 ### State Management
+
 - Zustand for client-side state (auth, desktop, model config)
 - React Context for brand selection across components
 - LocalForage for persistent configuration storage
@@ -381,12 +413,14 @@ EXA_API_KEY=your_exa_search_key
 ### Error Handling Patterns
 
 **Duliday API Error Formatting:**
+
 - Use `DulidayErrorFormatter` class in `lib/utils/duliday-error-formatter.ts`
 - Provides detailed field-level validation errors with Zod
 - Formats network errors (timeout, connection reset) with user-friendly messages
 - Adds organization context to errors for better debugging
 
 **Error Display Components:**
+
 - `SyncErrorDisplay` component for formatted error rendering
 - Supports multi-line errors with proper indentation
 - Located in `components/sync/sync-error-display.tsx`
@@ -394,26 +428,31 @@ EXA_API_KEY=your_exa_search_key
 ### Common Debugging Patterns
 
 **Configuration Issues:**
+
 - Check browser DevTools > Application > IndexedDB for stored config data
 - Use `/admin/settings` to verify configuration state
 - Clear IndexedDB to force config re-initialization
 
 **Tool Component Not Rendering:**
+
 - Verify `message.parts` array exists (not `message.content` array)
 - Check tool registry in `components/tool-messages/index.ts`
 - Ensure tool name matches registry key exactly
 
 **Type Errors:**
+
 - Run `npx tsc --noEmit` to check types without building
 - Use `unknown` instead of `any` and narrow types properly
 - All data structures should derive from Zod schemas
 
 **API Route Debugging:**
+
 - Server-side tools receive config data as parameters
 - Check `configData` is passed from route handler to tool
 - Verify environment variables are loaded correctly
 
 **CSS Module Selector Issues:**
+
 - Check if CSS module hash values have changed
 - Use dynamic selectors from `lib/tools/yupao/dynamic-selector-utils.ts`
 - Test with sample HTML files in `docs/sample-data/`
@@ -432,24 +471,28 @@ EXA_API_KEY=your_exa_search_key
 ## Integration Features
 
 ### Brand and Organization Management
+
 - Organization ID to brand name mapping in `lib/constants/organization-mapping.ts`
 - Supports dynamic brand synchronization from external APIs
 - Brand context available throughout the application via React Context
 - Multi-tenant support using React Context
 
 ### Duliday Integration
+
 - Server-side data fetching without direct storage access
 - Client-side data persistence through the config service
 - Progress tracking with real-time updates
 - History management in localStorage for audit trails
 
 ### Yupao Platform Integration
+
 - Dynamic CSS selector handling for resilient automation
 - Exchange WeChat functionality with multi-strategy element finding
 - Anti-detection measures integrated
 - Test utilities for verifying selector adaptability
 
 ### Semantic Release Integration
+
 - **Branches**: `main` (production), `develop` (pre-release), `beta` (pre-release)
 - **Commit convention**: Use conventional commits (feat:, fix:, chore:, etc.)
 - **Release workflow**: `.github/workflows/release.yml` runs tests before releases
@@ -458,6 +501,7 @@ EXA_API_KEY=your_exa_search_key
 ## Important Development Notes
 
 When working with this codebase:
+
 - Always check configuration state before accessing brand/prompt data
 - Use the type definitions in `types/config.d.ts` for configuration interfaces
 - Follow the two-phase AI pattern for new intelligent features
@@ -466,3 +510,4 @@ When working with this codebase:
 - Use dynamic selectors for web automation to handle CSS module hash changes
 - Run type checking with `npx tsc --noEmit` before committing
 - Test with multiple AI providers to ensure fallback mechanisms work
+- When a test fails, prioritize analyzing the business logic for correctness, rather than modifying the test case to fit faulty logic.

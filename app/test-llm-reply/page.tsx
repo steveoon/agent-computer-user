@@ -9,7 +9,7 @@ import {
 } from "@/lib/utils/brand-storage";
 import { useModelConfig } from "@/lib/stores/model-config-store";
 import { useConfigDataForChat } from "@/hooks/useConfigDataForChat";
-import { Settings, MessageSquare, X, Plus } from "lucide-react";
+import { Settings, MessageSquare, X, Plus, ChevronUp, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { REPLY_TYPE_NAMES, type ReplyContext } from "@/types/zhipin";
 
@@ -38,6 +38,18 @@ export default function TestLLMReplyPage() {
   const [historyInput, setHistoryInput] = useState("");
   const [showHistoryEditor, setShowHistoryEditor] = useState(false);
   const [selectedRole, setSelectedRole] = useState<"我" | "求职者">("求职者");
+
+  // 📝 移动对话历史记录
+  const moveHistoryItem = (index: number, direction: 'up' | 'down') => {
+    const newHistory = [...conversationHistory];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    
+    if (targetIndex >= 0 && targetIndex < newHistory.length) {
+      // 交换两个元素的位置
+      [newHistory[index], newHistory[targetIndex]] = [newHistory[targetIndex], newHistory[index]];
+      setConversationHistory(newHistory);
+    }
+  };
 
   // 🗑️ 清除品牌偏好
   const handleClearPreferences = async () => {
@@ -207,7 +219,7 @@ export default function TestLLMReplyPage() {
               const isCandidate = role === "求职者";
               
               return (
-                <div key={index} className="flex items-start gap-2 text-sm">
+                <div key={index} className="flex items-start gap-1 text-sm">
                   <div className={`flex-1 flex items-center gap-2 p-2 rounded border ${
                     isCandidate ? "bg-blue-50 border-blue-200" : "bg-green-50 border-green-200"
                   }`}>
@@ -218,12 +230,35 @@ export default function TestLLMReplyPage() {
                     </span>
                     <span className="flex-1">{content}</span>
                   </div>
+                  
+                  {/* 排序按钮 */}
+                  <div className="flex flex-col gap-0.5 shrink-0">
+                    <button
+                      onClick={() => moveHistoryItem(index, 'up')}
+                      disabled={index === 0}
+                      className="p-0.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
+                      title="上移"
+                    >
+                      <ChevronUp className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => moveHistoryItem(index, 'down')}
+                      disabled={index === conversationHistory.length - 1}
+                      className="p-0.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
+                      title="下移"
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                  </div>
+                  
+                  {/* 删除按钮 */}
                   <button
                     onClick={() => {
                       const newHistory = conversationHistory.filter((_, i) => i !== index);
                       setConversationHistory(newHistory);
                     }}
                     className="p-1 text-red-500 hover:text-red-700 shrink-0"
+                    title="删除"
                   >
                     <X className="w-4 h-4" />
                   </button>

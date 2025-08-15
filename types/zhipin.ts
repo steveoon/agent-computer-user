@@ -307,14 +307,8 @@ export const SampleDataSchema = z.object({
   zhipin: ZhipinDataSchema,
 });
 
-// 候选人信息Schema
-export const CandidateInfoSchema = z.object({
-  name: z.string().optional(),
-  age: z.number().optional(),
-  location: z.string().optional(),
-  experience: z.string().optional(),
-  availability: z.string().optional(),
-});
+// 候选人信息从统一源导入，避免重复定义
+export { CandidateInfoSchema } from '@/lib/tools/zhipin/types';
 
 // 对话消息Schema
 export const ConversationMessageSchema = z.object({
@@ -378,7 +372,7 @@ export type BrandConfig = z.infer<typeof BrandConfigSchema>;
 export type ZhipinData = z.infer<typeof ZhipinDataSchema>;
 export type SampleData = z.infer<typeof SampleDataSchema>;
 export type ReplyContext = z.infer<typeof ReplyContextSchema>;
-export type CandidateInfo = z.infer<typeof CandidateInfoSchema>;
+export { type CandidateInfo } from '@/lib/tools/zhipin/types'; // 从统一源导出类型
 export type ConversationMessage = z.infer<typeof ConversationMessageSchema>;
 export type MessageClassification = z.infer<typeof MessageClassificationSchema>;
 export type Extract = z.infer<typeof MessageClassificationSchema>["extractedInfo"];

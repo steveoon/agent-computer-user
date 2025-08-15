@@ -36,6 +36,7 @@ export const AppConfigDataSchema = z.object({
     lastUpdated: z.string(),
     migratedAt: z.string().optional(),
     upgradedAt: z.string().optional(),
+    repairedAt: z.string().optional(), // 记录数据修复时间（不改变版本号）
   }),
 });
 

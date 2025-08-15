@@ -214,6 +214,9 @@ class AppConfigService implements ConfigService {
 // 导出单例实例
 export const configService = new AppConfigService();
 
+// 导出升级函数和版本常量供外部使用
+export { upgradeConfigData, CONFIG_VERSION };
+
 /**
  * 便捷函数：检查是否需要迁移
  */
@@ -453,19 +456,39 @@ export async function migrateFromHardcodedData(): Promise<void> {
 
 /**
  * 升级现有配置数据到新版本
+ * @param existingConfig 现有配置
+ * @param saveToStorage 是否保存到存储（默认true）
+ * @param forceRepair 是否强制修复数据（即使版本号是最新的）
+ * @returns 升级后的配置数据
  */
-async function upgradeConfigData(existingConfig: AppConfigData): Promise<void> {
+async function upgradeConfigData(
+  existingConfig: AppConfigData, 
+  saveToStorage = true,
+  forceRepair = false
+): Promise<AppConfigData> {
   try {
-    const fromVersion = existingConfig.metadata?.version || "undefined";
-    console.log(`🔄 开始升级配置数据从版本 ${fromVersion} 到 ${CONFIG_VERSION}`);
-    console.log(`📊 升级前数据状态:`, {
+    const currentVersion = existingConfig.metadata?.version || "undefined";
+    const isLatestVersion = currentVersion === CONFIG_VERSION;
+    
+    // 判断是升级还是修复
+    const operation = isLatestVersion && forceRepair ? "修复" : "升级";
+    
+    console.log(`🔄 开始${operation}配置数据 ${
+      isLatestVersion ? `(版本 ${currentVersion} 保持不变)` : `从版本 ${currentVersion} 到 ${CONFIG_VERSION}`
+    }`);
+    
+    console.log(`📊 ${operation}前数据状态:`, {
       replyPromptsCount: Object.keys(existingConfig.replyPrompts || {}).length,
       storesCount: existingConfig.brandData?.stores?.length || 0,
       hasVersion: !!existingConfig.metadata?.version,
+      currentVersion,
     });
 
-    // 导入最新的sample-data以获取attendanceRequirement示例
-    const { zhipinData } = await import("../../lib/data/sample-data");
+    // 导入最新的sample-data以获取attendanceRequirement示例，以及ReplyContextSchema获取所有模板键
+    const [{ zhipinData }, { ReplyContextSchema }] = await Promise.all([
+      import("../../lib/data/sample-data"),
+      import("../../types/zhipin")
+    ]);
 
     // 创建升级后的品牌数据，移除已废弃的顶层templates和screening字段
     const upgradedBrandData = { ...existingConfig.brandData };
@@ -479,6 +502,27 @@ async function upgradeConfigData(existingConfig: AppConfigData): Promise<void> {
       delete (upgradedBrandData as Record<string, unknown>).screening;
       console.log("✅ 移除了废弃的顶层screening字段");
     }
+
+    // 🆕 升级品牌配置中的templates字段，确保包含所有必需的模板字段
+    // 使用 ReplyContextSchema 的枚举值而不是硬编码
+    const requiredTemplateKeys = ReplyContextSchema.options;
+    
+    const upgradedBrands = { ...upgradedBrandData.brands };
+    Object.keys(upgradedBrands).forEach(brandName => {
+      const brand = upgradedBrands[brandName] as Record<string, unknown>;
+      const templates = (brand.templates || {}) as Record<string, string[]>;
+      
+      // 确保所有必需的模板字段都存在，缺失的设置为空数组
+      requiredTemplateKeys.forEach(key => {
+        if (!templates[key]) {
+          templates[key] = [];
+          console.log(`✅ 为品牌 ${brandName} 添加缺失的模板字段: ${key}`);
+        }
+      });
+      
+      brand.templates = templates;
+    });
+    upgradedBrandData.brands = upgradedBrands;
 
     // 为每个门店的每个岗位添加attendanceRequirement字段
     upgradedBrandData.stores.forEach((store: Record<string, unknown>, storeIndex: number) => {
@@ -573,18 +617,29 @@ async function upgradeConfigData(existingConfig: AppConfigData): Promise<void> {
       systemPrompts: upgradedSystemPrompts,
       metadata: {
         ...existingConfig.metadata,
-        version: CONFIG_VERSION,
+        // 只有在真正升级时才更新版本号，修复时保持原版本
+        version: isLatestVersion && forceRepair 
+          ? currentVersion 
+          : CONFIG_VERSION,
         lastUpdated: new Date().toISOString(),
-        upgradedAt: new Date().toISOString(),
+        // 根据操作类型设置不同的时间戳字段
+        ...(isLatestVersion && forceRepair 
+          ? { repairedAt: new Date().toISOString() }
+          : { upgradedAt: new Date().toISOString() }
+        ),
       },
     };
 
-    // 保存升级后的配置
-    await configService.saveConfig(upgradedConfig);
+    // 根据参数决定是否保存到存储
+    if (saveToStorage) {
+      await configService.saveConfig(upgradedConfig);
+      console.log("✅ 配置数据已保存到存储");
+    }
 
-    console.log("✅ 配置数据升级成功！");
-    console.log(`📊 升级后数据状态:`, {
+    console.log(`✅ 配置数据${operation}成功！`);
+    console.log(`📊 ${operation}后数据状态:`, {
       version: upgradedConfig.metadata.version,
+      operation: isLatestVersion && forceRepair ? "数据修复" : "版本升级",
       replyPromptsCount: Object.keys(upgradedConfig.replyPrompts).length,
       replyPromptsKeys: Object.keys(upgradedConfig.replyPrompts),
       hasAttendanceRequirements: upgradedBrandData.stores.every((store: Record<string, unknown>) =>
@@ -593,6 +648,8 @@ async function upgradeConfigData(existingConfig: AppConfigData): Promise<void> {
         )
       ),
     });
+    
+    return upgradedConfig;
   } catch (error) {
     console.error("❌ 配置数据升级失败:", error);
     console.error("错误详情:", {

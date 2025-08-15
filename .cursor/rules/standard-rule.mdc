@@ -1,14 +1,17 @@
 ---
 description: 这是 AI-SDK Computer Use 项目的核心开发规范，定义了 Next.js 15 + React 19 + TypeScript 生态系统下的完整开发标准。包含架构设计原则、代码风格指南、性能优化策略、类型安全保障和质量控制体系，确保 AI 助手生成的代码达到生产级别的质量标准。
-globs: 
+globs:
 alwaysApply: false
 ---
+
 # 🎯 终极 Cursor Rules 架构师
 
 ## [AI 代码生成专家]
+
 你是一位融合了软件架构师、TypeScript 大师、React 专家、性能优化师于一体的代码生成引擎设计者。你深谙现代前端开发的最佳实践，能够创造出让 AI 生成完美代码的规则体系。
 
 ## 🧬 核心设计DNA
+
 - **架构思维**：深度理解 Next.js 15 + React 19 生态系统
 - **类型安全**：TypeScript 类型系统的极致运用
 - **性能导向**：每一行代码都考虑性能影响
@@ -22,15 +25,17 @@ alwaysApply: false
 ## 🏗️ 项目架构概览
 
 **技术栈核心：**
+
 - Next.js 15.2.1 (App Router + Server Actions)
 - React 19 (Concurrent Features + Compiler)
 - TypeScript 5 (Strict Mode + Advanced Types)
 - Tailwind CSS 4 (Modern CSS + Utility-First Design)
-- AI SDK 4.3+ (Universal Tool Integration)
-- Zod 3.24+ (Runtime Validation)
+- AI SDK 5.x (Universal Tool Integration)
+- Zod 4.x (Runtime Validation + Enhanced Error Handling)
 - E2B Desktop (Sandbox Environment)
 
 **架构原则：**
+
 - 🎯 **性能优先**：每个决策都考虑 Core Web Vitals
 - 🔒 **类型安全**：100% TypeScript，零 `any` 容忍度
 - 🧩 **组件化**：高内聚、低耦合的组件设计
@@ -41,23 +46,24 @@ alwaysApply: false
 ---
 
 ## 📁 文件结构标准
+```
 
-```
 项目根目录/
-├── app/                    # App Router (Next.js 15)
-│   ├── api/               # API Routes + Server Actions
-│   ├── globals.css        # Global Styles
-│   ├── layout.tsx         # Root Layout
-│   └── page.tsx           # Pages
-├── components/            # Reusable Components
-│   ├── ui/               # Base UI Components
-│   └── [feature]/        # Feature-specific Components
-├── lib/                  # Utility Libraries
-│   ├── [domain]/         # Domain-specific Utilities
-│   ├── utils.ts          # General Utilities
-│   └── types.ts          # Global Type Definitions
-└── public/               # Static Assets
-```
+├── app/ # App Router (Next.js 15)
+│ ├── api/ # API Routes + Server Actions
+│ ├── globals.css # Global Styles
+│ ├── layout.tsx # Root Layout
+│ └── page.tsx # Pages
+├── components/ # Reusable Components
+│ ├── ui/ # Base UI Components
+│ └── [feature]/ # Feature-specific Components
+├── lib/ # Utility Libraries
+│ ├── [domain]/ # Domain-specific Utilities
+│ ├── utils.ts # General Utilities
+│ └── types.ts # Global Type Definitions
+└── public/ # Static Assets
+
+````
 
 ---
 
@@ -87,15 +93,16 @@ type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 // 品牌类型防止类型混淆
 type UserId = string & { readonly __brand: 'UserId' };
 type Email = string & { readonly __brand: 'Email' };
-```
+````
 
 **❌ 避免写法：**
+
 ```typescript
 // 禁止使用 any
 const data: any = {};
 
 // 禁止类型断言滥用
-const element = document.getElementById('id') as HTMLElement;
+const element = document.getElementById("id") as HTMLElement;
 
 // 禁止空接口
 interface EmptyInterface {}
@@ -104,6 +111,7 @@ interface EmptyInterface {}
 ### React 19 现代模式
 
 **✅ 组件设计标准：**
+
 ```typescript
 // 泛型组件设计模式
 interface ComponentProps<T extends ElementType = 'div'> {
@@ -120,7 +128,7 @@ const GenericComponent = <T extends ElementType = 'div'>({
   ...props
 }: ComponentProps<T> & ComponentPropsWithoutRef<T>) => {
   const Component = as ?? 'div';
-  
+
   return (
     <Component
       className={cn(getVariantStyles(variant), className)}
@@ -152,7 +160,7 @@ function useAsyncState<T, E = Error>(
 
   const execute = useCallback(async (operation: () => Promise<T>) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
-    
+
     try {
       const result = await operation();
       setState({ data: result, error: null, loading: false });
@@ -168,6 +176,7 @@ function useAsyncState<T, E = Error>(
 ### Next.js 15 App Router 模式
 
 **✅ Server Actions：**
+
 ```typescript
 // 类型安全的Server Action模式
 interface ActionResult<T> {
@@ -182,53 +191,50 @@ async function typedServerAction<T>(
   formData: FormData
 ): Promise<ActionResult<T>> {
   try {
-    // 输入验证
-    const validatedData = schema.parse(
-      Object.fromEntries(formData.entries())
-    );
+    // 输入验证（Zod v4 优化的解析性能）
+    const validatedData = schema.parse(Object.fromEntries(formData.entries()));
 
     // 业务逻辑处理
     const result = await processBusinessLogic<T>(validatedData);
-    
+
     // 缓存失效
-    revalidatePath('/relevant-path');
-    
+    revalidatePath("/relevant-path");
+
     return { success: true, data: result };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return { 
-        success: false, 
-        error: 'Validation failed',
-        details: error.errors 
+      return {
+        success: false,
+        error: "Validation failed",
+        details: error.errors,
       };
     }
-    return { success: false, error: 'Internal server error' };
+    return { success: false, error: "Internal server error" };
   }
 }
 ```
 
 **✅ API Routes：**
+
 ```typescript
 // 统一的API错误处理模式
 interface APIResponse<T> {
   readonly data?: T;
-  readonly status: 'success' | 'error';
+  readonly status: "success" | "error";
   readonly message?: string;
   readonly timestamp: Date;
 }
 
-export async function POST(
-  request: Request
-): Promise<NextResponse<APIResponse<unknown>>> {
+export async function POST(request: Request): Promise<NextResponse<APIResponse<unknown>>> {
   try {
     const body = await request.json();
     const validatedData = inputSchema.parse(body);
-    
+
     const result = await serviceLayer.process(validatedData);
-    
+
     return NextResponse.json({
       data: result,
-      status: 'success',
+      status: "success",
       timestamp: new Date(),
     });
   } catch (error) {
@@ -242,6 +248,7 @@ export async function POST(
 ## 🎯 AI SDK 集成标准
 
 **✅ 通用Tool定义模式：**
+
 ```typescript
 // 可扩展的工具参数模式
 const createUniversalTool = (toolName: string, config: ToolConfig) =>
@@ -259,10 +266,10 @@ const createUniversalTool = (toolName: string, config: ToolConfig) =>
       // 通用错误处理包装
       return await withErrorHandling(
         () => config.handlers[action](mdc:parameters, options),
-        { 
+        {
           operation: `${toolName}.${action}`,
           timeout: options?.timeout,
-          retries: options?.retries 
+          retries: options?.retries
         }
       );
     },
@@ -281,6 +288,7 @@ interface ToolResult {
 ## 🎨 Tailwind CSS 样式标准
 
 **✅ 现代CSS模式：**
+
 ```typescript
 // 条件样式组合工具
 const createStyleVariants = (baseStyles: string) => ({
@@ -288,7 +296,7 @@ const createStyleVariants = (baseStyles: string) => ({
   variants: {
     size: {
       sm: "h-8 px-3 text-sm",
-      md: "h-10 px-4 text-base", 
+      md: "h-10 px-4 text-base",
       lg: "h-12 px-6 text-lg",
     },
     variant: {
@@ -320,12 +328,13 @@ const ResponsiveComponent = () => (
 ## 🛡️ 错误处理标准
 
 **✅ 现代错误边界模式：**
+
 ```typescript
 // 函数组件错误边界（React 19）
-function ErrorBoundary({ 
-  children, 
+function ErrorBoundary({
+  children,
   fallback: Fallback,
-  onError 
+  onError
 }: {
   children: ReactNode;
   fallback?: ComponentType<{ error: Error; reset: () => void }>;
@@ -347,13 +356,13 @@ const withErrorHandling = async <T>(
   context: { operation: string; timeout?: number; retries?: number }
 ): Promise<T> => {
   const { operation: opName, timeout = 5000, retries = 1 } = context;
-  
+
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error(`${opName} timeout`)), timeout)
       );
-      
+
       return await Promise.race([operation(), timeoutPromise]);
     } catch (error) {
       if (attempt === retries) {
@@ -364,7 +373,7 @@ const withErrorHandling = async <T>(
       await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
     }
   }
-  
+
   throw new Error(`${opName} exhausted all retries`);
 };
 ```
@@ -374,9 +383,10 @@ const withErrorHandling = async <T>(
 ## ⚡ 性能优化指南
 
 **✅ 代码分割策略：**
+
 ```typescript
 // 智能组件懒加载
-const LazyComponent = lazy(() => 
+const LazyComponent = lazy(() =>
   import('./Component').then(module => ({
     default: module.Component
   }))
@@ -395,6 +405,7 @@ function OptimizedApp() {
 ```
 
 **✅ 缓存策略：**
+
 ```typescript
 // React 19 缓存模式
 const cachedDataFetcher = cache(async (id: string) => {
@@ -403,21 +414,21 @@ const cachedDataFetcher = cache(async (id: string) => {
 });
 
 // 记忆化计算
-const expensiveCalculation = useMemo(() => 
-  computeExpensiveValue(dependencies), 
-  [dependencies]
-);
+const expensiveCalculation = useMemo(() => computeExpensiveValue(dependencies), [dependencies]);
 ```
 
 ---
 
 ## 🔒 类型安全保障
 
-**✅ 运行时验证模式：**
+**✅ 运行时验证模式（Zod v4）：**
+
 ```typescript
-// Zod集成模式
+// Zod v4 错误处理模式
 const createTypedSchema = <T>() => ({
-  schema: z.object({}) as z.ZodType<T>,
+  schema: z.object({}).refine(() => true, {
+    error: "Custom validation failed",
+  }) as z.ZodType<T>,
   validate: (data: unknown): data is T => {
     return schema.safeParse(data).success;
   },
@@ -429,15 +440,69 @@ const createTypedSchema = <T>() => ({
   },
 });
 
-// 类型守卫模式
-function createTypeGuard<T>(
-  schema: z.ZodSchema<T>
-): (value: unknown) => value is T {
+// Zod v4 新的错误自定义模式
+const userSchema = z.object({
+  email: z.string().email({
+    error: "请输入有效的邮箱地址",
+  }),
+  age: z.number().min(18, {
+    error: issue => `年龄必须大于等于 ${issue.minimum}, 当前值: ${issue.input}`,
+  }),
+});
+
+// 类型守卫模式（Zod v4 优化）
+function createTypeGuard<T>(schema: z.ZodSchema<T>): (value: unknown) => value is T {
   return (value: unknown): value is T => {
     return schema.safeParse(value).success;
   };
 }
+
+// 详尽性检查模式（Zod v4 新特性）
+const StatusEnum = z.enum(["pending", "completed", "failed"]);
+const StatusRecord = z.record(StatusEnum, z.string()); // 要求所有枚举值作为键
+const PartialStatusRecord = z.partialRecord(StatusEnum, z.string()); // 允许部分键
 ```
+
+---
+
+## ⚠️ Zod v4 迁移重点
+
+### 🔄 必须更新的代码模式
+
+**❌ 旧版本（Zod v3）：**
+
+```typescript
+// 不再支持的错误处理模式
+z.string().min(5, { message: "Too short" });
+z.string({
+  invalid_type_error: "Not a string",
+  required_error: "This field is required",
+});
+z.string().refine(val => val.length > 0, {
+  message: "Required field",
+});
+```
+
+**✅ 新版本（Zod v4）：**
+
+```typescript
+// 统一的错误处理模式
+z.string().min(5, { error: "Too short" });
+z.string({
+  error: issue => (issue.input === undefined ? "This field is required" : "Not a string"),
+});
+z.string().refine(val => val.length > 0, {
+  error: "Required field",
+});
+```
+
+### 📋 迁移检查清单
+
+- [ ] 将所有 `message` 参数替换为 `error`
+- [ ] 移除 `invalid_type_error` 和 `required_error` 参数
+- [ ] 更新 `errorMap` 为 `error`
+- [ ] 检查 `z.record()` 的详尽性要求
+- [ ] 测试错误消息的显示效果
 
 ---
 
@@ -481,4 +546,4 @@ function createTypeGuard<T>(
 
 ---
 
-*记住：每一行代码都应该是有意图的、可维护的、高性能的。我们追求的不仅仅是能工作的代码，而是优雅的、未来可持续的解决方案。*
+_记住：每一行代码都应该是有意图的、可维护的、高性能的。我们追求的不仅仅是能工作的代码，而是优雅的、未来可持续的解决方案。_

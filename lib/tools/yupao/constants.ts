@@ -56,6 +56,27 @@ export const YUPAO_CHAT_DETAILS_SELECTORS = {
   chatRecordPage: '.chat-record-page',
   chatRecordBody: '.chat-record-body',
   
+  // Candidate info section (top of chat)
+  topInfo: '._top-info_1qq7t_356',
+  userInfo: '._user-info_1qq7t_365',
+  baseInfo: '._base-info_1qq7t_370',
+  candidateName: '._name_1qq7t_121',  // 候选人姓名
+  candidateStats: '._stats_1qq7t_379', // 活跃时间等
+  
+  // Candidate resume card
+  topInfoWrap: '._top-info-wrap_1ttbp_11',
+  cardWrap: '._card-wrap_1ttbp_15',
+  innerBox: '._inner-box_1ttbp_23',
+  occName: '._occ-name_1ttbp_53', // 期望职位
+  resumeTag: '._resume-tag_1ttbp_63', // 性别、年龄、期望地等标签
+  salary: '._salary_1ttbp_40', // 期望薪资
+  
+  // Additional candidate info tags
+  extraInfo: '._extra_1ttbp_87',
+  tagsContainer: '._tags_1ttbp_96',
+  tagItem: '._tag_1ttbp_96',
+  tagValue: '._it-val_1ttbp_118', // 身高、体重、健康证等
+  
   // Message containers
   msgWrap: '.msg-wrap',
   msgInner: '.msg-inner',
