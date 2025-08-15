@@ -22,6 +22,47 @@ import type { ReplyPromptsConfig } from "../../types/config";
 import { DEFAULT_PROVIDER_CONFIGS, DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import type { ModelConfig } from "@/lib/config/models";
 import type { CandidateInfo } from "@/lib/tools/zhipin/types";
+import type { SalaryDetails } from "../../types/zhipin";
+// 使用新的模块化 prompt engineering
+import { 
+  ClassificationPromptBuilder,
+  ReplyPromptBuilder,
+  type ClassificationParams,
+  type ReplyBuilderParams
+} from "@/lib/prompt-engineering";
+
+/**
+ * 🔧 智能薪资描述构建器
+ * 根据base值和memo内容智能判断薪资类型，生成合适的描述
+ * @param salary 薪资详情对象
+ * @returns 格式化的薪资描述字符串
+ */
+function buildSalaryDescription(salary: SalaryDetails): string {
+  const { base, range, memo } = salary;
+  
+  // 🎯 简单启发式判断：base值很小时可能是计件制
+  const isPossiblyPieceRate = base < 10; // 小于10元通常不是时薪
+  
+  // 🔧 构建基础薪资信息
+  let description = '';
+  
+  if (isPossiblyPieceRate && memo) {
+    // 可能是计件制，包含memo信息让LLM理解
+    description = `${base}元（${memo.replace(/\n/g, ' ').trim()}）`;
+  } else {
+    // 常规时薪
+    description = `${base}元/时`;
+    if (range && range !== `${base}-${base}`) {
+      description += `，范围${range}元`;
+    }
+    // 如果有memo且不太长，也包含进来
+    if (memo && memo.length < 50) {
+      description += `（${memo.replace(/\n/g, ' ').trim()}）`;
+    }
+  }
+  
+  return description;
+}
 
 /**
  * 🎯 加载Boss直聘相关数据 - 重构版
@@ -339,9 +380,24 @@ export async function classifyUserMessage(
 
   console.log(`[CLASSIFY] 使用模型: ${classifyModel}`);
 
-  // 构建对话历史上下文
-  const conversationContext =
-    conversationHistory.length > 0 ? `\n对话历史：${conversationHistory.slice(-3).join("\n")}` : "";
+  // 创建分类构建器
+  const classificationBuilder = new ClassificationPromptBuilder();
+
+  // 构建分类参数
+  const classificationParams: ClassificationParams = {
+    message,
+    conversationHistory,
+    candidateInfo,
+    brandData: {
+      city: data.city,
+      defaultBrand: data.defaultBrand || getBrandName(data),
+      availableBrands: Object.keys(data.brands),
+      storeCount: data.stores.length
+    }
+  };
+
+  // 构建分类提示
+  const classificationPrompts = classificationBuilder.build(classificationParams);
 
   // 使用generateObject进行智能分类
   const { object: classification } = await generateObject({
@@ -383,98 +439,8 @@ export async function classifyUserMessage(
         .describe("从消息中提取的关键信息"),
       reasoningText: z.string().describe("分类依据和分析过程"),
     }),
-    system: `你是一个专业的招聘助手分类专家，负责准确分析求职者消息的意图并提取关键信息。
-
-    ## 核心职责
-    1. 准确识别求职者消息的意图类型
-    2. 提取消息中的关键信息（品牌、地点、年龄、时间偏好等）
-    3. 为后续的智能回复提供精准的分类依据
-
-    ## 分类原则
-    - 基于消息内容和对话历史综合判断意图
-    - 优先识别最具体、最明确的意图类型
-    - 对敏感话题（年龄、保险、身体条件）保持高度敏感
-
-    ## 意图类型定义
-
-    ### 招聘咨询类（1-10）
-    - initial_inquiry: 初次咨询工作机会，没有具体指向
-    - location_inquiry: 询问位置信息，也可包含具体位置匹配
-    - no_location_match: 提到位置但无法匹配到门店
-    - salary_inquiry: 询问薪资待遇
-    - schedule_inquiry: 询问工作时间安排
-    - interview_request: 表达面试意向
-    - age_concern: 询问年龄要求（敏感话题）
-    - insurance_inquiry: 询问保险福利（敏感话题）
-    - followup_chat: 需要跟进的聊天
-    - general_chat: 一般性对话
-
-    ### 出勤排班类（11-16）
-    - attendance_inquiry: 询问出勤要求（如"需要每天都上班吗？"）
-    - flexibility_inquiry: 询问排班灵活性（如"可以换班吗？"）
-    - attendance_policy_inquiry: 询问考勤政策（如"考勤严格吗？"）
-    - work_hours_inquiry: 询问工时要求（如"一周工作多少小时？"）
-    - availability_inquiry: 询问时间段可用性（如"现在还有位置吗？"）
-    - part_time_support: 询问兼职支持（如"支持兼职吗？"）
-
-    ## 关键信息提取规则
-    1. **品牌识别**：准确识别求职者提到的品牌名称
-    2. **地点识别**：
-      - 区分品牌名中的地点（如"成都你六姐"）和实际询问的工作地点
-      - 只有明确询问具体区域/位置时才提取为mentionedLocations
-    3. **年龄信息**：提取具体年龄数字
-    4. **时间偏好**：识别求职者的工作时间偏好
-
-    ## 敏感话题识别
-    - 年龄相关：年龄、岁、多大、老了、小了
-    - 保险相关：保险、社保、五险一金
-    - 身体相关：残疾、身体、健康问题
-
-    ## 分析要求
-    1. 结合对话历史理解当前消息的完整语境
-    2. 提供清晰的分类依据说明
-    3. 对模糊的意图，选择最可能的分类并说明推理过程`,
-    prompt: `【待分析消息】
-    ${message}${conversationContext}
-
-    ${
-      candidateInfo
-        ? `【候选人资料】
-    姓名：${candidateInfo.name || "未知"}
-    求职职位：${candidateInfo.position || "未知"}
-    年龄：${candidateInfo.age || "未知"}
-    经验：${candidateInfo.experience || "未知"}
-    学历：${candidateInfo.education || "未知"}`
-        : ""
-    }
-
-    【品牌和门店数据】
-    工作城市：${data.city}
-    默认品牌：${data.defaultBrand || getBrandName(data)}
-    可选品牌：${Object.keys(data.brands).join("、")}
-
-    ${Object.keys(data.brands)
-      .map(brand => {
-        const brandStores = data.stores.filter(store => store.brand === brand);
-        return `\n${brand}（${brandStores.length}家门店）：
-    ${brandStores
-      .map(
-        store =>
-          `• ${store.name}（${store.district}${store.subarea || ""}）- ${store.location}
-      岗位：${store.positions.map(pos => `${pos.name}（${pos.salary.base}元/时）`).join("、")}`
-      )
-      .join("\n")}`;
-      })
-      .join("\n")}
-
-    【分析任务】
-    1. 判断候选人消息的意图类型
-    2. 提取关键信息（品牌、地点、年龄、时间偏好等）
-    3. 说明分类依据
-
-    注意：品牌名可能包含地名（如"成都你六姐"），勿混淆为工作地点询问。
-
-    请根据以上规则和数据，生成一个完整的分析结果。`,
+    system: classificationPrompts.system,
+    prompt: classificationPrompts.prompt
   });
 
   return classification;
@@ -549,56 +515,40 @@ export async function generateSmartReplyWithLLM(
     // 构建上下文信息
     const contextInfo = buildContextInfo(data, classification);
 
+    // 获取当前品牌
+    const targetBrand = data.defaultBrand || getBrandName(data);
+
+    // 创建回复构建器
+    const replyBuilder = new ReplyPromptBuilder();
+
+    // 构建回复参数
+    const replyParams: ReplyBuilderParams = {
+      message,
+      classification,
+      contextInfo,
+      systemInstruction: systemPromptInstruction,
+      conversationHistory,
+      candidateInfo,
+      targetBrand
+    };
+
+    // 使用新的构建器生成提示
+    const optimizedPrompts = replyBuilder.build(replyParams);
+
     // 生成最终回复
     const finalReply = await generateText({
       model: dynamicRegistry.languageModel(replyModel),
-      system: `你是专业的招聘助手。
-
-      # 回复规则
-      1.  **年龄优先处理规则**: 参考通用回复指令或者品牌专属话术模板(优先级更高)回答。
-      2.  **优先使用品牌专属话术**: 如果"当前招聘数据上下文"中包含当前品牌的专属话术，必须优先使用该模板生成回复。
-      3.  **参考通用指令**: 如果没有品牌专属话术，或专属话术不适用，则遵循下面的"通用回复指令"。
-      4.  **保持真人语气**: 回复要自然、口语化，像真人对话。避免使用"您"、感叹号或过于官方、热情的词汇。
-      5.  **其他敏感话题规则**: 社保等敏感问题，必须使用固定的安全话术。
-
-      # 通用回复指令
-      ${systemPromptInstruction}
-
-      # 当前招聘数据上下文
-      ${contextInfo}
-
-      ${
-        candidateInfo
-          ? `# 候选人基本信息
-      - 姓名：${candidateInfo.name || "未知"}
-      - 求职职位：${candidateInfo.position || "未知"}
-      - 年龄：${candidateInfo.age || "未知"}
-      - 工作经验：${candidateInfo.experience || "未知"}
-      - 学历：${candidateInfo.education || "未知"}
-      
-      请根据候选人的具体情况（年龄、经验、求职职位等）生成更有针对性的回复。`
-          : ""
-      }
-
-      # LLM分析过程
-      - 回复类型: ${classification.replyType}
-      - 提取信息: ${JSON.stringify(classification.extractedInfo, null, 2)}
-      - 分析依据: ${classification.reasoningText}
-
-      📋 核心要求:
-      - 严格遵循回复规则的优先级。
-      - 回复必须简洁、自然，像一个正在打字的真人。
-      - 根据候选人消息和上下文，将模板中的 {placeholder} 替换为具体信息。
-      - 控制字数在10-40字以内。
-      - 如果候选人询问的品牌不是当前品牌的，则告知对方，我们目前只招聘{brand}品牌的岗位。
-
-      请生成最终回复。`,
-      prompt: `候选人消息："${message}"${
-        conversationHistory.length > 0
-          ? `\n对话历史：${conversationHistory.slice(-3).join("\n")}`
-          : ""
-      }`,
+      system: optimizedPrompts.system,
+      prompt: optimizedPrompts.prompt,
     });
+
+    // 更新对话内存（通过builder内部的内存管理器）
+    replyBuilder.updateMemory(message, finalReply.text);
+
+    // 定期清理内存
+    if (Math.random() < 0.1) {
+      replyBuilder.cleanupMemory();
+    }
 
     return {
       replyType: classification.replyType,
@@ -749,12 +699,10 @@ function buildContextInfo(data: ZhipinData, classification: MessageClassificatio
     relevantStores.slice(0, 3).forEach(store => {
       context += `• ${store.name}（${store.district}${store.subarea}）：${store.location}\n`;
       store.positions.forEach(pos => {
-        context += `  职位：${pos.name}，时间：${pos.timeSlots.join(
-          "、"
-        )}，薪资：${pos.salary.base}元/时\n`;
-        if (pos.salary.range) {
-          context += `  薪资范围：${pos.salary.range}\n`;
-        }
+        // 🔧 智能薪资信息构建（包含memo解析）
+        const salaryInfo = buildSalaryDescription(pos.salary);
+        context += `  职位：${pos.name}，时间：${pos.timeSlots.join("、")}，薪资：${salaryInfo}\n`;
+        
         if (pos.salary.bonus) {
           context += `  奖金：${pos.salary.bonus}\n`;
         }

@@ -9,11 +9,18 @@ import { z } from "zod";
  */
 export const CandidateInfoSchema = z.object({
   name: z.string().optional(),
-  position: z.string().optional(),
+  position: z.string().optional(), // 期望职位
   age: z.string().optional(),
+  gender: z.string().optional(), // 性别
   experience: z.string().optional(),
   education: z.string().optional(),
-  info: z.array(z.string()).optional(),
+  expectedSalary: z.string().optional(), // 期望薪资
+  expectedLocation: z.string().optional(), // 期望工作地
+  height: z.string().optional(), // 身高
+  weight: z.string().optional(), // 体重
+  healthCertificate: z.boolean().optional(), // 是否有健康证
+  activeTime: z.string().optional(), // 最近活跃时间
+  info: z.array(z.string()).optional(), // 其他标签信息
   fullText: z.string().optional()
 });
 

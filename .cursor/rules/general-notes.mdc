@@ -1,18 +1,21 @@
 ---
-description: 
+description:
 globs: .cursor/rules/reminder-general-notes.mdc
 alwaysApply: false
 ---
+
 # 📝 AI-SDK Computer Use 项目通用笔记
 
 ## 🏗️ 架构决策记录
 
 ### 核心技术栈选择
+
 - **Next.js 15.2.1** + **React 19** + **TypeScript 5**
-- **AI SDK 4.3+** + **E2B Desktop Sandbox**
-- **Tailwind CSS 4** + **Zod 3.24+**
+- **AI SDK 5.x** + **E2B Desktop Sandbox**
+- **Tailwind CSS 4** + **Zod 4.x**
 
 ### 关键架构原则
+
 - [ ] 类型安全优先：100% TypeScript，零 `any` 容忍度
 - [ ] 性能导向：每个决策都考虑 Core Web Vitals
 - [ ] 组件化设计：高内聚、低耦合
@@ -23,17 +26,27 @@ alwaysApply: false
 ## 🚨 已知问题与解决方案
 
 ### 常见问题
+
 1. **类型定义冗余问题**：在多个文件中重复定义相同的类型
    - **原因**：开发过程中没有优先检查 `types/` 文件夹中的现有定义
    - **解决方案**：统一类型定义到 `types/` 文件夹，通过 `types/index.ts` 统一导出
    - **预防措施**：开发前必须检查 `types/` 中的现有类型，优先复用而非重复定义
 
-2. **问题描述**：[待记录]
-   - **原因**：[分析]
-   - **解决方案**：[具体方法]
-   - **预防措施**：[如何避免]
+2. **Zod v4 迁移兼容性问题**：升级到 Zod v4 后错误处理代码失效
+   - **原因**：Zod v4 废弃了 `message`、`invalid_type_error`、`required_error` 参数
+   - **解决方案**：统一使用新的 `error` 参数进行错误自定义
+   - **预防措施**：
+     - 使用 `error: (issue) => string` 函数形式进行动态错误处理
+     - `z.record()` 使用 `z.partialRecord()` 避免详尽性检查
+     - 开发时使用类型检查确保 schema 定义正确
+
+3. **AI SDK v5 工具集成问题**：工具定义和调用方式可能发生变化
+   - **原因**：AI SDK v5 可能调整了工具定义的 API 接口
+   - **解决方案**：参考最新文档更新工具定义模式
+   - **预防措施**：保持工具定义的向后兼容性，使用抽象层封装变化
 
 ### 性能优化经验
+
 - [ ] **代码分割**：使用 `lazy()` 和 `Suspense` 实现智能懒加载
 - [ ] **缓存策略**：React 19 `cache()` + `useMemo()` 组合使用
 - [ ] **类型优化**：避免复杂类型推导影响 IDE 性能
@@ -43,22 +56,25 @@ alwaysApply: false
 ## 🎯 开发规范提醒
 
 ### 类型定义优先级
+
 1. **检查 `types/` 文件夹** - 避免重复定义
 2. **遵循现有命名规范** - 保持一致性
 3. **使用 `readonly` 和严格类型** - 提升代码质量
 
 ### API 设计模式
+
 ```typescript
 // 统一的 API 响应格式
 interface APIResponse<T> {
   readonly data?: T;
-  readonly status: 'success' | 'error';
+  readonly status: "success" | "error";
   readonly message?: string;
   readonly timestamp: Date;
 }
 ```
 
 ### 组件设计模式
+
 - 泛型组件优先
 - Props 接口必须明确定义
 - 错误边界包装关键组件
@@ -68,46 +84,59 @@ interface APIResponse<T> {
 ## 🛠️ 工具与配置经验
 
 ### E2B Desktop 集成要点
+
 - [ ] **沙盒环境管理**：[具体配置]
 - [ ] **工具调用模式**：[标准化流程]
 - [ ] **错误处理策略**：[超时与重试]
 
-### AI SDK 使用经验
-- [ ] **Tool 定义规范**：使用通用 Tool 创建模式
-- [ ] **参数验证**：Zod schema 集成
+### AI SDK 使用经验（v5 更新）
+
+- [ ] **Tool 定义规范**：使用通用 Tool 创建模式，适配 v5 API 变化
+- [ ] **参数验证**：Zod v4 schema 集成，使用新的错误处理模式
 - [ ] **结果标准化**：统一 `ToolResult` 接口
+- [ ] **版本兼容性**：确保工具定义向后兼容，处理 API 变更
 
 ---
 
 ## 📋 检查清单
 
 ### 新功能开发前
+
 - [ ] 检查 `types/` 中是否有相关类型定义
 - [ ] 确认架构设计符合项目原则
 - [ ] 评估性能影响
-- [ ] 规划错误处理策略
+- [ ] 规划错误处理策略（使用 Zod v4 新语法）
+- [ ] 确认 AI SDK 工具定义符合 v5 规范
 
 ### 代码审查要点
+
 - [ ] 类型安全性检查
 - [ ] 性能优化机会识别
 - [ ] 代码复用性评估
-- [ ] 错误处理完整性
+- [ ] 错误处理完整性（确保使用 Zod v4 `error` 参数）
+- [ ] Zod schema 迁移检查（避免使用废弃的 `message` 等参数）
+- [ ] AI SDK 工具定义规范性检查
 
 ### 部署前确认
+
 - [ ] 所有 TypeScript 错误已解决
 - [ ] 关键路径性能测试通过
 - [ ] 错误边界测试完成
 - [ ] 类型定义导出正确
+- [ ] Zod v4 schema 验证正常工作
+- [ ] AI SDK v5 工具集成功能测试通过
 
 ---
 
 ## 💡 待办事项与改进计划
 
 ### 短期目标
+
 - [ ] [具体任务 1]
 - [ ] [具体任务 2]
 
 ### 长期规划
+
 - [ ] [架构升级计划]
 - [ ] [性能优化路线图]
 
@@ -116,14 +145,16 @@ interface APIResponse<T> {
 ## 📚 学习资源与参考
 
 ### 官方文档
+
 - [Next.js 15 文档](mdc:https:/nextjs.org/docs)
 - [React 19 新特性](mdc:https:/react.dev/blog/2024/04/25/react-19)
 - [AI SDK 文档](mdc:https:/sdk.vercel.ai)
 
 ### 最佳实践参考
+
 - [TypeScript 最佳实践](mdc:https:/typescript-eslint.io/rules)
 - [React 性能优化指南](mdc:https:/react.dev/learn/render-and-commit)
 
 ---
 
-*💡 提示：定期更新此文件，将重要经验和决策记录在案，避免重复踩坑！*
+_💡 提示：定期更新此文件，将重要经验和决策记录在案，避免重复踩坑！_
