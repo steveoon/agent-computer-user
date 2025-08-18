@@ -7,6 +7,7 @@ import { configService, migrateFromHardcodedData } from "@/lib/services/config.s
 import type { AppConfigData, ZhipinData, ReplyPromptsConfig, SystemPromptsConfig } from "@/types";
 // 🔧 导入预定义的 Zod Schema，避免重复定义
 import { AppConfigDataSchema } from "@/types/config";
+import { toast } from "sonner";
 
 interface ConfigState {
   // 配置数据
@@ -83,7 +84,9 @@ const useConfigStore = create<ConfigState>()(
       updateBrandData: async (brandData: ZhipinData) => {
         const { config } = get();
         if (!config) {
-          set({ error: "配置未加载，无法更新品牌数据" });
+          const errorMsg = "配置未加载，无法更新品牌数据";
+          set({ error: errorMsg });
+          toast.error("更新失败", { description: errorMsg });
           return;
         }
 
@@ -101,20 +104,35 @@ const useConfigStore = create<ConfigState>()(
           await configService.saveConfig(updatedConfig);
           set({ config: updatedConfig, error: null });
 
-          console.log("✅ 品牌数据更新成功", {
+          const stats = {
             brands: Object.keys(brandData.brands).length,
             stores: brandData.stores.length,
+          };
+
+          console.log("✅ 品牌数据更新成功", stats);
+          
+          // 显示成功 toast 通知
+          toast.success("品牌数据更新成功", {
+            description: `已保存 ${stats.brands} 个品牌和 ${stats.stores} 家门店的配置`,
           });
         } catch (error) {
           console.error("❌ 品牌数据更新失败:", error);
-          set({ error: error instanceof Error ? error.message : "更新失败" });
+          const errorMessage = error instanceof Error ? error.message : "更新失败";
+          set({ error: errorMessage });
+          
+          // 显示错误 toast 通知
+          toast.error("品牌数据更新失败", {
+            description: errorMessage,
+          });
         }
       },
 
       updateReplyPrompts: async (replyPrompts: ReplyPromptsConfig) => {
         const { config } = get();
         if (!config) {
-          set({ error: "配置未加载，无法更新回复指令" });
+          const errorMsg = "配置未加载，无法更新回复指令";
+          set({ error: errorMsg });
+          toast.error("更新失败", { description: errorMsg });
           return;
         }
 
@@ -132,19 +150,31 @@ const useConfigStore = create<ConfigState>()(
           await configService.saveConfig(updatedConfig);
           set({ config: updatedConfig, error: null });
 
-          console.log("✅ 回复指令更新成功", {
-            count: Object.keys(replyPrompts).length,
+          const count = Object.keys(replyPrompts).length;
+          console.log("✅ 回复指令更新成功", { count });
+          
+          // 显示成功 toast 通知
+          toast.success("回复指令更新成功", {
+            description: `已保存 ${count} 个智能回复模板`,
           });
         } catch (error) {
           console.error("❌ 回复指令更新失败:", error);
-          set({ error: error instanceof Error ? error.message : "更新失败" });
+          const errorMessage = error instanceof Error ? error.message : "更新失败";
+          set({ error: errorMessage });
+          
+          // 显示错误 toast 通知
+          toast.error("回复指令更新失败", {
+            description: errorMessage,
+          });
         }
       },
 
       updateSystemPrompts: async (systemPrompts: SystemPromptsConfig) => {
         const { config } = get();
         if (!config) {
-          set({ error: "配置未加载，无法更新系统提示词" });
+          const errorMsg = "配置未加载，无法更新系统提示词";
+          set({ error: errorMsg });
+          toast.error("更新失败", { description: errorMsg });
           return;
         }
 
@@ -162,12 +192,22 @@ const useConfigStore = create<ConfigState>()(
           await configService.saveConfig(updatedConfig);
           set({ config: updatedConfig, error: null });
 
-          console.log("✅ 系统提示词更新成功", {
-            count: Object.keys(systemPrompts).length,
+          const count = Object.keys(systemPrompts).length;
+          console.log("✅ 系统提示词更新成功", { count });
+          
+          // 显示成功 toast 通知
+          toast.success("系统提示词更新成功", {
+            description: `已保存 ${count} 个系统提示词配置`,
           });
         } catch (error) {
           console.error("❌ 系统提示词更新失败:", error);
-          set({ error: error instanceof Error ? error.message : "更新失败" });
+          const errorMessage = error instanceof Error ? error.message : "更新失败";
+          set({ error: errorMessage });
+          
+          // 显示错误 toast 通知
+          toast.error("系统提示词更新失败", {
+            description: errorMessage,
+          });
         }
       },
 
@@ -211,6 +251,9 @@ const useConfigStore = create<ConfigState>()(
         const { config } = get();
         if (!config) {
           set({ error: "没有可导出的配置数据" });
+          toast.error("导出失败", {
+            description: "没有可导出的配置数据",
+          });
           return;
         }
 
@@ -226,9 +269,20 @@ const useConfigStore = create<ConfigState>()(
 
           URL.revokeObjectURL(url);
           console.log("✅ 配置导出成功");
+          
+          // 显示成功 toast 通知
+          toast.success("配置导出成功", {
+            description: `配置文件已保存为 app-config-${new Date().toISOString().split("T")[0]}.json`,
+          });
         } catch (error) {
           console.error("❌ 配置导出失败:", error);
-          set({ error: error instanceof Error ? error.message : "导出失败" });
+          const errorMessage = error instanceof Error ? error.message : "导出失败";
+          set({ error: errorMessage });
+          
+          // 显示错误 toast 通知
+          toast.error("配置导出失败", {
+            description: errorMessage,
+          });
         }
       },
 
@@ -375,17 +429,31 @@ const useConfigStore = create<ConfigState>()(
           await configService.saveConfig(configWithTimestamp);
           set({ config: configWithTimestamp, loading: false, error: null });
 
-          console.log("✅ 配置导入成功", {
+          const stats = {
             brands: Object.keys(configWithTimestamp.brandData.brands).length,
             stores: configWithTimestamp.brandData.stores.length,
             systemPrompts: Object.keys(configWithTimestamp.systemPrompts).length,
             replyPrompts: Object.keys(configWithTimestamp.replyPrompts).length,
+          };
+
+          console.log("✅ 配置导入成功", stats);
+
+          // 显示成功 toast 通知
+          toast.success("配置导入成功", {
+            description: `已成功导入 ${stats.brands} 个品牌、${stats.stores} 家门店、${stats.systemPrompts} 个系统提示词和 ${stats.replyPrompts} 个回复指令`,
           });
         } catch (error) {
           console.error("❌ 配置导入失败:", error);
+          const errorMessage = error instanceof Error ? error.message : "导入失败";
+          
           set({
             loading: false,
-            error: error instanceof Error ? error.message : "导入失败",
+            error: errorMessage,
+          });
+
+          // 显示错误 toast 通知
+          toast.error("配置导入失败", {
+            description: errorMessage,
           });
         }
       },
@@ -406,11 +474,23 @@ const useConfigStore = create<ConfigState>()(
           await get().loadConfig();
 
           console.log("✅ 配置重置成功");
+          
+          // 显示成功 toast 通知
+          toast.success("配置重置成功", {
+            description: "已恢复到默认配置状态",
+          });
         } catch (error) {
           console.error("❌ 配置重置失败:", error);
+          const errorMessage = error instanceof Error ? error.message : "重置失败";
+          
           set({
             loading: false,
-            error: error instanceof Error ? error.message : "重置失败",
+            error: errorMessage,
+          });
+          
+          // 显示错误 toast 通知
+          toast.error("配置重置失败", {
+            description: errorMessage,
           });
         }
       },
