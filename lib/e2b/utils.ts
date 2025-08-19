@@ -1,7 +1,7 @@
 "use server";
 
 import { Sandbox, SandboxOpts } from "@e2b/desktop";
-import { resolution } from "./tool";
+import { resolution, dpi } from "./tool";
 
 // 直接使用Sandbox类型，避免类型不匹配问题
 export type E2BDesktop = Sandbox;
@@ -128,14 +128,19 @@ export const getDesktop = async (sandboxId?: string): Promise<E2BDesktop> => {
       }
     }
 
-    // 创建新的沙盒
+    // 创建新的沙盒 - 使用可配置的分辨率
     const desktop = await Sandbox.create({
-      resolution: [resolution.x, resolution.y],
+      resolution: [resolution.x, resolution.y], // 动态分辨率
+      dpi: dpi, // 动态 DPI 
       timeoutMs: 3600000, // 延长到1小时 (3600000毫秒)
     });
+    
+    console.log(`Created new sandbox with ID: ${desktop.sandboxId}`);
+    console.log(`Resolution: ${resolution.x}x${resolution.y}, DPI: ${dpi}`);
+    
+    // 启动桌面流
     await desktop.stream.start();
-
-    console.log("Created new sandbox with ID:", desktop.sandboxId);
+    console.log("Desktop stream started successfully");
     return desktop;
   } catch (error) {
     console.error("Error in getDesktop:", error);
@@ -151,7 +156,7 @@ export const getDesktopURL = async (id?: string) => {
   try {
     const desktop = await getDesktop(id);
     const streamUrl = desktop.stream.getUrl();
-
+    
     return { streamUrl, id: desktop.sandboxId };
   } catch (error) {
     console.error("Error in getDesktopURL:", error);

@@ -14,6 +14,7 @@ export const ORGANIZATION_MAPPING: Record<number, string> = {
   1161: "M Stand",
   1102: "嘉定山姆",
   1107: "成都必胜客",
+  746: "来伊份",
   // TODO: 根据实际的 organizationId 添加更多品牌映射
   // 可以通过调用 Duliday API 获取组织列表来确定具体的 ID
 };

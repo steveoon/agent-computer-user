@@ -2,9 +2,27 @@
 
 import { useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { getDesktopURL } from "@/lib/e2b/utils";
 import { useDesktopSandboxStore } from "@/lib/stores/desktop-sandbox-store";
 import { useAuthStore } from "@/lib/stores/auth-store";
+
+// 调用受保护的 API 端点获取 Desktop URL
+async function fetchDesktopURL(sandboxId?: string) {
+  const params = sandboxId ? `?sandboxId=${encodeURIComponent(sandboxId)}` : '';
+  const response = await fetch(`/api/desktop-url${params}`);
+  
+  if (!response.ok) {
+    // 处理认证错误
+    if (response.status === 401) {
+      const error = await response.json();
+      throw new Error(error.message || '未授权访问，请先登录');
+    }
+    
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to get desktop URL');
+  }
+  
+  return response.json();
+}
 
 export function useDesktopSandbox() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
@@ -39,7 +57,7 @@ export function useDesktopSandbox() {
         });
       }
 
-      const { streamUrl: newStreamUrl, id } = await getDesktopURL(
+      const { streamUrl: newStreamUrl, id } = await fetchDesktopURL(
         sandboxId || undefined
       );
       console.log("Desktop connection established with ID:", id);
@@ -222,7 +240,7 @@ export function useDesktopSandbox() {
       console.log("Starting desktop initialization...");
 
       // Use the provided ID or create a new one
-      const { streamUrl: newStreamUrl, id } = await getDesktopURL(
+      const { streamUrl: newStreamUrl, id } = await fetchDesktopURL(
         sandboxId ?? undefined
       );
 
