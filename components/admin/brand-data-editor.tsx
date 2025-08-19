@@ -10,6 +10,7 @@ import { TemplateEditor } from "./template-editor";
 import { ScheduleEditor } from "./schedule-editor";
 import { SearchPagination } from "@/components/ui/search-pagination";
 import { useBrandEditorStore } from "@/lib/stores/brand-editor-store";
+import { BrandTemplateCopier } from "./brand-template-copier";
 import type { ZhipinData } from "@/types";
 
 interface BrandDataEditorProps {
@@ -34,7 +35,25 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
     updateJsonData,
     saveData,
     resetData,
+    updateTemplates,
   } = useBrandEditorStore();
+
+  // 处理品牌话术复制
+  const handleCopyTemplates = async (sourceBrand: string, targetBrand: string) => {
+    if (!localData?.brands[sourceBrand]?.templates) {
+      throw new Error(`源品牌 ${sourceBrand} 没有话术模板`);
+    }
+
+    const sourceTemplates = localData.brands[sourceBrand].templates;
+    
+    // 更新目标品牌的模板
+    const updatedData = updateTemplates(targetBrand, sourceTemplates);
+    
+    if (updatedData) {
+      await onSave(updatedData);
+      console.log(`✅ 成功将 ${sourceBrand} 的话术复制到 ${targetBrand}`);
+    }
+  };
 
   // 初始化数据 - 当data变化时重新初始化
   useEffect(() => {
@@ -98,8 +117,13 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
         {/* 品牌列表 */}
         <Card>
           <CardHeader>
-            <CardTitle>品牌配置</CardTitle>
-            <CardDescription>当前配置的品牌及其基本信息</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>品牌配置</CardTitle>
+                <CardDescription className="mt-1">当前配置的品牌及其基本信息</CardDescription>
+              </div>
+              <BrandTemplateCopier data={localData} onCopy={handleCopyTemplates} />
+            </div>
           </CardHeader>
           <CardContent>
             {editingBrand ? (
