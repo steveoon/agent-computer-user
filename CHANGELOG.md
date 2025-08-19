@@ -2,6 +2,22 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.4.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.3.1...v1.4.0-develop.1) (2025-08-19)
+
+
+### Bug Fixes
+
+* resolve template reference sharing bug and improve toast messages ([85d616d](https://github.com/steveoon/agent-computer-user/commit/85d616d4661d9a86e8810f98afdbddf74b6d72d6))
+
+
+### Features
+
+* add brand template copier for admin settings ([d665534](https://github.com/steveoon/agent-computer-user/commit/d66553435854d5fc2e17e28027a236fad1204483))
+* add toast notifications for config operations ([361f261](https://github.com/steveoon/agent-computer-user/commit/361f26124ab078cddc2cf603e9b0631d6319e7fd))
+* enhance contact extraction and multi-platform support ([eab7c94](https://github.com/steveoon/agent-computer-user/commit/eab7c94fd59f6717ade5a2dff3a393fc33738f80))
+* improve token estimation with js-tiktoken integration ([54af119](https://github.com/steveoon/agent-computer-user/commit/54af1199bc2907707996038b23e053febbd5523b))
+* optimize system prompt to enforce zhipin_reply_generator tool usage ([3b8b3be](https://github.com/steveoon/agent-computer-user/commit/3b8b3bed8b26bcf08f25ba0ea2c4f20dc41e01c1))
+
 ## [1.3.1](https://github.com/steveoon/agent-computer-user/compare/v1.3.0...v1.3.1) (2025-08-15)
 
 
