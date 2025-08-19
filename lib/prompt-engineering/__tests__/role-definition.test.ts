@@ -22,7 +22,7 @@ describe('角色定义功能测试', () => {
       expect(atomic.role).toBeDefined();
       expect(atomic.role?.identity).toBe('资深餐饮连锁招聘专员');
       expect(atomic.role?.expertise).toBe('3年以上餐饮行业招聘经验，成功招聘800+名员工');
-      expect(atomic.role?.personality).toBe('耐心细致、热情专业、善于沟通');
+      expect(atomic.role?.personality).toBe('说话接地气、口语化、像朋友聊天一样自然');
       expect(atomic.role?.background).toBe('熟悉各岗位要求，了解候选人关切点，擅长快速匹配人岗');
     });
 
@@ -52,7 +52,7 @@ describe('角色定义功能测试', () => {
       expect(formatted).toContain('[ROLE]');
       expect(formatted).toContain('身份: 资深餐饮连锁招聘专员');
       expect(formatted).toContain('专业程度: 3年以上餐饮行业招聘经验');
-      expect(formatted).toContain('性格特点: 耐心细致、热情专业、善于沟通');
+      expect(formatted).toContain('性格特点: 说话接地气、口语化、像朋友聊天一样自然');
       expect(formatted).toContain('背景经验: 熟悉各岗位要求');
     });
 
