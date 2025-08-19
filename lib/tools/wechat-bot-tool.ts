@@ -15,6 +15,15 @@ export const weChatBotTool = () =>
       "发送WeChat群机器人通知。支持多种通知类型和消息格式（text、markdown、markdown_v2）。当需要发送通知到WeChat群时使用此工具。",
     inputSchema: z.object({
       notification_type: weChatNotificationTypeSchema.describe("通知类型"),
+      platform: z
+        .enum(["boss", "yupao"])
+        .optional()
+        .default("boss")
+        .describe("招聘平台：boss(Boss直聘) 或 yupao(鱼泡直聘)"),
+      platform_username: z
+        .string()
+        .optional()
+        .describe("招聘平台当前登录账号用户名"),
       candidate_name: z
         .string()
         .optional()
@@ -51,6 +60,8 @@ export const weChatBotTool = () =>
     }),
     execute: async ({
       notification_type,
+      platform = "boss",
+      platform_username,
       candidate_name,
       wechat_id,
       message,
@@ -85,10 +96,13 @@ export const weChatBotTool = () =>
 
         switch (notification_type) {
           case "candidate_wechat":
+            const platformName = platform === "yupao" ? "鱼泡" : "Boss";
+            const platformInfo = platform_username ? `\n> **${platformName}账号**: ${platform_username}` : "";
+            
             if (useMarkdownV2) {
-              finalMessage = `# 候选人微信信息\n\n**姓名**: ${candidate_name?.trim()}\n**微信**: ${wechat_id?.trim()}\n**时间**: ${timestamp}`;
+              finalMessage = `# 候选人微信信息\n\n**姓名**: ${candidate_name?.trim()}\n**微信**: ${wechat_id?.trim()}${platform_username ? `\n**${platformName}账号**: ${platform_username}` : ""}\n**时间**: ${timestamp}`;
             } else {
-              finalMessage = `## 🎯 候选人微信信息\n\n> **姓名**: ${candidate_name?.trim()}\n> **微信**: <font color="info">${wechat_id?.trim()}</font>\n> **时间**: ${timestamp}`;
+              finalMessage = `## 🎯 候选人微信信息\n\n> **姓名**: ${candidate_name?.trim()}\n> **微信**: <font color="info">${wechat_id?.trim()}</font>${platformInfo}\n> **时间**: ${timestamp}`;
             }
             break;
 

@@ -18,9 +18,14 @@ export const feishuBotTool = () =>
           "custom", // 自定义消息
         ])
         .describe("通知类型"),
+      platform: z
+        .enum(["boss", "yupao"])
+        .optional()
+        .default("boss")
+        .describe("招聘平台：boss(Boss直聘) 或 yupao(鱼泡直聘)"),
       boss_username: z
         .string()
-        .describe("Boss直聘当前登录账号用户名（必填）"),
+        .describe("招聘平台当前登录账号用户名（必填）"),
       candidate_name: z
         .string()
         .optional()
@@ -66,6 +71,7 @@ export const feishuBotTool = () =>
     }),
     execute: async ({
       notification_type,
+      platform = "boss",
       boss_username,
       candidate_name,
       wechat_id,
@@ -103,8 +109,9 @@ export const feishuBotTool = () =>
             // 构建候选人微信通知的详细模板
             let candidateMessage = `📋 候选人微信通知${candidate_name ? ` - ${candidate_name.trim()}` : ''}\n\n`;
             
-            // Boss账号信息
-            candidateMessage += `Boss账号：${boss_username}\n\n`;
+            // 平台账号信息
+            const platformName = platform === "yupao" ? "鱼泡" : "Boss";
+            candidateMessage += `${platformName}账号：${boss_username}\n\n`;
             
             // 候选人基本信息
             candidateMessage += `候选人信息：\n`;

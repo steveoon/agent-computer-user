@@ -1,7 +1,7 @@
 "use client";
 
 import { BaseToolMessage } from "./base-tool-message";
-import { FileText, User, MessageSquare, Clock } from "lucide-react";
+import { FileText, User, MessageSquare, Clock, Phone, MessageCircle } from "lucide-react";
 import { ToolMessageProps } from "./types";
 import { 
   getSenderDisplay,
@@ -175,13 +175,43 @@ export function YupaoChatDetailsTool(props: ToolMessageProps) {
             </div>
           )}
 
+          {/* 交换的联系方式 */}
+          {stats && ((stats.phoneNumbers && stats.phoneNumbers.length > 0) || (stats.wechatIds && stats.wechatIds.length > 0)) && (
+            <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-200 dark:border-blue-900">
+              <div className="space-y-2">
+                {stats.phoneNumbers && stats.phoneNumbers.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      电话号码: {stats.phoneNumbers.join(", ")}
+                    </span>
+                  </div>
+                )}
+                {stats.wechatIds && stats.wechatIds.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      微信号: {stats.wechatIds.join(", ")}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* 统计信息 */}
           {stats && (
-            <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-4">
+            <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-4 flex-wrap">
               <span>总消息数: {stats.totalMessages}</span>
               <span>候选人: {stats.candidateMessages}</span>
               <span>招聘者: {stats.recruiterMessages}</span>
               <span>系统: {stats.systemMessages}</span>
+              {stats.phoneExchangeCount && stats.phoneExchangeCount > 0 && (
+                <span>交换电话: {stats.phoneExchangeCount}</span>
+              )}
+              {stats.wechatExchangeCount && stats.wechatExchangeCount > 0 && (
+                <span>交换微信: {stats.wechatExchangeCount}</span>
+              )}
             </div>
           )}
 

@@ -56,6 +56,18 @@ export const MODEL_DICTIONARY = {
   },
 
   // OpenAI 模型
+  "openai/gpt-5": {
+    provider: "openai",
+    name: "GPT-5",
+    description: "OpenAI GPT-5",
+    categories: ["chat", "general"] as ModelCategory[],
+  },
+  "openai/gpt-5-chat-latest": {
+    provider: "openai",
+    name: "GPT-5 Chat (最新)",
+    description: "OpenAI GPT-5 Chat (最新)",
+    categories: ["general"] as ModelCategory[],
+  },
   "openai/gpt-4.1": {
     provider: "openai",
     name: "GPT-4.1",

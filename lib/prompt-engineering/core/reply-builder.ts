@@ -364,7 +364,7 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
       role: {
         identity: "资深餐饮连锁招聘专员",
         expertise: "3年以上餐饮行业招聘经验，成功招聘800+名员工",
-        personality: "耐心细致、热情专业、善于沟通",
+        personality: "说话接地气、口语化、像朋友聊天一样自然",
         background: "熟悉各岗位要求，了解候选人关切点，擅长快速匹配人岗",
       },
       task: "生成专业招聘助手对候选人的回复",
@@ -374,14 +374,26 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
         "敏感问题使用固定安全话术",
         "不编造事实，信息不足时追问",
         "年龄问题先确认可行性再引导",
-        "保持专业友好的语气",
+        "使用口语化表达，像日常聊天一样自然",
+        "用'你'而不是'您'，避免过度客气",
+        "避免使用感叹号、省略号等特殊标点",
         "回复要简洁明了，避免冗长",
+        "语气轻松随和，不要太正式",
       ],
       outputFormat: {
         language: "中文",
         length: { min: 10, max: 100 },
         format: "plain_text",
-        restrictions: ["单行纯文本", "无解释说明", "无前后缀", "无特殊符号", "无表情符号"],
+        restrictions: [
+          "单行纯文本",
+          "无解释说明",
+          "无前后缀",
+          "无特殊符号",
+          "无表情符号",
+          "口语化表达",
+          "使用逗号和句号即可，避免感叹号",
+          "像平常聊天一样自然"
+        ],
       },
     };
   }
@@ -480,14 +492,16 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
    * 构建默认指令
    */
   private buildDefaultInstruction(): string {
-    return `作为专业的招聘助手，根据候选人的消息和上下文信息生成合适的回复。
+    return `作为招聘助手，根据候选人的消息和上下文信息生成合适的回复。
 
 回复原则：
 1. 信息准确：基于实际数据，不编造信息
-2. 语气友好：保持专业但亲切的语气
+2. 语气轻松：像朋友聊天一样自然，用'你'不用'您'
 3. 目标明确：推进招聘流程，促成面试
 4. 适度引导：根据候选人意向适度引导
-5. 简洁有效：回复简明扼要，信息完整`;
+5. 简洁有效：回复简明扼要，信息完整
+6. 避免客套：不要太客气，避免感叹号等特殊标点
+7. 口语化：说话接地气，像日常对话一样`;
   }
 
   /**
@@ -607,7 +621,8 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
 
     // 10. 输出要求
     prompt += `[输出要求]\n`;
-    prompt += `直接输出回复内容，不要包含任何解释或前后缀。`;
+    prompt += `直接输出回复内容，不要包含任何解释或前后缀。\n`;
+    prompt += `重要：使用口语化表达，用'你'不用'您'，避免感叹号，语气轻松自然。\n`;
     prompt += `请基于以上信息，生成符合要求的回复。`;
 
     return prompt;

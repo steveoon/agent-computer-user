@@ -235,6 +235,59 @@ export const yupaoChatDetailsTool = () =>
                 return;
               }
               
+              // 检查是否是联系方式交换消息（电话或微信）
+              const viewPhoneBox = msgInner.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.viewPhoneBox}');
+              if (viewPhoneBox) {
+                const contactEl = viewPhoneBox.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.contactNumber}');
+                const contactValue = contactEl ? contactEl.textContent.trim() : '';
+                const titleEl = viewPhoneBox.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.contactTitle}');
+                const contactTitle = titleEl ? titleEl.textContent.trim() : '';
+                
+                // 判断是电话还是微信
+                const hasPhoneIcon = viewPhoneBox.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.phoneIcon}');
+                const hasWechatIcon = viewPhoneBox.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.wechatIcon}');
+                const contactType = hasPhoneIcon ? 'phone' : (hasWechatIcon ? 'wechat' : 'unknown');
+                
+                if (contactValue) {
+                  chatMessages.push({
+                    index: i,
+                    sender: sender,
+                    messageType: contactType === 'phone' ? 'phone-exchange' : 'wechat-exchange',
+                    content: contactTitle + ': ' + contactValue,
+                    contactType: contactType,
+                    contactValue: contactValue,
+                    phoneNumber: contactType === 'phone' ? contactValue : undefined,
+                    wechatId: contactType === 'wechat' ? contactValue : undefined,
+                    time: time,
+                    hasTime: !!time,
+                    isRead: isRead,
+                    extraInfo: extraInfo
+                  });
+                }
+                return;
+              }
+              
+              // 检查是否是交换电话请求消息
+              const exchangePhoneBox = msgInner.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.exchangePhoneBox}');
+              if (exchangePhoneBox) {
+                const requestText = exchangePhoneBox.querySelector('.tip-ss');
+                const content = requestText ? requestText.textContent.trim() : '请求交换联系方式';
+                const isAccepted = exchangePhoneBox.querySelector('.disabled') !== null;
+                
+                chatMessages.push({
+                  index: i,
+                  sender: sender,
+                  messageType: 'phone-exchange-request',
+                  content: content,
+                  accepted: isAccepted,
+                  time: time,
+                  hasTime: !!time,
+                  isRead: isRead,
+                  extraInfo: extraInfo
+                });
+                return;
+              }
+              
               // 获取文本消息
               const textBox = msgInner.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.messageTextBox}');
               if (textBox) {
@@ -266,6 +319,12 @@ export const yupaoChatDetailsTool = () =>
             chatMessages = chatMessages.slice(-${maxMessages});
           }
           
+          // 提取交换的联系方式
+          const phoneExchangeMessages = chatMessages.filter(m => m.messageType === 'phone-exchange');
+          const wechatExchangeMessages = chatMessages.filter(m => m.messageType === 'wechat-exchange');
+          const exchangedPhoneNumbers = phoneExchangeMessages.map(m => m.phoneNumber).filter(Boolean);
+          const exchangedWechatIds = wechatExchangeMessages.map(m => m.wechatId).filter(Boolean);
+          
           // 统计信息
           const stats = {
             totalMessages: originalCount,
@@ -274,6 +333,10 @@ export const yupaoChatDetailsTool = () =>
             recruiterMessages: chatMessages.filter(m => m.sender === 'recruiter').length,
             systemMessages: chatMessages.filter(m => m.sender === 'system').length,
             messagesWithTime: chatMessages.filter(m => m.hasTime).length,
+            phoneExchangeCount: phoneExchangeMessages.length,
+            wechatExchangeCount: wechatExchangeMessages.length,
+            phoneNumbers: exchangedPhoneNumbers,
+            wechatIds: exchangedWechatIds,
             truncated: originalCount > ${maxMessages}
           };
           
@@ -352,6 +415,10 @@ export const yupaoChatDetailsTool = () =>
                     lastMessageTime:
                       parsedResult.chatMessages?.[parsedResult.chatMessages.length - 1]?.time ||
                       "无",
+                    phoneNumbers: parsedResult.stats?.phoneNumbers || [],
+                    wechatIds: parsedResult.stats?.wechatIds || [],
+                    phoneExchangeCount: parsedResult.stats?.phoneExchangeCount || 0,
+                    wechatExchangeCount: parsedResult.stats?.wechatExchangeCount || 0,
                   },
                   formattedHistory: parsedResult.formattedHistory || [],
                 };
