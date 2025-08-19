@@ -17,7 +17,12 @@ interface ConfigState {
 
   // 操作方法
   loadConfig: () => Promise<void>;
-  updateBrandData: (brandData: ZhipinData) => Promise<void>;
+  updateBrandData: (brandData: ZhipinData, options?: { 
+    customToast?: { 
+      title: string; 
+      description?: string; 
+    } 
+  }) => Promise<void>;
   updateReplyPrompts: (replyPrompts: ReplyPromptsConfig) => Promise<void>;
   updateSystemPrompts: (systemPrompts: SystemPromptsConfig) => Promise<void>;
   updateActiveSystemPrompt: (promptType: keyof SystemPromptsConfig) => Promise<void>;
@@ -81,7 +86,7 @@ const useConfigStore = create<ConfigState>()(
         }
       },
 
-      updateBrandData: async (brandData: ZhipinData) => {
+      updateBrandData: async (brandData: ZhipinData, options) => {
         const { config } = get();
         if (!config) {
           const errorMsg = "配置未加载，无法更新品牌数据";
@@ -111,10 +116,17 @@ const useConfigStore = create<ConfigState>()(
 
           console.log("✅ 品牌数据更新成功", stats);
           
-          // 显示成功 toast 通知
-          toast.success("品牌数据更新成功", {
-            description: `已保存 ${stats.brands} 个品牌和 ${stats.stores} 家门店的配置`,
-          });
+          // 使用自定义 toast 或默认 toast
+          if (options?.customToast) {
+            toast.success(options.customToast.title, {
+              description: options.customToast.description,
+            });
+          } else {
+            // 默认的全局更新提示
+            toast.success("品牌数据更新成功", {
+              description: `已保存 ${stats.brands} 个品牌和 ${stats.stores} 家门店的配置`,
+            });
+          }
         } catch (error) {
           console.error("❌ 品牌数据更新失败:", error);
           const errorMessage = error instanceof Error ? error.message : "更新失败";

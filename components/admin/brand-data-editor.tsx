@@ -15,7 +15,12 @@ import type { ZhipinData } from "@/types";
 
 interface BrandDataEditorProps {
   data: ZhipinData | undefined;
-  onSave: (data: ZhipinData) => Promise<void>;
+  onSave: (data: ZhipinData, options?: { 
+    customToast?: { 
+      title: string; 
+      description?: string; 
+    } 
+  }) => Promise<void>;
 }
 
 export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }) => {
@@ -46,12 +51,34 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
 
     const sourceTemplates = localData.brands[sourceBrand].templates;
     
+    // 深拷贝模板对象，确保每个品牌有独立的副本
+    const clonedTemplates = structuredClone(sourceTemplates);
+    
     // 更新目标品牌的模板
-    const updatedData = updateTemplates(targetBrand, sourceTemplates);
+    const updatedData = updateTemplates(targetBrand, clonedTemplates);
     
     if (updatedData) {
-      await onSave(updatedData);
+      await onSave(updatedData, {
+        customToast: {
+          title: "话术复制成功",
+          description: `成功将 ${sourceBrand} 的话术复制到 ${targetBrand}`
+        }
+      });
       console.log(`✅ 成功将 ${sourceBrand} 的话术复制到 ${targetBrand}`);
+    }
+  };
+
+  // 处理单个品牌话术更新
+  const handleBrandTemplateUpdate = async (data: ZhipinData, brandName?: string) => {
+    if (brandName) {
+      await onSave(data, {
+        customToast: {
+          title: `${brandName} 话术更新成功`,
+          description: `品牌话术模板已保存`
+        }
+      });
+    } else {
+      await onSave(data);
     }
   };
 
@@ -144,7 +171,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
                   </Button>
                 </div>
                 {editingType === "templates" && (
-                  <TemplateEditor brandName={editingBrand} onDataUpdate={onSave} />
+                  <TemplateEditor brandName={editingBrand} onDataUpdate={handleBrandTemplateUpdate} />
                 )}
                 {editingType === "schedule" && (
                   <ScheduleEditor brandName={editingBrand} onDataUpdate={onSave} />
