@@ -2,6 +2,14 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.4.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.4.0-develop.1...v1.4.0-develop.2) (2025-08-20)
+
+
+### Features
+
+* add Boss直聘 candidate list and batch greeting tools ([afe3ba8](https://github.com/steveoon/agent-computer-user/commit/afe3ba8ba159971c0d188a212702cc0545ddfe58))
+* refactor E2B desktop initialization and enhance security ([1fe00e8](https://github.com/steveoon/agent-computer-user/commit/1fe00e883349951b3f943e4b4154f06f0e97cbd2))
+
 # [1.4.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.3.1...v1.4.0-develop.1) (2025-08-19)
 
 
