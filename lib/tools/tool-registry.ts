@@ -162,6 +162,22 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     create: () => zhipinTools.getUsername,
   },
 
+  zhipin_say_hello: {
+    name: "zhipin_say_hello",
+    description: "Boss直聘批量打招呼",
+    category: "automation",
+    requiresSandbox: false,
+    create: () => zhipinTools.sayHelloSimple(),
+  },
+
+  zhipin_get_candidate_list: {
+    name: "zhipin_get_candidate_list",
+    description: "获取Boss直聘候选人列表",
+    category: "automation",
+    requiresSandbox: false,
+    create: () => zhipinTools.getCandidateList(),
+  },
+
   // ===== Yupao 自动化工具 =====
   yupao_get_unread_messages: {
     name: "yupao_get_unread_messages",
@@ -312,6 +328,8 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "zhipin_get_chat_details",
     "zhipin_exchange_wechat",
     "zhipin_get_username",
+    "zhipin_say_hello",
+    "zhipin_get_candidate_list",
     // Yupao自动化
     "yupao_get_unread_messages",
     "yupao_open_candidate_chat",
