@@ -374,6 +374,7 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
         "敏感问题使用固定安全话术",
         "不编造事实，信息不足时追问",
         "年龄问题先确认可行性再引导",
+        "兼职岗位不提供五险一金，严禁承诺五险一金福利",
         "使用口语化表达，像日常聊天一样自然",
         "用'你'而不是'您'，避免过度客气",
         "避免使用感叹号、省略号等特殊标点",
@@ -421,7 +422,7 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
     );
 
     return {
-      instruction: params.systemInstruction || this.buildDefaultInstruction(),
+      instruction: params.systemInstruction || "",
       examples,
       context: optimizedContext,
       newInput: params.message,
@@ -488,21 +489,6 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
     };
   }
 
-  /**
-   * 构建默认指令
-   */
-  private buildDefaultInstruction(): string {
-    return `作为招聘助手，根据候选人的消息和上下文信息生成合适的回复。
-
-回复原则：
-1. 信息准确：基于实际数据，不编造信息
-2. 语气轻松：像朋友聊天一样自然，用'你'不用'您'
-3. 目标明确：推进招聘流程，促成面试
-4. 适度引导：根据候选人意向适度引导
-5. 简洁有效：回复简明扼要，信息完整
-6. 避免客套：不要太客气，避免感叹号等特殊标点
-7. 口语化：说话接地气，像日常对话一样`;
-  }
 
   /**
    * 格式化带记忆的分子提示

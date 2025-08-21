@@ -87,18 +87,18 @@ export const CHAT_SELECTORS = {
 
 // Chat details selectors
 export const CHAT_DETAILS_SELECTORS = {
-  // Candidate info container
-  candidateInfoContainer: '#container > div:nth-child(1) > div > div.chat-box > div.chat-container > div.chat-conversation > div.conversation-box > div.conversation-main > div.base-info-content',
+  // Candidate info container  
+  candidateInfoContainer: '.base-info-single-container, .base-info-content, #container > div:nth-child(1) > div > div.chat-box > div.chat-container > div.chat-conversation > div.conversation-box > div.conversation-main > div.base-info-content',
   
   // Candidate info elements
-  candidateName: '.geek-name',
-  candidateInfoItem: '.geek-info-item',
-  candidateTag: '.geek-tag',
-  candidatePosition: '.geek-position',
-  candidatePositionAlt: '.position-name',
+  candidateName: '.name-box, .geek-name, .base-name',
+  candidateInfoItem: '.geek-info-item, .base-info-item, .base-info-single-detial > div',
+  candidateTag: '.geek-tag, .high-light-boss',
+  candidatePosition: '.geek-position, .position-name',
+  candidatePositionAlt: '.position-content .value, .position-item .value',
   
   // Chat message container
-  chatMessageContainer: '#container > div:nth-child(1) > div > div.chat-box > div.chat-container > div.chat-conversation > div.conversation-box > div.conversation-main > div.conversation-message',
+  chatMessageContainer: '.conversation-message, .message-list, #container > div:nth-child(1) > div > div.chat-box > div.chat-container > div.chat-conversation > div.conversation-box > div.conversation-main > div.conversation-message',
   
   // Message elements
   messageItem: '.message-item',
