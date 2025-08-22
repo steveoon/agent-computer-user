@@ -302,15 +302,15 @@ export function generateSmartReply(
     msg.includes("去店里") ||
     msg.includes("什么时候")
   ) {
-    return "可以帮您和店长约面试呢，麻烦加一下我微信吧，需要几项简单的个人信息";
+    return "可以帮你和店长约面试，麻烦加一下我微信吧，需要几项简单的个人信息";
   }
 
   // 5. 年龄相关问题处理
   if (msg.includes("年龄") || msg.includes("岁")) {
     if (msg.includes("50") || msg.includes("五十") || msg.includes("18") || msg.includes("十八")) {
-      return "您附近目前没有岗位空缺了";
+      return "你附近目前没有岗位空缺了";
     }
-    return "您的年龄没问题的";
+    return "你的年龄没问题的";
   }
 
   // 6. 社保相关问题

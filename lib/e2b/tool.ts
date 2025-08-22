@@ -6,15 +6,13 @@ import { mapKeySequence } from "../utils";
 import { diagnoseE2BEnvironment } from "./diagnostic";
 import { compressImageServerV2 } from "../image-optimized";
 import { loadZhipinData, generateSmartReplyWithLLM } from "../loaders/zhipin-data.loader";
+import { activeConfig } from "./display-config";
 import type { Store } from "../../types/zhipin";
 import type { ModelConfig } from "../config/models";
 import type { ZhipinData, ReplyPromptsConfig } from "@/types";
 
 // 定义工具执行的返回类型
-type E2BToolResult = 
-  | { type: "image"; data: string }
-  | { type: "text"; text: string }
-  | string;
+type E2BToolResult = { type: "image"; data: string } | { type: "text"; text: string } | string;
 
 const wait = async (seconds: number) => {
   await new Promise(resolve => setTimeout(resolve, seconds * 1000));
@@ -36,7 +34,15 @@ const moveMouseWithVisualUpdate = async (
   return { x: clampedX, y: clampedY };
 };
 
-export const resolution = { x: 1024, y: 768 };
+// 使用可配置的显示设置
+export const resolution = activeConfig.resolution;
+export const dpi = activeConfig.dpi;
+
+// 启动时显示当前配置
+console.log(`🖥️ E2B Desktop Configuration:
+  • Resolution: ${resolution.x}x${resolution.y}
+  • DPI: ${dpi}
+  • Profile: ${activeConfig.description}`);
 
 // 公共的中文输入处理函数 - 返回字符串
 const handleChineseInput = async (
@@ -626,7 +632,6 @@ export const computerTool = (
           const image = await desktop.screenshot();
           const base64Data = Buffer.from(image).toString("base64");
 
-          // 直接使用服务端压缩函数以减少 token 使用
           console.log(`🖼️ 截图原始大小: ${(base64Data.length / 1024).toFixed(2)}KB`);
           // 🌍 根据环境动态调整压缩参数
           const { getEnvironmentLimits } = await import("@/lib/utils/environment");

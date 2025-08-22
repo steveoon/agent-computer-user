@@ -10,11 +10,17 @@ import { TemplateEditor } from "./template-editor";
 import { ScheduleEditor } from "./schedule-editor";
 import { SearchPagination } from "@/components/ui/search-pagination";
 import { useBrandEditorStore } from "@/lib/stores/brand-editor-store";
+import { BrandTemplateCopier } from "./brand-template-copier";
 import type { ZhipinData } from "@/types";
 
 interface BrandDataEditorProps {
   data: ZhipinData | undefined;
-  onSave: (data: ZhipinData) => Promise<void>;
+  onSave: (data: ZhipinData, options?: { 
+    customToast?: { 
+      title: string; 
+      description?: string; 
+    } 
+  }) => Promise<void>;
 }
 
 export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }) => {
@@ -34,7 +40,47 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
     updateJsonData,
     saveData,
     resetData,
+    updateTemplates,
   } = useBrandEditorStore();
+
+  // 处理品牌话术复制
+  const handleCopyTemplates = async (sourceBrand: string, targetBrand: string) => {
+    if (!localData?.brands[sourceBrand]?.templates) {
+      throw new Error(`源品牌 ${sourceBrand} 没有话术模板`);
+    }
+
+    const sourceTemplates = localData.brands[sourceBrand].templates;
+    
+    // 深拷贝模板对象，确保每个品牌有独立的副本
+    const clonedTemplates = structuredClone(sourceTemplates);
+    
+    // 更新目标品牌的模板
+    const updatedData = updateTemplates(targetBrand, clonedTemplates);
+    
+    if (updatedData) {
+      await onSave(updatedData, {
+        customToast: {
+          title: "话术复制成功",
+          description: `成功将 ${sourceBrand} 的话术复制到 ${targetBrand}`
+        }
+      });
+      console.log(`✅ 成功将 ${sourceBrand} 的话术复制到 ${targetBrand}`);
+    }
+  };
+
+  // 处理单个品牌话术更新
+  const handleBrandTemplateUpdate = async (data: ZhipinData, brandName?: string) => {
+    if (brandName) {
+      await onSave(data, {
+        customToast: {
+          title: `${brandName} 话术更新成功`,
+          description: `品牌话术模板已保存`
+        }
+      });
+    } else {
+      await onSave(data);
+    }
+  };
 
   // 初始化数据 - 当data变化时重新初始化
   useEffect(() => {
@@ -98,8 +144,13 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
         {/* 品牌列表 */}
         <Card>
           <CardHeader>
-            <CardTitle>品牌配置</CardTitle>
-            <CardDescription>当前配置的品牌及其基本信息</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>品牌配置</CardTitle>
+                <CardDescription className="mt-1">当前配置的品牌及其基本信息</CardDescription>
+              </div>
+              <BrandTemplateCopier data={localData} onCopy={handleCopyTemplates} />
+            </div>
           </CardHeader>
           <CardContent>
             {editingBrand ? (
@@ -120,7 +171,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
                   </Button>
                 </div>
                 {editingType === "templates" && (
-                  <TemplateEditor brandName={editingBrand} onDataUpdate={onSave} />
+                  <TemplateEditor brandName={editingBrand} onDataUpdate={handleBrandTemplateUpdate} />
                 )}
                 {editingType === "schedule" && (
                   <ScheduleEditor brandName={editingBrand} onDataUpdate={onSave} />

@@ -107,6 +107,16 @@ export const toolRegistry: Record<string, ToolConfig> = {
     defaultTheme: themes.green,
     render: ZhipinGetUsernameTool,
   },
+  zhipin_get_candidate_list: {
+    icon: ClipboardList,
+    defaultTheme: themes.blue,
+    render: ZhipinToolMessage,
+  },
+  zhipin_say_hello: {
+    icon: HandshakeIcon,
+    defaultTheme: themes.blue,
+    render: ZhipinToolMessage,
+  },
   // Duliday interview booking tools
   duliday_job_list: {
     icon: Building2,

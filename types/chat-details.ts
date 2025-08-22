@@ -27,7 +27,11 @@ export const ChatMessageTypeSchema = z.enum([
   "text",              // 文本消息
   "system",            // 系统消息
   "resume",            // 简历信息
-  "wechat-exchange"    // 微信交换
+  "job-info",          // 岗位信息
+  "phone-exchange",    // 电话交换
+  "phone-exchange-request", // 电话交换请求
+  "wechat-exchange",   // 微信交换
+  "wechat-exchange-request" // 微信交换请求
 ]);
 
 /**
@@ -39,7 +43,14 @@ export const ChatMessageSchema = z.object({
   messageType: ChatMessageTypeSchema,
   content: z.string().describe("消息内容"),
   time: z.string().describe("消息时间戳"),
-  hasTime: z.boolean().describe("是否有时间戳")
+  hasTime: z.boolean().describe("是否有时间戳"),
+  phoneNumber: z.string().optional().describe("交换的电话号码"),
+  wechatId: z.string().optional().describe("交换的微信号"),
+  contactType: z.enum(["phone", "wechat", "unknown"]).optional().describe("联系方式类型"),
+  contactValue: z.string().optional().describe("联系方式值"),
+  accepted: z.boolean().optional().describe("交换请求是否已接受"),
+  isRead: z.boolean().optional().describe("消息是否已读"),
+  extraInfo: z.string().optional().describe("额外信息")
 });
 
 /**
@@ -52,6 +63,10 @@ export const ChatStatsSchema = z.object({
   recruiterMessages: z.number().describe("招聘者消息数"),
   systemMessages: z.number().describe("系统消息数"),
   messagesWithTime: z.number().describe("有时间戳的消息数"),
+  phoneExchangeCount: z.number().optional().describe("电话交换次数"),
+  wechatExchangeCount: z.number().optional().describe("微信交换次数"),
+  phoneNumbers: z.array(z.string()).optional().describe("交换的电话号码列表"),
+  wechatIds: z.array(z.string()).optional().describe("交换的微信号列表"),
   truncated: z.boolean().optional().describe("是否被截断"),
   dataTruncated: z.boolean().optional().describe("数据是否被截断"),
   originalDataSizeKB: z.number().optional().describe("原始数据大小(KB)")

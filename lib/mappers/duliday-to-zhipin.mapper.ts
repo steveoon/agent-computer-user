@@ -50,7 +50,7 @@ export function convertDulidayListToZhipinData(
       salary_inquiry: [`基本薪资是{salary}元/小时，{level_salary}。`],
       schedule_inquiry: [`排班比较灵活，一般是2-4小时，具体可以和店长商量。`],
       general_chat: [`好的，有什么其他问题可以问我。`],
-      age_concern: [`您的年龄没问题的。`],
+      age_concern: [`你的年龄没问题的。`],
       insurance_inquiry: [`有商业保险。`],
       followup_chat: [`这家门店不合适也没关系，以后还有其他店空缺的，到时候可以再报名。`],
       attendance_inquiry: [`出勤要求是{attendance_description}，{minimum_days}天起，比较灵活的。`],

@@ -11,6 +11,10 @@ export const ORGANIZATION_MAPPING: Record<number, string> = {
   1072: "天津肯德基",
   850: "上海必胜客",
   865: "奥乐齐",
+  1161: "M Stand",
+  1102: "嘉定山姆",
+  1107: "成都必胜客",
+  746: "来伊份",
   // TODO: 根据实际的 organizationId 添加更多品牌映射
   // 可以通过调用 Duliday API 获取组织列表来确定具体的 ID
 };
@@ -93,33 +97,36 @@ export const EDUCATION_MAPPING: Record<number, string> = {
 export function getEducationIdByName(educationName: string): number | undefined {
   // 标准化输入
   const normalizedName = educationName.trim().toLowerCase();
-  
+
   // 创建别名映射
   const aliases: Record<string, number> = {
-    "初中以下": 9,
-    "小学": 9,
-    "初中": 5,
-    "高中": 4,
-    "中专": 8,
-    "技校": 8,
-    "职高": 8,
+    初中以下: 9,
+    小学: 9,
+    初中: 5,
+    高中: 4,
+    中专: 8,
+    技校: 8,
+    职高: 8,
     "中专/技校/职高": 8,
-    "高职": 10,
-    "大专": 3,
-    "专科": 3,
-    "本科": 2,
-    "学士": 2,
-    "硕士": 6,
-    "研究生": 6,
+    高职: 10,
+    大专: 3,
+    专科: 3,
+    本科: 2,
+    学士: 2,
+    硕士: 6,
+    研究生: 6,
   };
-  
+
   // 查找匹配
   for (const [alias, id] of Object.entries(aliases)) {
-    if (alias.toLowerCase().includes(normalizedName) || normalizedName.includes(alias.toLowerCase())) {
+    if (
+      alias.toLowerCase().includes(normalizedName) ||
+      normalizedName.includes(alias.toLowerCase())
+    ) {
       return id;
     }
   }
-  
+
   return undefined;
 }
 

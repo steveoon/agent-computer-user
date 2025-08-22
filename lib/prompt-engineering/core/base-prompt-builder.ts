@@ -16,6 +16,8 @@ import type {
   BuilderConfig,
   PromptResult,
 } from '@/types/context-engineering';
+import { Tiktoken } from 'js-tiktoken/lite';
+import cl100k_base from 'js-tiktoken/ranks/cl100k_base';
 
 // Re-export types for convenience
 export type {
@@ -31,6 +33,7 @@ export type {
 export abstract class BasePromptBuilder {
   protected config: BuilderConfig;
   protected memoryManager?: unknown;   // 将来集成CellularMemoryManager
+  private tiktoken: Tiktoken | null = null;
 
   constructor(config: BuilderConfig = {}) {
     this.config = {
@@ -40,6 +43,14 @@ export abstract class BasePromptBuilder {
       experimentalFieldSupport: false,
       ...config
     };
+    
+    // 初始化 tiktoken 编码器
+    try {
+      this.tiktoken = new Tiktoken(cl100k_base);
+    } catch (error) {
+      console.warn('Failed to initialize tiktoken, falling back to heuristic estimation:', error);
+      this.tiktoken = null;
+    }
   }
 
   /**
@@ -131,13 +142,59 @@ export abstract class BasePromptBuilder {
   }
 
   /**
-   * 估算token数（简化版）
+   * 估算token数（使用 js-tiktoken 精确计算）
+   * 同时支持客户端和服务端环境
    */
   protected estimateTokens(text: string): number {
-    // 简单估算：中文约2字符/token，英文约4字符/token
-    const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
-    const englishChars = text.length - chineseChars;
-    return Math.ceil(chineseChars / 2 + englishChars / 4);
+    try {
+      // 优先使用 tiktoken 进行精确计算
+      if (this.tiktoken) {
+        const tokens = this.tiktoken.encode(text);
+        return tokens.length;
+      }
+      
+      // 如果 tiktoken 未初始化，使用改进的启发式估算
+      return this.estimateTokensHeuristic(text);
+    } catch (error) {
+      console.warn('Token encoding failed, using fallback estimation:', error);
+      return this.estimateTokensHeuristic(text);
+    }
+  }
+
+  /**
+   * 启发式 token 估算（作为后备方案）
+   * 基于 cl100k_base 编码器的经验值
+   */
+  private estimateTokensHeuristic(text: string): number {
+    // 识别不同类型的字符
+    const chineseChars = (text.match(/[\u4e00-\u9fff\u3000-\u303f]/g) || []).length;
+    const japaneseChars = (text.match(/[\u3040-\u309f\u30a0-\u30ff]/g) || []).length;
+    const koreanChars = (text.match(/[\uac00-\ud7af]/g) || []).length;
+    const arabicChars = (text.match(/[\u0600-\u06ff]/g) || []).length;
+    const cyrillicChars = (text.match(/[\u0400-\u04ff]/g) || []).length;
+    
+    // CJK字符（中日韩）通常编码为 1.5-2 tokens per character
+    const cjkTokens = (chineseChars + japaneseChars + koreanChars) * 1.8;
+    
+    // 其他非ASCII字符
+    const otherNonAsciiTokens = (arabicChars + cyrillicChars) * 1.5;
+    
+    // ASCII字符（英文、数字、标点）
+    const asciiChars = text.length - chineseChars - japaneseChars - koreanChars - arabicChars - cyrillicChars;
+    
+    // 分词估算：平均每个单词约1.3 tokens
+    const asciiTokens = asciiChars / 3.8;
+    
+    // 特殊处理：代码和技术文本
+    const codeIndicators = ['{', '}', '(', ')', '[', ']', ';', '=', '<', '>', '/'];
+    const codeCharCount = codeIndicators.reduce((count, char) => {
+      return count + (text.split(char).length - 1);
+    }, 0);
+    
+    // 代码通常有更多的 tokens（因为特殊字符和语法）
+    const codeAdjustment = codeCharCount * 0.3;
+    
+    return Math.ceil(cjkTokens + otherNonAsciiTokens + asciiTokens + codeAdjustment);
   }
 
   /**

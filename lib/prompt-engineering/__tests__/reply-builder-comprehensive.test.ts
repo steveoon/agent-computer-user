@@ -752,6 +752,53 @@ describe('ReplyPromptBuilder - 综合测试套件', () => {
         expect(result.prompt).toContain('最新消息');
         expect(result.prompt).toContain('[候选人消息]');
       });
+
+      it('应该准确估算不同类型文本的token数', () => {
+        // 测试纯中文文本
+        const chineseText = '你好，请问贵公司的工作时间是什么时候？我想了解一下薪资待遇。';
+        // @ts-ignore - 访问受保护的方法用于测试
+        const chineseTokens = replyBuilder.estimateTokens(chineseText);
+        // 使用 tiktoken 后，期望更精确的结果
+        // 中文文本通常每个字符1-2个tokens，整体约为字符数的1.5-2倍
+        expect(chineseTokens).toBeGreaterThan(25); // 至少25个tokens
+        expect(chineseTokens).toBeLessThan(70); // 不超过70个tokens
+
+        // 测试纯英文文本
+        const englishText = 'Hello, I would like to know about the working hours and salary for this position.';
+        // @ts-ignore - 访问受保护的方法用于测试
+        const englishTokens = replyBuilder.estimateTokens(englishText);
+        // 英文文本通常每个单词约1.3个tokens（约16个单词）
+        expect(englishTokens).toBeGreaterThan(15); // 至少15个tokens
+        expect(englishTokens).toBeLessThan(30); // 不超过30个tokens
+
+        // 测试混合文本（中英文混合）
+        const mixedText = '肯德基KFC招聘part-time服务员，薪资22-25元/hour，欢迎join我们的team！';
+        // @ts-ignore - 访问受保护的方法用于测试
+        const mixedTokens = replyBuilder.estimateTokens(mixedText);
+        // 混合文本应该在合理范围内
+        expect(mixedTokens).toBeGreaterThan(20);
+        expect(mixedTokens).toBeLessThan(60);
+
+        // 验证 token 估算的一致性
+        const testText = '测试文本进行token估算';
+        // @ts-ignore - 访问受保护的方法用于测试
+        const tokens1 = replyBuilder.estimateTokens(testText);
+        // @ts-ignore - 访问受保护的方法用于测试
+        const tokens2 = replyBuilder.estimateTokens(testText);
+        expect(tokens1).toBe(tokens2); // 相同文本应该返回相同的估算值
+
+        // 测试精确性：已知的简单案例
+        const simpleText = 'hello';
+        // @ts-ignore - 访问受保护的方法用于测试
+        const simpleTokens = replyBuilder.estimateTokens(simpleText);
+        expect(simpleTokens).toBe(1); // "hello" 在 cl100k_base 中是1个token
+
+        // 测试空字符串
+        const emptyText = '';
+        // @ts-ignore - 访问受保护的方法用于测试
+        const emptyTokens = replyBuilder.estimateTokens(emptyText);
+        expect(emptyTokens).toBe(0); // 空字符串应该是0个tokens
+      });
     });
   });
 

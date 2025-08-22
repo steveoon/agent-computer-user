@@ -105,6 +105,15 @@ export const YUPAO_CHAT_DETAILS_SELECTORS = {
   
   // Avatar
   messageAvatar: '.message-avatar img',
+  
+  // Exchange phone/wechat boxes
+  exchangePhoneBox: '.exchange-phone-box',
+  viewPhoneBox: '.view-phone-box',
+  contactNumber: '.view-phone-box .text',
+  contactTitle: '.view-phone-box .title',
+  copyButton: '.view-phone-box .copy',
+  phoneIcon: '.yp-pc.yp-shouji3',
+  wechatIcon: '.yp-pc.yp-weixinlogo',
 } as const;
 
 // Message input selectors

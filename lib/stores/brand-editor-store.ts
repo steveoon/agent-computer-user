@@ -91,13 +91,16 @@ export const useBrandEditorStore = create<BrandEditorState>()(
         const { localData } = get();
         if (!localData) return null;
 
+        // 深拷贝模板以确保每个品牌有独立的副本
+        const clonedTemplates = structuredClone(templates);
+
         const updatedData = {
           ...localData,
           brands: {
             ...localData.brands,
             [brandName]: {
               ...localData.brands[brandName],
-              templates,
+              templates: clonedTemplates,
             },
           },
         };

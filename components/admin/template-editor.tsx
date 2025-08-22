@@ -18,7 +18,7 @@ import { ReplyContext } from "@/types/zhipin";
 
 interface TemplateEditorProps {
   brandName: string;
-  onDataUpdate?: (data: ZhipinData) => Promise<void>;
+  onDataUpdate?: (data: ZhipinData, brandName?: string) => Promise<void>;
 }
 
 const REPLY_TYPE_LABELS: Record<
@@ -61,10 +61,10 @@ export function TemplateEditor({
   const autoSave = async (updatedData: ZhipinData | null) => {
     if (updatedData && onDataUpdate) {
       try {
-        await onDataUpdate(updatedData);
-        console.log("✅ 话术模板已自动保存并同步状态");
+        await onDataUpdate(updatedData, brandName);
+        console.log(`✅ ${brandName}话术模板已自动保存并同步状态`);
       } catch (error) {
-        console.error("❌ 话术模板自动保存失败:", error);
+        console.error(`❌ ${brandName}话术模板自动保存失败:`, error);
       }
     }
   };
@@ -94,13 +94,12 @@ export function TemplateEditor({
   const handleSaveNewTemplate = async () => {
     if (!newTemplate || !newTemplate.value.trim()) return;
 
-    const updatedTemplates = {
-      ...templates,
-      [newTemplate.type]: [
-        ...(templates[newTemplate.type] || []),
-        newTemplate.value.trim(),
-      ],
-    };
+    // 深拷贝模板以避免修改共享引用
+    const updatedTemplates = structuredClone(templates);
+    updatedTemplates[newTemplate.type] = [
+      ...(updatedTemplates[newTemplate.type] || []),
+      newTemplate.value.trim(),
+    ];
 
     const updatedData = updateTemplates(brandName, updatedTemplates);
     await autoSave(updatedData);
@@ -115,7 +114,8 @@ export function TemplateEditor({
   const handleSaveEdit = async () => {
     if (!editingTemplate || !editingTemplate.value.trim()) return;
 
-    const updatedTemplates = { ...templates };
+    // 深拷贝模板以避免修改共享引用
+    const updatedTemplates = structuredClone(templates);
     if (!updatedTemplates[editingTemplate.type]) {
       updatedTemplates[editingTemplate.type] = [];
     }
@@ -132,7 +132,8 @@ export function TemplateEditor({
   };
 
   const handleDeleteTemplate = async (type: ReplyContext, index: number) => {
-    const updatedTemplates = { ...templates };
+    // 深拷贝模板以避免修改共享引用
+    const updatedTemplates = structuredClone(templates);
     if (updatedTemplates[type]) {
       updatedTemplates[type] = updatedTemplates[type].filter(
         (_, i) => i !== index
