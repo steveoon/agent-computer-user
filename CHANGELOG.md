@@ -2,6 +2,18 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.4.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.4.0-develop.2...v1.4.0-develop.3) (2025-08-22)
+
+
+### Bug Fixes
+
+* improve zhipin parsing and add five-insurance constraint ([2159806](https://github.com/steveoon/agent-computer-user/commit/21598069d94f4d2c130214f778df182e003f1860))
+
+
+### Features
+
+* add WeChat exchange guidance constraint to reply builder ([0fd467e](https://github.com/steveoon/agent-computer-user/commit/0fd467e6b85ee20444dc39fbed79e081e587cdad))
+
 # [1.4.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.4.0-develop.1...v1.4.0-develop.2) (2025-08-20)
 
 
