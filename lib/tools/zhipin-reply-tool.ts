@@ -74,7 +74,12 @@ export const zhipinReplyTool = (
         "候选人基本信息，包括姓名、求职职位、年龄、经验、学历等"
       ),
 
-      brand: z.string().optional().describe("指定品牌名称，如果不指定则使用默认品牌"),
+      brand: z
+        .string()
+        .optional()
+        .describe(
+          "从聊天详情中获取品牌名称，通常来说可以根据岗位信息来判断，如果不指定则使用默认品牌"
+        ),
 
       include_stats: z
         .boolean()
