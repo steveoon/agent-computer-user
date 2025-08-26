@@ -2,6 +2,19 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.5.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.4.0...v1.5.0-develop.1) (2025-08-26)
+
+
+### Bug Fixes
+
+* resolve Duliday API data validation issues with nullable work days ([135a354](https://github.com/steveoon/agent-computer-user/commit/135a35406a991bc6d04b411513d3faac7090b381))
+
+
+### Features
+
+* add toggle functionality to StorageDebug component ([498bf3b](https://github.com/steveoon/agent-computer-user/commit/498bf3b66a28196d314e23c95396a0599338f2f5))
+* enhance brand display in zhipin-reply-tool ([526bc15](https://github.com/steveoon/agent-computer-user/commit/526bc15ad58993344297905e4da2ffb6f45f0b08))
+
 # [1.4.0](https://github.com/steveoon/agent-computer-user/compare/v1.3.1...v1.4.0) (2025-08-22)
 
 
