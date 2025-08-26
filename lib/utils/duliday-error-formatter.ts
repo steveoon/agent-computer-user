@@ -8,9 +8,10 @@ export class DulidayErrorFormatter {
   /**
    * 格式化 Zod 验证错误
    * @param error - Zod 验证错误对象
+   * @param context - 可选的上下文信息
    * @returns 格式化后的错误消息
    */
-  static formatValidationError(error: z.ZodError): string {
+  static formatValidationError(error: z.ZodError, context?: { jobName?: string; jobId?: number }): string {
     const errorDetails = error.issues.map(issue => {
       const path = issue.path.join(".");
 
@@ -52,7 +53,77 @@ export class DulidayErrorFormatter {
       }
     });
 
-    return `数据格式验证失败：\n${errorDetails.join("\n\n")}`;
+    // 添加上下文信息（如果有）
+    let contextInfo = "";
+    if (context?.jobName) {
+      contextInfo = `\n岗位 "${context.jobName}" (ID: ${context.jobId || "未知"}) 同步失败：`;
+    }
+
+    return `数据格式验证失败：${contextInfo}\n${errorDetails.join("\n\n")}`;
+  }
+
+  /**
+   * 格式化带有数据上下文的验证错误
+   * @param error - Zod 验证错误对象
+   * @param dataItem - 失败的数据项
+   * @returns 格式化后的错误消息
+   */
+  static formatValidationErrorWithContext(
+    error: z.ZodError,
+    dataItem?: { jobName?: string; jobId?: number; [key: string]: unknown }
+  ): string {
+    // 提取数据上下文信息
+    const jobInfo = dataItem?.jobName 
+      ? `"${dataItem.jobName}" (ID: ${dataItem.jobId || "未知"})`
+      : null;
+
+    const errorDetails = error.issues.map(issue => {
+      const path = issue.path.join(".");
+
+      let baseError = "";
+      switch (issue.code) {
+        case "invalid_type":
+          const expectedType = issue.expected || "未知类型";
+          baseError = `• 字段 "${path}"\n  期望类型: ${expectedType}\n  ${issue.message}`;
+          break;
+
+        case "invalid_union":
+          baseError = `• 字段 "${path}"\n  数据不符合任何预期的格式\n  ${issue.message}`;
+          break;
+
+        case "unrecognized_keys":
+          const keys = issue.keys;
+          const keysList = keys && Array.isArray(keys) ? keys.join(", ") : "未知键";
+          baseError = `• 字段 "${path}"\n  包含未识别的键: ${keysList}`;
+          break;
+
+        case "invalid_format":
+          baseError = `• 字段 "${path}"\n  字符串格式无效\n  ${issue.message}`;
+          break;
+
+        case "too_small":
+          const minimum = issue.minimum;
+          baseError = `• 字段 "${path}"\n  值太小${minimum !== undefined ? `（最小值: ${minimum}）` : ""}\n  ${issue.message}`;
+          break;
+
+        case "too_big":
+          const maximum = issue.maximum;
+          baseError = `• 字段 "${path}"\n  值太大${maximum !== undefined ? `（最大值: ${maximum}）` : ""}\n  ${issue.message}`;
+          break;
+
+        case "custom":
+          baseError = `• 字段 "${path}"\n  自定义验证失败\n  ${issue.message}`;
+          break;
+
+        default:
+          baseError = `• 字段 "${path}"\n  ${issue.message}`;
+      }
+
+      return baseError;
+    });
+
+    const header = jobInfo ? `岗位 ${jobInfo} 同步失败：` : "";
+    return `${header}\n数据格式验证失败：\n${errorDetails.join("\n\n")}`;
   }
 
   /**

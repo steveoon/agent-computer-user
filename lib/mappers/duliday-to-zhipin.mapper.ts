@@ -375,9 +375,14 @@ function calculateMinHoursPerWeek(workTimeArrangement: DulidayRaw.WorkTimeArrang
 
   // 备用：如果 perWeekWorkDays 为空，从 customWorkTimes 获取 minWorkDays
   if (!workTimeArrangement.perWeekWorkDays && workTimeArrangement.customWorkTimes?.length) {
-    // 从所有 customWorkTimes 中取最小的 minWorkDays（最宽松的要求）
-    const minWorkDaysArray = workTimeArrangement.customWorkTimes.map(ct => ct.minWorkDays);
-    workDays = Math.min(...minWorkDaysArray);
+    // 从所有 customWorkTimes 中取最小的非空 minWorkDays（最宽松的要求）
+    const minWorkDaysArray = workTimeArrangement.customWorkTimes
+      .map(ct => ct.minWorkDays)
+      .filter((days): days is number => days !== null && days !== undefined);
+    
+    if (minWorkDaysArray.length > 0) {
+      workDays = Math.min(...minWorkDaysArray);
+    }
   }
 
   return dailyHours * workDays;
@@ -421,9 +426,14 @@ function generateAttendanceRequirement(
 
   // 备用：如果 perWeekWorkDays 为空，从 customWorkTimes 获取 minWorkDays
   if (!workTimeArrangement.perWeekWorkDays && workTimeArrangement.customWorkTimes?.length) {
-    // 从所有 customWorkTimes 中取最小的 minWorkDays（最宽松的要求）
-    const minWorkDaysArray = workTimeArrangement.customWorkTimes.map(ct => ct.minWorkDays);
-    minimumDays = Math.min(...minWorkDaysArray);
+    // 从所有 customWorkTimes 中取最小的非空 minWorkDays（最宽松的要求）
+    const minWorkDaysArray = workTimeArrangement.customWorkTimes
+      .map(ct => ct.minWorkDays)
+      .filter((days): days is number => days !== null && days !== undefined);
+    
+    if (minWorkDaysArray.length > 0) {
+      minimumDays = Math.min(...minWorkDaysArray);
+    }
   }
 
   return {

@@ -30,7 +30,12 @@ export function ZhipinReplyToolMessage(props: ToolMessageProps) {
       candidateMessage.length > 20 ? candidateMessage.substring(0, 20) + "..." : candidateMessage;
     details.push(`"${truncated}"`);
   }
-  if (brand) details.push(brand);
+  // 突出显示品牌信息
+  if (brand) {
+    details.push(`🏢 品牌: ${brand}`);
+  } else {
+    details.push(`⚠️ 品牌: 未传入(使用默认)`);
+  }
   if (includeStats) details.push("含统计");
 
   // 添加分类信息到详情

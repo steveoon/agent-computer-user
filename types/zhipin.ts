@@ -71,8 +71,8 @@ export namespace DulidayRaw {
   export const CustomWorkTimeSchema = z.object({
     jobWorkTimeArrangementId: z.number(),
     weekdays: z.array(z.number()),
-    minWorkDays: z.number(),
-    maxWorkDays: z.number(),
+    minWorkDays: z.number().nullable(),
+    maxWorkDays: z.number().nullable(),
   });
 
   export const WorkTimeArrangementSchema = z.object({
@@ -106,7 +106,28 @@ export namespace DulidayRaw {
     maxWorkTakingTime: z.number(),
     restTimeDesc: z.string().nullable(),
     workTimeRemark: z.string(),
-  });
+  }).refine(
+    (data) => {
+      // 确保 perWeekWorkDays 有值，或者所有 customWorkTimes 的 minWorkDays 都有值
+      if (data.perWeekWorkDays !== null && data.perWeekWorkDays !== undefined) {
+        return true; // perWeekWorkDays 有值，验证通过
+      }
+      
+      // 如果 perWeekWorkDays 为空，检查 customWorkTimes
+      if (!data.customWorkTimes || data.customWorkTimes.length === 0) {
+        return false; // 两个都没有，验证失败
+      }
+      
+      // 确保至少有一个 customWorkTime 的 minWorkDays 有值
+      return data.customWorkTimes.some(
+        (ct) => ct.minWorkDays !== null && ct.minWorkDays !== undefined
+      );
+    },
+    {
+      message: "必须提供 perWeekWorkDays 或至少一个 customWorkTimes.minWorkDays",
+      path: ["workTimeArrangement"],
+    }
+  );
 
   export const PositionSchema = z.object({
     jobBasicInfoId: z.number(),

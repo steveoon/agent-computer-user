@@ -2,6 +2,7 @@ import { DulidayRaw, ZhipinData } from "@/types/zhipin";
 import { convertDulidayListToZhipinData } from "@/lib/mappers/duliday-to-zhipin.mapper";
 import { DulidayErrorFormatter, formatDulidayError, formatHttpError } from "@/lib/utils/duliday-error-formatter";
 import { getBrandNameByOrgId } from "@/lib/constants/organization-mapping";
+import { z } from "zod";
 // 注意：服务器端不使用 configService，数据保存逻辑在客户端处理
 
 /**
@@ -95,6 +96,37 @@ export class DulidaySyncService {
         return DulidayRaw.ListResponseSchema.parse(data);
       } catch (validationError) {
         console.error("API response validation failed:", validationError);
+        
+        // 尝试提取失败数据的上下文信息
+        if (validationError instanceof z.ZodError && data?.data?.result) {
+          const issues = validationError.issues;
+          const enrichedErrors: string[] = [];
+          
+          for (const issue of issues) {
+            // 从路径中提取数组索引（例如 data.result.0.xxx -> 索引 0）
+            const pathMatch = issue.path.join('.').match(/data\.result\.(\d+)/);
+            if (pathMatch) {
+              const index = parseInt(pathMatch[1], 10);
+              const failedItem = data.data.result[index];
+              
+              if (failedItem?.jobName) {
+                // 使用新的带上下文的格式化方法
+                const errorWithContext = DulidayErrorFormatter.formatValidationErrorWithContext(
+                  new z.ZodError([issue]),
+                  { jobName: failedItem.jobName, jobId: failedItem.jobId }
+                );
+                enrichedErrors.push(errorWithContext);
+              } else {
+                enrichedErrors.push(formatDulidayError(new z.ZodError([issue])));
+              }
+            } else {
+              enrichedErrors.push(formatDulidayError(new z.ZodError([issue])));
+            }
+          }
+          
+          throw new Error(enrichedErrors.join('\n\n'));
+        }
+        
         throw new Error(formatDulidayError(validationError));
       }
     } catch (error) {
