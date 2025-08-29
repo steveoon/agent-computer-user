@@ -23,8 +23,8 @@ interface SyncProgressProps {
 
 // 工具函数：获取状态样式
 const getStatusStyles = (success: boolean) => ({
-  container: success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50",
-  icon: success ? "text-green-600" : "text-red-600",
+  container: success ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50",
+  icon: success ? "text-emerald-600" : "text-rose-600",
 });
 
 // 工具函数：获取进度状态样式
@@ -33,8 +33,8 @@ const getProgressStatusStyles = (isSyncing: boolean, overallSuccess?: boolean) =
     return { icon: "text-blue-600", badge: "default" as const };
   }
   return overallSuccess
-    ? { icon: "text-green-600", badge: "default" as const }
-    : { icon: "text-red-600", badge: "destructive" as const };
+    ? { icon: "text-emerald-600", badge: "default" as const }
+    : { icon: "text-rose-600", badge: "destructive" as const };
 };
 
 // 状态图标组件
@@ -49,9 +49,9 @@ function StatusIcon({ isSyncing, success, className = "h-4 w-4" }: StatusIconPro
     return <RefreshCw className={`${className} animate-spin text-blue-600`} aria-hidden="true" />;
   }
   return success ? (
-    <CheckCircle className={`${className} text-green-600`} aria-hidden="true" />
+    <CheckCircle className={`${className} text-emerald-600`} aria-hidden="true" />
   ) : (
-    <XCircle className={`${className} text-red-600`} aria-hidden="true" />
+    <XCircle className={`${className} text-rose-600`} aria-hidden="true" />
   );
 }
 
@@ -75,10 +75,10 @@ function SyncStats({ stats, totalDuration, selectedBrandsCount }: SyncStatsProps
 
       <div className="text-center">
         <div className="flex items-center justify-center gap-1 mb-1">
-          <Database className="h-4 w-4 text-green-600" aria-hidden="true" />
+          <Database className="h-4 w-4 text-emerald-600" aria-hidden="true" />
           <span className="text-sm font-medium">处理记录</span>
         </div>
-        <div className="text-2xl font-bold text-green-600">{stats.totalProcessedRecords}</div>
+        <div className="text-2xl font-bold text-emerald-600">{stats.totalProcessedRecords}</div>
       </div>
 
       <div className="text-center">
@@ -116,7 +116,7 @@ function BrandStatusList({ results }: BrandStatusListProps) {
           const styles = getStatusStyles(result.success);
           return (
             <div
-              key={`${result.brandName}-${index}`}
+              key={`${result.brandName}-${result.totalRecords}-${index}`}
               className={`flex items-center justify-between p-3 border rounded-lg ${styles.container}`}
               role="listitem"
             >

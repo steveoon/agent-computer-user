@@ -190,9 +190,8 @@ export default function SyncPage() {
                   <div className="space-y-3">
                     {currentSyncResult.results.map((result, index) => (
                       <BrandSyncResultCard 
-                        key={index} 
-                        result={result} 
-                        index={index}
+                        key={`${result.brandName}-${result.totalRecords}-${index}`} 
+                        result={result}
                       />
                     ))}
                   </div>

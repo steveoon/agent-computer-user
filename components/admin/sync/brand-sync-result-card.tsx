@@ -20,7 +20,6 @@ interface SyncStats {
 
 interface BrandSyncResultCardProps {
   result: SyncResult;
-  index: number;
   forceShowErrors?: boolean; // 用于批量操作
 }
 
@@ -101,12 +100,10 @@ function ProgressSection({ totalRecords, successRate }: ProgressSectionProps) {
 // 错误详情组件
 interface ErrorDetailsSectionProps {
   errors: SyncResult["errors"];
-  showErrors: boolean;
 }
 
-function ErrorDetailsSection({ errors, showErrors }: ErrorDetailsSectionProps) {
-  if (!errors.length || !showErrors) return null;
-
+function ErrorDetailsSection({ errors }: ErrorDetailsSectionProps) {
+  // 组件只在需要显示时才被挂载，无需再检查 showErrors
   return (
     <div className="border-t border-rose-200 dark:border-rose-800 overflow-hidden">
       <div className="max-h-[300px] overflow-y-auto w-full">
@@ -225,8 +222,10 @@ export function BrandSyncResultCard({ result, forceShowErrors = false }: BrandSy
         </div>
       </div>
 
-      {/* 错误详情 */}
-      <ErrorDetailsSection errors={result.errors} showErrors={isErrorsVisible} />
+      {/* 错误详情 - 条件渲染优化性能 */}
+      {hasErrors && isErrorsVisible && (
+        <ErrorDetailsSection errors={result.errors} />
+      )}
     </div>
   );
 }
@@ -319,9 +318,8 @@ export function BrandSyncResultCards({ results, isLoading = false }: BrandSyncRe
       <div className="space-y-3" id="sync-results-list">
         {results.map((result, index) => (
           <BrandSyncResultCard
-            key={`${result.brandName}-${index}`}
+            key={`${result.brandName}-${result.totalRecords}-${index}`}
             result={result}
-            index={index}
             forceShowErrors={expandedAll && result.errors.length > 0}
           />
         ))}
