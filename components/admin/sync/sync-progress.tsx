@@ -1,21 +1,148 @@
 "use client";
 
+import { useMemo } from "react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { 
-  RefreshCw, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  Activity,
-  Server,
-  Database
-} from "lucide-react";
+import { RefreshCw, CheckCircle, XCircle, Clock, Activity, Server, Database } from "lucide-react";
 import { useSyncStore, formatDuration } from "@/lib/stores/sync-store";
 import { getAvailableBrands } from "@/lib/constants/organization-mapping";
+import { SyncResult } from "@/lib/services/duliday-sync.service";
 
-export const SyncProgress = () => {
+// 类型定义
+interface SyncStatsData {
+  totalProcessedRecords: number;
+  totalStoreCount: number;
+  successCount: number;
+  failedCount: number;
+}
+
+interface SyncProgressProps {
+  className?: string;
+}
+
+// 工具函数：获取状态样式
+const getStatusStyles = (success: boolean) => ({
+  container: success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50",
+  icon: success ? "text-green-600" : "text-red-600",
+});
+
+// 工具函数：获取进度状态样式
+const getProgressStatusStyles = (isSyncing: boolean, overallSuccess?: boolean) => {
+  if (isSyncing) {
+    return { icon: "text-blue-600", badge: "default" as const };
+  }
+  return overallSuccess
+    ? { icon: "text-green-600", badge: "default" as const }
+    : { icon: "text-red-600", badge: "destructive" as const };
+};
+
+// 状态图标组件
+interface StatusIconProps {
+  isSyncing: boolean;
+  success?: boolean;
+  className?: string;
+}
+
+function StatusIcon({ isSyncing, success, className = "h-4 w-4" }: StatusIconProps) {
+  if (isSyncing) {
+    return <RefreshCw className={`${className} animate-spin text-blue-600`} aria-hidden="true" />;
+  }
+  return success ? (
+    <CheckCircle className={`${className} text-green-600`} aria-hidden="true" />
+  ) : (
+    <XCircle className={`${className} text-red-600`} aria-hidden="true" />
+  );
+}
+
+// 统计信息组件
+interface SyncStatsProps {
+  stats: SyncStatsData;
+  totalDuration: number;
+  selectedBrandsCount: number;
+}
+
+function SyncStats({ stats, totalDuration, selectedBrandsCount }: SyncStatsProps) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4" role="region" aria-label="同步统计信息">
+      <div className="text-center">
+        <div className="flex items-center justify-center gap-1 mb-1">
+          <Server className="h-4 w-4 text-blue-600" aria-hidden="true" />
+          <span className="text-sm font-medium">品牌数量</span>
+        </div>
+        <div className="text-2xl font-bold text-blue-600">{selectedBrandsCount}</div>
+      </div>
+
+      <div className="text-center">
+        <div className="flex items-center justify-center gap-1 mb-1">
+          <Database className="h-4 w-4 text-green-600" aria-hidden="true" />
+          <span className="text-sm font-medium">处理记录</span>
+        </div>
+        <div className="text-2xl font-bold text-green-600">{stats.totalProcessedRecords}</div>
+      </div>
+
+      <div className="text-center">
+        <div className="flex items-center justify-center gap-1 mb-1">
+          <CheckCircle className="h-4 w-4 text-purple-600" aria-hidden="true" />
+          <span className="text-sm font-medium">门店数量</span>
+        </div>
+        <div className="text-2xl font-bold text-purple-600">{stats.totalStoreCount}</div>
+      </div>
+
+      <div className="text-center">
+        <div className="flex items-center justify-center gap-1 mb-1">
+          <Clock className="h-4 w-4 text-orange-600" aria-hidden="true" />
+          <span className="text-sm font-medium">耗时</span>
+        </div>
+        <div className="text-2xl font-bold text-orange-600">
+          <time>{formatDuration(totalDuration)}</time>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 品牌状态列表组件
+interface BrandStatusListProps {
+  results: SyncResult[];
+}
+
+function BrandStatusList({ results }: BrandStatusListProps) {
+  return (
+    <div className="space-y-2" role="region" aria-label="各品牌同步状态">
+      <h4 className="font-medium text-sm">各品牌同步状态</h4>
+      <div className="space-y-2">
+        {results.map((result, index) => {
+          const styles = getStatusStyles(result.success);
+          return (
+            <div
+              key={`${result.brandName}-${index}`}
+              className={`flex items-center justify-between p-3 border rounded-lg ${styles.container}`}
+              role="listitem"
+            >
+              <div className="flex items-center gap-2">
+                <StatusIcon isSyncing={false} success={result.success} />
+                <span className="font-medium text-sm">{result.brandName}</span>
+              </div>
+
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">{result.processedRecords} 条记录</span>
+                <Badge
+                  variant={result.success ? "default" : "destructive"}
+                  className="text-xs text-white"
+                >
+                  {result.success ? "成功" : "失败"}
+                </Badge>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export const SyncProgress = ({ className }: SyncProgressProps = {}) => {
   const {
     isSyncing,
     currentStep,
@@ -27,42 +154,54 @@ export const SyncProgress = () => {
 
   const availableBrands = getAvailableBrands();
 
-  // 获取当前正在同步的品牌名称
-  const getCurrentBrandName = () => {
+  // 使用useMemo优化计算性能
+  const stats = useMemo((): SyncStatsData | null => {
+    if (!currentSyncResult) return null;
+
+    return {
+      totalProcessedRecords: currentSyncResult.results.reduce(
+        (sum, r) => sum + r.processedRecords,
+        0
+      ),
+      totalStoreCount: currentSyncResult.results.reduce((sum, r) => sum + r.storeCount, 0),
+      successCount: currentSyncResult.results.filter(r => r.success).length,
+      failedCount: currentSyncResult.results.filter(r => !r.success).length,
+    };
+  }, [currentSyncResult]);
+
+  // 获取当前品牌名称
+  const currentBrandName = useMemo(() => {
     if (currentOrganization === 0) return "";
     const brand = availableBrands.find(b => b.id === currentOrganization);
     return brand?.name || `组织 ${currentOrganization}`;
-  };
+  }, [currentOrganization, availableBrands]);
 
+  // 进度状态样式
+  const progressStyles = useMemo(
+    () => getProgressStatusStyles(isSyncing, currentSyncResult?.overallSuccess),
+    [isSyncing, currentSyncResult?.overallSuccess]
+  );
+
+  // 空状态处理
   if (!isSyncing && !currentSyncResult) {
     return null;
   }
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${className}`} role="region" aria-label="同步进度">
       {/* 总体进度 */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {isSyncing ? (
-              <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
-            ) : currentSyncResult?.overallSuccess ? (
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            ) : (
-              <XCircle className="h-4 w-4 text-red-600" />
-            )}
-            <span className="font-medium">
-              {isSyncing ? "同步进行中..." : "同步已完成"}
-            </span>
+            <StatusIcon isSyncing={isSyncing} success={currentSyncResult?.overallSuccess} />
+            <span className="font-medium">{isSyncing ? "同步进行中..." : "同步已完成"}</span>
           </div>
-          <Badge variant={isSyncing ? "default" : currentSyncResult?.overallSuccess ? "default" : "destructive"}>
-            {overallProgress}%
-          </Badge>
+          <Badge variant={progressStyles.badge}>{overallProgress}%</Badge>
         </div>
-        
-        <Progress value={overallProgress} className="w-full" />
-        
-        <div className="text-sm text-muted-foreground">
+
+        <Progress value={overallProgress} className="w-full" aria-label="总体进度" />
+
+        <div className="text-sm text-muted-foreground" role="status" aria-live="polite">
           {currentStep}
         </div>
       </div>
@@ -72,11 +211,11 @@ export const SyncProgress = () => {
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <Activity className="h-5 w-5 text-primary animate-pulse" />
+              <Activity className="h-5 w-5 text-primary animate-pulse" aria-hidden="true" />
               <div>
-                <div className="font-medium">正在同步: {getCurrentBrandName()}</div>
+                <div className="font-medium">正在同步: {currentBrandName}</div>
                 <div className="text-sm text-muted-foreground">
-                  组织ID: {currentOrganization}
+                  组织ID: <span className="font-mono">{currentOrganization}</span>
                 </div>
               </div>
             </div>
@@ -85,90 +224,17 @@ export const SyncProgress = () => {
       )}
 
       {/* 同步统计信息 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-1 mb-1">
-            <Server className="h-4 w-4 text-blue-600" />
-            <span className="text-sm font-medium">品牌数量</span>
-          </div>
-          <div className="text-2xl font-bold text-blue-600">
-            {selectedBrands.length}
-          </div>
-        </div>
-
-        {currentSyncResult && (
-          <>
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 mb-1">
-                <Database className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium">处理记录</span>
-              </div>
-              <div className="text-2xl font-bold text-green-600">
-                {currentSyncResult.results.reduce((sum, r) => sum + r.processedRecords, 0)}
-              </div>
-            </div>
-
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 mb-1">
-                <CheckCircle className="h-4 w-4 text-purple-600" />
-                <span className="text-sm font-medium">门店数量</span>
-              </div>
-              <div className="text-2xl font-bold text-purple-600">
-                {currentSyncResult.results.reduce((sum, r) => sum + r.storeCount, 0)}
-              </div>
-            </div>
-
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 mb-1">
-                <Clock className="h-4 w-4 text-orange-600" />
-                <span className="text-sm font-medium">耗时</span>
-              </div>
-              <div className="text-2xl font-bold text-orange-600">
-                {formatDuration(currentSyncResult.totalDuration)}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+      {stats && currentSyncResult && (
+        <SyncStats
+          stats={stats}
+          totalDuration={currentSyncResult.totalDuration}
+          selectedBrandsCount={selectedBrands.length}
+        />
+      )}
 
       {/* 品牌同步状态列表 */}
-      {currentSyncResult && (
-        <div className="space-y-2">
-          <h4 className="font-medium text-sm">各品牌同步状态</h4>
-          <div className="space-y-2">
-            {currentSyncResult.results.map((result, index) => (
-              <div
-                key={index}
-                className={`flex items-center justify-between p-3 border rounded-lg ${
-                  result.success 
-                    ? "border-green-200 bg-green-50" 
-                    : "border-red-200 bg-red-50"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {result.success ? (
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <XCircle className="h-4 w-4 text-red-600" />
-                  )}
-                  <span className="font-medium text-sm">{result.brandName}</span>
-                </div>
-                
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-muted-foreground">
-                    {result.processedRecords} 条记录
-                  </span>
-                  <Badge 
-                    variant={result.success ? "default" : "destructive"}
-                    className="text-xs"
-                  >
-                    {result.success ? "成功" : "失败"}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {currentSyncResult && currentSyncResult.results.length > 0 && (
+        <BrandStatusList results={currentSyncResult.results} />
       )}
     </div>
   );

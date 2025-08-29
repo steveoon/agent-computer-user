@@ -6,6 +6,18 @@ import { z } from "zod";
 // 注意：服务器端不使用 configService，数据保存逻辑在客户端处理
 
 /**
+ * 部分成功的响应接口
+ */
+export interface PartialSuccessResponse {
+  validPositions: DulidayRaw.Position[];
+  invalidPositions: Array<{
+    position: Partial<DulidayRaw.Position>;
+    error: string;
+  }>;
+  totalCount: number;
+}
+
+/**
  * Duliday API 端点配置
  */
 const DULIDAY_API_BASE = "https://k8s.duliday.com/persistence/a";
@@ -52,12 +64,13 @@ export class DulidaySyncService {
 
   /**
    * 从 Duliday API 获取岗位列表（带超时和重试机制）
+   * 支持部分成功策略：即使部分岗位数据校验失败，也返回成功的数据
    */
   async fetchJobList(
     organizationIds: number[],
     pageSize: number = 100,
     retryCount: number = 0
-  ): Promise<DulidayRaw.ListResponse> {
+  ): Promise<PartialSuccessResponse> {
     const requestBody = {
       organizationIds,
       pageNum: 0,
@@ -91,44 +104,65 @@ export class DulidaySyncService {
 
       const data = await response.json();
 
-      // 使用 Zod 验证响应数据格式
-      try {
-        return DulidayRaw.ListResponseSchema.parse(data);
-      } catch (validationError) {
-        console.error("API response validation failed:", validationError);
-        
-        // 尝试提取失败数据的上下文信息
-        if (validationError instanceof z.ZodError && data?.data?.result) {
-          const issues = validationError.issues;
-          const enrichedErrors: string[] = [];
-          
-          for (const issue of issues) {
-            // 从路径中提取数组索引（例如 data.result.0.xxx -> 索引 0）
-            const pathMatch = issue.path.join('.').match(/data\.result\.(\d+)/);
-            if (pathMatch) {
-              const index = parseInt(pathMatch[1], 10);
-              const failedItem = data.data.result[index];
-              
-              if (failedItem?.jobName) {
-                // 使用新的带上下文的格式化方法
-                const errorWithContext = DulidayErrorFormatter.formatValidationErrorWithContext(
-                  new z.ZodError([issue]),
-                  { jobName: failedItem.jobName, jobId: failedItem.jobId }
-                );
-                enrichedErrors.push(errorWithContext);
-              } else {
-                enrichedErrors.push(formatDulidayError(new z.ZodError([issue])));
-              }
-            } else {
-              enrichedErrors.push(formatDulidayError(new z.ZodError([issue])));
-            }
-          }
-          
-          throw new Error(enrichedErrors.join('\n\n'));
-        }
-        
-        throw new Error(formatDulidayError(validationError));
+      // 部分成功策略：逐个验证岗位数据
+      const validPositions: DulidayRaw.Position[] = [];
+      const invalidPositions: Array<{
+        position: Partial<DulidayRaw.Position>;
+        error: string;
+      }> = [];
+
+      // 首先验证整体响应结构
+      if (!data?.data?.result || !Array.isArray(data.data.result)) {
+        throw new Error("API响应格式不正确：缺少data.result数组");
       }
+
+      const totalCount = data.data.total || data.data.result.length;
+
+      // 逐个验证每个岗位
+      for (let index = 0; index < data.data.result.length; index++) {
+        const positionData = data.data.result[index];
+        
+        try {
+          // 尝试验证单个岗位数据
+          const validatedPosition = DulidayRaw.PositionSchema.parse(positionData);
+          validPositions.push(validatedPosition);
+        } catch (validationError) {
+          // 记录失败的岗位和错误信息
+          let errorMessage = "";
+          
+          if (validationError instanceof z.ZodError) {
+            // 使用带上下文的错误格式化
+            errorMessage = DulidayErrorFormatter.formatValidationErrorWithContext(
+              validationError,
+              { 
+                jobName: positionData?.jobName || `未知岗位_${index}`,
+                jobId: positionData?.jobId || `unknown_${index}`
+              }
+            );
+          } else {
+            errorMessage = formatDulidayError(validationError);
+          }
+
+          invalidPositions.push({
+            position: positionData || {},
+            error: errorMessage
+          });
+
+          console.warn(`岗位数据验证失败 (索引 ${index}):`, errorMessage);
+        }
+      }
+
+      // 如果没有任何有效的岗位，抛出错误
+      if (validPositions.length === 0 && invalidPositions.length > 0) {
+        const allErrors = invalidPositions.map(item => item.error).join('\n\n');
+        throw new Error(`所有岗位数据验证失败:\n${allErrors}`);
+      }
+
+      return {
+        validPositions,
+        invalidPositions,
+        totalCount
+      };
     } catch (error) {
       clearTimeout(timeoutId);
       
@@ -155,6 +189,7 @@ export class DulidaySyncService {
 
   /**
    * 同步单个组织的数据（仅获取和转换，不保存）
+   * 支持部分成功策略
    */
   async syncOrganization(
     organizationId: number,
@@ -169,30 +204,61 @@ export class DulidaySyncService {
         `正在从 Duliday API 获取组织 ${organizationId} 的数据...`
       );
 
-      // 获取数据
-      const dulidayResponse = await this.fetchJobList([organizationId]);
+      // 获取数据（支持部分成功）
+      const partialResponse = await this.fetchJobList([organizationId]);
+
+      const totalRecords = partialResponse.totalCount;
+      const validCount = partialResponse.validPositions.length;
+      const invalidCount = partialResponse.invalidPositions.length;
 
       onProgress?.(
         50,
-        `获取到 ${dulidayResponse.data.total} 条记录，正在转换数据格式...`
+        `获取到 ${totalRecords} 条记录，其中 ${validCount} 条有效，${invalidCount} 条失败，正在转换数据格式...`
       );
 
-      // 转换数据格式
-      const zhipinData = convertDulidayListToZhipinData(
-        dulidayResponse,
-        organizationId
-      );
+      // 收集失败岗位的错误信息
+      if (partialResponse.invalidPositions.length > 0) {
+        partialResponse.invalidPositions.forEach(item => {
+          errors.push(item.error);
+        });
+      }
+
+      // 只转换有效的数据
+      let zhipinData: Partial<ZhipinData> | undefined;
+      let storeCount = 0;
+
+      if (partialResponse.validPositions.length > 0) {
+        // 创建一个符合 ListResponse 格式的对象，只包含有效数据
+        const validListResponse: DulidayRaw.ListResponse = {
+          code: 200,
+          message: "success",
+          data: {
+            result: partialResponse.validPositions,
+            total: partialResponse.validPositions.length
+          }
+        };
+
+        zhipinData = convertDulidayListToZhipinData(
+          validListResponse,
+          organizationId
+        );
+        
+        storeCount = zhipinData.stores?.length || 0;
+      }
 
       onProgress?.(100, `数据转换完成！`);
 
       const duration = Date.now() - startTime;
-      const brandName = Object.keys(zhipinData.brands || {})[0] || "未知品牌";
+      const brandName = getBrandNameByOrgId(organizationId) || "未知品牌";
+
+      // 判断是否成功：有任何有效数据就算部分成功
+      const isSuccess = partialResponse.validPositions.length > 0;
 
       return {
-        success: true,
-        totalRecords: dulidayResponse.data.total,
-        processedRecords: dulidayResponse.data.result.length,
-        storeCount: zhipinData.stores?.length || 0,
+        success: isSuccess,
+        totalRecords,
+        processedRecords: validCount,
+        storeCount,
         brandName,
         errors,
         duration,

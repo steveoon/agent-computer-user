@@ -431,4 +431,540 @@ describe("品牌同步和导入功能测试", () => {
       expect(mappedBrands).not.toContain("自定义品牌");
     });
   });
+
+  describe("部分成功策略", () => {
+    it("应该跳过数据校验失败的岗位，继续同步其他岗位", async () => {
+      const existingBrandData: ZhipinData = {
+        city: "上海市",
+        defaultBrand: "肯德基",
+        brands: {
+          肯德基: {
+            templates: {
+              initial_inquiry: ["肯德基话术模板"],
+            } as any,
+            screening: {
+              age: { min: 18, max: 50, preferred: [25] },
+              blacklistKeywords: [],
+              preferredKeywords: [],
+            },
+          },
+        },
+        stores: [],
+      };
+
+      mockGetConfig.mockResolvedValue({
+        brandData: existingBrandData,
+        replyPrompts: {} as any,
+        systemPrompts: {} as any,
+        activeSystemPrompt: "bossZhipinSystemPrompt",
+        metadata: {
+          version: "1.0.0",
+          lastUpdated: new Date().toISOString(),
+        },
+      });
+      
+      mockGetBrandDataFn.mockResolvedValue(existingBrandData);
+
+      // 同步结果包含部分成功和失败的岗位
+      const syncResults: SyncResult[] = [
+        {
+          success: true, // 部分成功
+          totalRecords: 5, // 总共5个岗位
+          processedRecords: 3, // 成功处理3个
+          storeCount: 2,
+          brandName: "肯德基",
+          errors: [
+            "岗位 '服务员-早班' (ID: job_001): 字段 'workTimeArrangement.perDayMinWorkHours' 期望数字类型，但收到字符串",
+            "岗位 '收银员-晚班' (ID: job_003): 字段 'salary' 必须为正数",
+          ],
+          duration: 1500,
+          convertedData: {
+            city: "上海市",
+            defaultBrand: "肯德基",
+            brands: {
+              肯德基: {
+                templates: {} as any,
+                screening: {
+                  age: { min: 18, max: 60, preferred: [25, 30] },
+                  blacklistKeywords: [],
+                  preferredKeywords: [],
+                },
+              },
+            },
+            stores: [
+              {
+                id: "store_kfc_001",
+                name: "肯德基浦东店",
+                brand: "肯德基",
+                location: "上海市浦东新区",
+                district: "浦东新区",
+                subarea: "陆家嘴",
+                coordinates: { lat: 0, lng: 0 },
+                transportation: "地铁2号线",
+                positions: [
+                  {
+                    id: "pos_002",
+                    name: "服务员",
+                    timeSlots: ["09:00~14:00"],
+                    salary: { base: 25, memo: "" },
+                    workHours: "5",
+                    benefits: { items: ["餐饮"] },
+                    requirements: ["工作认真负责"],
+                    urgent: false,
+                    scheduleType: "flexible",
+                    attendancePolicy: {
+                      punctualityRequired: false,
+                      lateToleranceMinutes: 15,
+                      attendanceTracking: "flexible",
+                      makeupShiftsAllowed: true,
+                    },
+                    availableSlots: [
+                      {
+                        slot: "09:00~14:00",
+                        maxCapacity: 5,
+                        currentBooked: 2,
+                        isAvailable: true,
+                        priority: "medium",
+                      },
+                    ],
+                    schedulingFlexibility: {
+                      canSwapShifts: true,
+                      advanceNoticeHours: 24,
+                      partTimeAllowed: true,
+                      weekendRequired: false,
+                      holidayRequired: false,
+                    },
+                  },
+                ],
+              },
+              {
+                id: "store_kfc_002",
+                name: "肯德基徐汇店",
+                brand: "肯德基",
+                location: "上海市徐汇区",
+                district: "徐汇区",
+                subarea: "徐家汇",
+                coordinates: { lat: 0, lng: 0 },
+                transportation: "地铁1号线",
+                positions: [
+                  {
+                    id: "pos_004",
+                    name: "配送员",
+                    timeSlots: ["14:00~20:00"],
+                    salary: { base: 30, memo: "" },
+                    workHours: "6",
+                    benefits: { items: ["餐饮", "补贴"] },
+                    requirements: ["熟悉路线"],
+                    urgent: true,
+                    scheduleType: "fixed",
+                    attendancePolicy: {
+                      punctualityRequired: true,
+                      lateToleranceMinutes: 5,
+                      attendanceTracking: "strict",
+                      makeupShiftsAllowed: false,
+                    },
+                    availableSlots: [
+                      {
+                        slot: "14:00~20:00",
+                        maxCapacity: 3,
+                        currentBooked: 1,
+                        isAvailable: true,
+                        priority: "high",
+                      },
+                    ],
+                    schedulingFlexibility: {
+                      canSwapShifts: false,
+                      advanceNoticeHours: 48,
+                      partTimeAllowed: false,
+                      weekendRequired: true,
+                      holidayRequired: false,
+                    },
+                  },
+                  {
+                    id: "pos_005",
+                    name: "清洁员",
+                    timeSlots: ["06:00~10:00"],
+                    salary: { base: 22, memo: "" },
+                    workHours: "4",
+                    benefits: { items: ["餐饮"] },
+                    requirements: ["工作细心"],
+                    urgent: false,
+                    scheduleType: "flexible",
+                    attendancePolicy: {
+                      punctualityRequired: false,
+                      lateToleranceMinutes: 10,
+                      attendanceTracking: "flexible",
+                      makeupShiftsAllowed: true,
+                    },
+                    availableSlots: [
+                      {
+                        slot: "06:00~10:00",
+                        maxCapacity: 2,
+                        currentBooked: 0,
+                        isAvailable: true,
+                        priority: "low",
+                      },
+                    ],
+                    schedulingFlexibility: {
+                      canSwapShifts: true,
+                      advanceNoticeHours: 12,
+                      partTimeAllowed: true,
+                      weekendRequired: false,
+                      holidayRequired: false,
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ];
+
+      await mergeAndSaveSyncData(syncResults);
+
+      const updatedData = mockUpdateBrandData.mock.calls[0][0] as ZhipinData;
+
+      // 验证门店数据
+      expect(updatedData.stores).toHaveLength(2);
+      
+      // 验证岗位数据 - 只有3个成功的岗位被同步
+      const allPositions = updatedData.stores.flatMap((s: Store) => s.positions || []);
+      expect(allPositions).toHaveLength(3);
+      expect(allPositions.map(p => p.id)).toEqual(["pos_002", "pos_004", "pos_005"]);
+      
+      // 验证失败的岗位 job_001 和 job_003 没有被同步
+      expect(allPositions.find(p => p.id === "pos_001")).toBeUndefined();
+      expect(allPositions.find(p => p.id === "pos_003")).toBeUndefined();
+    });
+
+    it("应该正确报告错误信息，包含具体的岗位名称和错误原因", () => {
+      const syncResult: SyncResult = {
+        success: true, // 部分成功
+        totalRecords: 10,
+        processedRecords: 7,
+        storeCount: 3,
+        brandName: "必胜客",
+        errors: [
+          "岗位 '服务员-早班' (ID: job_101): 字段 'workTimeArrangement.combinedArrangementTimes[0].startTime' 期望数字类型，但收到 null",
+          "岗位 '经理-全天' (ID: job_102): 字段 'requirementNum' 必须大于0",
+          "岗位 '收银员' (ID: job_103): 字段 'storeAddress' 格式不正确，期望格式：'城市-区域-详细地址'",
+        ],
+        duration: 2000,
+      };
+
+      // 验证错误信息格式
+      expect(syncResult.errors).toHaveLength(3);
+      expect(syncResult.errors[0]).toContain("服务员-早班");
+      expect(syncResult.errors[0]).toContain("job_101");
+      expect(syncResult.errors[0]).toContain("workTimeArrangement.combinedArrangementTimes[0].startTime");
+      
+      expect(syncResult.errors[1]).toContain("经理-全天");
+      expect(syncResult.errors[1]).toContain("requirementNum");
+      
+      expect(syncResult.errors[2]).toContain("收银员");
+      expect(syncResult.errors[2]).toContain("storeAddress");
+
+      // 验证统计信息
+      expect(syncResult.totalRecords).toBe(10);
+      expect(syncResult.processedRecords).toBe(7);
+      expect(syncResult.success).toBe(true); // 部分成功仍然标记为成功
+    });
+
+    it("应该在再次同步时，成功同步之前失败的岗位（如果数据已修复）", async () => {
+      const existingBrandData: ZhipinData = {
+        city: "上海市",
+        defaultBrand: "肯德基",
+        brands: {
+          肯德基: {
+            templates: {
+              initial_inquiry: ["肯德基话术"],
+            } as any,
+            screening: {
+              age: { min: 18, max: 50, preferred: [25] },
+              blacklistKeywords: [],
+              preferredKeywords: [],
+            },
+          },
+        },
+        stores: [
+          {
+            id: "store_kfc_001",
+            name: "肯德基浦东店",
+            brand: "肯德基",
+            location: "上海市浦东新区",
+            district: "浦东新区",
+            subarea: "陆家嘴",
+            coordinates: { lat: 0, lng: 0 },
+            transportation: "地铁2号线",
+            positions: [
+              {
+                id: "pos_002",
+                name: "服务员",
+                timeSlots: ["09:00~14:00"],
+                salary: { base: 25, memo: "" },
+                workHours: "5",
+                benefits: { items: ["餐饮"] },
+                requirements: ["工作认真负责"],
+                urgent: false,
+                scheduleType: "flexible",
+                attendancePolicy: {
+                  punctualityRequired: false,
+                  lateToleranceMinutes: 15,
+                  attendanceTracking: "flexible",
+                  makeupShiftsAllowed: true,
+                },
+                availableSlots: [
+                  {
+                    slot: "09:00~14:00",
+                    maxCapacity: 5,
+                    currentBooked: 2,
+                    isAvailable: true,
+                    priority: "medium",
+                  },
+                ],
+                schedulingFlexibility: {
+                  canSwapShifts: true,
+                  advanceNoticeHours: 24,
+                  partTimeAllowed: true,
+                  weekendRequired: false,
+                  holidayRequired: false,
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      mockGetConfig.mockResolvedValue({
+        brandData: existingBrandData,
+        replyPrompts: {} as any,
+        systemPrompts: {} as any,
+        activeSystemPrompt: "bossZhipinSystemPrompt",
+        metadata: {
+          version: "1.0.0",
+          lastUpdated: new Date().toISOString(),
+        },
+      });
+      
+      mockGetBrandDataFn.mockResolvedValue(existingBrandData);
+
+      // 第二次同步，之前失败的岗位数据已修复
+      const syncResults: SyncResult[] = [
+        {
+          success: true,
+          totalRecords: 2,
+          processedRecords: 2, // 这次全部成功
+          storeCount: 1,
+          brandName: "肯德基",
+          errors: [], // 没有错误
+          duration: 1000,
+          convertedData: {
+            city: "上海市",
+            defaultBrand: "肯德基",
+            brands: {
+              肯德基: {
+                templates: {} as any,
+                screening: {
+                  age: { min: 18, max: 60, preferred: [25, 30] },
+                  blacklistKeywords: [],
+                  preferredKeywords: [],
+                },
+              },
+            },
+            stores: [
+              {
+                id: "store_kfc_001",
+                name: "肯德基浦东店",
+                brand: "肯德基",
+                location: "上海市浦东新区",
+                district: "浦东新区",
+                subarea: "陆家嘴",
+                coordinates: { lat: 0, lng: 0 },
+                transportation: "地铁2号线",
+                positions: [
+                  {
+                    id: "pos_001", // 之前失败的岗位
+                    name: "服务员-早班",
+                    timeSlots: ["06:00~12:00"],
+                    salary: { base: 26, memo: "" },
+                    workHours: "6",
+                    benefits: { items: ["餐饮", "早餐"] },
+                    requirements: ["早起", "准时"],
+                    urgent: true,
+                    scheduleType: "fixed",
+                    attendancePolicy: {
+                      punctualityRequired: true,
+                      lateToleranceMinutes: 5,
+                      attendanceTracking: "strict",
+                      makeupShiftsAllowed: false,
+                    },
+                    availableSlots: [
+                      {
+                        slot: "06:00~12:00",
+                        maxCapacity: 4,
+                        currentBooked: 1,
+                        isAvailable: true,
+                        priority: "high",
+                      },
+                    ],
+                    schedulingFlexibility: {
+                      canSwapShifts: false,
+                      advanceNoticeHours: 24,
+                      partTimeAllowed: false,
+                      weekendRequired: true,
+                      holidayRequired: false,
+                    },
+                  },
+                  {
+                    id: "pos_003", // 之前失败的岗位
+                    name: "收银员-晚班",
+                    timeSlots: ["18:00~23:00"],
+                    salary: { base: 28, memo: "" },
+                    workHours: "5",
+                    benefits: { items: ["餐饮", "夜班补贴"] },
+                    requirements: ["细心", "数学好"],
+                    urgent: false,
+                    scheduleType: "fixed",
+                    attendancePolicy: {
+                      punctualityRequired: true,
+                      lateToleranceMinutes: 5,
+                      attendanceTracking: "strict",
+                      makeupShiftsAllowed: false,
+                    },
+                    availableSlots: [
+                      {
+                        slot: "18:00~23:00",
+                        maxCapacity: 2,
+                        currentBooked: 0,
+                        isAvailable: true,
+                        priority: "medium",
+                      },
+                    ],
+                    schedulingFlexibility: {
+                      canSwapShifts: false,
+                      advanceNoticeHours: 12,
+                      partTimeAllowed: false,
+                      weekendRequired: true,
+                      holidayRequired: false,
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ];
+
+      await mergeAndSaveSyncData(syncResults);
+
+      const updatedData = mockUpdateBrandData.mock.calls[0][0] as ZhipinData;
+
+      // 验证之前失败的岗位现在被成功同步
+      const allPositions = updatedData.stores.flatMap((s: Store) => s.positions || []);
+      
+      // 应该有3个岗位：1个原有的 + 2个新同步的
+      expect(allPositions.find(p => p.id === "pos_001")).toBeDefined();
+      expect(allPositions.find(p => p.id === "pos_003")).toBeDefined();
+      
+      // 验证岗位详情
+      const pos001 = allPositions.find(p => p.id === "pos_001");
+      expect(pos001?.name).toBe("服务员-早班");
+      expect(pos001?.salary.base).toBe(26);
+      
+      const pos003 = allPositions.find(p => p.id === "pos_003");
+      expect(pos003?.name).toBe("收银员-晚班");
+      expect(pos003?.salary.base).toBe(28);
+    });
+
+    it("应该正确处理完全失败的场景（所有岗位都校验失败）", async () => {
+      const existingBrandData: ZhipinData = {
+        city: "上海市",
+        defaultBrand: "必胜客",
+        brands: {
+          必胜客: {
+            templates: {
+              initial_inquiry: ["必胜客话术"],
+            } as any,
+            screening: {
+              age: { min: 18, max: 50, preferred: [25] },
+              blacklistKeywords: [],
+              preferredKeywords: [],
+            },
+          },
+        },
+        stores: [
+          {
+            id: "store_pizza_001",
+            name: "必胜客徐汇店",
+            brand: "必胜客",
+            location: "上海市徐汇区",
+            district: "徐汇区",
+            subarea: "徐家汇",
+            coordinates: { lat: 0, lng: 0 },
+            transportation: "地铁1号线",
+            positions: [],
+          },
+        ],
+      };
+
+      mockGetConfig.mockResolvedValue({
+        brandData: existingBrandData,
+        replyPrompts: {} as any,
+        systemPrompts: {} as any,
+        activeSystemPrompt: "bossZhipinSystemPrompt",
+        metadata: {
+          version: "1.0.0",
+          lastUpdated: new Date().toISOString(),
+        },
+      });
+      
+      mockGetBrandDataFn.mockResolvedValue(existingBrandData);
+
+      // 同步结果 - 所有岗位都失败
+      const syncResults: SyncResult[] = [
+        {
+          success: false, // 完全失败
+          totalRecords: 3,
+          processedRecords: 0, // 没有成功处理的
+          storeCount: 0,
+          brandName: "必胜客",
+          errors: [
+            "岗位 '服务员' (ID: job_201): 必填字段 'jobName' 缺失",
+            "岗位 '经理' (ID: job_202): 必填字段 'storeId' 缺失",
+            "岗位 '清洁员' (ID: job_203): 数据结构完全不符合预期格式",
+          ],
+          duration: 500,
+        },
+      ];
+
+      await mergeAndSaveSyncData(syncResults);
+
+      // 验证原有数据保持不变
+      expect(mockUpdateBrandData).not.toHaveBeenCalled();
+    });
+
+    it("应该正确统计和报告部分成功的统计信息", () => {
+      const syncResult: SyncResult = {
+        success: true,
+        totalRecords: 100,
+        processedRecords: 85,
+        storeCount: 10,
+        brandName: "肯德基",
+        errors: Array(15).fill("").map((_, i) => `岗位错误 ${i + 1}`),
+        duration: 5000,
+      };
+
+      // 计算成功率
+      const successRate = (syncResult.processedRecords / syncResult.totalRecords) * 100;
+      expect(successRate).toBe(85);
+
+      // 验证失败数量
+      const failedCount = syncResult.totalRecords - syncResult.processedRecords;
+      expect(failedCount).toBe(15);
+      expect(syncResult.errors).toHaveLength(15);
+
+      // 验证部分成功仍标记为成功
+      expect(syncResult.success).toBe(true);
+    });
+  });
 });

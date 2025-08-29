@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -14,14 +13,15 @@ import {
   Clock,
   Database,
   TrendingUp,
-  AlertTriangle,
+  Store,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useSyncStore, formatDuration, getSyncStatusText } from "@/lib/stores/sync-store";
+import { useSyncStore, formatDuration } from "@/lib/stores/sync-store";
 import { BrandSelector } from "@/components/admin/sync/brand-selector";
 import { SyncProgress } from "@/components/admin/sync/sync-progress";
 import { SyncHistory } from "@/components/admin/sync/sync-history";
-import { SyncErrorDisplay, SyncErrorList } from "@/components/sync/sync-error-display";
+import { SyncErrorDisplay } from "@/components/sync/sync-error-display";
+import { BrandSyncResultCard } from "@/components/admin/sync/brand-sync-result-card";
 
 export default function SyncPage() {
   const router = useRouter();
@@ -126,84 +126,77 @@ export default function SyncPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {currentSyncResult.results.length}
+                {/* 总体统计 - 使用 shadcn/ui 配色 */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div className="relative p-3 bg-slate-50 dark:bg-slate-900/20 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <Database className="absolute top-3 left-3 h-4 w-4 text-slate-500 dark:text-slate-400" />
+                    <div className="ml-6">
+                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                        {currentSyncResult.results.length}
+                      </div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400">品牌</div>
                     </div>
-                    <div className="text-sm text-muted-foreground">品牌数量</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {currentSyncResult.results.reduce((sum, r) => sum + r.processedRecords, 0)}
+                  
+                  <div className="relative p-3 bg-violet-50 dark:bg-violet-900/20 rounded-lg border border-violet-200 dark:border-violet-800">
+                    <Store className="absolute top-3 left-3 h-4 w-4 text-violet-500 dark:text-violet-400" />
+                    <div className="ml-6">
+                      <div className="text-2xl font-bold text-violet-900 dark:text-violet-100">
+                        {currentSyncResult.results.reduce((sum, r) => sum + r.storeCount, 0)}
+                      </div>
+                      <div className="text-xs text-violet-600 dark:text-violet-400">门店</div>
                     </div>
-                    <div className="text-sm text-muted-foreground">处理记录</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {currentSyncResult.results.reduce((sum, r) => sum + r.storeCount, 0)}
+                  
+                  <div className="relative p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                    <CheckCircle className="absolute top-3 left-3 h-4 w-4 text-emerald-500 dark:text-emerald-400" />
+                    <div className="ml-6">
+                      <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">
+                        {currentSyncResult.results.reduce((sum, r) => sum + r.processedRecords, 0)}
+                      </div>
+                      <div className="text-xs text-emerald-600 dark:text-emerald-400">成功岗位</div>
                     </div>
-                    <div className="text-sm text-muted-foreground">门店数量</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">
-                      {formatDuration(currentSyncResult.totalDuration)}
+                  
+                  <div className="relative p-3 bg-rose-50 dark:bg-rose-900/20 rounded-lg border border-rose-200 dark:border-rose-800">
+                    <XCircle className="absolute top-3 left-3 h-4 w-4 text-rose-500 dark:text-rose-400" />
+                    <div className="ml-6">
+                      <div className="text-2xl font-bold text-rose-900 dark:text-rose-100">
+                        {currentSyncResult.results.reduce((sum, r) => sum + (r.totalRecords - r.processedRecords), 0)}
+                      </div>
+                      <div className="text-xs text-rose-600 dark:text-rose-400">失败岗位</div>
                     </div>
-                    <div className="text-sm text-muted-foreground">总耗时</div>
+                  </div>
+                  
+                  <div className="relative p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <Clock className="absolute top-3 left-3 h-4 w-4 text-amber-500 dark:text-amber-400" />
+                    <div className="ml-6">
+                      <div className="text-2xl font-bold text-amber-900 dark:text-amber-100">
+                        {formatDuration(currentSyncResult.totalDuration)}
+                      </div>
+                      <div className="text-xs text-amber-600 dark:text-amber-400">总耗时</div>
+                    </div>
                   </div>
                 </div>
 
                 <Separator />
 
+                {/* 使用新的品牌同步结果卡片组件 */}
                 <div className="space-y-3">
-                  <h4 className="font-medium">各品牌同步状态</h4>
-                  {currentSyncResult.results.map((result, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 border rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        {result.success ? (
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <XCircle className="h-5 w-5 text-red-600" />
-                        )}
-                        <div>
-                          <div className="font-medium">{result.brandName}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {result.processedRecords} 条记录，{result.storeCount} 家门店
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <Badge variant={result.success ? "default" : "destructive"}>
-                          {getSyncStatusText(result.success)}
-                        </Badge>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {formatDuration(result.duration)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* 错误信息 */}
-                {currentSyncResult.results.some(r => r.errors.length > 0) && (
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-red-600 flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4" />
-                      错误详情
-                    </h4>
-                    {currentSyncResult.results
-                      .filter(r => r.errors.length > 0)
-                      .map((result, index) => (
-                        <div key={index} className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                          <div className="font-medium text-red-900">{result.brandName}</div>
-                          <SyncErrorList errors={result.errors} />
-                        </div>
-                      ))}
+                  <h4 className="font-medium flex items-center gap-2">
+                    <Database className="h-4 w-4" />
+                    各品牌同步详情
+                  </h4>
+                  <div className="space-y-3">
+                    {currentSyncResult.results.map((result, index) => (
+                      <BrandSyncResultCard 
+                        key={index} 
+                        result={result} 
+                        index={index}
+                      />
+                    ))}
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           )}
