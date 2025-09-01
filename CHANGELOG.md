@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.6.0](https://github.com/steveoon/agent-computer-user/compare/v1.5.0...v1.6.0) (2025-09-01)
+
+
+### Features
+
+* 实现部分成功同步策略及优化同步结果 UI ([bec4095](https://github.com/steveoon/agent-computer-user/commit/bec40953df7948a14af3fb0a007fb8d80afd2b57))
+
 # [1.6.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.5.0...v1.6.0-develop.1) (2025-09-01)
 
 
