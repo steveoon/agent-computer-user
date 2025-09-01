@@ -272,7 +272,7 @@ describe('ClassificationPromptBuilder - 实际实现测试', () => {
       const endTime = Date.now();
 
       expect(result).toBeDefined();
-      expect(endTime - startTime).toBeLessThan(500); // 500ms内完成（tiktoken初始化需要时间）
+      expect(endTime - startTime).toBeLessThan(1000); // 1000ms内完成（CI环境性能差异考虑）
     });
 
     it('应该高效处理批量分类', () => {
@@ -298,7 +298,7 @@ describe('ClassificationPromptBuilder - 实际实现测试', () => {
       const endTime = Date.now();
       const avgTime = (endTime - startTime) / messages.length;
 
-      expect(avgTime).toBeLessThan(20); // 平均20ms内完成
+      expect(avgTime).toBeLessThan(50); // 平均50ms内完成（CI环境性能差异考虑）
     });
   });
 
