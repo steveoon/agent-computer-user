@@ -529,7 +529,7 @@ export const dulidayBiReportTool = () =>
         .describe(`返回记录数量，默认${LIMITS.DEFAULT_LIMIT}条，最大${LIMITS.MAX_LIMIT}条`),
       offset: z.number().optional().default(0).describe("分页偏移量，默认0"),
       orderStatus: z
-        .enum(["待接受", "进行中", "已完成", "已取消"])
+        .enum(["待接受", "待验收", "进行中", "已拒绝", "已取消", "已验收"])
         .optional()
         .describe("订单状态筛选"),
       storeName: z.string().optional().describe("门店名称关键词，用于筛选特定门店"),
