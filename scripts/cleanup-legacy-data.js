@@ -1,7 +1,7 @@
 /**
  * 清理旧版数据的脚本
  * 在浏览器控制台中执行以清理废弃的字段
- * 
+ *
  * 使用方法：
  * 1. 打开应用网页
  * 2. 打开浏览器开发者工具（F12）
@@ -10,12 +10,12 @@
  */
 
 (async function cleanupLegacyData() {
-  console.log('🧹 开始清理旧版数据...');
-  
+  console.log("🧹 开始清理旧版数据...");
+
   try {
     // 确保 localforage 可用
-    if (typeof localforage === 'undefined') {
-      console.error('❌ localforage 未找到，请确保在应用页面中执行此脚本');
+    if (typeof localforage === "undefined") {
+      console.error("❌ localforage 未找到，请确保在应用页面中执行此脚本");
       return;
     }
 
@@ -27,42 +27,42 @@
     });
 
     // 获取当前配置
-    const config = await configStorage.getItem('APP_CONFIG_DATA');
-    
+    const config = await configStorage.getItem("APP_CONFIG_DATA");
+
     if (!config) {
-      console.log('ℹ️ 未找到配置数据，无需清理');
+      console.log("ℹ️ 未找到配置数据，无需清理");
       return;
     }
 
-    console.log('📊 当前配置版本:', config.metadata?.version || '未知');
-    
+    console.log("📊 当前配置版本:", config.metadata?.version || "未知");
+
     let hasChanges = false;
 
     // 清理 brandData 中的顶层 templates 和 screening
     if (config.brandData) {
-      if ('templates' in config.brandData) {
+      if ("templates" in config.brandData) {
         delete config.brandData.templates;
-        console.log('✅ 已移除 brandData.templates');
+        console.log("✅ 已移除 brandData.templates");
         hasChanges = true;
       }
-      
-      if ('screening' in config.brandData) {
+
+      if ("screening" in config.brandData) {
         delete config.brandData.screening;
-        console.log('✅ 已移除 brandData.screening');
+        console.log("✅ 已移除 brandData.screening");
         hasChanges = true;
       }
     }
 
     // 清理 replyPrompts 中的 location_match
-    if (config.replyPrompts && 'location_match' in config.replyPrompts) {
+    if (config.replyPrompts && "location_match" in config.replyPrompts) {
       // 如果 location_inquiry 不存在，迁移数据
       if (!config.replyPrompts.location_inquiry) {
         config.replyPrompts.location_inquiry = config.replyPrompts.location_match;
-        console.log('✅ 已将 location_match 内容迁移到 location_inquiry');
+        console.log("✅ 已将 location_match 内容迁移到 location_inquiry");
       }
-      
+
       delete config.replyPrompts.location_match;
-      console.log('✅ 已移除 replyPrompts.location_match');
+      console.log("✅ 已移除 replyPrompts.location_match");
       hasChanges = true;
     }
 
@@ -71,32 +71,31 @@
       // 更新版本号和时间戳
       config.metadata = {
         ...config.metadata,
-        version: '1.1.2',
+        version: "1.1.2",
         lastUpdated: new Date().toISOString(),
-        cleanedAt: new Date().toISOString()
+        cleanedAt: new Date().toISOString(),
       };
 
-      await configStorage.setItem('APP_CONFIG_DATA', config);
-      console.log('✅ 配置已更新并保存');
-      console.log('📊 新版本:', config.metadata.version);
-      
-      // 显示清理统计
-      console.log('\n📈 清理完成统计:');
-      console.log('- 品牌数量:', Object.keys(config.brandData.brands).length);
-      console.log('- 门店数量:', config.brandData.stores.length);
-      console.log('- 回复指令数量:', Object.keys(config.replyPrompts).length);
-      console.log('- 系统提示词数量:', Object.keys(config.systemPrompts).length);
-      
-      console.log('\n🎉 数据清理完成！请刷新页面以应用更改。');
-    } else {
-      console.log('✅ 数据已是最新，无需清理');
-    }
+      await configStorage.setItem("APP_CONFIG_DATA", config);
+      console.log("✅ 配置已更新并保存");
+      console.log("📊 新版本:", config.metadata.version);
 
+      // 显示清理统计
+      console.log("\n📈 清理完成统计:");
+      console.log("- 品牌数量:", Object.keys(config.brandData.brands).length);
+      console.log("- 门店数量:", config.brandData.stores.length);
+      console.log("- 回复指令数量:", Object.keys(config.replyPrompts).length);
+      console.log("- 系统提示词数量:", Object.keys(config.systemPrompts).length);
+
+      console.log("\n🎉 数据清理完成！请刷新页面以应用更改。");
+    } else {
+      console.log("✅ 数据已是最新，无需清理");
+    }
   } catch (error) {
-    console.error('❌ 清理过程中出错:', error);
-    console.error('错误详情:', {
+    console.error("❌ 清理过程中出错:", error);
+    console.error("错误详情:", {
       message: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
   }
 })();

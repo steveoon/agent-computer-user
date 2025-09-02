@@ -14,10 +14,5 @@
     "components/__tests__/**/*",
     "app/**/__tests__/**/*"
   ],
-  "exclude": [
-    "node_modules",
-    ".next",
-    "dist",
-    "coverage"
-  ]
+  "exclude": ["node_modules", ".next", "dist", "coverage"]
 }

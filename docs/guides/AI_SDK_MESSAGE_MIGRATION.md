@@ -9,28 +9,31 @@
 ### 1. 消息结构变化
 
 **旧版本 (ai 包)**：
+
 ```typescript
 interface Message {
   id: string;
-  role: 'user' | 'assistant' | 'system';
+  role: "user" | "assistant" | "system";
   content: string | Array<TextPart | ToolCallPart>;
 }
 ```
 
 **新版本 (@ai-sdk/react 包)**：
+
 ```typescript
 interface Message {
   id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;  // 始终是字符串
-  parts?: Array<{    // 新增 parts 数组
-    type: 'text' | 'tool-invocation' | 'step-start';
+  role: "user" | "assistant" | "system";
+  content: string; // 始终是字符串
+  parts?: Array<{
+    // 新增 parts 数组
+    type: "text" | "tool-invocation" | "step-start";
     text?: string;
     toolInvocation?: {
       toolName: string;
       toolCallId: string;
       args: any;
-      state: 'call' | 'result' | 'partial-call';
+      state: "call" | "result" | "partial-call";
       result?: any;
     };
   }>;
@@ -79,7 +82,7 @@ export function MessagePartsAdapter({ message }: Props) {
   if (typeof message.content === "string") {
     return <Markdown>{message.content}</Markdown>;
   }
-  
+
   // 再检查 content 数组（永远不会执行到这里）
   if (Array.isArray(message.content)) {
     // 渲染工具组件...
@@ -88,6 +91,7 @@ export function MessagePartsAdapter({ message }: Props) {
 ```
 
 问题在于：
+
 1. 在新版本中，`message.content` **始终是字符串**
 2. 工具调用信息存储在 `message.parts` 数组中
 3. 代码优先检查 `content` 类型，导致永远无法处理 `parts`
@@ -99,7 +103,7 @@ export function MessagePartsAdapter({ message }: Props) {
 export function MessagePartsAdapter({ message }: Props) {
   // 优先检查 parts 数组
   const parts = (message as any).parts;
-  
+
   if (parts && Array.isArray(parts) && parts.length > 0) {
     return (
       <div className="w-full">
@@ -107,7 +111,7 @@ export function MessagePartsAdapter({ message }: Props) {
           if (part.type === "text") {
             return <Markdown key={i}>{part.text}</Markdown>;
           }
-          
+
           if (part.type === "tool-invocation" && part.toolInvocation) {
             const { toolName, args, state, result } = part.toolInvocation;
             // 渲染工具组件
@@ -116,18 +120,18 @@ export function MessagePartsAdapter({ message }: Props) {
               return <ToolComponent key={i} {...props} />;
             }
           }
-          
+
           return null;
         })}
       </div>
     );
   }
-  
+
   // 回退到字符串内容
   if (typeof message.content === "string") {
     return <Markdown>{message.content}</Markdown>;
   }
-  
+
   return null;
 }
 ```
@@ -135,10 +139,11 @@ export function MessagePartsAdapter({ message }: Props) {
 ## 迁移要点
 
 1. **更新导入**：
+
    ```typescript
    // 旧
    import type { Message } from "ai";
-   
+
    // 新
    import type { Message } from "@ai-sdk/react";
    ```
@@ -156,14 +161,16 @@ export function MessagePartsAdapter({ message }: Props) {
 ## 调试技巧
 
 1. **检查消息结构**：
+
    ```typescript
-   console.log('message:', message);
-   console.log('parts:', (message as any).parts);
+   console.log("message:", message);
+   console.log("parts:", (message as any).parts);
    ```
 
 2. **验证工具注册**：
+
    ```typescript
-   console.log('Tool registry:', Object.keys(toolRegistry));
+   console.log("Tool registry:", Object.keys(toolRegistry));
    ```
 
 3. **追踪渲染流程**：

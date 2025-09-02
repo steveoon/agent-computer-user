@@ -43,7 +43,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     category: "sandbox",
     requiresSandbox: true,
     requiredContext: ["sandboxId"],
-    create: (ctx) => {
+    create: ctx => {
       // 只有当 sandboxId 存在时才创建
       if (!ctx.sandboxId) return null;
       return computerTool(
@@ -62,7 +62,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     description: "Bash命令执行工具",
     category: "universal",
     requiresSandbox: false,
-    create: (ctx) => bashTool(ctx.sandboxId || undefined),
+    create: ctx => bashTool(ctx.sandboxId || undefined),
   }),
 
   // ===== 通信工具 =====
@@ -88,7 +88,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     description: "职位发布生成器",
     category: "business",
     requiresSandbox: false,
-    create: (ctx) => jobPostingGeneratorTool(ctx.preferredBrand, ctx.configData),
+    create: ctx => jobPostingGeneratorTool(ctx.preferredBrand, ctx.configData),
   },
 
   zhipin_reply_generator: {
@@ -96,12 +96,13 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     description: "智聘智能回复生成器",
     category: "business",
     requiresSandbox: false,
-    create: (ctx) => zhipinReplyTool(
-      ctx.preferredBrand,
-      ctx.modelConfig || DEFAULT_MODEL_CONFIG,
-      ctx.configData,
-      ctx.replyPrompts
-    ),
+    create: ctx =>
+      zhipinReplyTool(
+        ctx.preferredBrand,
+        ctx.modelConfig || DEFAULT_MODEL_CONFIG,
+        ctx.configData,
+        ctx.replyPrompts
+      ),
   },
 
   // ===== 自动化工具 =====
@@ -249,7 +250,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     description: "Duliday职位列表",
     category: "business",
     requiresSandbox: false,
-    create: (ctx) => dulidayJobListTool(ctx.dulidayToken, ctx.preferredBrand),
+    create: ctx => dulidayJobListTool(ctx.dulidayToken, ctx.preferredBrand),
   },
 
   duliday_job_details: {
@@ -257,7 +258,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     description: "Duliday职位详情",
     category: "business",
     requiresSandbox: false,
-    create: (ctx) => dulidayJobDetailsTool(ctx.dulidayToken),
+    create: ctx => dulidayJobDetailsTool(ctx.dulidayToken),
   },
 
   duliday_interview_booking: {
@@ -265,7 +266,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     description: "Duliday面试预约",
     category: "business",
     requiresSandbox: false,
-    create: (ctx) => dulidayInterviewBookingTool(ctx.dulidayToken),
+    create: ctx => dulidayInterviewBookingTool(ctx.dulidayToken),
   },
 
   duliday_bi_report: {
@@ -294,11 +295,13 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
   // Boss直聘E2B版 - 使用E2B桌面自动化
   bossZhipinSystemPrompt: [
     // 通用工具
-    "bash", "feishu", "wechat",
+    "bash",
+    "feishu",
+    "wechat",
     // 沙盒工具
     "computer",
     // 业务工具
-    "job_posting_generator", 
+    "job_posting_generator",
     "zhipin_reply_generator",
     "duliday_job_list",
     "duliday_job_details",
@@ -306,15 +309,17 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "duliday_bi_report",
     "duliday_bi_refresh",
   ],
-  
+
   // Boss直聘本地版 - 使用Puppeteer自动化
   bossZhipinLocalSystemPrompt: [
     // 通用工具
-    "bash", "feishu", "wechat",
+    "bash",
+    "feishu",
+    "wechat",
     // 自动化工具
     "puppeteer",
     // 业务工具
-    "job_posting_generator", 
+    "job_posting_generator",
     "zhipin_reply_generator",
     "duliday_job_list",
     "duliday_job_details",
@@ -340,11 +345,13 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "yupao_get_candidate_list",
     "yupao_say_hello",
   ],
-  
+
   // 通用计算机使用 - 包含E2B和Puppeteer，但不包含Boss直聘业务工具
   generalComputerSystemPrompt: [
     // 通用工具
-    "bash", "feishu", "wechat",
+    "bash",
+    "feishu",
+    "wechat",
     // 沙盒工具
     "computer",
     // 自动化工具
@@ -360,7 +367,7 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
  */
 export function createTools(context: ToolCreationContext): ToolSet {
   const tools: ToolSet = {};
-  
+
   // 遍历注册表，创建所有工具
   for (const [toolName, definition] of Object.entries(TOOL_REGISTRY)) {
     // 使用类型安全的创建包装器
@@ -369,7 +376,7 @@ export function createTools(context: ToolCreationContext): ToolSet {
       tools[toolName] = tool;
     }
   }
-  
+
   console.log(`🔧 创建了 ${Object.keys(tools).length} 个工具`);
   return tools;
 }
@@ -383,22 +390,22 @@ export function filterToolsBySystemPrompt(
 ): ToolSet {
   // 获取允许的工具列表
   const allowedTools = PROMPT_TOOL_MAPPING[activeSystemPrompt];
-  
+
   // 如果没有找到对应的映射，返回所有工具（兼容性处理）
   if (!allowedTools) {
     console.warn(`⚠️ 未找到系统提示词 "${activeSystemPrompt}" 的工具映射，返回所有工具`);
     return allTools;
   }
-  
+
   // 过滤工具
   const filteredTools: ToolSet = {};
-  
+
   for (const [toolName, tool] of Object.entries(allTools)) {
     if (allowedTools.includes(toolName)) {
       filteredTools[toolName] = tool;
     }
   }
-  
+
   // 记录过滤结果
   const originalCount = Object.keys(allTools).length;
   const filteredCount = Object.keys(filteredTools).length;
@@ -406,7 +413,7 @@ export function filterToolsBySystemPrompt(
     `🔧 工具过滤: ${activeSystemPrompt} - 从 ${originalCount} 个工具过滤为 ${filteredCount} 个工具`
   );
   console.log(`✅ 可用工具: ${Object.keys(filteredTools).join(", ")}`);
-  
+
   return filteredTools;
 }
 
@@ -452,10 +459,7 @@ export function getSandboxRequiredTools(): string[] {
 /**
  * 检查某个工具是否在指定提示词下可用
  */
-export function isToolAllowed(
-  toolName: string,
-  activeSystemPrompt: SystemPromptType
-): boolean {
+export function isToolAllowed(toolName: string, activeSystemPrompt: SystemPromptType): boolean {
   const allowedTools = PROMPT_TOOL_MAPPING[activeSystemPrompt];
   return allowedTools ? allowedTools.includes(toolName) : true;
 }

@@ -1,12 +1,12 @@
 "use client";
 
-import { 
-  Users, 
-  UserCheck, 
-  ListChecks, 
+import {
+  Users,
+  UserCheck,
+  ListChecks,
   ClipboardList,
   HandshakeIcon,
-  type LucideIcon 
+  type LucideIcon,
 } from "lucide-react";
 import { BaseToolMessage } from "./base-tool-message";
 import { themes, type ToolMessageProps } from "./types";
@@ -62,7 +62,7 @@ export function ZhipinToolMessage(props: ToolMessageProps) {
   } else if (toolName === "zhipin_get_candidate_list") {
     const maxResults = input.maxResults as number | undefined;
     const includeNoGreetButton = input.includeNoGreetButton as boolean | undefined;
-    
+
     const details: string[] = [];
     if (maxResults) details.push(`最多${maxResults}个`);
     if (includeNoGreetButton) details.push("包含已联系");
@@ -70,7 +70,7 @@ export function ZhipinToolMessage(props: ToolMessageProps) {
   } else if (toolName === "zhipin_say_hello") {
     const candidateIndices = input.candidateIndices as number[] | undefined;
     const scrollBehavior = input.scrollBehavior as boolean | undefined;
-    
+
     const details: string[] = [];
     if (candidateIndices?.length) {
       details.push(`${candidateIndices.length}个候选人`);
@@ -78,7 +78,7 @@ export function ZhipinToolMessage(props: ToolMessageProps) {
     if (scrollBehavior === false) details.push("禁用滚动");
     detail = details.join(" · ");
   }
-  
+
   // 对于输出，更新detail以包含结果信息
   if (state === "output-available" && output) {
     const result = output as {
@@ -92,7 +92,7 @@ export function ZhipinToolMessage(props: ToolMessageProps) {
         };
       };
     };
-    
+
     if (toolName === "zhipin_get_candidate_list" && result.data?.candidates) {
       const candidates = result.data.candidates;
       detail = `找到 ${candidates.length} 个候选人`;

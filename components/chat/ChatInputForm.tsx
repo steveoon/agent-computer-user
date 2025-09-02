@@ -22,7 +22,7 @@ interface ChatInputFormProps {
 
 interface TemplateState {
   template: string;
-  editableFields?: PromptSuggestion['editableFields'];
+  editableFields?: PromptSuggestion["editableFields"];
 }
 
 export function ChatInputForm({
@@ -39,7 +39,7 @@ export function ChatInputForm({
 }: ChatInputFormProps) {
   const { addToHistory } = useInputHistoryStore();
   const [templateState, setTemplateState] = useState<TemplateState | null>(null);
-  
+
   const handlePromptClick = (suggestion: PromptSuggestion) => {
     if (!isAuthenticated) {
       toast.error("请先登录", {
@@ -89,13 +89,16 @@ export function ChatInputForm({
           />
         )}
 
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          if (input.trim()) {
-            addToHistory(input);
-          }
-          handleSubmit(e);
-        }} className="p-4">
+        <form
+          onSubmit={e => {
+            e.preventDefault();
+            if (input.trim()) {
+              addToHistory(input);
+            }
+            handleSubmit(e);
+          }}
+          className="p-4"
+        >
           <Input
             handleInputChange={handleInputChange}
             input={input}

@@ -2,7 +2,11 @@ import { tool } from "ai";
 import { z } from "zod";
 import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
 import { YUPAO_EXCHANGE_WECHAT_SELECTORS } from "./constants";
-import { wrapAntiDetectionScript, randomDelay, clickWithMouseTrajectory } from "../zhipin/anti-detection-utils";
+import {
+  wrapAntiDetectionScript,
+  randomDelay,
+  clickWithMouseTrajectory,
+} from "../zhipin/anti-detection-utils";
 import { createDynamicClassSelector } from "./dynamic-selector-utils";
 
 /**
@@ -73,7 +77,12 @@ export const yupaoExchangeWechatTool = () =>
         .describe("交换完成后的最大等待时间（毫秒）"),
     }),
 
-    execute: async ({ waitBetweenClicksMin = 400, waitBetweenClicksMax = 800, waitAfterExchangeMin = 800, waitAfterExchangeMax = 1500 }) => {
+    execute: async ({
+      waitBetweenClicksMin = 400,
+      waitBetweenClicksMax = 800,
+      waitAfterExchangeMin = 800,
+      waitAfterExchangeMax = 1500,
+    }) => {
       try {
         const client = await getPuppeteerMCPClient();
         const tools = await client.tools();
@@ -85,16 +94,18 @@ export const yupaoExchangeWechatTool = () =>
             throw new Error(`MCP tool ${toolName} not available`);
           }
         }
-        
+
         // 类型断言：在检查后这些工具一定存在
-        const puppeteerEvaluate = tools.puppeteer_evaluate as NonNullable<typeof tools.puppeteer_evaluate>;
+        const puppeteerEvaluate = tools.puppeteer_evaluate as NonNullable<
+          typeof tools.puppeteer_evaluate
+        >;
 
         // 添加初始延迟
         await randomDelay(100, 300);
 
         // 第一步：查找交换微信按钮 - 使用动态选择器
-        const exchangeBtnSelector = createDynamicClassSelector('_exchange-tel-btn');
-        
+        const exchangeBtnSelector = createDynamicClassSelector("_exchange-tel-btn");
+
         const findExchangeButtonScript = wrapAntiDetectionScript(`
           // 策略1: 尝试精确的选择器（如果constants中的选择器有效）
           const exchangeBtn = document.querySelector('${YUPAO_EXCHANGE_WECHAT_SELECTORS.exchangeButton}');
@@ -137,7 +148,9 @@ export const yupaoExchangeWechatTool = () =>
           return { exists: false };
         `);
 
-        const exchangeResult = await puppeteerEvaluate.execute({ script: findExchangeButtonScript });
+        const exchangeResult = await puppeteerEvaluate.execute({
+          script: findExchangeButtonScript,
+        });
         const exchangeData = parseEvaluateResult(exchangeResult);
 
         if (!exchangeData?.exists) {
@@ -151,7 +164,7 @@ export const yupaoExchangeWechatTool = () =>
         // 点击交换按钮
         let exchangeClicked = false;
         try {
-          if (exchangeData.index !== undefined && typeof exchangeData.index === 'number') {
+          if (exchangeData.index !== undefined && typeof exchangeData.index === "number") {
             // 使用索引点击
             const markScript = wrapAntiDetectionScript(`
               const selector = '${exchangeData.selector || exchangeBtnSelector}';
@@ -163,30 +176,30 @@ export const yupaoExchangeWechatTool = () =>
               }
               return { success: false };
             `);
-            
+
             const markResult = await puppeteerEvaluate.execute({ script: markScript });
             const marked = parseEvaluateResult(markResult);
-            
+
             if (marked?.success) {
               await clickWithMouseTrajectory(client, '[data-exchange-wechat-temp="true"]', {
                 preClickDelay: 100,
-                moveSteps: 20
+                moveSteps: 20,
               });
               exchangeClicked = true;
-              
+
               // 清理临时属性
-              await puppeteerEvaluate.execute({ 
+              await puppeteerEvaluate.execute({
                 script: wrapAntiDetectionScript(`
                   const btn = document.querySelector('[data-exchange-wechat-temp="true"]');
                   if (btn) btn.removeAttribute('data-exchange-wechat-temp');
-                `)
+                `),
               });
             }
-          } else if (exchangeData.selector && typeof exchangeData.selector === 'string') {
+          } else if (exchangeData.selector && typeof exchangeData.selector === "string") {
             // 直接使用选择器
             await clickWithMouseTrajectory(client, exchangeData.selector, {
               preClickDelay: 100,
-              moveSteps: 20
+              moveSteps: 20,
             });
             exchangeClicked = true;
           }
@@ -202,15 +215,15 @@ export const yupaoExchangeWechatTool = () =>
             }
             return { success: false };
           `);
-          
+
           const fallbackResult = await puppeteerEvaluate.execute({ script: fallbackScript });
           const fallback = parseEvaluateResult(fallbackResult);
-          
+
           if (fallback?.success) {
             try {
               await clickWithMouseTrajectory(client, 'div[data-exchange-wechat-fallback="true"]', {
                 preClickDelay: 100,
-                moveSteps: 20
+                moveSteps: 20,
               });
               exchangeClicked = true;
             } catch (_err) {
@@ -222,18 +235,18 @@ export const yupaoExchangeWechatTool = () =>
         if (!exchangeClicked) {
           return {
             success: false,
-            error: '点击交换微信按钮失败',
+            error: "点击交换微信按钮失败",
             message: "请确保已打开候选人聊天窗口",
           };
         }
 
         // 等待弹窗出现
         await randomDelay(waitBetweenClicksMin, waitBetweenClicksMax);
-        
+
         // 检查弹窗是否出现 - 使用动态选择器
-        const dialogSelector = createDynamicClassSelector('_exchangeTipPop');
-        const wechatPopSelector = createDynamicClassSelector('_wechatPop');
-        
+        const dialogSelector = createDynamicClassSelector("_exchangeTipPop");
+        const wechatPopSelector = createDynamicClassSelector("_wechatPop");
+
         const checkDialogScript = wrapAntiDetectionScript(`
           // 策略1: 尝试精确的选择器
           let dialog = document.querySelector('${YUPAO_EXCHANGE_WECHAT_SELECTORS.exchangeTipPop}');
@@ -262,10 +275,10 @@ export const yupaoExchangeWechatTool = () =>
             hasConfirmButton: !!confirmBtn
           };
         `);
-        
+
         const dialogCheck = await puppeteerEvaluate.execute({ script: checkDialogScript });
         const dialogData = parseEvaluateResult(dialogCheck);
-        
+
         if (!dialogData?.visible || !dialogData?.hasConfirmButton) {
           // 如果弹窗还没出现，再等待一下
           await randomDelay(500, 800);
@@ -328,7 +341,7 @@ export const yupaoExchangeWechatTool = () =>
         // 点击确认按钮
         let confirmClicked = false;
         try {
-          if (confirmData.index !== undefined && typeof confirmData.index === 'number') {
+          if (confirmData.index !== undefined && typeof confirmData.index === "number") {
             // 使用索引点击
             const markConfirmScript = wrapAntiDetectionScript(`
               const dialog = document.querySelector('${dialogSelector}') || 
@@ -343,30 +356,30 @@ export const yupaoExchangeWechatTool = () =>
               }
               return { success: false };
             `);
-            
+
             const markResult = await puppeteerEvaluate.execute({ script: markConfirmScript });
             const marked = parseEvaluateResult(markResult);
-            
+
             if (marked?.success) {
               await clickWithMouseTrajectory(client, 'button[data-confirm-wechat-temp="true"]', {
                 preClickDelay: 150,
-                moveSteps: 15
+                moveSteps: 15,
               });
               confirmClicked = true;
-              
+
               // 清理临时属性
-              await puppeteerEvaluate.execute({ 
+              await puppeteerEvaluate.execute({
                 script: wrapAntiDetectionScript(`
                   const btn = document.querySelector('button[data-confirm-wechat-temp="true"]');
                   if (btn) btn.removeAttribute('data-confirm-wechat-temp');
-                `)
+                `),
               });
             }
-          } else if (confirmData.selector && typeof confirmData.selector === 'string') {
+          } else if (confirmData.selector && typeof confirmData.selector === "string") {
             // 直接使用选择器
             await clickWithMouseTrajectory(client, confirmData.selector, {
               preClickDelay: 150,
-              moveSteps: 15
+              moveSteps: 15,
             });
             confirmClicked = true;
           }
@@ -387,7 +400,7 @@ export const yupaoExchangeWechatTool = () =>
             }
             return { success: false };
           `);
-          
+
           const lastResult = await puppeteerEvaluate.execute({ script: lastResortScript });
           const lastData = parseEvaluateResult(lastResult);
           confirmClicked = !!lastData?.success;
@@ -396,7 +409,7 @@ export const yupaoExchangeWechatTool = () =>
         if (!confirmClicked) {
           return {
             success: false,
-            error: '点击确认按钮失败',
+            error: "点击确认按钮失败",
             exchangeButtonClicked: true,
             message: "已点击交换微信按钮，但未能点击确认按钮",
           };
@@ -409,8 +422,8 @@ export const yupaoExchangeWechatTool = () =>
           success: true,
           message: "成功交换微信",
           details: {
-            exchangeButtonSelector: exchangeData.selector as string || 'unknown',
-            confirmButtonSelector: confirmData.selector as string || 'unknown',
+            exchangeButtonSelector: (exchangeData.selector as string) || "unknown",
+            confirmButtonSelector: (confirmData.selector as string) || "unknown",
           },
         };
       } catch (error) {

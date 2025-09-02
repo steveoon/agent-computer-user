@@ -1,10 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ModelId, ProviderConfig } from "@/lib/config/models";
-import {
-  DEFAULT_MODEL_CONFIG,
-  DEFAULT_PROVIDER_CONFIGS,
-} from "@/lib/config/models";
+import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
 
 /**
  * 🤖 模型配置管理Store
@@ -51,7 +48,7 @@ function mergeProviderConfigs(
   const merged = { ...defaultConfigs };
 
   // 保留用户自定义的配置（如果存在）
-  Object.keys(savedConfigs).forEach((provider) => {
+  Object.keys(savedConfigs).forEach(provider => {
     if (merged[provider]) {
       merged[provider] = savedConfigs[provider];
     }
@@ -93,7 +90,7 @@ export const useModelConfigStore = create<ModelConfigStore>()(
 
       // Provider配置方法
       updateProviderConfig: (provider: string, config: ProviderConfig) => {
-        set((state) => ({
+        set(state => ({
           providerConfigs: {
             ...state.providerConfigs,
             [provider]: config,
@@ -105,7 +102,7 @@ export const useModelConfigStore = create<ModelConfigStore>()(
       resetProviderConfig: (provider: string) => {
         const defaultConfig = DEFAULT_PROVIDER_CONFIGS[provider];
         if (defaultConfig) {
-          set((state) => ({
+          set(state => ({
             providerConfigs: {
               ...state.providerConfigs,
               [provider]: { ...defaultConfig },
@@ -133,7 +130,7 @@ export const useModelConfigStore = create<ModelConfigStore>()(
     }),
     {
       name: "model-config-storage",
-      partialize: (state) => ({
+      partialize: state => ({
         chatModel: state.chatModel,
         classifyModel: state.classifyModel,
         replyModel: state.replyModel,
@@ -158,18 +155,14 @@ export const useModelConfigStore = create<ModelConfigStore>()(
 );
 
 // 导出便捷的选择器hooks
-export const useChatModel = () =>
-  useModelConfigStore((state) => state.chatModel);
-export const useClassifyModel = () =>
-  useModelConfigStore((state) => state.classifyModel);
-export const useReplyModel = () =>
-  useModelConfigStore((state) => state.replyModel);
-export const useProviderConfigs = () =>
-  useModelConfigStore((state) => state.providerConfigs);
+export const useChatModel = () => useModelConfigStore(state => state.chatModel);
+export const useClassifyModel = () => useModelConfigStore(state => state.classifyModel);
+export const useReplyModel = () => useModelConfigStore(state => state.replyModel);
+export const useProviderConfigs = () => useModelConfigStore(state => state.providerConfigs);
 
 // 获取特定provider的配置
 export const useProviderConfig = (provider: string) =>
-  useModelConfigStore((state) => state.providerConfigs[provider]);
+  useModelConfigStore(state => state.providerConfigs[provider]);
 
 // 导出完整的store供组件使用
 export const useModelConfig = () => useModelConfigStore();

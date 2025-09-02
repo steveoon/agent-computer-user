@@ -35,7 +35,7 @@ export const Input = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     // Check for Ctrl/Cmd + Arrow keys
     const isModifierPressed = e.ctrlKey || e.metaKey;
-    
+
     if (isModifierPressed && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
       e.preventDefault();
 
@@ -78,7 +78,9 @@ export const Input = ({
         value={input}
         autoFocus
         placeholder={
-          !isAuthenticated ? "请先登录以使用AI助手..." : "输入提示词...使用 Ctrl/Cmd + ↑↓ 键切换输入历史"
+          !isAuthenticated
+            ? "请先登录以使用AI助手..."
+            : "输入提示词...使用 Ctrl/Cmd + ↑↓ 键切换输入历史"
         }
         onChange={handleChange}
         onKeyDown={handleKeyDown}

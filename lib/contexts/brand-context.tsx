@@ -1,17 +1,8 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  ReactNode,
-  useEffect,
-} from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { useConfigManager } from "@/hooks/useConfigManager";
-import {
-  saveBrandPreference,
-  loadBrandPreference,
-} from "../utils/brand-storage";
+import { saveBrandPreference, loadBrandPreference } from "../utils/brand-storage";
 import type { ZhipinData } from "@/types";
 import { getAvailableBrands as getAvailableBrandsFromMapping } from "@/lib/constants/organization-mapping";
 
@@ -48,8 +39,7 @@ export function BrandProvider({ children }: BrandProviderProps) {
 
     // 如果当前品牌不存在或为空，设置默认品牌
     if (!currentBrand || !brandData.brands[currentBrand]) {
-      const defaultBrand =
-        brandData.defaultBrand || Object.keys(brandData.brands)[0] || "";
+      const defaultBrand = brandData.defaultBrand || Object.keys(brandData.brands)[0] || "";
       setCurrentBrand(defaultBrand);
 
       console.log("✅ 品牌上下文：配置数据已更新", {
@@ -103,7 +93,7 @@ export function BrandProvider({ children }: BrandProviderProps) {
   // 合并两个来源的品牌：ORGANIZATION_MAPPING 中的映射品牌 + 实际数据中的额外品牌
   const mappedBrands = getAvailableBrandsFromMapping().map(brand => brand.name);
   const dataBrands = brandData ? Object.keys(brandData.brands) : [];
-  
+
   // 使用 Set 去重，确保所有品牌都能显示（映射的 + 导入的额外品牌）
   const availableBrands = Array.from(new Set([...mappedBrands, ...dataBrands])).sort();
 
@@ -116,9 +106,7 @@ export function BrandProvider({ children }: BrandProviderProps) {
     isConfigLoaded,
   };
 
-  return (
-    <BrandContext.Provider value={value}>{children}</BrandContext.Provider>
-  );
+  return <BrandContext.Provider value={value}>{children}</BrandContext.Provider>;
 }
 
 // 🎯 Hook：使用品牌上下文
@@ -145,17 +133,13 @@ export function useCurrentBrandData() {
   return {
     brandName: currentBrand,
     brandData: brandData.brands[currentBrand] || null,
-    storesForBrand: brandData.stores.filter(
-      (store) => store.brand === currentBrand
-    ),
+    storesForBrand: brandData.stores.filter(store => store.brand === currentBrand),
   };
 }
 
 // 🎯 动态导出可用品牌列表（向后兼容）
 export function getAvailableBrands(): string[] {
   // 这个函数现在只是一个占位符，实际的品牌列表通过 useBrand Hook 获取
-  console.warn(
-    "getAvailableBrands 已废弃，请使用 useBrand Hook 的 availableBrands 属性"
-  );
+  console.warn("getAvailableBrands 已废弃，请使用 useBrand Hook 的 availableBrands 属性");
   return [];
 }

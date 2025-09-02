@@ -1,12 +1,12 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
-import { 
-  wrapAntiDetectionScript, 
-  randomDelay, 
+import {
+  wrapAntiDetectionScript,
+  randomDelay,
   humanDelay,
   performRandomScroll,
-  shouldAddRandomBehavior
+  shouldAddRandomBehavior,
 } from "./anti-detection-utils";
 import type { AutomationResult } from "./types";
 
@@ -47,12 +47,12 @@ function parseEvaluateResult(result: unknown): unknown {
 
 /**
  * Boss直聘点击打招呼工具
- * 
+ *
  * 功能：
  * - 点击指定候选人的"打招呼"按钮
  * - 系统会自动发送默认招呼语
  * - 包含反爬虫策略
- * 
+ *
  * 注意：
  * - Boss直聘使用两列布局，每个li.card-item包含两个候选人卡片
  * - 候选人索引是基于所有候选人卡片的顺序，不是li元素的顺序
@@ -72,7 +72,7 @@ export const zhipinSayHelloSimpleTool = () =>
     - 候选人索引从0开始，对应页面上的候选人顺序
     - 点击后系统会自动发送消息，无需手动输入
     - 包含随机延迟和鼠标轨迹模拟`,
-    
+
     inputSchema: z.object({
       candidateIndices: z
         .array(z.number())
@@ -87,57 +87,55 @@ export const zhipinSayHelloSimpleTool = () =>
         .optional()
         .default(4000)
         .describe("两次点击之间的最大延迟（毫秒）"),
-      scrollBehavior: z
-        .boolean()
-        .optional()
-        .default(true)
-        .describe("是否启用随机滚动行为"),
+      scrollBehavior: z.boolean().optional().default(true).describe("是否启用随机滚动行为"),
     }),
-    
+
     execute: async ({
       candidateIndices,
       delayBetweenClicksMin = 2000,
       delayBetweenClicksMax = 4000,
-      scrollBehavior = true
-    }): Promise<AutomationResult<{
-      results: ZhipinSayHelloResult[];
-      summary: {
-        total: number;
-        success: number;
-        failed: number;
-      };
-    }>> => {
+      scrollBehavior = true,
+    }): Promise<
+      AutomationResult<{
+        results: ZhipinSayHelloResult[];
+        summary: {
+          total: number;
+          success: number;
+          failed: number;
+        };
+      }>
+    > => {
       try {
         const client = await getPuppeteerMCPClient();
         const tools = await client.tools();
-        
+
         // 检查必需的工具
         if (!tools.puppeteer_evaluate) {
           throw new Error("Required MCP tool puppeteer_evaluate not available");
         }
-        
+
         const puppeteerEvaluate = tools.puppeteer_evaluate;
-        
+
         // 初始延迟
         await randomDelay(500, 1000);
-        
+
         const results: ZhipinSayHelloResult[] = [];
-        
+
         // 依次点击每个候选人的打招呼按钮
         for (let i = 0; i < candidateIndices.length; i++) {
           const candidateIndex = candidateIndices[i];
-          
+
           try {
             // 滚动行为
             if (scrollBehavior && shouldAddRandomBehavior(0.3)) {
               await performRandomScroll(client, {
                 minDistance: 100,
                 maxDistance: 300,
-                direction: 'down',
-                probability: 0.5
+                direction: "down",
+                probability: 0.5,
               });
             }
-            
+
             // 查找并点击目标按钮
             const clickScript = wrapAntiDetectionScript(`
               // 首先尝试获取iframe
@@ -272,64 +270,63 @@ export const zhipinSayHelloSimpleTool = () =>
                 };
               }
             `);
-            
+
             const clickResult = await puppeteerEvaluate.execute({ script: clickScript });
-            const result = parseEvaluateResult(clickResult) as { 
-              success: boolean; 
+            const result = parseEvaluateResult(clickResult) as {
+              success: boolean;
               buttonText?: string;
               candidateName?: string;
               candidateId?: string;
               error?: string;
               clicked?: boolean;
             } | null;
-            
+
             if (!result?.success) {
               results.push({
                 candidateName: result?.candidateName || `候选人${candidateIndex}`,
                 candidateId: result?.candidateId,
                 success: false,
                 error: result?.error || "操作失败",
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
               });
               continue;
             }
-            
+
             // 点击成功
             results.push({
               candidateName: result.candidateName || `候选人${candidateIndex}`,
               candidateId: result.candidateId,
               success: true,
-              message: `成功点击${result.buttonText || '打招呼按钮'}`,
-              timestamp: new Date().toISOString()
+              message: `成功点击${result.buttonText || "打招呼按钮"}`,
+              timestamp: new Date().toISOString(),
             });
-            
+
             // 等待系统处理和发送消息
             await randomDelay(1000, 1500);
-            
+
             // 等待下一个候选人
             if (i < candidateIndices.length - 1) {
               await randomDelay(delayBetweenClicksMin, delayBetweenClicksMax);
-              
+
               // 偶尔添加更长的延迟
               if (shouldAddRandomBehavior(0.1)) {
                 await humanDelay();
               }
             }
-            
           } catch (error) {
             results.push({
               candidateName: `候选人${candidateIndex}`,
               success: false,
               error: error instanceof Error ? error.message : "点击失败",
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
             });
           }
         }
-        
+
         // 统计结果
         const successCount = results.filter(r => r.success).length;
         const failCount = results.filter(r => !r.success).length;
-        
+
         return {
           success: true,
           data: {
@@ -337,18 +334,17 @@ export const zhipinSayHelloSimpleTool = () =>
             summary: {
               total: results.length,
               success: successCount,
-              failed: failCount
-            }
-          }
+              failed: failCount,
+            },
+          },
         };
-        
       } catch (error) {
         return {
           success: false,
-          error: error instanceof Error ? error.message : "Unknown error occurred"
+          error: error instanceof Error ? error.message : "Unknown error occurred",
         };
       }
-    }
+    },
   });
 
 /**

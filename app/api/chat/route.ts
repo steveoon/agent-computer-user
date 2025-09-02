@@ -16,7 +16,7 @@ async function cleanupSandboxIfNeeded(sandboxId: string | null, error: unknown, 
   if (!sandboxId) {
     return;
   }
-  
+
   if (shouldCleanupSandbox(error)) {
     try {
       console.log(`🧹 开始清理沙箱: ${sandboxId} (${context})`);

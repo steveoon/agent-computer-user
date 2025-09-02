@@ -7,6 +7,7 @@
 ## 迁移状态
 
 ### ✅ 已完成迁移
+
 - **CellularMemoryManager** → `memory/cellular-memory-manager.ts`
 - **分类功能** → `core/classification-builder.ts`
 - **回复功能** → `core/reply-builder.ts`
@@ -14,17 +15,19 @@
 - **上下文优化** → `core/reply-builder.ts` (ContextOptimizer)
 
 ### ✅ 迁移完成
+
 原文件 `lib/loaders/context-engineering-prompt-builder.ts` 已被移除，所有功能已完全迁移到新的模块化架构。
 
 ## 使用示例
 
 ### 旧代码（已移除）
+
 ```typescript
 // ⚠️ 以下代码已不可用，文件已被删除
-import { 
+import {
   ContextEngineeringPromptBuilder,
-  promptBuilder 
-} from '@/lib/loaders/context-engineering-prompt-builder'; // ❌ 文件已删除
+  promptBuilder,
+} from "@/lib/loaders/context-engineering-prompt-builder"; // ❌ 文件已删除
 
 // 使用旧的构建器 - 已弃用
 const result = promptBuilder.buildOptimizedPrompt({
@@ -36,11 +39,9 @@ const result = promptBuilder.buildOptimizedPrompt({
 ```
 
 ### 新代码（推荐）
+
 ```typescript
-import { 
-  replyBuilder, 
-  classificationBuilder 
-} from '@/lib/prompt-engineering';
+import { replyBuilder, classificationBuilder } from "@/lib/prompt-engineering";
 
 // 1. 分类提示构建
 const classificationResult = classificationBuilder.createOptimizedClassificationPrompt({
@@ -48,9 +49,9 @@ const classificationResult = classificationBuilder.createOptimizedClassification
   brandData: {
     city: "上海",
     defaultBrand: "肯德基",
-    availableBrands: ["肯德基", "麦当劳"]
+    availableBrands: ["肯德基", "麦当劳"],
   },
-  candidateInfo: candidateInfo
+  candidateInfo: candidateInfo,
 });
 
 // 2. 回复提示构建
@@ -61,7 +62,7 @@ const replyResult = replyBuilder.createOptimizedReplyPrompt({
   systemInstruction: instruction,
   conversationHistory: history,
   candidateInfo: candidateInfo,
-  targetBrand: "肯德基"
+  targetBrand: "肯德基",
 });
 
 // 3. 更新内存（如需要）
@@ -71,11 +72,13 @@ replyBuilder.updateMemory(message, reply);
 ## 主要改进
 
 ### 1. 模块化架构
+
 - 功能分离：分类、回复、内存管理独立
 - 依赖清晰：消除循环依赖
 - 易于测试：各模块可独立测试
 
 ### 2. 增强功能
+
 - **ContextOptimizer**：智能上下文优化
 - **情绪检测**：positive/neutral/negative
 - **紧急度检测**：high/medium/low
@@ -85,6 +88,7 @@ replyBuilder.updateMemory(message, reply);
 - **完整候选人档案**：性别、期望薪资、健康证、活跃时间等关键信息
 
 ### 3. 类型安全
+
 - 基于Zod的运行时验证
 - 完整的TypeScript类型定义
 - 统一的接口规范
@@ -92,6 +96,7 @@ replyBuilder.updateMemory(message, reply);
 ## 集成步骤
 
 ### Step 1: 更新导入
+
 ```typescript
 // 替换旧导入
 - import { promptBuilder } from '@/lib/loaders/context-engineering-prompt-builder';
@@ -99,12 +104,13 @@ replyBuilder.updateMemory(message, reply);
 ```
 
 ### Step 2: 更新调用代码
+
 ```typescript
 // 分类
 const { system, prompt } = classificationBuilder.build({
   message: userMessage,
   brandData: brandData,
-  candidateInfo: candidateInfo
+  candidateInfo: candidateInfo,
 });
 
 // 回复
@@ -113,11 +119,12 @@ const replyResult = replyBuilder.build({
   classification: classification,
   contextInfo: contextInfo,
   systemInstruction: instruction,
-  conversationHistory: history
+  conversationHistory: history,
 });
 ```
 
 ### Step 3: 使用新的内存管理
+
 ```typescript
 // 更新对话内存
 replyBuilder.updateMemory(userMessage, assistantReply);
@@ -129,8 +136,9 @@ replyBuilder.cleanupMemory();
 ## 配置选项
 
 ### 预设配置
+
 ```typescript
-import { HIGH_PERFORMANCE_CONFIG, HIGH_QUALITY_CONFIG } from '@/lib/prompt-engineering';
+import { HIGH_PERFORMANCE_CONFIG, HIGH_QUALITY_CONFIG } from "@/lib/prompt-engineering";
 
 // 高性能模式（减少示例和token）
 const fastBuilder = new ReplyPromptBuilder(HIGH_PERFORMANCE_CONFIG);
@@ -140,12 +148,13 @@ const qualityBuilder = new ReplyPromptBuilder(HIGH_QUALITY_CONFIG);
 ```
 
 ### 自定义配置
+
 ```typescript
 const customBuilder = new ReplyPromptBuilder({
   maxExamples: 4,
   tokenBudget: 3500,
   enableMemory: true,
-  experimentalFieldSupport: false
+  experimentalFieldSupport: false,
 });
 ```
 

@@ -2,8 +2,8 @@
  * Utility functions for Zhipin automation
  */
 
-import { AutomationResult } from './types';
-import { TIMING } from './constants';
+import { AutomationResult } from "./types";
+import { TIMING } from "./constants";
 
 /**
  * Sleep helper
@@ -21,7 +21,7 @@ export async function retry<T>(
   delay: number = TIMING.retryDelay
 ): Promise<T> {
   let lastError: Error | undefined;
-  
+
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await fn();
@@ -32,22 +32,18 @@ export async function retry<T>(
       }
     }
   }
-  
-  throw lastError || new Error('Operation failed after retries');
+
+  throw lastError || new Error("Operation failed after retries");
 }
 
 /**
  * Create automation result
  */
-export function createResult<T>(
-  success: boolean,
-  data?: T,
-  error?: string
-): AutomationResult<T> {
+export function createResult<T>(success: boolean, data?: T, error?: string): AutomationResult<T> {
   return {
     success,
     ...(data !== undefined && { data }),
-    ...(error && { error })
+    ...(error && { error }),
   };
 }
 
@@ -55,7 +51,7 @@ export function createResult<T>(
  * Check if URL is Zhipin chat page
  */
 export function isZhipinChatUrl(url: string): boolean {
-  return url.includes('zhipin.com') && url.includes('chat');
+  return url.includes("zhipin.com") && url.includes("chat");
 }
 
 /**
@@ -87,11 +83,11 @@ export async function withRetry<T>(
   const {
     maxAttempts = TIMING.maxRetries,
     delay = TIMING.retryDelay,
-    actionName = 'operation'
+    actionName = "operation",
   } = options;
-  
+
   let lastError: Error | undefined;
-  
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       console.log(`Attempting ${actionName} (attempt ${attempt}/${maxAttempts})`);
@@ -99,13 +95,15 @@ export async function withRetry<T>(
     } catch (error) {
       lastError = error as Error;
       console.error(`${actionName} failed (attempt ${attempt}/${maxAttempts}):`, error);
-      
+
       if (attempt < maxAttempts) {
         console.log(`Retrying ${actionName} in ${delay}ms...`);
         await sleep(delay);
       }
     }
   }
-  
-  throw new Error(`${actionName} failed after ${maxAttempts} attempts: ${lastError?.message || 'Unknown error'}`);
+
+  throw new Error(
+    `${actionName} failed after ${maxAttempts} attempts: ${lastError?.message || "Unknown error"}`
+  );
 }

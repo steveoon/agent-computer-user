@@ -30,7 +30,11 @@ export const zhipinGetChatDetailsTool = () =>
     inputSchema: z.object({
       includeHtml: z.boolean().optional().default(false).describe("是否包含原始HTML（用于调试）"),
       maxMessages: z.number().optional().default(100).describe("返回的最大消息数量，默认100条"),
-      maxDataSizeKB: z.number().optional().default(300).describe("返回数据的最大大小（KB），默认300KB"),
+      maxDataSizeKB: z
+        .number()
+        .optional()
+        .default(300)
+        .describe("返回数据的最大大小（KB），默认300KB"),
     }),
 
     execute: async ({ includeHtml = false, maxMessages = 100, maxDataSizeKB = 300 }) => {
@@ -41,7 +45,7 @@ export const zhipinGetChatDetailsTool = () =>
         if (!tools.puppeteer_evaluate) {
           throw new Error("MCP tool puppeteer_evaluate not available");
         }
-        
+
         // 添加滚轮事件以模拟用户行为
         const addScrollBehavior = async () => {
           if (tools.puppeteer_evaluate) {
@@ -114,7 +118,8 @@ export const zhipinGetChatDetailsTool = () =>
             const messageElements = Array.from(chatContainer.querySelectorAll('${CHAT_DETAILS_SELECTORS.messageItem}'));
             
             // 生成批处理代码（每批30条消息，减少rIC调用）
-            ${generateBatchProcessingScript(`
+            ${generateBatchProcessingScript(
+              `
               const msgEl = element;
               // 一次性获取所有文本内容和类名，减少DOM访问
               const msgText = msgEl.textContent || '';
@@ -203,7 +208,9 @@ export const zhipinGetChatDetailsTool = () =>
                   hasTime: !!time
                 });
               }
-            `, 30)}
+            `,
+              30
+            )}
             
             // 执行批处理
             chatMessages = await processAllBatches(messageElements);
@@ -295,7 +302,7 @@ export const zhipinGetChatDetailsTool = () =>
 
         // 在执行前添加初始滚动行为
         await addScrollBehavior();
-        
+
         // 执行脚本
         const result = await tools.puppeteer_evaluate.execute({ script });
 

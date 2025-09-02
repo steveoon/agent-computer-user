@@ -99,11 +99,7 @@ export type {
   APISuccessResponse,
 } from "./api";
 
-export { 
-  ChatRequestBodySchema,
-  isChatRequestBody,
-  validateChatRequestBody,
-} from "./api";
+export { ChatRequestBodySchema, isChatRequestBody, validateChatRequestBody } from "./api";
 
 // 从chat-details.ts导出聊天详情相关类型
 export type {

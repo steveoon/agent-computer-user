@@ -2,15 +2,15 @@
  * 使用示例 - 展示如何使用新的Prompt Engineering模块
  */
 
-import { 
-  classificationBuilder, 
+import {
+  classificationBuilder,
   replyBuilder,
   createClassificationBuilder,
   createReplyBuilder,
-  HIGH_QUALITY_CONFIG
-} from '../index';
-import type { MessageClassification } from '@/types/zhipin';
-import type { CandidateInfo } from '@/lib/tools/zhipin/types';
+  HIGH_QUALITY_CONFIG,
+} from "../index";
+import type { MessageClassification } from "@/types/zhipin";
+import type { CandidateInfo } from "@/lib/tools/zhipin/types";
 
 /**
  * 示例1：消息分类
@@ -23,7 +23,7 @@ export function classifyMessage(message: string) {
       city: "上海",
       defaultBrand: "肯德基",
       availableBrands: ["肯德基", "麦当劳", "必胜客"],
-      storeCount: 50
+      storeCount: 50,
     },
     candidateInfo: {
       name: "张三",
@@ -38,23 +38,20 @@ export function classifyMessage(message: string) {
       weight: "70kg",
       healthCertificate: true,
       activeTime: "5分钟前活跃",
-      info: ["有经验", "有健康证", "可立即上岗"]
-    }
+      info: ["有经验", "有健康证", "可立即上岗"],
+    },
   });
 
   console.log("分类系统提示:", result.system);
   console.log("分类用户提示:", result.prompt);
-  
+
   return result;
 }
 
 /**
  * 示例2：生成回复
  */
-export function generateReply(
-  message: string,
-  classification: MessageClassification
-) {
+export function generateReply(message: string, classification: MessageClassification) {
   const result = replyBuilder.createOptimizedReplyPrompt({
     message: message,
     classification: classification,
@@ -66,10 +63,7 @@ export function generateReply(
       - 要求: 18岁以上，健康证
     `,
     systemInstruction: "你是专业的招聘助手，帮助候选人了解工作机会",
-    conversationHistory: [
-      "用户: 有什么工作吗？",
-      "助手: 有服务员和后厨岗位，你想了解哪个？"
-    ],
+    conversationHistory: ["用户: 有什么工作吗？", "助手: 有服务员和后厨岗位，你想了解哪个？"],
     candidateInfo: {
       name: "李四",
       position: "店员/营业员",
@@ -83,9 +77,9 @@ export function generateReply(
       weight: "50kg",
       healthCertificate: true,
       activeTime: "刚刚活跃",
-      info: ["可立即上岗", "有健康证"]
+      info: ["可立即上岗", "有健康证"],
     } as CandidateInfo,
-    targetBrand: "肯德基"
+    targetBrand: "肯德基",
   });
 
   // 更新内存（可选）
@@ -109,13 +103,13 @@ export function createCustomBuilders() {
     maxExamples: 5,
     tokenBudget: 4000,
     enableMemory: true,
-    experimentalFieldSupport: false
+    experimentalFieldSupport: false,
   });
 
   return {
     qualityClassifier,
     qualityReplyBuilder,
-    customReplyBuilder
+    customReplyBuilder,
   };
 }
 
@@ -129,8 +123,8 @@ export async function handleConversation(userMessage: string) {
     brandData: {
       city: "上海",
       defaultBrand: "肯德基",
-      availableBrands: ["肯德基", "麦当劳"]
-    }
+      availableBrands: ["肯德基", "麦当劳"],
+    },
   });
 
   // 假设这里调用LLM获取分类结果
@@ -139,9 +133,9 @@ export async function handleConversation(userMessage: string) {
     extractedInfo: {
       mentionedBrand: null,
       city: "上海",
-      hasUrgency: false
+      hasUrgency: false,
     },
-    reasoningText: "用户询问薪资信息"
+    reasoningText: "用户询问薪资信息",
   };
 
   // Step 2: 生成回复
@@ -151,7 +145,7 @@ export async function handleConversation(userMessage: string) {
     contextInfo: "服务员22-25元/时，满勤奖200元",
     systemInstruction: "生成友好专业的回复",
     conversationHistory: [],
-    targetBrand: "肯德基"
+    targetBrand: "肯德基",
   });
 
   // Step 3: 更新内存
@@ -163,8 +157,8 @@ export async function handleConversation(userMessage: string) {
     reply: mockReply,
     prompts: {
       classification: classificationPrompt,
-      reply: replyPrompt
-    }
+      reply: replyPrompt,
+    },
   };
 }
 
@@ -190,7 +184,7 @@ export function demonstrateCandidateMatching() {
   // 理想候选人（应该得高分85%+）
   const idealCandidate: CandidateInfo = {
     name: "王小明",
-    position: "店员/营业员", 
+    position: "店员/营业员",
     age: "25岁",
     gender: "男",
     experience: "2年餐饮经验",
@@ -201,7 +195,7 @@ export function demonstrateCandidateMatching() {
     weight: "70kg",
     healthCertificate: true,
     activeTime: "5分钟前活跃",
-    info: ["有经验", "有健康证", "可立即上岗"]
+    info: ["有经验", "有健康证", "可立即上岗"],
   };
 
   // 普通候选人（无健康证，应该得分<50%）
@@ -210,7 +204,7 @@ export function demonstrateCandidateMatching() {
     position: "收银员",
     age: "35岁",
     healthCertificate: false,
-    activeTime: "3天前活跃"
+    activeTime: "3天前活跃",
   };
 
   const replyResult1 = replyBuilder.build({
@@ -218,12 +212,12 @@ export function demonstrateCandidateMatching() {
     classification: {
       replyType: "general_chat",
       extractedInfo: {},
-      reasoningText: "测试"
+      reasoningText: "测试",
     },
     contextInfo: "测试数据",
     systemInstruction: "测试",
     conversationHistory: [],
-    candidateInfo: idealCandidate
+    candidateInfo: idealCandidate,
   });
 
   const replyResult2 = replyBuilder.build({
@@ -231,12 +225,12 @@ export function demonstrateCandidateMatching() {
     classification: {
       replyType: "general_chat",
       extractedInfo: {},
-      reasoningText: "测试"
+      reasoningText: "测试",
     },
-    contextInfo: "测试数据", 
+    contextInfo: "测试数据",
     systemInstruction: "测试",
     conversationHistory: [],
-    candidateInfo: normalCandidate
+    candidateInfo: normalCandidate,
   });
 
   console.log("理想候选人提示:", replyResult1.prompt);

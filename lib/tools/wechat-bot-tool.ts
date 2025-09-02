@@ -20,18 +20,9 @@ export const weChatBotTool = () =>
         .optional()
         .default("boss")
         .describe("招聘平台：boss(Boss直聘) 或 yupao(鱼泡直聘)"),
-      platform_username: z
-        .string()
-        .optional()
-        .describe("招聘平台当前登录账号用户名"),
-      candidate_name: z
-        .string()
-        .optional()
-        .describe("候选人姓名（candidate_wechat类型时必需）"),
-      wechat_id: z
-        .string()
-        .optional()
-        .describe("候选人微信号（candidate_wechat类型时必需）"),
+      platform_username: z.string().optional().describe("招聘平台当前登录账号用户名"),
+      candidate_name: z.string().optional().describe("候选人姓名（candidate_wechat类型时必需）"),
+      wechat_id: z.string().optional().describe("候选人微信号（candidate_wechat类型时必需）"),
       message: z
         .string()
         .optional()
@@ -41,18 +32,9 @@ export const weChatBotTool = () =>
         .optional()
         .default("markdown")
         .describe("消息类型，默认为markdown"),
-      additional_info: z
-        .string()
-        .optional()
-        .describe("附加信息，用于生成更详细的通知内容"),
-      mentioned_list: z
-        .array(z.string())
-        .optional()
-        .describe("需要@的成员userid列表，支持@all"),
-      mentioned_mobile_list: z
-        .array(z.string())
-        .optional()
-        .describe("需要@的成员手机号列表"),
+      additional_info: z.string().optional().describe("附加信息，用于生成更详细的通知内容"),
+      mentioned_list: z.array(z.string()).optional().describe("需要@的成员userid列表，支持@all"),
+      mentioned_mobile_list: z.array(z.string()).optional().describe("需要@的成员手机号列表"),
       use_markdown_v2: z
         .boolean()
         .optional()
@@ -97,8 +79,10 @@ export const weChatBotTool = () =>
         switch (notification_type) {
           case "candidate_wechat":
             const platformName = platform === "yupao" ? "鱼泡" : "Boss";
-            const platformInfo = platform_username ? `\n> **${platformName}账号**: ${platform_username}` : "";
-            
+            const platformInfo = platform_username
+              ? `\n> **${platformName}账号**: ${platform_username}`
+              : "";
+
             if (useMarkdownV2) {
               finalMessage = `# 候选人微信信息\n\n**姓名**: ${candidate_name?.trim()}\n**微信**: ${wechat_id?.trim()}${platform_username ? `\n**${platformName}账号**: ${platform_username}` : ""}\n**时间**: ${timestamp}`;
             } else {
@@ -167,9 +151,7 @@ export const weChatBotTool = () =>
               }`;
             } else {
               finalMessage = `## 🚀 部署成功通知\n\n✅ **应用已成功部署到生产环境**\n⏰ 部署时间: ${timestamp}${
-                additional_info
-                  ? `\n📦 版本信息: <font color="info">${additional_info}</font>`
-                  : ""
+                additional_info ? `\n📦 版本信息: <font color="info">${additional_info}</font>` : ""
               }`;
             }
             break;
@@ -202,12 +184,9 @@ export const weChatBotTool = () =>
 
           case "custom":
             if (useMarkdownV2) {
-              finalMessage =
-                additional_info || `# 📢 自定义通知\n\n发送时间: ${timestamp}`;
+              finalMessage = additional_info || `# 📢 自定义通知\n\n发送时间: ${timestamp}`;
             } else {
-              finalMessage =
-                additional_info ||
-                `## 📢 自定义通知\n\n⏰ 发送时间: ${timestamp}`;
+              finalMessage = additional_info || `## 📢 自定义通知\n\n⏰ 发送时间: ${timestamp}`;
             }
             break;
 
@@ -246,11 +225,7 @@ export const weChatBotTool = () =>
 📊 响应状态: ${result.data?.errmsg || "success"}
 ⏰ 发送时间: ${new Date().toLocaleString("zh-CN")}
 ${mentioned_list?.length ? `👥 @成员: ${mentioned_list.join(", ")}` : ""}
-${
-  mentioned_mobile_list?.length
-    ? `📱 @手机号: ${mentioned_mobile_list.join(", ")}`
-    : ""
-}`;
+${mentioned_mobile_list?.length ? `📱 @手机号: ${mentioned_mobile_list.join(", ")}` : ""}`;
 
         return {
           type: "text" as const,

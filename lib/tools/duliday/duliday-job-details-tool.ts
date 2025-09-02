@@ -4,7 +4,7 @@ import { jobDetailsResponseSchema, type InterviewTime } from "./types";
 
 /**
  * Duliday获取岗位详情工具
- * 
+ *
  * @description 根据jobBasicInfoId获取岗位的详细信息，包括面试时间、地址等
  * @param customToken 自定义的Duliday token，优先使用此token
  * @returns AI SDK tool instance
@@ -14,9 +14,7 @@ export const dulidayJobDetailsTool = (customToken?: string) =>
     description:
       "根据jobBasicInfoId获取岗位详情。获取指定岗位的详细信息，包括面试时间安排、面试地址等重要信息。",
     inputSchema: z.object({
-      jobBasicInfoId: z
-        .number()
-        .describe("岗位基础信息ID，可以从岗位列表中获取"),
+      jobBasicInfoId: z.number().describe("岗位基础信息ID，可以从岗位列表中获取"),
     }),
     execute: async ({ jobBasicInfoId }) => {
       console.log("🔍 duliday_job_details tool called with:", { jobBasicInfoId });
@@ -46,7 +44,7 @@ export const dulidayJobDetailsTool = (customToken?: string) =>
         }
 
         const rawData = await response.json();
-        
+
         // 使用 zod 验证响应数据
         const parseResult = jobDetailsResponseSchema.safeParse(rawData);
         if (!parseResult.success) {
@@ -56,7 +54,7 @@ export const dulidayJobDetailsTool = (customToken?: string) =>
             text: `❌ API响应格式错误，请联系管理员`,
           };
         }
-        
+
         const data = parseResult.data;
 
         // 检查响应状态
@@ -86,7 +84,7 @@ export const dulidayJobDetailsTool = (customToken?: string) =>
         if (jobDetails.interviewTimes && jobDetails.interviewTimes.length > 0) {
           message += `⏰ 面试时间安排：\n`;
           const weekdayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-          
+
           jobDetails.interviewTimes.forEach((timeSlot: InterviewTime) => {
             if (timeSlot.weekdays && timeSlot.weekdays.length > 0) {
               const weekday = weekdayNames[timeSlot.weekdays[0]];
@@ -95,7 +93,7 @@ export const dulidayJobDetailsTool = (customToken?: string) =>
                 // 将秒转换为时间格式
                 const startHour = Math.floor(time.start / 3600);
                 const startMinute = Math.floor((time.start % 3600) / 60);
-                message += `   ${weekday} ${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}\n`;
+                message += `   ${weekday} ${startHour.toString().padStart(2, "0")}:${startMinute.toString().padStart(2, "0")}\n`;
               }
             }
           });
@@ -125,9 +123,7 @@ export const dulidayJobDetailsTool = (customToken?: string) =>
         console.error("获取岗位详情失败:", error);
         return {
           type: "text" as const,
-          text: `❌ 获取岗位详情失败: ${
-            error instanceof Error ? error.message : "未知错误"
-          }`,
+          text: `❌ 获取岗位详情失败: ${error instanceof Error ? error.message : "未知错误"}`,
         };
       }
     },

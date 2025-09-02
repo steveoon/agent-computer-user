@@ -2,16 +2,13 @@ import { tool } from "ai";
 import { z } from "zod";
 import { YUPAO_UNREAD_SELECTORS } from "./constants";
 import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
-import { 
+import {
   generateBatchProcessingScript,
   wrapAntiDetectionScript,
   performInitialScrollPattern,
-  performRandomScroll 
+  performRandomScroll,
 } from "../zhipin/anti-detection-utils";
-import { 
-  getAdaptiveSelectors,
-  generateFindElementScript 
-} from "./dynamic-selector-utils";
+import { getAdaptiveSelectors, generateFindElementScript } from "./dynamic-selector-utils";
 
 export const getUnreadMessagesTool = tool({
   description: `获取Yupao聊天列表中所有未读消息候选人
@@ -45,7 +42,7 @@ export const getUnreadMessagesTool = tool({
   }) => {
     try {
       const client = await getPuppeteerMCPClient();
-      
+
       // 在获取候选人列表前执行初始滚动模式
       await performInitialScrollPattern(client);
 
@@ -55,12 +52,12 @@ export const getUnreadMessagesTool = tool({
         ${generateFindElementScript()}
         
         // 使用预定义的自适应选择器
-        const nameSelectors = ${JSON.stringify(getAdaptiveSelectors('candidateName'))};
-        const positionSelectors = ${JSON.stringify(getAdaptiveSelectors('jobTitle'))};
-        const unreadNumSelectors = ${JSON.stringify(getAdaptiveSelectors('unreadNum'))};
-        const statusSelectors = ${JSON.stringify(getAdaptiveSelectors('statusUnread'))};
-        const timeSelectors = ${JSON.stringify(getAdaptiveSelectors('messageTime'))};
-        const msgSelectors = ${JSON.stringify(getAdaptiveSelectors('msgText'))};
+        const nameSelectors = ${JSON.stringify(getAdaptiveSelectors("candidateName"))};
+        const positionSelectors = ${JSON.stringify(getAdaptiveSelectors("jobTitle"))};
+        const unreadNumSelectors = ${JSON.stringify(getAdaptiveSelectors("unreadNum"))};
+        const statusSelectors = ${JSON.stringify(getAdaptiveSelectors("statusUnread"))};
+        const timeSelectors = ${JSON.stringify(getAdaptiveSelectors("messageTime"))};
+        const msgSelectors = ${JSON.stringify(getAdaptiveSelectors("msgText"))};
         
         // 查找各个元素
         const nameElement = findElement(element, nameSelectors);
@@ -124,7 +121,7 @@ export const getUnreadMessagesTool = tool({
         const findConvItems = () => {
           const selectors = [
             selector, // 首先尝试传入的选择器
-            ...${JSON.stringify(getAdaptiveSelectors('convItem'))} // 使用预定义的自适应选择器
+            ...${JSON.stringify(getAdaptiveSelectors("convItem"))} // 使用预定义的自适应选择器
           ];
           
           for (const sel of selectors) {
@@ -203,13 +200,13 @@ export const getUnreadMessagesTool = tool({
 
       // 执行脚本
       const result = await tool.execute({ script });
-      
+
       // 在获取结果后再执行一次随机滚动
       await performRandomScroll(client, {
         minDistance: 30,
         maxDistance: 100,
         probability: 0.4,
-        direction: 'both'
+        direction: "both",
       });
 
       // 解析结果

@@ -1,10 +1,10 @@
 /**
  * 反爬虫检测规避工具函数
- * 
+ *
  * 这些函数用于模拟真实用户行为，降低被反爬虫系统检测的风险
  */
 
-import type { MCPClient } from '@/types/mcp';
+import type { MCPClient } from "@/types/mcp";
 
 /**
  * 生成随机延迟
@@ -45,20 +45,20 @@ export const humanDelay = (): Promise<void> => {
 export const obfuscatedLog = (message: string): string => {
   // 替换敏感关键词
   const replacements: Record<string, string> = {
-    'candidate': 'c4nd1d',
-    'Candidate': 'C4nd1d',
-    'candidates': 'c4nd1ds',
-    'Processed': 'Pr0c3ss3d',
-    'Found': 'F0und',
-    'chat': 'ch4t',
-    'message': 'm3ss4g3',
-    'unread': 'unr34d',
-    'click': 'cl1ck',
+    candidate: "c4nd1d",
+    Candidate: "C4nd1d",
+    candidates: "c4nd1ds",
+    Processed: "Pr0c3ss3d",
+    Found: "F0und",
+    chat: "ch4t",
+    message: "m3ss4g3",
+    unread: "unr34d",
+    click: "cl1ck",
   };
 
   let obfuscated = message;
   Object.entries(replacements).forEach(([key, value]) => {
-    obfuscated = obfuscated.replace(new RegExp(key, 'g'), value);
+    obfuscated = obfuscated.replace(new RegExp(key, "g"), value);
   });
 
   // 添加随机 Unicode 字符作为前缀
@@ -203,7 +203,7 @@ export const generateMouseMovementScript = (): string => {
 export const generateRandomScrollScript = (): string => {
   const scrollDistance = 50 + Math.random() * 150; // 50-200px
   const duration = 200 + Math.random() * 300; // 200-500ms
-  
+
   return `
     // 平滑滚动
     const smoothScroll = (distance, duration) => {
@@ -251,10 +251,10 @@ export const obfuscateSelector = (selector: string): string => {
 export const wrapAntiDetectionScript = (innerScript: string): string => {
   // 生成随机延迟时间
   const randomDelayMs = Math.floor(Math.random() * 100);
-  
+
   // 判断脚本是否包含 await 关键字
-  const hasAwait = innerScript.includes('await ');
-  
+  const hasAwait = innerScript.includes("await ");
+
   if (hasAwait) {
     // 对于包含 await 的脚本，返回 async 函数体
     return `
@@ -324,17 +324,17 @@ export const shouldAddRandomBehavior = (probability: number = 0.3): boolean => {
 export const generateTypingDelay = (): number => {
   // 基础延迟 60-120ms
   const baseDelay = 60 + Math.random() * 60;
-  
+
   // 10% 概率出现较长延迟（思考）
   if (Math.random() < 0.1) {
     return baseDelay + 200 + Math.random() * 300;
   }
-  
+
   // 5% 概率出现很短延迟（快速输入）
   if (Math.random() < 0.05) {
     return 30 + Math.random() * 30;
   }
-  
+
   return baseDelay;
 };
 
@@ -357,11 +357,11 @@ export const clickWithMouseTrajectory = async (
   } = {}
 ): Promise<void> => {
   const tools = await mcpClient.tools();
-  
+
   if (!tools.puppeteer_evaluate || !tools.puppeteer_click) {
-    throw new Error('必需的 puppeteer 工具不可用');
+    throw new Error("必需的 puppeteer 工具不可用");
   }
-  
+
   // 获取目标元素的位置
   const getElementPositionScript = wrapAntiDetectionScript(`
     // 使用 JSON.stringify 来安全地处理选择器字符串
@@ -419,32 +419,38 @@ export const clickWithMouseTrajectory = async (
       height: rect.height
     };
   `);
-  
+
   const posResult = await tools.puppeteer_evaluate.execute({ script: getElementPositionScript });
-  const posData = parseEvaluateResult(posResult) as { success?: boolean; x?: number; y?: number; width?: number; height?: number } | null;
-  
+  const posData = parseEvaluateResult(posResult) as {
+    success?: boolean;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+  } | null;
+
   if (!posData?.success) {
     // 如果启用了回退机制，则直接使用 puppeteer_click
     if (options.fallbackToDirectClick !== false) {
       console.warn(`无法获取元素位置，回退到直接点击: ${selector}`);
-      
+
       // 添加一个随机延迟
-      const preClickDelay = options.preClickDelay || (50 + Math.random() * 100);
+      const preClickDelay = options.preClickDelay || 50 + Math.random() * 100;
       await randomDelay(preClickDelay, preClickDelay + 50);
-      
+
       // 直接点击
       await tools.puppeteer_click.execute({ selector });
       return;
     }
-    
+
     throw new Error(`无法获取元素位置: ${selector}`);
   }
-  
+
   // 生成鼠标轨迹
-  const steps = options.moveSteps || (15 + Math.floor(Math.random() * 10));
+  const steps = options.moveSteps || 15 + Math.floor(Math.random() * 10);
   const moveDelayMin = options.moveDelayMin || 10;
   const moveDelayMax = options.moveDelayMax || 30;
-  
+
   // 获取当前鼠标位置（使用视口中心作为起点）
   const getCurrentMouseScript = wrapAntiDetectionScript(`
     return {
@@ -452,10 +458,13 @@ export const clickWithMouseTrajectory = async (
       y: window.innerHeight / 2 + (Math.random() - 0.5) * 200
     };
   `);
-  
+
   const mouseResult = await tools.puppeteer_evaluate.execute({ script: getCurrentMouseScript });
-  const currentPos = parseEvaluateResult(mouseResult) as { x: number; y: number } || { x: 100, y: 100 };
-  
+  const currentPos = (parseEvaluateResult(mouseResult) as { x: number; y: number }) || {
+    x: 100,
+    y: 100,
+  };
+
   // 生成贝塞尔曲线轨迹
   const mouseTrajectoryScript = wrapAntiDetectionScript(`
     const start = ${JSON.stringify(currentPos)};
@@ -488,10 +497,12 @@ export const clickWithMouseTrajectory = async (
     
     return points;
   `);
-  
-  const trajectoryResult = await tools.puppeteer_evaluate.execute({ script: mouseTrajectoryScript });
-  const points = parseEvaluateResult(trajectoryResult) as Array<{x: number, y: number}> | null;
-  
+
+  const trajectoryResult = await tools.puppeteer_evaluate.execute({
+    script: mouseTrajectoryScript,
+  });
+  const points = parseEvaluateResult(trajectoryResult) as Array<{ x: number; y: number }> | null;
+
   // 模拟鼠标移动
   if (points && Array.isArray(points)) {
     for (const point of points) {
@@ -509,16 +520,16 @@ export const clickWithMouseTrajectory = async (
         `);
         await tools.puppeteer_evaluate.execute({ script: moveScript });
       }
-      
+
       // 每步之间的随机延迟
       await randomDelay(moveDelayMin, moveDelayMax);
     }
   }
-  
+
   // 点击前的小延迟
-  const preClickDelay = options.preClickDelay || (50 + Math.random() * 100);
+  const preClickDelay = options.preClickDelay || 50 + Math.random() * 100;
   await randomDelay(preClickDelay, preClickDelay + 50);
-  
+
   // 执行点击
   await tools.puppeteer_click.execute({ selector });
 };
@@ -561,7 +572,7 @@ export const performRandomScroll = async (
     maxDistance?: number; // 最大滚动距离，默认 300px
     duration?: number; // 滚动动画时长，默认 200-500ms
     probability?: number; // 执行滚动的概率，默认 0.3
-    direction?: 'down' | 'up' | 'both'; // 滚动方向，默认 both
+    direction?: "down" | "up" | "both"; // 滚动方向，默认 both
   } = {}
 ): Promise<void> => {
   const {
@@ -569,29 +580,29 @@ export const performRandomScroll = async (
     maxDistance = 300,
     duration = 200 + Math.random() * 300,
     probability = 0.3,
-    direction = 'both'
+    direction = "both",
   } = options;
-  
+
   // 根据概率决定是否执行滚动
   if (Math.random() > probability) {
     return;
   }
-  
+
   const tools = await mcpClient.tools();
   if (!tools.puppeteer_evaluate) {
     return;
   }
-  
+
   // 计算滚动距离
   let scrollDistance = minDistance + Math.random() * (maxDistance - minDistance);
-  
+
   // 根据方向调整滚动距离
-  if (direction === 'up') {
+  if (direction === "up") {
     scrollDistance = -scrollDistance;
-  } else if (direction === 'both') {
+  } else if (direction === "both") {
     scrollDistance = Math.random() < 0.7 ? scrollDistance : -scrollDistance; // 70% 向下，30% 向上
   }
-  
+
   // 执行滚动
   const scrollScript = wrapAntiDetectionScript(`
     const distance = ${scrollDistance};
@@ -623,7 +634,7 @@ export const performRandomScroll = async (
       to: start + distance
     };
   `);
-  
+
   try {
     await tools.puppeteer_evaluate.execute({ script: scrollScript });
     // 滚动后的小延迟
@@ -631,30 +642,28 @@ export const performRandomScroll = async (
   } catch (_e) {
     // 静默处理错误
   }
-}
+};
 
 /**
  * 在页面加载后执行初始滚动
  * 模拟用户开始浏览页面的行为
  */
-export const performInitialScrollPattern = async (
-  mcpClient: MCPClient
-): Promise<void> => {
+export const performInitialScrollPattern = async (mcpClient: MCPClient): Promise<void> => {
   // 第一次小幅度滚动
   await performRandomScroll(mcpClient, {
     minDistance: 100,
     maxDistance: 200,
     probability: 0.8,
-    direction: 'down'
+    direction: "down",
   });
-  
+
   await humanDelay();
-  
+
   // 第二次随机滚动
   await performRandomScroll(mcpClient, {
     minDistance: 50,
     maxDistance: 150,
     probability: 0.5,
-    direction: 'both'
+    direction: "both",
   });
-}
+};

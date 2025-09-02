@@ -68,12 +68,8 @@ export default function AgentConfigPage() {
   };
 
   // 更新临时配置
-  const updateTempConfig = (
-    provider: string,
-    field: keyof ProviderConfig,
-    value: string
-  ) => {
-    setTempProviderConfigs((prev) => ({
+  const updateTempConfig = (provider: string, field: keyof ProviderConfig, value: string) => {
+    setTempProviderConfigs(prev => ({
       ...prev,
       [provider]: {
         ...prev[provider],
@@ -87,7 +83,7 @@ export default function AgentConfigPage() {
   const handleResetProvider = (provider: string) => {
     const defaultConfig = DEFAULT_PROVIDER_CONFIGS[provider];
     if (defaultConfig) {
-      setTempProviderConfigs((prev) => ({
+      setTempProviderConfigs(prev => ({
         ...prev,
         [provider]: { ...defaultConfig },
       }));
@@ -118,11 +114,7 @@ export default function AgentConfigPage() {
         </div>
         <div className="flex gap-2">
           {hasUnsavedChanges && (
-            <Button
-              variant="outline"
-              onClick={saveProviderConfigs}
-              className="gap-2"
-            >
+            <Button variant="outline" onClick={saveProviderConfigs} className="gap-2">
               <CheckCircle className="h-4 w-4" />
               保存更改
             </Button>
@@ -137,9 +129,7 @@ export default function AgentConfigPage() {
       {hasUnsavedChanges && (
         <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
           <AlertCircle className="h-4 w-4 text-amber-600" />
-          <span className="text-sm text-amber-800">
-            有未保存的Provider配置更改
-          </span>
+          <span className="text-sm text-amber-800">有未保存的Provider配置更改</span>
         </div>
       )}
 
@@ -152,9 +142,7 @@ export default function AgentConfigPage() {
               <MessageSquare className="h-5 w-5 text-blue-500" />
               Chat API 主模型
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              用于 /api/chat 接口的主要对话模型
-            </p>
+            <p className="text-sm text-muted-foreground">用于 /api/chat 接口的主要对话模型</p>
           </CardHeader>
           <CardContent className="space-y-3">
             <Select value={chatModel} onValueChange={setChatModel}>
@@ -162,15 +150,13 @@ export default function AgentConfigPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {getChatModels().map((modelId) => {
+                {getChatModels().map(modelId => {
                   const model = MODEL_DICTIONARY[modelId];
                   return (
                     <SelectItem key={modelId} value={modelId}>
                       <div className="flex flex-col items-start">
                         <span className="font-medium">{model.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {model.description}
-                        </span>
+                        <span className="text-xs text-muted-foreground">{model.description}</span>
                       </div>
                     </SelectItem>
                   );
@@ -190,9 +176,7 @@ export default function AgentConfigPage() {
               <Zap className="h-5 w-5 text-green-500" />
               消息分类模型
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              用于分析用户消息意图的模型
-            </p>
+            <p className="text-sm text-muted-foreground">用于分析用户消息意图的模型</p>
           </CardHeader>
           <CardContent className="space-y-3">
             <Select value={classifyModel} onValueChange={setClassifyModel}>
@@ -200,15 +184,13 @@ export default function AgentConfigPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {getGeneralModels().map((modelId) => {
+                {getGeneralModels().map(modelId => {
                   const model = MODEL_DICTIONARY[modelId];
                   return (
                     <SelectItem key={modelId} value={modelId}>
                       <div className="flex flex-col items-start">
                         <span className="font-medium">{model.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {model.description}
-                        </span>
+                        <span className="text-xs text-muted-foreground">{model.description}</span>
                       </div>
                     </SelectItem>
                   );
@@ -228,9 +210,7 @@ export default function AgentConfigPage() {
               <Bot className="h-5 w-5 text-purple-500" />
               智能回复模型
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              用于生成最终回复内容的模型
-            </p>
+            <p className="text-sm text-muted-foreground">用于生成最终回复内容的模型</p>
           </CardHeader>
           <CardContent className="space-y-3">
             <Select value={replyModel} onValueChange={setReplyModel}>
@@ -238,15 +218,13 @@ export default function AgentConfigPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {getGeneralModels().map((modelId) => {
+                {getGeneralModels().map(modelId => {
                   const model = MODEL_DICTIONARY[modelId];
                   return (
                     <SelectItem key={modelId} value={modelId}>
                       <div className="flex flex-col items-start">
                         <span className="font-medium">{model.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {model.description}
-                        </span>
+                        <span className="text-xs text-muted-foreground">{model.description}</span>
                       </div>
                     </SelectItem>
                   );
@@ -285,9 +263,7 @@ export default function AgentConfigPage() {
                     重置
                   </Button>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {config.description}
-                </p>
+                <p className="text-sm text-muted-foreground">{config.description}</p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -295,9 +271,7 @@ export default function AgentConfigPage() {
                   <Input
                     id={`${provider}-baseurl`}
                     value={config.baseURL}
-                    onChange={(e) =>
-                      updateTempConfig(provider, "baseURL", e.target.value)
-                    }
+                    onChange={e => updateTempConfig(provider, "baseURL", e.target.value)}
                     placeholder="https://api.example.com/v1"
                   />
                 </div>
@@ -307,27 +281,19 @@ export default function AgentConfigPage() {
                   <Input
                     id={`${provider}-desc`}
                     value={config.description}
-                    onChange={(e) =>
-                      updateTempConfig(provider, "description", e.target.value)
-                    }
+                    onChange={e => updateTempConfig(provider, "description", e.target.value)}
                     placeholder="服务描述"
                   />
                 </div>
 
                 {/* 显示当前使用此Provider的模型 */}
                 <div className="pt-2">
-                  <Label className="text-xs text-muted-foreground">
-                    使用此Provider的模型:
-                  </Label>
+                  <Label className="text-xs text-muted-foreground">使用此Provider的模型:</Label>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {Object.entries(MODEL_DICTIONARY)
                       .filter(([, model]) => model.provider === provider)
                       .map(([modelId, model]) => (
-                        <Badge
-                          key={modelId}
-                          variant="secondary"
-                          className="text-xs"
-                        >
+                        <Badge key={modelId} variant="secondary" className="text-xs">
                           {model.name}
                         </Badge>
                       ))}
@@ -352,9 +318,7 @@ export default function AgentConfigPage() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">分类模型</Label>
-              <p className="font-medium">
-                {MODEL_DICTIONARY[classifyModel].name}
-              </p>
+              <p className="font-medium">{MODEL_DICTIONARY[classifyModel].name}</p>
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">回复模型</Label>

@@ -2,7 +2,7 @@ import { useEffect, useRef, type RefObject } from "react";
 
 export function useScrollToBottom(): [
   RefObject<HTMLDivElement | null>,
-  RefObject<HTMLDivElement | null>
+  RefObject<HTMLDivElement | null>,
 ] {
   const containerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);

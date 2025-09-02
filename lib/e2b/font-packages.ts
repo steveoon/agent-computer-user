@@ -68,9 +68,7 @@ export const CHINESE_FONT_PACKAGES: FontPackage[] = [
 /**
  * 检测系统中可用的字体包
  */
-export const detectAvailableFontPackages = async (
-  desktop: E2BDesktop
-): Promise<FontPackage[]> => {
+export const detectAvailableFontPackages = async (desktop: E2BDesktop): Promise<FontPackage[]> => {
   console.log("🔍 检测可用的字体包...");
   const available: FontPackage[] = [];
 
@@ -154,31 +152,20 @@ export const getFontStatus = async (desktop: E2BDesktop) => {
 
   try {
     // 检查字体工具
-    const toolCheck: CommandResult = await desktop.commands.run(
-      "which fc-list && echo 'ok'"
-    );
+    const toolCheck: CommandResult = await desktop.commands.run("which fc-list && echo 'ok'");
     status.hasFontTools = toolCheck.stdout?.includes("ok") ?? false;
 
     if (status.hasFontTools) {
       // 检查字体数量
-      const totalCheck: CommandResult = await desktop.commands.run(
-        "fc-list | wc -l"
-      );
+      const totalCheck: CommandResult = await desktop.commands.run("fc-list | wc -l");
       status.totalFonts = parseInt(totalCheck.stdout?.trim() || "0");
 
-      const chineseCheck: CommandResult = await desktop.commands.run(
-        "fc-list :lang=zh | wc -l"
-      );
+      const chineseCheck: CommandResult = await desktop.commands.run("fc-list :lang=zh | wc -l");
       status.chineseFonts = parseInt(chineseCheck.stdout?.trim() || "0");
     }
 
     // 检查已安装的字体包
-    const packages = [
-      "fonts-dejavu",
-      "fonts-liberation",
-      "fonts-wqy-zenhei",
-      "fontconfig",
-    ];
+    const packages = ["fonts-dejavu", "fonts-liberation", "fonts-wqy-zenhei", "fontconfig"];
     for (const pkg of packages) {
       try {
         const pkgCheck: CommandResult = await desktop.commands.run(

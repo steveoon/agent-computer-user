@@ -11,11 +11,7 @@ export const diagnoseE2BEnvironment = async (sandboxId?: string) => {
 
     // 测试截图
     try {
-      const image = (await withTimeout(
-        desktop.screenshot(),
-        10000,
-        "Screenshot"
-      )) as Buffer;
+      const image = (await withTimeout(desktop.screenshot(), 10000, "Screenshot")) as Buffer;
       console.log("✅ 截图功能正常，图片大小:", image.length, "字节");
     } catch (error) {
       console.error("❌ 截图失败:", error);
@@ -74,12 +70,7 @@ export const diagnoseE2BEnvironment = async (sandboxId?: string) => {
 
     // 检查可用的浏览器
     try {
-      const browsers = [
-        "firefox",
-        "chromium-browser",
-        "google-chrome",
-        "chrome",
-      ];
+      const browsers = ["firefox", "chromium-browser", "google-chrome", "chrome"];
       for (const browser of browsers) {
         try {
           await desktop.commands.run(`which ${browser}`);
@@ -113,9 +104,7 @@ export const diagnoseE2BEnvironment = async (sandboxId?: string) => {
           if (tool === "xdotool") {
             try {
               console.log("🔧 尝试安装 xdotool...");
-              await desktop.commands.run(
-                "apt-get update && apt-get install -y xdotool"
-              );
+              await desktop.commands.run("apt-get update && apt-get install -y xdotool");
               console.log("✅ xdotool 安装成功");
             } catch (installError) {
               console.log("⚠️ xdotool 安装失败:", installError);

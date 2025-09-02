@@ -63,13 +63,7 @@ export const sampleData: SampleData = {
             },
             minHoursPerWeek: 10,
             maxHoursPerWeek: 20,
-            preferredDays: [
-              "Monday",
-              "Tuesday",
-              "Wednesday",
-              "Thursday",
-              "Friday",
-            ],
+            preferredDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
             // 新增：出勤要求
             attendanceRequirement: {
               requiredDays: [1, 2, 3, 4, 5], // 周一到周五
@@ -196,13 +190,7 @@ export const sampleData: SampleData = {
             },
             minHoursPerWeek: 12,
             maxHoursPerWeek: 30,
-            preferredDays: [
-              "Tuesday",
-              "Wednesday",
-              "Thursday",
-              "Friday",
-              "Saturday",
-            ],
+            preferredDays: ["Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
             // 新增：出勤要求
             attendanceRequirement: {
               requiredDays: [5, 6, 7], // 周五-周日
@@ -394,13 +382,7 @@ export const sampleData: SampleData = {
             },
             minHoursPerWeek: 15,
             maxHoursPerWeek: 25,
-            preferredDays: [
-              "Monday",
-              "Tuesday",
-              "Wednesday",
-              "Thursday",
-              "Friday",
-            ],
+            preferredDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
             // 新增：出勤要求
             attendanceRequirement: {
               requiredDays: [1, 2, 3, 4, 5], // 周一-周五
@@ -482,10 +464,7 @@ export const sampleData: SampleData = {
           ],
           // 新增缺失的模板
           general_chat: ["好的，有什么其他问题可以问我，方便的话可以加个微信"],
-          age_concern: [
-            "你的年龄没问题的，听店长安排。",
-            "年龄要求比较灵活，你的情况可以考虑。",
-          ],
+          age_concern: ["你的年龄没问题的，听店长安排。", "年龄要求比较灵活，你的情况可以考虑。"],
           insurance_inquiry: ["有商业保险的。", "六姐门店有商业保险保障。"],
         },
         screening: {
@@ -512,12 +491,8 @@ export const sampleData: SampleData = {
             "可以，我可以安排你和{store_name}店长面试，方便加微信详细沟通吗？",
             "好的，我帮你约店长面谈，需要你的基本信息，可以加下微信吗？",
           ],
-          salary_inquiry: [
-            "基本时薪是{salary}元，最高可以到28元，具体看店长安排。",
-          ],
-          schedule_inquiry: [
-            "排班时间比较灵活，具体可以和店长沟通，一般是3-4小时的班。",
-          ],
+          salary_inquiry: ["基本时薪是{salary}元，最高可以到28元，具体看店长安排。"],
+          schedule_inquiry: ["排班时间比较灵活，具体可以和店长沟通，一般是3-4小时的班。"],
           // 🆕 新增：大米先生专属出勤要求回复模板
           attendance_inquiry: [
             "大米先生的出勤要求：{attendance_description}，最少{minimum_days}天，听店长安排。",
@@ -593,12 +568,7 @@ export const zhipinData = sampleData.zhipin;
 export const dataStats = {
   storeCount: sampleData.zhipin.stores.length,
   brandCount: Object.keys(sampleData.zhipin.brands).length,
-  positionCount: sampleData.zhipin.stores.reduce(
-    (sum, store) => sum + store.positions.length,
-    0
-  ),
-  districts: [
-    ...new Set(sampleData.zhipin.stores.map((store) => store.district)),
-  ],
+  positionCount: sampleData.zhipin.stores.reduce((sum, store) => sum + store.positions.length, 0),
+  districts: [...new Set(sampleData.zhipin.stores.map(store => store.district))],
   brands: Object.keys(sampleData.zhipin.brands),
 };

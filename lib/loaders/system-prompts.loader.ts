@@ -91,7 +91,6 @@ export async function getGeneralComputerSystemPrompt(): Promise<string> {
   }
 }
 
-
 /**
  * 便捷函数：获取所有系统提示词（用于管理界面）
  */

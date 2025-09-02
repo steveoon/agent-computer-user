@@ -10,7 +10,7 @@ import { z } from "zod";
 export const YupaoCandidateInfoSchema = z.object({
   name: z.string().optional(),
   position: z.string().optional(),
-  fullText: z.string().optional()
+  fullText: z.string().optional(),
 });
 
 export type YupaoCandidateInfo = z.infer<typeof YupaoCandidateInfoSchema>;
@@ -28,7 +28,7 @@ export interface YupaoUnreadCandidate {
 }
 
 export interface YupaoChatMsg {
-  sender: 'user' | 'candidate';
+  sender: "user" | "candidate";
   message: string;
   timestamp?: string;
   isSystemMessage?: boolean;
@@ -43,7 +43,7 @@ export interface YupaoConversation {
 
 export interface YupaoPageState {
   url: string;
-  pageType: 'chat' | 'im' | 'unknown';
+  pageType: "chat" | "im" | "unknown";
   isLoaded: boolean;
   hasUnreadMessages: boolean;
 }
@@ -69,7 +69,7 @@ export interface YupaoCandidateCard {
   expectedPosition?: string;
   expectedSalary?: string;
   expectedLocation?: string;
-  onlineStatus?: 'online' | 'recently' | 'offline' | 'contacted';
+  onlineStatus?: "online" | "recently" | "offline" | "contacted";
   buttonText?: string; // "聊一聊" or "继续聊"
   tags?: string[];
 }

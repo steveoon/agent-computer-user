@@ -51,10 +51,7 @@ export const AISDKLogo = () => {
                   </svg>
                 </div>
                 <div className="text-2xl font-bold text-zinc-800 dark:text-zinc-100">
-                  AI{" "}
-                  <span className="hidden min-[385px]:inline">
-                    SDK
-                  </span>
+                  AI <span className="hidden min-[385px]:inline">SDK</span>
                 </div>
               </div>
             </Link>
@@ -94,12 +91,7 @@ export const VercelIcon = ({ size = 16 }: { size: number }) => {
       width={size}
       style={{ color: "currentcolor" }}
     >
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M8 1L16 15H0L8 1Z"
-        fill="currentColor"
-      ></path>
+      <path fillRule="evenodd" clipRule="evenodd" d="M8 1L16 15H0L8 1Z" fill="currentColor"></path>
     </svg>
   );
 };

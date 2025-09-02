@@ -12,7 +12,7 @@ export const PROTECTED_ROUTES = [
   "/api/chat",
   "/api/sync",
   "/api/test-llm-reply",
-  "/api/desktop-url",  // E2B Desktop URL 获取
+  "/api/desktop-url", // E2B Desktop URL 获取
   "/admin",
 ] as const;
 
@@ -41,14 +41,14 @@ export const EXCLUDED_PATHS = [
  * 🔍 检查路径是否为受保护路由
  */
 export const isProtectedRoute = (pathname: string): boolean => {
-  return PROTECTED_ROUTES.some((route) => pathname.startsWith(route));
+  return PROTECTED_ROUTES.some(route => pathname.startsWith(route));
 };
 
 /**
  * 🔍 检查路径是否为公开API路由
  */
 export const isPublicApiRoute = (pathname: string): boolean => {
-  return PUBLIC_API_ROUTES.some((route) => pathname.startsWith(route));
+  return PUBLIC_API_ROUTES.some(route => pathname.startsWith(route));
 };
 
 /**

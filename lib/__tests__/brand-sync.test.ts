@@ -102,7 +102,7 @@ describe("品牌同步和导入功能测试", () => {
           lastUpdated: new Date().toISOString(),
         },
       });
-      
+
       // Mock getBrandData to return existing data
       mockGetBrandDataFn.mockResolvedValue(existingBrandData);
 
@@ -175,7 +175,9 @@ describe("品牌同步和导入功能测试", () => {
       expect(updatedData.brands["测试品牌"]).toEqual(existingBrandData.brands["测试品牌"]);
 
       // 验证肯德基保留了原有的话术模板
-      expect(updatedData.brands["肯德基"].templates.initial_inquiry).toEqual(["旧的肯德基话术模板"]);
+      expect(updatedData.brands["肯德基"].templates.initial_inquiry).toEqual([
+        "旧的肯德基话术模板",
+      ]);
       // 但其他配置应该更新
       expect(updatedData.brands["肯德基"].screening.age.max).toBe(60);
 
@@ -233,7 +235,7 @@ describe("品牌同步和导入功能测试", () => {
           lastUpdated: new Date().toISOString(),
         },
       });
-      
+
       // Mock getBrandData to return existing data
       mockGetBrandDataFn.mockResolvedValue(existingBrandData);
 
@@ -407,17 +409,23 @@ describe("品牌同步和导入功能测试", () => {
 
       // 门店完全替换
       expect(savedData.stores).toHaveLength(2);
-      expect(savedData.stores.every((s: Store) => s.id.startsWith("store_new_") || s.id.startsWith("store_ext_"))).toBe(true);
+      expect(
+        savedData.stores.every(
+          (s: Store) => s.id.startsWith("store_new_") || s.id.startsWith("store_ext_")
+        )
+      ).toBe(true);
 
       // 话术模板是新的
-      expect(savedData.brands["新品牌"].templates.initial_inquiry).toEqual(["新品牌的全新话术模板"]);
+      expect(savedData.brands["新品牌"].templates.initial_inquiry).toEqual([
+        "新品牌的全新话术模板",
+      ]);
     });
   });
 
   describe("数据验证", () => {
     it("同步时应该验证品牌名称是否在 ORGANIZATION_MAPPING 中", () => {
       const mappedBrands = Object.values(ORGANIZATION_MAPPING);
-      
+
       // 验证所有映射的品牌
       expect(mappedBrands).toContain("肯德基");
       expect(mappedBrands).toContain("成都你六姐");
@@ -462,7 +470,7 @@ describe("品牌同步和导入功能测试", () => {
           lastUpdated: new Date().toISOString(),
         },
       });
-      
+
       mockGetBrandDataFn.mockResolvedValue(existingBrandData);
 
       // 同步结果包含部分成功和失败的岗位
@@ -626,12 +634,12 @@ describe("品牌同步和导入功能测试", () => {
 
       // 验证门店数据
       expect(updatedData.stores).toHaveLength(2);
-      
+
       // 验证岗位数据 - 只有3个成功的岗位被同步
       const allPositions = updatedData.stores.flatMap((s: Store) => s.positions || []);
       expect(allPositions).toHaveLength(3);
       expect(allPositions.map(p => p.id)).toEqual(["pos_002", "pos_004", "pos_005"]);
-      
+
       // 验证失败的岗位 job_001 和 job_003 没有被同步
       expect(allPositions.find(p => p.id === "pos_001")).toBeUndefined();
       expect(allPositions.find(p => p.id === "pos_003")).toBeUndefined();
@@ -656,11 +664,13 @@ describe("品牌同步和导入功能测试", () => {
       expect(syncResult.errors).toHaveLength(3);
       expect(syncResult.errors[0]).toContain("服务员-早班");
       expect(syncResult.errors[0]).toContain("job_101");
-      expect(syncResult.errors[0]).toContain("workTimeArrangement.combinedArrangementTimes[0].startTime");
-      
+      expect(syncResult.errors[0]).toContain(
+        "workTimeArrangement.combinedArrangementTimes[0].startTime"
+      );
+
       expect(syncResult.errors[1]).toContain("经理-全天");
       expect(syncResult.errors[1]).toContain("requirementNum");
-      
+
       expect(syncResult.errors[2]).toContain("收银员");
       expect(syncResult.errors[2]).toContain("storeAddress");
 
@@ -745,7 +755,7 @@ describe("品牌同步和导入功能测试", () => {
           lastUpdated: new Date().toISOString(),
         },
       });
-      
+
       mockGetBrandDataFn.mockResolvedValue(existingBrandData);
 
       // 第二次同步，之前失败的岗位数据已修复
@@ -861,16 +871,16 @@ describe("品牌同步和导入功能测试", () => {
 
       // 验证之前失败的岗位现在被成功同步
       const allPositions = updatedData.stores.flatMap((s: Store) => s.positions || []);
-      
+
       // 应该有3个岗位：1个原有的 + 2个新同步的
       expect(allPositions.find(p => p.id === "pos_001")).toBeDefined();
       expect(allPositions.find(p => p.id === "pos_003")).toBeDefined();
-      
+
       // 验证岗位详情
       const pos001 = allPositions.find(p => p.id === "pos_001");
       expect(pos001?.name).toBe("服务员-早班");
       expect(pos001?.salary.base).toBe(26);
-      
+
       const pos003 = allPositions.find(p => p.id === "pos_003");
       expect(pos003?.name).toBe("收银员-晚班");
       expect(pos003?.salary.base).toBe(28);
@@ -917,7 +927,7 @@ describe("品牌同步和导入功能测试", () => {
           lastUpdated: new Date().toISOString(),
         },
       });
-      
+
       mockGetBrandDataFn.mockResolvedValue(existingBrandData);
 
       // 同步结果 - 所有岗位都失败
@@ -950,7 +960,9 @@ describe("品牌同步和导入功能测试", () => {
         processedRecords: 85,
         storeCount: 10,
         brandName: "肯德基",
-        errors: Array(15).fill("").map((_, i) => `岗位错误 ${i + 1}`),
+        errors: Array(15)
+          .fill("")
+          .map((_, i) => `岗位错误 ${i + 1}`),
         duration: 5000,
       };
 

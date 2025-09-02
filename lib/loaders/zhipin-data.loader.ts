@@ -24,11 +24,11 @@ import type { ModelConfig } from "@/lib/config/models";
 import type { CandidateInfo } from "@/lib/tools/zhipin/types";
 import type { SalaryDetails } from "../../types/zhipin";
 // 使用新的模块化 prompt engineering
-import { 
+import {
   ClassificationPromptBuilder,
   ReplyPromptBuilder,
   type ClassificationParams,
-  type ReplyBuilderParams
+  type ReplyBuilderParams,
 } from "@/lib/prompt-engineering";
 
 /**
@@ -39,16 +39,16 @@ import {
  */
 function buildSalaryDescription(salary: SalaryDetails): string {
   const { base, range, memo } = salary;
-  
+
   // 🎯 简单启发式判断：base值很小时可能是计件制
   const isPossiblyPieceRate = base < 10; // 小于10元通常不是时薪
-  
+
   // 🔧 构建基础薪资信息
-  let description = '';
-  
+  let description = "";
+
   if (isPossiblyPieceRate && memo) {
     // 可能是计件制，包含memo信息让LLM理解
-    description = `${base}元（${memo.replace(/\n/g, ' ').trim()}）`;
+    description = `${base}元（${memo.replace(/\n/g, " ").trim()}）`;
   } else {
     // 常规时薪
     description = `${base}元/时`;
@@ -57,10 +57,10 @@ function buildSalaryDescription(salary: SalaryDetails): string {
     }
     // 如果有memo且不太长，也包含进来
     if (memo && memo.length < 50) {
-      description += `（${memo.replace(/\n/g, ' ').trim()}）`;
+      description += `（${memo.replace(/\n/g, " ").trim()}）`;
     }
   }
-  
+
   return description;
 }
 
@@ -392,8 +392,8 @@ export async function classifyUserMessage(
       city: data.city,
       defaultBrand: data.defaultBrand || getBrandName(data),
       availableBrands: Object.keys(data.brands),
-      storeCount: data.stores.length
-    }
+      storeCount: data.stores.length,
+    },
   };
 
   // 构建分类提示
@@ -440,7 +440,7 @@ export async function classifyUserMessage(
       reasoningText: z.string().describe("分类依据和分析过程"),
     }),
     system: classificationPrompts.system,
-    prompt: classificationPrompts.prompt
+    prompt: classificationPrompts.prompt,
   });
 
   return classification;
@@ -529,7 +529,7 @@ export async function generateSmartReplyWithLLM(
       systemInstruction: systemPromptInstruction,
       conversationHistory,
       candidateInfo,
-      targetBrand
+      targetBrand,
     };
 
     // 使用新的构建器生成提示
@@ -702,7 +702,7 @@ function buildContextInfo(data: ZhipinData, classification: MessageClassificatio
         // 🔧 智能薪资信息构建（包含memo解析）
         const salaryInfo = buildSalaryDescription(pos.salary);
         context += `  职位：${pos.name}，时间：${pos.timeSlots.join("、")}，薪资：${salaryInfo}\n`;
-        
+
         if (pos.salary.bonus) {
           context += `  奖金：${pos.salary.bonus}\n`;
         }

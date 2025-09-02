@@ -19,21 +19,21 @@ AI SDK 4.x 提供了 `ai/test` 模块，包含以下测试工具：
 ```typescript
 // lib/__tests__/test-utils/ai-mocks.ts
 
-import { MockLanguageModelV1, mockId } from 'ai/test'
-import type { LanguageModelV1StreamPart } from 'ai'
+import { MockLanguageModelV1, mockId } from "ai/test";
+import type { LanguageModelV1StreamPart } from "ai";
 
 // 创建模拟文本流
 export function createMockTextStream(
   chunks: string[],
   options: MockStreamOptions = {}
-): MockLanguageModelV1
+): MockLanguageModelV1;
 
 // 创建模拟工具调用流
 export function createMockToolCallStream(
   toolName: string,
   args: any,
-  resultText: string = 'Tool executed successfully'
-): MockLanguageModelV1
+  resultText: string = "Tool executed successfully"
+): MockLanguageModelV1;
 ```
 
 ### 2. API 路由测试示例
@@ -41,25 +41,28 @@ export function createMockToolCallStream(
 ```typescript
 // app/api/chat/__tests__/route.test.ts
 
-import { describe, it, expect, vi } from 'vitest'
-import { POST } from '../route'
-import { createMockTextStream, createMockToolCallStream } from '@/lib/__tests__/test-utils/ai-mocks'
+import { describe, it, expect, vi } from "vitest";
+import { POST } from "../route";
+import {
+  createMockTextStream,
+  createMockToolCallStream,
+} from "@/lib/__tests__/test-utils/ai-mocks";
 
-describe('Chat API Route', () => {
-  it('should handle a simple text response', async () => {
-    const mockModel = createMockTextStream(['Hello', ', ', 'world!'])
+describe("Chat API Route", () => {
+  it("should handle a simple text response", async () => {
+    const mockModel = createMockTextStream(["Hello", ", ", "world!"]);
     // ... 设置 mock 和测试
-  })
+  });
 
-  it('should handle tool invocations', async () => {
+  it("should handle tool invocations", async () => {
     const mockModel = createMockToolCallStream(
-      'wechat',
-      { message: '测试消息' },
-      '已发送消息到微信群'
-    )
+      "wechat",
+      { message: "测试消息" },
+      "已发送消息到微信群"
+    );
     // ... 测试工具调用
-  })
-})
+  });
+});
 ```
 
 ## 组件测试
@@ -69,30 +72,32 @@ describe('Chat API Route', () => {
 ```typescript
 // components/chat/__tests__/ChatMessages.test.tsx
 
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import type { Message } from '@ai-sdk/react'
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import type { Message } from "@ai-sdk/react";
 
-describe('ChatMessages', () => {
-  it('renders tool invocation messages', () => {
-    const messages: Message[] = [{
-      id: '1',
-      role: 'assistant',
-      content: '',
-      parts: [
-        { type: 'text', text: 'Let me help you with that.' },
-        {
-          type: 'tool-invocation',
-          toolInvocationId: 'tool-1',
-          toolName: 'wechat',
-          state: 'result',
-          result: { success: true }
-        } as any
-      ]
-    }]
+describe("ChatMessages", () => {
+  it("renders tool invocation messages", () => {
+    const messages: Message[] = [
+      {
+        id: "1",
+        role: "assistant",
+        content: "",
+        parts: [
+          { type: "text", text: "Let me help you with that." },
+          {
+            type: "tool-invocation",
+            toolInvocationId: "tool-1",
+            toolName: "wechat",
+            state: "result",
+            result: { success: true },
+          } as any,
+        ],
+      },
+    ];
     // ... 渲染和断言
-  })
-})
+  });
+});
 ```
 
 ## 测试最佳实践
@@ -104,18 +109,18 @@ AI SDK React 使用 `parts` 数组而不是 `content` 数组：
 ```typescript
 // ✅ 正确
 const message: Message = {
-  id: '1',
-  role: 'user',
-  content: 'Hello',
-  parts: [{ type: 'text', text: 'Hello' }]
-}
+  id: "1",
+  role: "user",
+  content: "Hello",
+  parts: [{ type: "text", text: "Hello" }],
+};
 
 // ❌ 错误（旧格式）
 const message = {
-  id: '1',
-  role: 'user',
-  content: [{ type: 'text', text: 'Hello' }]
-}
+  id: "1",
+  role: "user",
+  content: [{ type: "text", text: "Hello" }],
+};
 ```
 
 ### 2. 工具调用格式
@@ -147,13 +152,13 @@ const message = {
 测试 API 路由时需要 mock 动态注册表：
 
 ```typescript
-vi.mock('@/lib/model-registry/dynamic-registry', () => ({
+vi.mock("@/lib/model-registry/dynamic-registry", () => ({
   getDynamicRegistry: vi.fn(() => ({
     languageModel: () => mockModel,
     textEmbeddingModel: () => null as any,
-    imageModel: () => null as any
-  }))
-}))
+    imageModel: () => null as any,
+  })),
+}));
 ```
 
 ### 4. 流式响应测试
@@ -161,20 +166,20 @@ vi.mock('@/lib/model-registry/dynamic-registry', () => ({
 测试流式响应时，需要正确读取和解析流：
 
 ```typescript
-const response = await POST(request)
-const reader = response.body?.getReader()
-const chunks: string[] = []
+const response = await POST(request);
+const reader = response.body?.getReader();
+const chunks: string[] = [];
 
 if (reader) {
   while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    chunks.push(new TextDecoder().decode(value))
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(new TextDecoder().decode(value));
   }
 }
 
-const responseText = chunks.join('')
-expect(responseText).toContain('expected content')
+const responseText = chunks.join("");
+expect(responseText).toContain("expected content");
 ```
 
 ## 工具调用测试场景
@@ -183,10 +188,10 @@ expect(responseText).toContain('expected content')
 
 ```typescript
 const mockModel = createMockToolCallStream(
-  'job_posting_generator',
-  { position: '前厅服务员', salary: '5000-6000' },
-  '招聘信息已生成'
-)
+  "job_posting_generator",
+  { position: "前厅服务员", salary: "5000-6000" },
+  "招聘信息已生成"
+);
 ```
 
 ### 2. 多个工具调用序列
@@ -197,7 +202,7 @@ const messages: Message[] = [{
   role: 'assistant',
   parts: [
     { type: 'text', text: '我将为您执行多个操作' },
-    { 
+    {
       type: 'tool-invocation',
       toolInvocationId: 'tool-1',
       toolName: 'zhipin_get_unread_candidates_improved',
@@ -205,7 +210,7 @@ const messages: Message[] = [{
       result: { candidates: [...] }
     },
     {
-      type: 'tool-invocation', 
+      type: 'tool-invocation',
       toolInvocationId: 'tool-2',
       toolName: 'zhipin_reply_generator',
       state: 'result',
@@ -218,13 +223,13 @@ const messages: Message[] = [{
 ### 3. 错误处理测试
 
 ```typescript
-it('should handle errors gracefully', async () => {
+it("should handle errors gracefully", async () => {
   vi.mocked(getDynamicRegistry).mockImplementation(() => {
-    throw new Error('Model initialization failed')
-  })
-  
-  await expect(POST(request)).rejects.toThrow('Model initialization failed')
-})
+    throw new Error("Model initialization failed");
+  });
+
+  await expect(POST(request)).rejects.toThrow("Model initialization failed");
+});
 ```
 
 ## 运行测试

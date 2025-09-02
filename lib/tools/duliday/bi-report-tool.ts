@@ -58,6 +58,15 @@ const FILTER_TYPES = {
 // ==================== 类型定义 ====================
 type Order = Record<string, unknown>;
 
+// 更严格的类型定义
+interface LoginResponse {
+  result: string;
+  response?: {
+    token: string;
+  };
+  message?: string;
+}
+
 type FilterCondition = {
   name: string;
   filterType: string;
@@ -72,6 +81,7 @@ type StoreStats = {
 // BI API 响应类型
 type BIApiResponse = {
   result: string;
+  message?: string;
   response?: {
     chartMain?: {
       offset?: number;
@@ -98,13 +108,27 @@ type BIApiResponse = {
 
 // ==================== 辅助函数 ====================
 /**
+ * 解析金额字符串，处理中文货币符号、千分位等
+ */
+function parseMoney(input: unknown): number {
+  if (input == null) return 0;
+
+  // 转换为字符串并移除货币符号、千分位、空格等
+  const normalized = String(input)
+    .replace(/[,\s¥￥]/g, "")
+    .replace(/，/g, "") // 中文逗号
+    .trim();
+
+  const value = Number(normalized);
+  return Number.isFinite(value) ? value : 0;
+}
+
+/**
  * 从订单中提取收入值
  */
 function extractRevenue(order: Order): number {
   const revenue = order[FIELD_NAMES.EXPECTED_REVENUE];
-  const value =
-    typeof revenue === "string" || typeof revenue === "number" ? parseFloat(String(revenue)) : 0;
-  return isNaN(value) ? 0 : value;
+  return parseMoney(revenue);
 }
 
 /**
@@ -199,27 +223,72 @@ function buildFilters(params: {
 }
 
 /**
+ * 带超时和重试的fetch请求
+ */
+async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  options: { timeout?: number; retries?: number; retryDelay?: number } = {}
+): Promise<Response> {
+  const { timeout = 10000, retries = 3, retryDelay = 1000 } = options;
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      const response = await fetch(input, {
+        ...init,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // 如果是5xx错误，重试
+      if (response.status >= 500 && attempt < retries - 1) {
+        console.log(`⚠️ 服务器错误 ${response.status}，${retryDelay}ms 后重试...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      if (attempt === retries - 1) throw error;
+
+      console.log(`⚠️ 请求失败，${retryDelay}ms 后重试 (${attempt + 1}/${retries})...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
+  }
+
+  throw new Error("请求失败，已达最大重试次数");
+}
+
+/**
  * 登录获取Token
  */
 async function login(): Promise<string> {
   console.log("🔐 正在登录获取Token...");
 
-  const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.LOGIN_ENDPOINT}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      domain: API_CONFIG.DOMAIN,
-      loginId: CREDENTIALS.LOGIN_ID,
-      password: CREDENTIALS.PASSWORD,
-    }),
-  });
+  const response = await fetchWithRetry(
+    `${API_CONFIG.BASE_URL}${API_CONFIG.LOGIN_ENDPOINT}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        domain: API_CONFIG.DOMAIN,
+        loginId: CREDENTIALS.LOGIN_ID,
+        password: CREDENTIALS.PASSWORD,
+      }),
+    },
+    { timeout: 15000, retries: 3 }
+  );
 
   if (!response.ok) {
     throw new Error(`登录失败: ${response.status} ${response.statusText}`);
   }
 
-  const data = await response.json();
-  if (data.result !== "ok") {
+  const data = (await response.json()) as LoginResponse;
+  if (data.result !== "ok" || !data.response?.token) {
     throw new Error(`登录失败: ${data.message || "未知错误"}`);
   }
 
@@ -237,7 +306,7 @@ async function fetchBIData(
   console.log("📤 正在请求BI数据...");
   console.log("请求参数:", JSON.stringify(queryPayload, null, 2));
 
-  const response = await fetch(
+  const response = await fetchWithRetry(
     `${API_CONFIG.BASE_URL}${API_CONFIG.DATA_ENDPOINT}/${API_CONFIG.CARD_ID}/data`,
     {
       method: "POST",
@@ -246,19 +315,67 @@ async function fetchBIData(
         "Content-Type": "application/json",
       },
       body: JSON.stringify(queryPayload),
-    }
+    },
+    { timeout: 20000, retries: 3 }
   );
 
   if (!response.ok) {
     throw new Error(`获取数据失败: ${response.status} ${response.statusText}`);
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as BIApiResponse;
   if (data.result !== "ok") {
     throw new Error(`API返回错误: ${data.message || "未知错误"}`);
   }
 
   return data;
+}
+
+/**
+ * 获取所有分页数据
+ */
+async function fetchAllPages(
+  token: string,
+  basePayload: Record<string, unknown>,
+  maxPages: number = 10
+): Promise<Order[]> {
+  const allOrders: Order[] = [];
+  let offset = Number(basePayload.offset) || 0; // 继承传入的offset
+  const limit = Math.min((basePayload.limit as number) || LIMITS.DEFAULT_LIMIT, LIMITS.MAX_LIMIT);
+
+  for (let page = 0; page < maxPages; page++) {
+    const payload = {
+      ...basePayload,
+      offset,
+      limit,
+    };
+
+    console.log(`📄 获取第 ${page + 1} 页数据 (offset: ${offset})...`);
+    const data = await fetchBIData(token, payload);
+    const chartMain = data.response?.chartMain;
+
+    if (!chartMain) break;
+
+    const orders = parseOrders(chartMain);
+    if (orders.length === 0) break;
+
+    allOrders.push(...orders);
+
+    // 检查是否还有更多数据
+    if (!chartMain.hasMoreData) {
+      console.log(`✅ 已获取所有数据，共 ${allOrders.length} 条`);
+      break;
+    }
+
+    offset += orders.length;
+
+    // 为避免请求过快，添加短暂延迟
+    if (page < maxPages - 1) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
+  return allOrders;
 }
 
 /**
@@ -311,64 +428,79 @@ function applyLocalFilters(
   }
 ): { filtered: Order[]; wasFiltered: boolean } {
   let filtered = orders;
-  let wasFiltered = false;
+  const originalCount = orders.length;
 
-  // 检查并应用门店过滤
+  // 门店过滤
   if (params.storeName) {
-    const storeName = params.storeName;
-    const needsFilter = filtered.some(o => {
+    const key = String(params.storeName).trim().toLowerCase();
+    filtered = filtered.filter(o => {
       const store = o[FIELD_NAMES.STORE_NAME];
-      return typeof store === "string" && !store.includes(storeName);
+      return typeof store === "string" && store.toLowerCase().includes(key);
     });
-
-    if (needsFilter) {
-      wasFiltered = true;
-      filtered = filtered.filter(o => {
-        const store = o[FIELD_NAMES.STORE_NAME];
-        return typeof store === "string" && store.includes(storeName);
-      });
-    }
   }
 
-  // 检查并应用大区过滤
+  // 大区过滤
   if (params.regionName) {
-    const regionName = params.regionName;
-    const needsFilter = filtered.some(o => {
+    const key = String(params.regionName).trim().toLowerCase();
+    filtered = filtered.filter(o => {
       const region = o[FIELD_NAMES.BIG_REGION];
-      return !(typeof region === "string" && region.includes(regionName));
+      return typeof region === "string" && region.toLowerCase().includes(key);
     });
-
-    if (needsFilter) {
-      wasFiltered = true;
-      filtered = filtered.filter(o => {
-        const region = o[FIELD_NAMES.BIG_REGION];
-        return typeof region === "string" && region.includes(regionName);
-      });
-    }
   }
 
-  // 检查并应用订单地区过滤
+  // 订单地区过滤
   if (params.orderRegionName) {
-    const orderRegionName = params.orderRegionName;
-    const needsFilter = filtered.some(o => {
+    const key = String(params.orderRegionName).trim().toLowerCase();
+    filtered = filtered.filter(o => {
       const region = o[FIELD_NAMES.ORDER_REGION];
-      return !(typeof region === "string" && region.includes(orderRegionName));
+      return typeof region === "string" && region.toLowerCase().includes(key);
     });
-
-    if (needsFilter) {
-      wasFiltered = true;
-      filtered = filtered.filter(o => {
-        const region = o[FIELD_NAMES.ORDER_REGION];
-        return typeof region === "string" && region.includes(orderRegionName);
-      });
-    }
   }
 
+  const wasFiltered = filtered.length < originalCount;
   if (wasFiltered) {
-    console.log("⚠️ API筛选未生效，已应用本地筛选");
+    console.log(`⚠️ 本地过滤: ${originalCount} → ${filtered.length} 条`);
   }
 
   return { filtered, wasFiltered };
+}
+
+/**
+ * 本地排序函数
+ */
+function sortOrders(orders: Order[], sortBy: string, sortOrder: "ASC" | "DESC" = "DESC"): Order[] {
+  return [...orders].sort((a, b) => {
+    let aValue = a[sortBy];
+    let bValue = b[sortBy];
+
+    // 处理金额排序
+    if (sortBy === FIELD_NAMES.EXPECTED_REVENUE) {
+      aValue = parseMoney(aValue);
+      bValue = parseMoney(bValue);
+    }
+
+    // 处理日期排序（包括所有日期相关字段）
+    const dateFields = [
+      FIELD_NAMES.ORDER_DATE,
+      FIELD_NAMES.SERVICE_DATE,
+      "派发时间",
+      "剩余开始时间"
+    ];
+    if (dateFields.includes(sortBy)) {
+      aValue = new Date(String(aValue || "")).getTime();
+      bValue = new Date(String(bValue || "")).getTime();
+    }
+
+    // 字符串比较
+    if (typeof aValue === "string" && typeof bValue === "string") {
+      return sortOrder === "ASC" ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+    }
+
+    // 数字比较
+    const numA = Number(aValue) || 0;
+    const numB = Number(bValue) || 0;
+    return sortOrder === "ASC" ? numA - numB : numB - numA;
+  });
 }
 
 /**
@@ -473,12 +605,30 @@ export const dulidayBiReportTool = () =>
           ...(headerSortings && { headerSortings }),
         };
 
-        // Step 3: 获取BI数据
-        const rawData = await fetchBIData(token, queryPayload);
+        // Step 3: 获取数据（支持分页）
+        let orders: Order[] = [];
+        let totalCount = 0;
+        let hasMoreData = false;
 
-        // Step 4: 解析数据
-        const chartMain = rawData.response?.chartMain;
-        let orders = parseOrders(chartMain);
+        // 判断是否需要获取全部数据
+        const needAllData = limit > LIMITS.MAX_LIMIT || formatType === "notification";
+
+        if (needAllData) {
+          // 获取所有分页数据
+          orders = await fetchAllPages(token, queryPayload);
+          totalCount = orders.length;
+        } else {
+          // 只获取第一页
+          const rawData = await fetchBIData(token, queryPayload);
+          const chartMain = rawData.response?.chartMain;
+          orders = parseOrders(chartMain);
+          totalCount = chartMain?.count || orders.length;
+          hasMoreData = chartMain?.hasMoreData || false;
+
+          if (hasMoreData) {
+            console.log(`ℹ️ 数据未完全加载，共有 ${totalCount} 条，当前显示 ${orders.length} 条`);
+          }
+        }
 
         if (orders.length === 0) {
           return {
@@ -487,15 +637,21 @@ export const dulidayBiReportTool = () =>
           };
         }
 
-        // Step 5: 应用本地过滤（如果需要）
-        const { filtered } = applyLocalFilters(orders, {
+        // Step 4: 应用本地过滤（如果需要）
+        const { filtered, wasFiltered } = applyLocalFilters(orders, {
           storeName,
           regionName,
           orderRegionName,
         });
         orders = filtered;
 
-        const totalCount = chartMain?.count || orders.length;
+        // Step 5: 本地排序（如果需要）
+        if (sortBy && orders.length > 0) {
+          orders = sortOrders(orders, sortBy, sortOrder);
+        }
+
+        // 如果本地过滤了数据，使用过滤后的数量作为总数
+        const displayCount = wasFiltered ? orders.length : totalCount;
 
         // 如果需要返回原始数据
         if (includeRawData) {
@@ -503,11 +659,12 @@ export const dulidayBiReportTool = () =>
             type: "text" as const,
             text: JSON.stringify(
               {
-                totalCount,
+                totalCount: displayCount,
+                originalCount: totalCount,
                 currentCount: orders.length,
-                hasMoreData: chartMain?.hasMoreData || false,
+                hasMoreData,
+                wasFiltered,
                 data: orders,
-                raw: rawData.response,
               },
               null,
               2
@@ -516,7 +673,7 @@ export const dulidayBiReportTool = () =>
         }
 
         // Step 6: 格式化输出
-        const message = formatOutput(orders, totalCount, formatType, params);
+        const message = formatOutput(orders, displayCount, formatType, params);
 
         return {
           type: "text" as const,
@@ -591,7 +748,9 @@ function formatSummary(
 
   message += `\n📈 数据统计：\n`;
   message += `   总记录数：${totalCount} 条\n`;
-  message += `   当前显示：${orders.length} 条\n`;
+  if (totalCount !== orders.length) {
+    message += `   筛选后：${orders.length} 条\n`;
+  }
 
   // 计算汇总数据
   const totalRevenue = calculateTotalRevenue(orders);
@@ -616,19 +775,20 @@ function formatSummary(
 function formatDetailed(orders: Order[], totalCount: number): string {
   let message = `📊 BI报表详细数据\n`;
   message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  message += `共 ${totalCount} 条记录，显示前 ${orders.length} 条\n\n`;
-
+  
   // 限制详细显示的条数
   const ordersToDisplay = orders.slice(0, LIMITS.MAX_DETAILED_DISPLAY);
+  message += `共 ${totalCount} 条记录，显示前 ${ordersToDisplay.length} 条\n\n`;
 
   ordersToDisplay.forEach((order, index) => {
     message += `【订单 ${index + 1}】\n`;
     message += `📍 门店：${order[FIELD_NAMES.STORE_NAME]}\n`;
     message += `📍 位置：${order[FIELD_NAMES.BIG_REGION]} - ${order[FIELD_NAMES.ORDER_REGION]}\n`;
-    message += `📅 服务日期：${order[FIELD_NAMES.ORDER_DATE]}\n`;
+    message += `📅 归属日期：${order[FIELD_NAMES.ORDER_DATE]}\n`;
     message += `⏰ 服务时间：${order[FIELD_NAMES.SERVICE_DATE]}\n`;
     message += `💼 服务内容：${order[FIELD_NAMES.SERVICE_CONTENT]}\n`;
-    message += `💰 预计收入：¥${order[FIELD_NAMES.EXPECTED_REVENUE]}\n`;
+    const revenue = parseMoney(order[FIELD_NAMES.EXPECTED_REVENUE]);
+    message += `💰 预计收入：¥${revenue.toFixed(2)}\n`;
     message += `📌 订单状态：${order[FIELD_NAMES.ORDER_STATUS]}\n`;
     message += `🔗 详情链接：${order[FIELD_NAMES.SHARE_LINK]}\n`;
     message += `─────────────────────\n`;
@@ -650,23 +810,28 @@ function formatNotification(orders: Order[]): string {
   let message = `【Duliday BI报表通知】\n\n`;
 
   const today = new Date().toISOString().split("T")[0];
-  const todayOrders = orders.filter(o => o[FIELD_NAMES.ORDER_DATE] === today);
+  // 统一使用SERVICE_DATE判断今日订单，与显示保持一致
+  const todayOrders = orders.filter(o => {
+    const serviceDate = String(o[FIELD_NAMES.SERVICE_DATE] || "");
+    return serviceDate.startsWith(today);
+  });
   const pendingOrders = orders.filter(o => o[FIELD_NAMES.ORDER_STATUS] === "待接受");
 
   if (todayOrders.length > 0) {
-    message += `📅 今日订单（${today}）：\n`;
+    message += `📅 今日服务订单（${today}）：\n`;
     todayOrders.forEach(order => {
       message += `• ${order[FIELD_NAMES.STORE_NAME]} - ${order[FIELD_NAMES.SERVICE_DATE]}\n`;
       message += `  ${order[FIELD_NAMES.SERVICE_CONTENT]}\n`;
-      message += `  预计收入：¥${order[FIELD_NAMES.EXPECTED_REVENUE]}\n\n`;
+      const revenue = parseMoney(order[FIELD_NAMES.EXPECTED_REVENUE]);
+      message += `  预计收入：¥${revenue.toFixed(2)}\n\n`;
     });
   }
 
   if (pendingOrders.length > 0) {
     message += `⚠️ 待接受订单（${pendingOrders.length}个）：\n`;
     pendingOrders.slice(0, LIMITS.MAX_NOTIFICATION_PENDING).forEach(order => {
-      message += `• ${order[FIELD_NAMES.STORE_NAME]} - ${order[FIELD_NAMES.ORDER_DATE]}\n`;
-      message += `  ${order[FIELD_NAMES.SHARE_TEXT]}\n\n`;
+      message += `• ${order[FIELD_NAMES.STORE_NAME]} - ${order[FIELD_NAMES.SERVICE_DATE]}\n`;
+      message += `  ${order[FIELD_NAMES.SHARE_TEXT] || order[FIELD_NAMES.SERVICE_CONTENT]}\n\n`;
     });
   }
 

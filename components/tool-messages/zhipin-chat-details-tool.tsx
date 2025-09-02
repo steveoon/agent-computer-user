@@ -3,10 +3,10 @@
 import { BaseToolMessage } from "./base-tool-message";
 import { FileText, User, MessageSquare, Clock } from "lucide-react";
 import { ToolMessageProps } from "./types";
-import { 
+import {
   getSenderDisplay,
   parseChatDetailsResult,
-  type ChatMessageSender
+  type ChatMessageSender,
 } from "@/types/chat-details";
 
 /**

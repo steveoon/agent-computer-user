@@ -379,7 +379,7 @@ function calculateMinHoursPerWeek(workTimeArrangement: DulidayRaw.WorkTimeArrang
     const minWorkDaysArray = workTimeArrangement.customWorkTimes
       .map(ct => ct.minWorkDays)
       .filter((days): days is number => days !== null && days !== undefined);
-    
+
     if (minWorkDaysArray.length > 0) {
       workDays = Math.min(...minWorkDaysArray);
     }
@@ -430,7 +430,7 @@ function generateAttendanceRequirement(
     const minWorkDaysArray = workTimeArrangement.customWorkTimes
       .map(ct => ct.minWorkDays)
       .filter((days): days is number => days !== null && days !== undefined);
-    
+
     if (minWorkDaysArray.length > 0) {
       minimumDays = Math.min(...minWorkDaysArray);
     }

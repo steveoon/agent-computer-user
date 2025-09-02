@@ -12,7 +12,7 @@ interface BrandEditorState {
   originalData: ZhipinData | undefined;
   localData: ZhipinData | undefined;
   jsonData: string;
-  
+
   // UI 状态
   editMode: "overview" | "json";
   editingBrand: string | null;
@@ -20,10 +20,10 @@ interface BrandEditorState {
   isLoading: boolean;
   isSaving: boolean;
   error: string | null;
-  
+
   // 编辑状态追踪
   hasUnsavedChanges: boolean;
-  
+
   // Actions
   initializeData: (data: ZhipinData) => void;
   setEditMode: (mode: "overview" | "json") => void;
@@ -61,7 +61,7 @@ export const useBrandEditorStore = create<BrandEditorState>()(
       hasUnsavedChanges: false,
 
       // 初始化数据
-      initializeData: (data) => {
+      initializeData: data => {
         set({
           originalData: data,
           localData: structuredClone(data),
@@ -72,17 +72,17 @@ export const useBrandEditorStore = create<BrandEditorState>()(
       },
 
       // 设置编辑模式
-      setEditMode: (mode) => {
+      setEditMode: mode => {
         set({ editMode: mode });
       },
 
       // 设置正在编辑的品牌
-      setEditingBrand: (brand) => {
+      setEditingBrand: brand => {
         set({ editingBrand: brand });
       },
 
       // 设置编辑类型
-      setEditingType: (type) => {
+      setEditingType: type => {
         set({ editingType: type });
       },
 
@@ -110,7 +110,7 @@ export const useBrandEditorStore = create<BrandEditorState>()(
           jsonData: JSON.stringify(updatedData, null, 2),
           hasUnsavedChanges: true,
         });
-        
+
         // 返回更新后的数据
         return updatedData;
       },
@@ -131,9 +131,9 @@ export const useBrandEditorStore = create<BrandEditorState>()(
 
         if (targetType === "all") {
           // 批量更新该品牌下所有门店的所有岗位
-          updatedStores.forEach((store) => {
+          updatedStores.forEach(store => {
             if (store.brand === brandName) {
-              store.positions.forEach((position) => {
+              store.positions.forEach(position => {
                 position.scheduleType = scheduleType;
                 position.schedulingFlexibility = { ...schedulingFlexibility };
               });
@@ -152,7 +152,7 @@ export const useBrandEditorStore = create<BrandEditorState>()(
           } else {
             // 更新门店下所有岗位
             if (updatedStores[storeIndex]) {
-              updatedStores[storeIndex].positions.forEach((position) => {
+              updatedStores[storeIndex].positions.forEach(position => {
                 position.scheduleType = scheduleType;
                 position.schedulingFlexibility = { ...schedulingFlexibility };
               });
@@ -170,15 +170,15 @@ export const useBrandEditorStore = create<BrandEditorState>()(
           jsonData: JSON.stringify(updatedData, null, 2),
           hasUnsavedChanges: true,
         });
-        
+
         // 返回更新后的数据
         return updatedData;
       },
 
       // 更新 JSON 数据
-      updateJsonData: (json) => {
+      updateJsonData: json => {
         set({ jsonData: json, hasUnsavedChanges: true });
-        
+
         // 尝试解析并同步到 localData
         try {
           const parsed = JSON.parse(json);
@@ -200,7 +200,7 @@ export const useBrandEditorStore = create<BrandEditorState>()(
       },
 
       // 保存数据
-      saveData: async (onSave) => {
+      saveData: async onSave => {
         set({ isSaving: true, error: null });
 
         try {
@@ -264,7 +264,7 @@ export const useBrandEditorStore = create<BrandEditorState>()(
       },
 
       // 设置错误信息
-      setError: (error) => {
+      setError: error => {
         set({ error });
       },
     }),

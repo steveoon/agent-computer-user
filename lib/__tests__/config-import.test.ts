@@ -452,7 +452,7 @@ describe("配置导入数据格式校验", () => {
 
       // 动态导入升级函数
       const { upgradeConfigData } = await import("@/lib/services/config.service");
-      
+
       // 升级配置（第三个参数 false 表示这是版本升级，不是修复）
       const upgradedConfig = await upgradeConfigData(oldConfig as any, false, false);
 
@@ -552,7 +552,7 @@ describe("配置导入数据格式校验", () => {
 
       // 动态导入升级函数
       const { upgradeConfigData } = await import("@/lib/services/config.service");
-      
+
       // 修复配置（第三个参数 true 表示这是修复，不是升级）
       const repairedConfig = await upgradeConfigData(latestButIncompleteConfig as any, false, true);
 
@@ -563,7 +563,7 @@ describe("配置导入数据格式校验", () => {
       if (finalResult.success) {
         // 验证版本号没有改变
         expect(finalResult.data.metadata.version).toBe("1.2.0");
-        
+
         // 验证缺失的模板字段已补全
         const brandTemplates = finalResult.data.brandData.brands["肯德基"].templates;
         expect(brandTemplates.flexibility_inquiry).toBeDefined();
@@ -571,7 +571,7 @@ describe("配置导入数据格式校验", () => {
         expect(brandTemplates.work_hours_inquiry).toBeDefined();
         expect(brandTemplates.availability_inquiry).toBeDefined();
         expect(brandTemplates.part_time_support).toBeDefined();
-        
+
         // 验证元数据中有 repairedAt 而不是 upgradedAt
         expect(finalResult.data.metadata).toHaveProperty("repairedAt");
         expect(finalResult.data.metadata).not.toHaveProperty("upgradedAt");

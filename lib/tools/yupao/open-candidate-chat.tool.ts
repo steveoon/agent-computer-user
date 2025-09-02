@@ -2,7 +2,11 @@ import { tool } from "ai";
 import { z } from "zod";
 import { YUPAO_UNREAD_SELECTORS } from "./constants";
 import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
-import { wrapAntiDetectionScript, clickWithMouseTrajectory, performRandomScroll } from "../zhipin/anti-detection-utils";
+import {
+  wrapAntiDetectionScript,
+  clickWithMouseTrajectory,
+  performRandomScroll,
+} from "../zhipin/anti-detection-utils";
 
 export const openCandidateChatTool = tool({
   description: `打开指定候选人的聊天窗口
@@ -253,24 +257,28 @@ export const openCandidateChatTool = tool({
           if (executionMatch && executionMatch[1].trim() !== "undefined") {
             const jsonResult = executionMatch[1].trim();
             const parsedResult = JSON.parse(jsonResult);
-            
+
             // 如果找到了点击目标，使用更可靠的方法执行点击
-            if (parsedResult.success && parsedResult.action === 'found' && parsedResult.clickTarget) {
+            if (
+              parsedResult.success &&
+              parsedResult.action === "found" &&
+              parsedResult.clickTarget
+            ) {
               const { selector, index, name } = parsedResult.clickTarget;
-              
+
               try {
                 // 添加随机延迟模拟人类行为
                 const delay = 50 + Math.random() * 100;
                 await new Promise(resolve => setTimeout(resolve, delay));
-                
+
                 // 在点击前执行随机滚动
                 await performRandomScroll(client, {
                   minDistance: 20,
                   maxDistance: 80,
                   probability: 0.3,
-                  direction: 'both'
+                  direction: "both",
                 });
-                
+
                 // 使用临时属性标记目标元素，避免选择器问题
                 const markScript = wrapAntiDetectionScript(`
                   const items = document.querySelectorAll('${selector}');
@@ -297,52 +305,61 @@ export const openCandidateChatTool = tool({
                   }
                   return { success: false, error: '无法找到目标元素' };
                 `);
-                
+
                 const markResult = await tools.puppeteer_evaluate.execute({ script: markScript });
                 const markData = parseEvaluateResult(markResult);
-                
-                if (markData && typeof markData === 'object' && 'success' in markData && markData.success) {
+
+                if (
+                  markData &&
+                  typeof markData === "object" &&
+                  "success" in markData &&
+                  markData.success
+                ) {
                   // 使用临时属性选择器点击
                   const tempSelector = `${selector}[data-temp-click-target="true"]`;
-                  
+
                   // 使用带鼠标轨迹的点击
                   await clickWithMouseTrajectory(client, tempSelector, {
                     preClickDelay: 200,
-                    moveSteps: 18
+                    moveSteps: 18,
                   });
-                  
+
                   // 清理临时属性
                   const cleanupScript = wrapAntiDetectionScript(`
                     const el = document.querySelector('[data-temp-click-target]');
                     if (el) el.removeAttribute('data-temp-click-target');
                   `);
                   await tools.puppeteer_evaluate.execute({ script: cleanupScript });
-                  
+
                   return {
                     success: true,
-                    action: 'clicked',
+                    action: "clicked",
                     clickedCandidate: parsedResult.candidateInfo,
                     totalCandidates: parsedResult.totalCandidates,
-                    message: '成功点击候选人' + (parsedResult.byIndex ? '（通过索引）' : '') + ': ' + parsedResult.candidateInfo.name
+                    message:
+                      "成功点击候选人" +
+                      (parsedResult.byIndex ? "（通过索引）" : "") +
+                      ": " +
+                      parsedResult.candidateInfo.name,
                   };
                 } else {
                   return {
                     success: false,
-                    error: '无法标记目标元素',
+                    error: "无法标记目标元素",
                     details: markData,
-                    candidateInfo: parsedResult.candidateInfo
+                    candidateInfo: parsedResult.candidateInfo,
                   };
                 }
               } catch (clickError) {
                 return {
                   success: false,
-                  error: '点击操作失败',
-                  details: clickError instanceof Error ? clickError.message : '未知错误',
-                  candidateInfo: parsedResult.candidateInfo
+                  error: "点击操作失败",
+                  details: clickError instanceof Error ? clickError.message : "未知错误",
+                  candidateInfo: parsedResult.candidateInfo,
                 };
               }
             }
-            
+
             return parsedResult;
           }
 

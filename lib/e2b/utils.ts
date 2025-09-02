@@ -12,10 +12,7 @@ interface SandboxWithExtensions extends Sandbox {
 }
 
 interface SandboxConstructor {
-  create: (
-    template: string,
-    options: SandboxOpts
-  ) => Promise<SandboxWithExtensions>;
+  create: (template: string, options: SandboxOpts) => Promise<SandboxWithExtensions>;
   connect: (id: string) => Promise<SandboxWithExtensions>;
   resume?: (id: string) => Promise<SandboxWithExtensions>;
 }
@@ -27,9 +24,7 @@ export const pauseDesktop = async (desktop: E2BDesktop) => {
     const extendedDesktop = desktop as unknown as SandboxWithExtensions;
     if (typeof extendedDesktop.pause !== "function") {
       // 目前 Desktop SDK 还不支持 pause 功能，我们提供一个优雅的降级方案
-      console.warn(
-        "Desktop SDK 暂停功能暂未完全支持，将保存沙盒ID以供后续连接使用"
-      );
+      console.warn("Desktop SDK 暂停功能暂未完全支持，将保存沙盒ID以供后续连接使用");
 
       // 返回当前沙盒ID，用于后续连接
       const sandboxId = desktop.sandboxId;
@@ -114,30 +109,24 @@ export const getDesktop = async (sandboxId?: string): Promise<E2BDesktop> => {
             console.log("Successfully resumed sandbox:", sandboxId);
             return resumed;
           } catch (resumeError) {
-            console.log(
-              "Failed to resume sandbox, creating new one:",
-              resumeError
-            );
+            console.log("Failed to resume sandbox, creating new one:", resumeError);
           }
         }
       } catch (connectError) {
-        console.log(
-          "Failed to connect to sandbox, creating new one:",
-          connectError
-        );
+        console.log("Failed to connect to sandbox, creating new one:", connectError);
       }
     }
 
     // 创建新的沙盒 - 使用可配置的分辨率
     const desktop = await Sandbox.create({
       resolution: [resolution.x, resolution.y], // 动态分辨率
-      dpi: dpi, // 动态 DPI 
+      dpi: dpi, // 动态 DPI
       timeoutMs: 3600000, // 延长到1小时 (3600000毫秒)
     });
-    
+
     console.log(`Created new sandbox with ID: ${desktop.sandboxId}`);
     console.log(`Resolution: ${resolution.x}x${resolution.y}, DPI: ${dpi}`);
-    
+
     // 启动桌面流
     await desktop.stream.start();
     console.log("Desktop stream started successfully");
@@ -156,7 +145,7 @@ export const getDesktopURL = async (id?: string) => {
   try {
     const desktop = await getDesktop(id);
     const streamUrl = desktop.stream.getUrl();
-    
+
     return { streamUrl, id: desktop.sandboxId };
   } catch (error) {
     console.error("Error in getDesktopURL:", error);
@@ -195,10 +184,7 @@ export const withTimeout = async <T>(
   operation: string
 ): Promise<T> => {
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(
-      () => reject(new Error(`${operation} timeout after ${timeoutMs}ms`)),
-      timeoutMs
-    );
+    setTimeout(() => reject(new Error(`${operation} timeout after ${timeoutMs}ms`)), timeoutMs);
   });
 
   return Promise.race([promise, timeoutPromise]);

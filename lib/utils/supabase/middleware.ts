@@ -1,11 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { SUPABASE_URL, SUPABASE_PUBLIC_ANON_KEY } from "@/lib/constants";
-import {
-  isProtectedRoute,
-  isPublicApiRoute,
-  isApiRoute,
-} from "@/lib/config/routes";
+import { isProtectedRoute, isPublicApiRoute, isApiRoute } from "@/lib/config/routes";
 
 /**
  * 更新会话
@@ -26,46 +22,40 @@ export const updateSession = async (request: NextRequest) => {
       console.error("[MIDDLEWARE] Supabase environment variables not set", {
         hasUrl: !!SUPABASE_URL,
         hasKey: !!SUPABASE_PUBLIC_ANON_KEY,
-        urlPrefix: SUPABASE_URL ? SUPABASE_URL.substring(0, 20) + "..." : "undefined"
+        urlPrefix: SUPABASE_URL ? SUPABASE_URL.substring(0, 20) + "..." : "undefined",
       });
       return response;
     }
 
-    const supabase = createServerClient(
-      SUPABASE_URL,
-      SUPABASE_PUBLIC_ANON_KEY,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            // 先更新request的cookies
-            cookiesToSet.forEach(({ name, value }) =>
-              request.cookies.set(name, value)
-            );
-
-            // 创建新的response，包含更新后的request
-            response = NextResponse.next({
-              request: {
-                headers: request.headers,
-              },
-            });
-
-            // 将所有cookies设置到response中，包括options
-            cookiesToSet.forEach(({ name, value, options }) =>
-              response.cookies.set(name, value, options)
-            );
-          },
+    const supabase = createServerClient(SUPABASE_URL, SUPABASE_PUBLIC_ANON_KEY, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
         },
-      }
-    );
+        setAll(cookiesToSet) {
+          // 先更新request的cookies
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+
+          // 创建新的response，包含更新后的request
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          });
+
+          // 将所有cookies设置到response中，包括options
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
+    });
 
     // This will refresh session if expired - required for Server Components
     // https://supabase.com/docs/guides/auth/server-side/nextjs
     let user = null;
     let error = null;
-    
+
     try {
       const result = await supabase.auth.getUser();
       user = result.data?.user;
@@ -76,10 +66,11 @@ export const updateSession = async (request: NextRequest) => {
         stack: fetchError instanceof Error ? fetchError.stack : undefined,
         supabaseUrl: SUPABASE_URL ? SUPABASE_URL.substring(0, 30) + "..." : "undefined",
         errorName: fetchError instanceof Error ? fetchError.name : "Unknown",
-        errorCause: fetchError instanceof Error && 'cause' in fetchError ? fetchError.cause : undefined
+        errorCause:
+          fetchError instanceof Error && "cause" in fetchError ? fetchError.cause : undefined,
       });
       // 针对 fetch failed 错误的特殊处理建议
-      if (fetchError instanceof Error && fetchError.message.includes('fetch failed')) {
+      if (fetchError instanceof Error && fetchError.message.includes("fetch failed")) {
         console.error("[MIDDLEWARE] Fetch failed troubleshooting tips:");
         console.error("1. Check if NEXT_PUBLIC_SUPABASE_URL is correctly set in .env");
         console.error("2. Verify the Supabase URL is accessible from your network");

@@ -1,7 +1,7 @@
 /**
  * Shared type definitions for chat details tools
  * Used by both Zhipin and Yupao chat details components
- * 
+ *
  * These types are derived from Zod schemas to ensure runtime validation
  * and compile-time type safety across recruitment platforms
  */
@@ -14,24 +14,24 @@ import { z } from "zod";
  * Chat message sender type schema
  */
 export const ChatMessageSenderSchema = z.enum([
-  "candidate",   // 候选人
-  "recruiter",   // 招聘者
-  "system",      // 系统消息
-  "unknown"      // 未知发送者
+  "candidate", // 候选人
+  "recruiter", // 招聘者
+  "system", // 系统消息
+  "unknown", // 未知发送者
 ]);
 
 /**
  * Chat message type schema
  */
 export const ChatMessageTypeSchema = z.enum([
-  "text",              // 文本消息
-  "system",            // 系统消息
-  "resume",            // 简历信息
-  "job-info",          // 岗位信息
-  "phone-exchange",    // 电话交换
+  "text", // 文本消息
+  "system", // 系统消息
+  "resume", // 简历信息
+  "job-info", // 岗位信息
+  "phone-exchange", // 电话交换
   "phone-exchange-request", // 电话交换请求
-  "wechat-exchange",   // 微信交换
-  "wechat-exchange-request" // 微信交换请求
+  "wechat-exchange", // 微信交换
+  "wechat-exchange-request", // 微信交换请求
 ]);
 
 /**
@@ -50,7 +50,7 @@ export const ChatMessageSchema = z.object({
   contactValue: z.string().optional().describe("联系方式值"),
   accepted: z.boolean().optional().describe("交换请求是否已接受"),
   isRead: z.boolean().optional().describe("消息是否已读"),
-  extraInfo: z.string().optional().describe("额外信息")
+  extraInfo: z.string().optional().describe("额外信息"),
 });
 
 /**
@@ -69,22 +69,24 @@ export const ChatStatsSchema = z.object({
   wechatIds: z.array(z.string()).optional().describe("交换的微信号列表"),
   truncated: z.boolean().optional().describe("是否被截断"),
   dataTruncated: z.boolean().optional().describe("数据是否被截断"),
-  originalDataSizeKB: z.number().optional().describe("原始数据大小(KB)")
+  originalDataSizeKB: z.number().optional().describe("原始数据大小(KB)"),
 });
 
 /**
  * Candidate information schema
  * Compatible with both platforms' candidate info structure
  */
-export const UnifiedCandidateInfoSchema = z.object({
-  name: z.string().optional().describe("候选人姓名"),
-  position: z.string().optional().describe("职位"),
-  age: z.string().optional().describe("年龄"),
-  experience: z.string().optional().describe("工作经验"),
-  education: z.string().optional().describe("学历"),
-  info: z.array(z.string()).optional().describe("其他信息标签"),
-  fullText: z.string().optional().describe("完整文本信息"),
-}).loose(); // Allow additional fields for platform-specific data
+export const UnifiedCandidateInfoSchema = z
+  .object({
+    name: z.string().optional().describe("候选人姓名"),
+    position: z.string().optional().describe("职位"),
+    age: z.string().optional().describe("年龄"),
+    experience: z.string().optional().describe("工作经验"),
+    education: z.string().optional().describe("学历"),
+    info: z.array(z.string()).optional().describe("其他信息标签"),
+    fullText: z.string().optional().describe("完整文本信息"),
+  })
+  .loose(); // Allow additional fields for platform-specific data
 
 /**
  * Chat details summary schema
@@ -93,7 +95,7 @@ export const ChatDetailsSummarySchema = z.object({
   candidateName: z.string().describe("候选人姓名"),
   candidatePosition: z.string().describe("候选人职位"),
   totalMessages: z.number().describe("总消息数"),
-  lastMessageTime: z.string().describe("最后消息时间")
+  lastMessageTime: z.string().describe("最后消息时间"),
 });
 
 /**
@@ -107,13 +109,13 @@ export const ChatDetailsDataSchema = z.object({
   stats: ChatStatsSchema.optional().describe("统计信息"),
   candidateInfoFound: z.boolean().optional().describe("是否找到候选人信息"),
   chatContainerFound: z.boolean().optional().describe("是否找到聊天容器"),
-  extractedAt: z.string().optional().describe("提取时间")
+  extractedAt: z.string().optional().describe("提取时间"),
 });
 
 /**
  * Complete chat details result schema
  * The final output structure from chat details tools
- * 
+ *
  * Note: Using strictObject to reject unknown fields and ensure type safety
  */
 export const ChatDetailsResultSchema = z.strictObject({
@@ -123,7 +125,7 @@ export const ChatDetailsResultSchema = z.strictObject({
   data: ChatDetailsDataSchema.optional().describe("聊天详情数据"),
   summary: ChatDetailsSummarySchema.optional().describe("聊天摘要"),
   formattedHistory: z.array(z.string()).optional().describe("格式化的对话历史"),
-  rawResult: z.unknown().optional().describe("原始结果(调试用)")
+  rawResult: z.unknown().optional().describe("原始结果(调试用)"),
 });
 
 // ========== TypeScript Types (derived from Zod schemas) ==========
@@ -207,37 +209,37 @@ export function parseChatDetailsResult(value: unknown): ChatDetailsResult | null
   if (value === null || value === undefined) {
     return null;
   }
-  
+
   const parsed = ChatDetailsResultSchema.safeParse(value);
   if (parsed.success) {
     return parsed.data;
   }
-  
+
   // Check if the value has any of the expected properties
   // If it's a completely unrelated object, return null
-  if (typeof value === 'object' && value !== null) {
+  if (typeof value === "object" && value !== null) {
     const obj = value as any;
-    const hasExpectedProps = 
-      'success' in obj || 
-      'message' in obj || 
-      'error' in obj || 
-      'data' in obj || 
-      'summary' in obj ||
-      'formattedHistory' in obj;
-    
+    const hasExpectedProps =
+      "success" in obj ||
+      "message" in obj ||
+      "error" in obj ||
+      "data" in obj ||
+      "summary" in obj ||
+      "formattedHistory" in obj;
+
     if (!hasExpectedProps) {
       console.warn("Object does not appear to be a ChatDetailsResult:", parsed.error);
       return null;
     }
-    
+
     // If it has some expected properties but failed validation,
     // try to return a partial result with what we can salvage
     console.warn("Failed to fully parse chat details result, returning partial:", parsed.error);
-    
+
     // Only return a partial object if at least one property is defined
     const partialResult: any = {};
     let hasDefinedValue = false;
-    
+
     if (obj.success !== undefined) {
       partialResult.success = obj.success;
       hasDefinedValue = true;
@@ -262,15 +264,15 @@ export function parseChatDetailsResult(value: unknown): ChatDetailsResult | null
       partialResult.formattedHistory = obj.formattedHistory;
       hasDefinedValue = true;
     }
-    
+
     // If no properties are defined, return null instead of an empty object
     if (!hasDefinedValue) {
       return null;
     }
-    
+
     return partialResult;
   }
-  
+
   // For non-objects, return null
   console.warn("Invalid type for chat details result:", typeof value);
   return null;
@@ -346,6 +348,6 @@ export function migrateToUnifiedType(oldResult: any): ChatDetailsResult {
     data: oldResult?.data,
     summary: oldResult?.summary,
     formattedHistory: oldResult?.formattedHistory,
-    rawResult: oldResult?.rawResult
+    rawResult: oldResult?.rawResult,
   };
 }

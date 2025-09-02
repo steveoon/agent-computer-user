@@ -170,25 +170,25 @@ class ContextOptimizer {
       name: info.name || "未知",
       gender: info.gender,
       age: info.age,
-      
+
       // 职业信息
       position: info.position,
       expectedSalary: info.expectedSalary,
       expectedLocation: info.expectedLocation,
       experience: info.experience,
       education: info.education,
-      
+
       // 身体条件
       height: info.height,
       weight: info.weight,
       healthCertificate: info.healthCertificate,
-      
+
       // 活跃度
       activeTime: info.activeTime,
-      
+
       // 其他信息
       info: info.info,
-      
+
       // 计算相关性分数
       relevanceScore: this.calculateRelevanceScore(info),
     };
@@ -202,36 +202,40 @@ class ContextOptimizer {
     let score = 0;
     const weights = {
       // 基础信息权重
-      name: 0.05,        // 有真实姓名
-      position: 0.15,    // 期望职位匹配
-      age: 0.10,         // 年龄信息
-      gender: 0.02,      // 性别信息
-      
+      name: 0.05, // 有真实姓名
+      position: 0.15, // 期望职位匹配
+      age: 0.1, // 年龄信息
+      gender: 0.02, // 性别信息
+
       // 关键匹配因素权重
-      expectedSalary: 0.15,     // 薪资期望
-      expectedLocation: 0.15,   // 工作地点期望
-      healthCertificate: 0.20,  // 健康证（服务行业关键）
-      
+      expectedSalary: 0.15, // 薪资期望
+      expectedLocation: 0.15, // 工作地点期望
+      healthCertificate: 0.2, // 健康证（服务行业关键）
+
       // 其他因素权重
-      experience: 0.08,   // 工作经验
-      education: 0.05,    // 学历
-      activeTime: 0.05,   // 活跃度（越近越好）
+      experience: 0.08, // 工作经验
+      education: 0.05, // 学历
+      activeTime: 0.05, // 活跃度（越近越好）
     };
 
     // 基础信息评分
     if (info.name && info.name !== "未知" && info.name !== "候选人") {
       score += weights.name;
     }
-    
+
     if (info.position) {
       score += weights.position;
       // 如果职位包含"店员"、"服务员"等关键词，额外加分
-      if (info.position.includes("店员") || info.position.includes("服务员") || 
-          info.position.includes("营业员") || info.position.includes("补货")) {
+      if (
+        info.position.includes("店员") ||
+        info.position.includes("服务员") ||
+        info.position.includes("营业员") ||
+        info.position.includes("补货")
+      ) {
         score += 0.05;
       }
     }
-    
+
     if (info.age) {
       score += weights.age;
       // 如果年龄在18-45岁之间（服务行业黄金年龄），额外加分
@@ -240,7 +244,7 @@ class ContextOptimizer {
         score += 0.03;
       }
     }
-    
+
     if (info.gender) {
       score += weights.gender;
     }
@@ -249,12 +253,15 @@ class ContextOptimizer {
     if (info.expectedSalary) {
       score += weights.expectedSalary;
       // 如果薪资期望在合理范围内（如6000-8000），额外加分
-      if (info.expectedSalary.includes("6000") || info.expectedSalary.includes("7000") || 
-          info.expectedSalary.includes("8000")) {
+      if (
+        info.expectedSalary.includes("6000") ||
+        info.expectedSalary.includes("7000") ||
+        info.expectedSalary.includes("8000")
+      ) {
         score += 0.05;
       }
     }
-    
+
     if (info.expectedLocation) {
       score += weights.expectedLocation;
       // 如果期望地点是"上海"或包含具体区域，额外加分
@@ -262,11 +269,11 @@ class ContextOptimizer {
         score += 0.03;
       }
     }
-    
+
     // 健康证 - 服务行业最重要的因素之一
     if (info.healthCertificate === true) {
       score += weights.healthCertificate;
-      score += 0.10; // 有健康证额外大幅加分
+      score += 0.1; // 有健康证额外大幅加分
     } else if (info.healthCertificate === false) {
       // 明确没有健康证要扣分
       score -= 0.05;
@@ -276,11 +283,11 @@ class ContextOptimizer {
     if (info.experience) {
       score += weights.experience;
     }
-    
+
     if (info.education) {
       score += weights.education;
     }
-    
+
     // 活跃度评分 - 越近期越好
     if (info.activeTime) {
       score += weights.activeTime;
@@ -292,7 +299,7 @@ class ContextOptimizer {
         score += 0.01; // 一般活跃
       }
     }
-    
+
     // 身高体重（某些岗位可能有要求）
     if (info.height) {
       score += 0.02;
@@ -300,7 +307,7 @@ class ContextOptimizer {
     if (info.weight) {
       score += 0.01;
     }
-    
+
     // 其他信息完整度
     if (info.info && Array.isArray(info.info) && info.info.length > 0) {
       score += 0.02 * Math.min(info.info.length, 3); // 最多加0.06分
@@ -394,7 +401,7 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
           "无表情符号",
           "口语化表达",
           "使用逗号和句号即可，避免感叹号",
-          "像平常聊天一样自然"
+          "像平常聊天一样自然",
         ],
       },
     };
@@ -490,7 +497,6 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
     };
   }
 
-
   /**
    * 格式化带记忆的分子提示
    */
@@ -553,39 +559,39 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
     if (ctx.candidateProfile) {
       const profile = ctx.candidateProfile;
       prompt += `[候选人资料]\n`;
-      
+
       // 基本信息
       prompt += `- 姓名: ${profile.name || "未知"}\n`;
       if (profile.gender) prompt += `- 性别: ${profile.gender}\n`;
       if (profile.age) prompt += `- 年龄: ${profile.age}\n`;
-      
+
       // 职业信息
       if (profile.position) prompt += `- 期望职位: ${profile.position}\n`;
       if (profile.expectedSalary) prompt += `- 期望薪资: ${profile.expectedSalary}\n`;
       if (profile.expectedLocation) prompt += `- 期望工作地: ${profile.expectedLocation}\n`;
       if (profile.experience) prompt += `- 工作经验: ${profile.experience}\n`;
       if (profile.education) prompt += `- 学历: ${profile.education}\n`;
-      
+
       // 身体条件（服务行业重要）
       if (profile.height) prompt += `- 身高: ${profile.height}\n`;
       if (profile.weight) prompt += `- 体重: ${profile.weight}\n`;
       if (profile.healthCertificate !== undefined) {
         prompt += `- 健康证: ${profile.healthCertificate ? "有" : "无"}\n`;
       }
-      
+
       // 活跃度信息
       if (profile.activeTime) prompt += `- 最近活跃: ${profile.activeTime}\n`;
-      
+
       // 其他信息
       if (profile.info && Array.isArray(profile.info) && profile.info.length > 0) {
         prompt += `- 其他信息: ${profile.info.join("、")}\n`;
       }
-      
+
       // 匹配度评分
       if ("relevanceScore" in profile && typeof profile.relevanceScore === "number") {
         prompt += `- 匹配度: ${(profile.relevanceScore * 100).toFixed(0)}%\n`;
       }
-      
+
       prompt += "\n";
     }
 

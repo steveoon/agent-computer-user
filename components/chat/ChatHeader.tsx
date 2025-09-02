@@ -4,11 +4,7 @@ import { Bot, Server, Cpu, Settings2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandSelector } from "@/components/brand-selector";
 import { UserNav } from "@/components/user-nav";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MODEL_DICTIONARY, type ModelId } from "@/lib/config/models";
 
 interface ChatHeaderProps {
@@ -91,16 +87,16 @@ export function ChatHeader({
                 sandboxStatus === "running"
                   ? "bg-green-500"
                   : sandboxStatus === "paused"
-                  ? "bg-yellow-500"
-                  : "bg-gray-400"
+                    ? "bg-yellow-500"
+                    : "bg-gray-400"
               }`}
             ></div>
             <span className="font-medium">
               {sandboxStatus === "running"
                 ? "运行中"
                 : sandboxStatus === "paused"
-                ? "已暂停"
-                : "未知"}
+                  ? "已暂停"
+                  : "未知"}
             </span>
           </div>
           {currentBrand && (
@@ -110,14 +106,9 @@ export function ChatHeader({
             </div>
           )}
           {/* 环境信息显示 */}
-          <div
-            className="flex items-center gap-1.5"
-            title={envInfo.description}
-          >
+          <div className="flex items-center gap-1.5" title={envInfo.description}>
             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-            <span className="font-medium capitalize">
-              {envInfo.environment}
-            </span>
+            <span className="font-medium capitalize">{envInfo.environment}</span>
           </div>
           {/* 模型配置显示 */}
           <Popover>
@@ -141,9 +132,7 @@ export function ChatHeader({
 
                 <div className="space-y-2">
                   <div className="bg-slate-50 rounded-lg p-3">
-                    <div className="text-xs text-slate-600 mb-1">
-                      主聊天模型
-                    </div>
+                    <div className="text-xs text-slate-600 mb-1">主聊天模型</div>
                     <div className="font-medium text-sm">
                       {MODEL_DICTIONARY[chatModel]?.name || chatModel}
                     </div>
@@ -151,21 +140,15 @@ export function ChatHeader({
                   </div>
 
                   <div className="bg-slate-50 rounded-lg p-3">
-                    <div className="text-xs text-slate-600 mb-1">
-                      消息分类模型
-                    </div>
+                    <div className="text-xs text-slate-600 mb-1">消息分类模型</div>
                     <div className="font-medium text-sm">
                       {MODEL_DICTIONARY[classifyModel]?.name || classifyModel}
                     </div>
-                    <div className="text-xs text-slate-500">
-                      {classifyModel}
-                    </div>
+                    <div className="text-xs text-slate-500">{classifyModel}</div>
                   </div>
 
                   <div className="bg-slate-50 rounded-lg p-3">
-                    <div className="text-xs text-slate-600 mb-1">
-                      智能回复模型
-                    </div>
+                    <div className="text-xs text-slate-600 mb-1">智能回复模型</div>
                     <div className="font-medium text-sm">
                       {MODEL_DICTIONARY[replyModel]?.name || replyModel}
                     </div>

@@ -19,7 +19,7 @@ export const cleanupSensitiveStorage = (): void => {
 
     let cleanedCount = 0;
 
-    sensitiveKeys.forEach((key) => {
+    sensitiveKeys.forEach(key => {
       if (localStorage.getItem(key) !== null) {
         localStorage.removeItem(key);
         cleanedCount++;
@@ -54,9 +54,7 @@ export const checkSensitiveStorage = (): {
     "authentication",
   ];
 
-  const foundKeys = sensitiveKeys.filter(
-    (key) => localStorage.getItem(key) !== null
-  );
+  const foundKeys = sensitiveKeys.filter(key => localStorage.getItem(key) !== null);
 
   return {
     hasSensitiveData: foundKeys.length > 0,

@@ -272,16 +272,18 @@ export class TokenAnalyzer {
                 const outputObj = parseToolOutput(output);
                 if (outputObj && outputObj.type === "image" && outputObj.data) {
                   // 对于图片数据，假设是 base64 字符串
-                  const dataLength = typeof outputObj.data === 'string' 
-                    ? outputObj.data.length 
-                    : String(outputObj.data).length;
+                  const dataLength =
+                    typeof outputObj.data === "string"
+                      ? outputObj.data.length
+                      : String(outputObj.data).length;
                   const imageKB = (dataLength * 3) / 4 / 1024;
                   toolChars += imageKB * 60; // 粗略估算图片字符数
                 } else if (outputObj && outputObj.type === "text" && outputObj.data) {
                   // 对于文本数据，获取字符串长度
-                  const textLength = typeof outputObj.data === 'string'
-                    ? outputObj.data.length
-                    : String(outputObj.data).length;
+                  const textLength =
+                    typeof outputObj.data === "string"
+                      ? outputObj.data.length
+                      : String(outputObj.data).length;
                   toolChars += textLength;
                 } else {
                   try {

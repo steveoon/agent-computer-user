@@ -6,18 +6,14 @@
 import { z } from "zod";
 import { UIMessage } from "ai";
 import type { ModelConfig } from "@/lib/config/models";
-import type { 
-  ZhipinData, 
-  SystemPromptsConfig, 
-  ReplyPromptsConfig 
-} from "./index";
+import type { ZhipinData, SystemPromptsConfig, ReplyPromptsConfig } from "./index";
 
 // ========== Chat API 相关类型 ==========
 
 /**
  * Chat API 请求体 Schema
  * 用于 POST /api/chat 接口
- * 
+ *
  * 注意：sandboxId 是可选的
  * - 当需要使用 computerTool 等沙盒工具时，必须提供有效的 sandboxId
  * - 对于纯文本对话或不需要沙盒的工具，可以不提供或设为 null
@@ -26,7 +22,7 @@ export const ChatRequestBodySchema = z.object({
   // 必需字段
   messages: z.array(z.any()), // UIMessage[] - Zod 无法验证复杂的 AI SDK 类型
   sandboxId: z.string().nullable(), // null 表示不使用沙盒
-  
+
   // 可选字段
   preferredBrand: z.string().optional(),
   modelConfig: z.any().optional(), // ModelConfig - 来自 lib/config/models
@@ -45,7 +41,7 @@ export interface ChatRequestBody {
   // 必需字段
   messages: UIMessage[];
   sandboxId: string | null; // null 表示不需要沙盒功能
-  
+
   // 可选字段
   preferredBrand?: string;
   modelConfig?: ModelConfig;

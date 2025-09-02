@@ -3,10 +3,7 @@
 import { useState } from "react";
 import { BrandSelector } from "@/components/brand-selector";
 import { useBrand } from "@/lib/contexts/brand-context";
-import {
-  clearBrandStorage,
-  getBrandStorageStatus,
-} from "@/lib/utils/brand-storage";
+import { clearBrandStorage, getBrandStorageStatus } from "@/lib/utils/brand-storage";
 import { useModelConfig } from "@/lib/stores/model-config-store";
 import { useConfigDataForChat } from "@/hooks/useConfigDataForChat";
 import { Settings, MessageSquare, X, Plus, ChevronUp, ChevronDown } from "lucide-react";
@@ -40,10 +37,10 @@ export default function TestLLMReplyPage() {
   const [selectedRole, setSelectedRole] = useState<"我" | "求职者">("求职者");
 
   // 📝 移动对话历史记录
-  const moveHistoryItem = (index: number, direction: 'up' | 'down') => {
+  const moveHistoryItem = (index: number, direction: "up" | "down") => {
     const newHistory = [...conversationHistory];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+
     if (targetIndex >= 0 && targetIndex < newHistory.length) {
       // 交换两个元素的位置
       [newHistory[index], newHistory[targetIndex]] = [newHistory[targetIndex], newHistory[index]];
@@ -145,10 +142,10 @@ export default function TestLLMReplyPage() {
 
       const data = await response.json();
       // 确保只存储文本内容，避免渲染对象
-      const replyText = typeof data.reply === 'string' ? data.reply : data.reply?.text || '';
+      const replyText = typeof data.reply === "string" ? data.reply : data.reply?.text || "";
       setReply(replyText);
-      setReplyType(data.replyType || '');
-      setReasoning(data.reasoningText || '');
+      setReplyType(data.replyType || "");
+      setReasoning(data.reasoningText || "");
     } catch (error) {
       console.error("测试失败:", error);
       setError(error instanceof Error ? error.message : "未知错误");
@@ -177,9 +174,7 @@ export default function TestLLMReplyPage() {
 
       {/* 当前模型配置显示 */}
       <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded">
-        <h2 className="text-lg font-semibold text-blue-800 mb-3">
-          🤖 当前模型配置
-        </h2>
+        <h2 className="text-lg font-semibold text-blue-800 mb-3">🤖 当前模型配置</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div>
             <span className="font-medium text-blue-700">分类模型：</span>
@@ -209,32 +204,36 @@ export default function TestLLMReplyPage() {
             {showHistoryEditor ? "收起" : "展开编辑"}
           </button>
         </div>
-        
+
         {conversationHistory.length > 0 && (
           <div className="mb-3 space-y-1">
             <div className="text-sm text-gray-600">当前历史记录：</div>
             {conversationHistory.map((msg, index) => {
-              const [role, ...contentParts] = msg.split(': ');
-              const content = contentParts.join(': ');
+              const [role, ...contentParts] = msg.split(": ");
+              const content = contentParts.join(": ");
               const isCandidate = role === "求职者";
-              
+
               return (
                 <div key={index} className="flex items-start gap-1 text-sm">
-                  <div className={`flex-1 flex items-center gap-2 p-2 rounded border ${
-                    isCandidate ? "bg-blue-50 border-blue-200" : "bg-green-50 border-green-200"
-                  }`}>
-                    <span className={`font-medium shrink-0 ${
-                      isCandidate ? "text-blue-700" : "text-green-700"
-                    }`}>
+                  <div
+                    className={`flex-1 flex items-center gap-2 p-2 rounded border ${
+                      isCandidate ? "bg-blue-50 border-blue-200" : "bg-green-50 border-green-200"
+                    }`}
+                  >
+                    <span
+                      className={`font-medium shrink-0 ${
+                        isCandidate ? "text-blue-700" : "text-green-700"
+                      }`}
+                    >
                       {role}:
                     </span>
                     <span className="flex-1">{content}</span>
                   </div>
-                  
+
                   {/* 排序按钮 */}
                   <div className="flex flex-col gap-0.5 shrink-0">
                     <button
-                      onClick={() => moveHistoryItem(index, 'up')}
+                      onClick={() => moveHistoryItem(index, "up")}
                       disabled={index === 0}
                       className="p-0.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
                       title="上移"
@@ -242,7 +241,7 @@ export default function TestLLMReplyPage() {
                       <ChevronUp className="w-3 h-3" />
                     </button>
                     <button
-                      onClick={() => moveHistoryItem(index, 'down')}
+                      onClick={() => moveHistoryItem(index, "down")}
                       disabled={index === conversationHistory.length - 1}
                       className="p-0.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
                       title="下移"
@@ -250,7 +249,7 @@ export default function TestLLMReplyPage() {
                       <ChevronDown className="w-3 h-3" />
                     </button>
                   </div>
-                  
+
                   {/* 删除按钮 */}
                   <button
                     onClick={() => {
@@ -267,7 +266,7 @@ export default function TestLLMReplyPage() {
             })}
           </div>
         )}
-        
+
         {showHistoryEditor && (
           <div className="space-y-3">
             <div className="flex gap-2">
@@ -296,16 +295,16 @@ export default function TestLLMReplyPage() {
                   我
                 </button>
               </div>
-              
+
               {/* 消息输入框 */}
               <input
                 type="text"
                 value={historyInput}
-                onChange={(e) => setHistoryInput(e.target.value)}
+                onChange={e => setHistoryInput(e.target.value)}
                 placeholder={`输入${selectedRole}的消息内容`}
                 className="flex-1 p-2 border rounded"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && historyInput.trim()) {
+                onKeyDown={e => {
+                  if (e.key === "Enter" && historyInput.trim()) {
                     const formattedMessage = `${selectedRole}: ${historyInput.trim()}`;
                     setConversationHistory([...conversationHistory, formattedMessage]);
                     setHistoryInput("");
@@ -326,7 +325,7 @@ export default function TestLLMReplyPage() {
                 添加
               </button>
             </div>
-            
+
             <div className="flex items-center justify-between text-sm text-gray-600">
               <span>预设对话历史场景：</span>
               <span className="text-xs">按 Enter 快速添加</span>
@@ -337,7 +336,7 @@ export default function TestLLMReplyPage() {
                   setConversationHistory([
                     "求职者: 你好，我想找工作",
                     "我: 您好！我们正在招聘前厅服务员，请问您在上海哪个区呢？",
-                    "求职者: 我在杨浦区"
+                    "求职者: 我在杨浦区",
                   ]);
                 }}
                 className="p-2 text-left border rounded hover:bg-gray-50 text-sm"
@@ -349,7 +348,7 @@ export default function TestLLMReplyPage() {
                   setConversationHistory([
                     "求职者: 你们还招人吗？",
                     "我: 是的，我们正在招聘。请问您想找什么岗位呢？",
-                    "求职者: 前厅服务员，薪资多少？"
+                    "求职者: 前厅服务员，薪资多少？",
                   ]);
                 }}
                 className="p-2 text-left border rounded hover:bg-gray-50 text-sm"
@@ -361,7 +360,7 @@ export default function TestLLMReplyPage() {
                   setConversationHistory([
                     "求职者: 这个工作需要上夜班吗？",
                     "我: 我们有白班和晚班，可以根据您的情况安排。",
-                    "求职者: 那排班时间是怎么安排的？"
+                    "求职者: 那排班时间是怎么安排的？",
                   ]);
                 }}
                 className="p-2 text-left border rounded hover:bg-gray-50 text-sm"
@@ -373,7 +372,7 @@ export default function TestLLMReplyPage() {
                   setConversationHistory([
                     "求职者: 我之前没做过餐饮",
                     "我: 没关系，我们会提供带薪培训。",
-                    "求职者: 培训多久？培训期间有工资吗？"
+                    "求职者: 培训多久？培训期间有工资吗？",
                   ]);
                 }}
                 className="p-2 text-left border rounded hover:bg-gray-50 text-sm"
@@ -391,11 +390,9 @@ export default function TestLLMReplyPage() {
             </div>
           </div>
         )}
-        
+
         {!showHistoryEditor && conversationHistory.length === 0 && (
-          <p className="text-sm text-gray-500">
-            点击"展开编辑"添加对话历史，模拟真实的聊天场景
-          </p>
+          <p className="text-sm text-gray-500">点击"展开编辑"添加对话历史，模拟真实的聊天场景</p>
         )}
       </div>
 
@@ -406,7 +403,7 @@ export default function TestLLMReplyPage() {
           {testPresetMessages.map((msg, index) => (
             <button
               key={index}
-              onClick={(e) => {
+              onClick={e => {
                 e.preventDefault();
                 e.stopPropagation();
                 setClickedButton(index);
@@ -431,7 +428,7 @@ export default function TestLLMReplyPage() {
           <input
             type="text"
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={e => setMessage(e.target.value)}
             placeholder="输入候选人消息..."
             className="flex-1 p-2 border rounded"
             disabled={loading}
@@ -484,17 +481,13 @@ export default function TestLLMReplyPage() {
       {reply && !loading && (
         <div className="space-y-3">
           <div className="p-4 bg-green-100 border border-green-400 rounded">
-            <h3 className="font-semibold text-green-800 mb-2">
-              智能回复：
-            </h3>
+            <h3 className="font-semibold text-green-800 mb-2">智能回复：</h3>
             <p className="text-green-700">{reply}</p>
           </div>
-          
+
           {(replyType || reasoning) && (
             <div className="p-4 bg-blue-50 border border-blue-200 rounded">
-              <h3 className="font-semibold text-blue-800 mb-2">
-                📊 分类分析
-              </h3>
+              <h3 className="font-semibold text-blue-800 mb-2">📊 分类分析</h3>
               {replyType && (
                 <div className="mb-2">
                   <span className="font-medium text-blue-700">分类类型：</span>
@@ -544,12 +537,8 @@ export default function TestLLMReplyPage() {
             <div className="flex items-center justify-between">
               <div className="text-sm">
                 <strong>品牌状态：</strong>
-                <span className="text-blue-600 mx-1">
-                  {brandStats.currentBrand || "默认"}
-                </span>
-                <span className="text-gray-500">
-                  | 历史记录：{brandStats.historyCount}条
-                </span>
+                <span className="text-blue-600 mx-1">{brandStats.currentBrand || "默认"}</span>
+                <span className="text-gray-500">| 历史记录：{brandStats.historyCount}条</span>
               </div>
               <div className="flex gap-2">
                 <button

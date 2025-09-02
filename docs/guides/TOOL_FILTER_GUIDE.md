@@ -7,6 +7,7 @@
 ## 工具分组
 
 ### 1. 通用工具（所有场景可用）
+
 - `bash` - 命令行执行
   - E2B 模式：在沙箱环境中安全执行
   - 本地模式：在本地系统执行（开发环境显示警告，生产环境禁用）
@@ -14,13 +15,16 @@
 - `wechat` - 微信通知
 
 ### 2. E2B 桌面自动化工具
+
 - `computer` - 桌面控制（截图、点击、输入等）
 
 ### 3. Boss 直聘业务工具
+
 - `job_posting_generator` - 生成招聘信息
 - `zhipin_reply_generator` - 生成智能回复
 
 ### 4. Puppeteer 浏览器自动化工具
+
 - `puppeteer` - 浏览器自动化
 - `zhipin_get_unread_candidates_improved` - 获取未读候选人
 - `zhipin_open_candidate_chat_improved` - 打开候选人聊天
@@ -31,21 +35,27 @@
 ## 系统提示词与工具映射
 
 ### bossZhipinSystemPrompt（Boss 直聘 E2B 版）
+
 可用工具：
+
 - ✅ 通用工具（bash, feishu, wechat）
 - ✅ E2B 工具（computer）
 - ✅ Boss 直聘业务工具（job_posting_generator, zhipin_reply_generator）
 - ❌ Puppeteer 相关工具
 
 ### bossZhipinLocalSystemPrompt（Boss 直聘本地版）
+
 可用工具：
+
 - ✅ 通用工具（bash, feishu, wechat）
 - ✅ Boss 直聘业务工具（job_posting_generator, zhipin_reply_generator）
-- ✅ Puppeteer 及所有 zhipin_* 工具
+- ✅ Puppeteer 及所有 zhipin\_\* 工具
 - ❌ E2B 工具（computer）
 
 ### generalComputerSystemPrompt（通用计算机使用）
+
 可用工具：
+
 - ✅ 通用工具（bash, feishu, wechat）
 - ✅ E2B 工具（computer）
 - ✅ Puppeteer 工具
@@ -54,7 +64,9 @@
 ## 验证方法
 
 ### 1. 控制台日志
+
 工具过滤器会在控制台输出过滤结果：
+
 ```
 🔧 工具过滤: bossZhipinSystemPrompt - 从 13 个工具过滤为 6 个工具
 ✅ 可用工具: bash, feishu, wechat, computer, job_posting_generator, zhipin_reply_generator
@@ -75,7 +87,9 @@
    - 验证无法使用任何 Boss 直聘相关工具
 
 ### 3. 添加新工具
+
 如需添加新工具，请更新 `/lib/tools/tool-filter.ts` 中的：
+
 1. `TOOL_GROUPS` - 添加工具到相应分组
 2. `PROMPT_TOOL_MAPPING` - 更新系统提示词映射
 

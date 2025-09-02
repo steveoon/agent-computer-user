@@ -9,6 +9,7 @@ Neural Field Architecture (NFA) 是基于Context Engineering原则设计的多Ag
 ### 新增文件目录结构
 
 #### Phase 1 - 基础设施（当前实施）
+
 ```
 lib/
 ├── neural-field/                           # 神经场核心模块
@@ -24,6 +25,7 @@ types/
 ```
 
 #### Phase 2+ - 后续扩展（规划中）
+
 ```
 lib/
 ├── neural-field/
@@ -63,6 +65,7 @@ types/
 ### 1. SemanticField 类详解
 
 #### 1.1 类的核心职责
+
 - 维护统一的高维语义空间（默认1536维，对应OpenAI embedding维度）
 - 管理Agent激活状态和相互作用
 - 实现场演化和稳定性检测（包含共振逻辑）
@@ -77,23 +80,23 @@ export const FieldConfigSchema = z.object({
   dimensions: z.number().default(1536),
   // 语义场的维度，决定了场的表达能力
   // 1536维对应OpenAI text-embedding-3-small模型的输出维度
-  
+
   resonanceDecay: z.number().min(0).max(1).default(0.1),
   // 共振衰减率，控制Agent间相互影响的持续性
   // 0.1表示每次迭代共振强度衰减10%
   // 值越小，共振影响持续越久；值越大，系统收敛越快
-  
+
   boundaryPermeability: z.number().min(0).max(1).default(0.8),
   // 边界渗透率，控制信息注入场时的渗透程度
   // 0.8表示注入的信息有80%的强度进入场
   // 高值利于信息流动，低值保持场的稳定性
-  
+
   stabilityThreshold: z.number().default(0.01),
   // 稳定性阈值，判断场是否达到稳定状态
   // 当连续两次迭代的场变化小于此值时，认为场已稳定
   // 值越小，要求的稳定性越高，演化时间越长
-  
-  maxIterations: z.number().default(20)
+
+  maxIterations: z.number().default(20),
   // 最大演化迭代次数，防止无限循环
   // 20次通常足够达到稳定，可根据实际调整
 });
@@ -104,24 +107,24 @@ export const FieldConfigSchema = z.object({
 ```typescript
 class SemanticField {
   // 注入方法：将信息编码到场中
-  async inject(data: string | number[], position?: number): Promise<void>
+  async inject(data: string | number[], position?: number): Promise<void>;
   // data: 要注入的数据，可以是文本或向量
   // position: 注入位置，默认从0开始
   // 使用指数衰减函数确保平滑注入，避免场的突变
-  
+
   // 演化方法：让场通过Agent相互作用达到稳定
-  async evolve(iterations?: number): Promise<FieldState>
+  async evolve(iterations?: number): Promise<FieldState>;
   // iterations: 可选的迭代次数，覆盖默认配置
   // 返回最终的场状态，包含是否稳定的标志
-  
+
   // 切片方法：获取场的特定区域供Agent使用
-  getSlice(start: number, end: number): Float32Array
+  getSlice(start: number, end: number): Float32Array;
   // start: 切片起始位置
   // end: 切片结束位置
   // 返回指定区域的场向量
-  
+
   // 激活注册：Agent将其激活状态注册到场中
-  registerActivation(agentName: string, activation: Float32Array): void
+  registerActivation(agentName: string, activation: Float32Array): void;
   // agentName: Agent标识符
   // activation: Agent的激活向量
   // 用于后续的共振计算
@@ -144,21 +147,21 @@ class SemanticField {
 private applyResonance(): void {
   // 1. 获取所有Agent的激活状态
   const activations = Array.from(this.agentActivations.entries());
-  
+
   // 2. 计算两两Agent间的共振
   for (let i = 0; i < activations.length; i++) {
     for (let j = i + 1; j < activations.length; j++) {
       const [name1, vec1] = activations[i];
       const [name2, vec2] = activations[j];
-      
+
       // 3. 计算语义相似度（余弦相似度）
       const similarity = this.cosineSimilarity(vec1, vec2);
-      
+
       // 4. 相似度超过阈值(0.7)时产生共振
       if (similarity > 0.7) {
         // 5. 共振强度 = 相似度 × 衰减系数
         const resonanceStrength = similarity * (1 - this.config.resonanceDecay);
-        
+
         // 6. 更新场状态：相似的Agent会强化彼此的信号
         this.applyResonanceEffect(vec1, vec2, resonanceStrength);
       }
@@ -177,10 +180,10 @@ private checkStability(): boolean {
     const diff = this.state[i] - this.previousState[i];
     totalChange += diff * diff;
   }
-  
+
   // 归一化变化量
   const normalizedChange = Math.sqrt(totalChange) / this.state.length;
-  
+
   // 当变化小于阈值时，认为场已稳定
   return normalizedChange < this.config.stabilityThreshold;
 }
@@ -235,6 +238,7 @@ static cosineSimilarity(vec1: Float32Array, vec2: Float32Array): number
 为了简化向量运算实现并提高性能，建议使用以下数学库之一：
 
 **选项1：TensorFlow.js**
+
 ```typescript
 import * as tf from '@tensorflow/tfjs';
 
@@ -242,19 +246,20 @@ import * as tf from '@tensorflow/tfjs';
 static cosineSimilarity(vec1: Float32Array, vec2: Float32Array): number {
   const a = tf.tensor1d(vec1);
   const b = tf.tensor1d(vec2);
-  
+
   // TensorFlow.js内置的余弦相似度计算
   const similarity = tf.losses.cosineDistance(a, b, 0).dataSync()[0];
-  
+
   // 清理内存
   a.dispose();
   b.dispose();
-  
+
   return 1 - similarity; // 转换为相似度
 }
 ```
 
 **选项2：ml-matrix（轻量级）**
+
 ```typescript
 import { Matrix } from 'ml-matrix';
 
@@ -267,6 +272,7 @@ static normalize(vector: Float32Array): Float32Array {
 ```
 
 **性能优势**：
+
 - TensorFlow.js：支持WebGL加速，批量运算性能优异
 - ml-matrix：轻量级，适合简单运算，无需GPU
 - 两者都提供成熟的数学运算实现，减少手写错误
@@ -282,6 +288,7 @@ static normalize(vector: Float32Array): Float32Array {
 3. **QualityValidator** 检测到薪资话题，激活薪资披露规则检查，在其区域(1152-1536)产生合规激活
 
 共振过程：
+
 - 第1次迭代：三个Agent的激活模式开始相互影响
 - 第2-3次迭代：薪资相关的语义信号在场中增强
 - 第4-5次迭代：合规信号影响生成Agent，调整回复措辞
@@ -315,6 +322,7 @@ static normalize(vector: Float32Array): Float32Array {
 ## 下一步
 
 完成Phase 1后，我们将拥有：
+
 1. 完整的语义场基础设施
 2. 基本的共振机制实现
 3. 文本向量化能力

@@ -75,59 +75,61 @@ export namespace DulidayRaw {
     maxWorkDays: z.number().nullable(),
   });
 
-  export const WorkTimeArrangementSchema = z.object({
-    id: z.number(),
-    jobBasicInfoId: z.number(),
-    employmentForm: z.number(),
-    minWorkMonths: z.number(),
-    temporaryEmploymentStartTime: z.string().nullable(),
-    temporaryEmploymentEndTime: z.string().nullable(),
-    employmentDescription: z.string().nullable(),
-    monthWorkTimeRequirement: z.number(),
-    perMonthMinWorkTime: z.number().nullable(),
-    perMonthMinWorkTimeUnit: z.number().nullable(),
-    perMonthMaxRestTime: z.number().nullable(),
-    perMonthMaxRestTimeUnit: z.number().nullable(),
-    weekWorkTimeRequirement: z.number(),
-    perWeekNeedWorkDays: z.number().nullable(),
-    perWeekWorkDays: z.number().nullable(),
-    perWeekRestDays: z.number().nullable(),
-    evenOddType: z.number().nullable(),
-    customWorkTimes: z.array(CustomWorkTimeSchema).nullable(),
-    dayWorkTimeRequirement: z.number(),
-    perDayMinWorkHours: z.number().nullable(),
-    arrangementType: z.number(),
-    fixedArrangementTimes: z.array(FixedTimeSlotSchema).nullable(),
-    combinedArrangementTimes: z.array(WorkTimeArrangementSlotSchema).nullable(),
-    goToWorkStartTime: z.number().nullable(),
-    goToWorkEndTime: z.number().nullable(),
-    goOffWorkStartTime: z.number().nullable(),
-    goOffWorkEndTime: z.number().nullable(),
-    maxWorkTakingTime: z.number(),
-    restTimeDesc: z.string().nullable(),
-    workTimeRemark: z.string(),
-  }).refine(
-    (data) => {
-      // 确保 perWeekWorkDays 有值，或者所有 customWorkTimes 的 minWorkDays 都有值
-      if (data.perWeekWorkDays !== null && data.perWeekWorkDays !== undefined) {
-        return true; // perWeekWorkDays 有值，验证通过
+  export const WorkTimeArrangementSchema = z
+    .object({
+      id: z.number(),
+      jobBasicInfoId: z.number(),
+      employmentForm: z.number(),
+      minWorkMonths: z.number(),
+      temporaryEmploymentStartTime: z.string().nullable(),
+      temporaryEmploymentEndTime: z.string().nullable(),
+      employmentDescription: z.string().nullable(),
+      monthWorkTimeRequirement: z.number(),
+      perMonthMinWorkTime: z.number().nullable(),
+      perMonthMinWorkTimeUnit: z.number().nullable(),
+      perMonthMaxRestTime: z.number().nullable(),
+      perMonthMaxRestTimeUnit: z.number().nullable(),
+      weekWorkTimeRequirement: z.number(),
+      perWeekNeedWorkDays: z.number().nullable(),
+      perWeekWorkDays: z.number().nullable(),
+      perWeekRestDays: z.number().nullable(),
+      evenOddType: z.number().nullable(),
+      customWorkTimes: z.array(CustomWorkTimeSchema).nullable(),
+      dayWorkTimeRequirement: z.number(),
+      perDayMinWorkHours: z.number().nullable(),
+      arrangementType: z.number(),
+      fixedArrangementTimes: z.array(FixedTimeSlotSchema).nullable(),
+      combinedArrangementTimes: z.array(WorkTimeArrangementSlotSchema).nullable(),
+      goToWorkStartTime: z.number().nullable(),
+      goToWorkEndTime: z.number().nullable(),
+      goOffWorkStartTime: z.number().nullable(),
+      goOffWorkEndTime: z.number().nullable(),
+      maxWorkTakingTime: z.number(),
+      restTimeDesc: z.string().nullable(),
+      workTimeRemark: z.string(),
+    })
+    .refine(
+      data => {
+        // 确保 perWeekWorkDays 有值，或者所有 customWorkTimes 的 minWorkDays 都有值
+        if (data.perWeekWorkDays !== null && data.perWeekWorkDays !== undefined) {
+          return true; // perWeekWorkDays 有值，验证通过
+        }
+
+        // 如果 perWeekWorkDays 为空，检查 customWorkTimes
+        if (!data.customWorkTimes || data.customWorkTimes.length === 0) {
+          return false; // 两个都没有，验证失败
+        }
+
+        // 确保至少有一个 customWorkTime 的 minWorkDays 有值
+        return data.customWorkTimes.some(
+          ct => ct.minWorkDays !== null && ct.minWorkDays !== undefined
+        );
+      },
+      {
+        message: "必须提供 perWeekWorkDays 或至少一个 customWorkTimes.minWorkDays",
+        path: ["workTimeArrangement"],
       }
-      
-      // 如果 perWeekWorkDays 为空，检查 customWorkTimes
-      if (!data.customWorkTimes || data.customWorkTimes.length === 0) {
-        return false; // 两个都没有，验证失败
-      }
-      
-      // 确保至少有一个 customWorkTime 的 minWorkDays 有值
-      return data.customWorkTimes.some(
-        (ct) => ct.minWorkDays !== null && ct.minWorkDays !== undefined
-      );
-    },
-    {
-      message: "必须提供 perWeekWorkDays 或至少一个 customWorkTimes.minWorkDays",
-      path: ["workTimeArrangement"],
-    }
-  );
+    );
 
   export const PositionSchema = z.object({
     jobBasicInfoId: z.number(),
@@ -292,11 +294,14 @@ export const BaseTemplatesSchema = z.record(ReplyContextSchema, z.array(z.string
 export const OptionalTemplatesSchema = BaseTemplatesSchema.optional();
 
 // 必需的模板Schema（用于品牌配置）
-export const RequiredTemplatesSchema = BaseTemplatesSchema.refine(val => {
-  return val !== undefined && typeof val === 'object';
-}, {
-  message: "品牌配置必须包含templates字段",
-});
+export const RequiredTemplatesSchema = BaseTemplatesSchema.refine(
+  val => {
+    return val !== undefined && typeof val === "object";
+  },
+  {
+    message: "品牌配置必须包含templates字段",
+  }
+);
 
 // 筛选规则Schema
 export const ScreeningRulesSchema = z.object({
@@ -329,7 +334,7 @@ export const SampleDataSchema = z.object({
 });
 
 // 候选人信息从统一源导入，避免重复定义
-export { CandidateInfoSchema } from '@/lib/tools/zhipin/types';
+export { CandidateInfoSchema } from "@/lib/tools/zhipin/types";
 
 // 对话消息Schema
 export const ConversationMessageSchema = z.object({
@@ -393,7 +398,7 @@ export type BrandConfig = z.infer<typeof BrandConfigSchema>;
 export type ZhipinData = z.infer<typeof ZhipinDataSchema>;
 export type SampleData = z.infer<typeof SampleDataSchema>;
 export type ReplyContext = z.infer<typeof ReplyContextSchema>;
-export { type CandidateInfo } from '@/lib/tools/zhipin/types'; // 从统一源导出类型
+export { type CandidateInfo } from "@/lib/tools/zhipin/types"; // 从统一源导出类型
 export type ConversationMessage = z.infer<typeof ConversationMessageSchema>;
 export type MessageClassification = z.infer<typeof MessageClassificationSchema>;
 export type Extract = z.infer<typeof MessageClassificationSchema>["extractedInfo"];
@@ -454,15 +459,15 @@ export const REPLY_TYPE_NAMES: Record<ReplyContext, string> = {
   schedule_inquiry: "时间安排",
   interview_request: "面试请求",
   general_chat: "一般对话",
-  
+
   // 敏感信息类
   salary_inquiry: "薪资询问",
   age_concern: "年龄问题",
   insurance_inquiry: "保险询问",
-  
+
   // 跟进沟通类
   followup_chat: "跟进对话",
-  
+
   // 考勤排班类
   attendance_inquiry: "出勤要求",
   flexibility_inquiry: "排班灵活性",

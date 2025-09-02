@@ -52,7 +52,7 @@ export async function encodeTextsServer(texts: string[]): Promise<number[]> {
       console.log("✅ [Server] js-tiktoken 批量编码初始化成功");
     }
 
-    return texts.map((text) => {
+    return texts.map(text => {
       try {
         if (!encoding) {
           return Math.ceil(text.length / 4);
@@ -67,6 +67,6 @@ export async function encodeTextsServer(texts: string[]): Promise<number[]> {
   } catch (error) {
     console.warn("⚠️ [Server] js-tiktoken 批量编码失败:", error);
     // 降级到字符长度估算
-    return texts.map((text) => Math.ceil(text.length / 4));
+    return texts.map(text => Math.ceil(text.length / 4));
   }
 }

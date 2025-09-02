@@ -164,14 +164,16 @@ export const dulidayJobListTool = (customToken?: string, defaultBrand?: string) 
           jobs = jobs.filter(job => {
             const normalizedJobNickName = (job.jobNickName || "").toLowerCase();
             const normalizedJobName = (job.jobName || "").toLowerCase();
-            
+
             // 支持多种匹配方式：
             // 1. jobNickName 包含搜索关键词
             // 2. 搜索关键词包含 jobNickName
             // 3. jobName 中包含搜索关键词（作为后备）
-            return normalizedJobNickName.includes(normalizedSearch) ||
-                   normalizedSearch.includes(normalizedJobNickName) ||
-                   normalizedJobName.includes(normalizedSearch);
+            return (
+              normalizedJobNickName.includes(normalizedSearch) ||
+              normalizedSearch.includes(normalizedJobNickName) ||
+              normalizedJobName.includes(normalizedSearch)
+            );
           });
         }
 

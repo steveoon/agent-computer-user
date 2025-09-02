@@ -11,7 +11,7 @@ function parseEvaluateResult(result: unknown): Record<string, unknown> | null {
     const mcpResult = result as { content?: Array<{ text?: string }> };
     if (mcpResult?.content?.[0]?.text) {
       const resultText = mcpResult.content[0].text;
-      
+
       // 首先尝试标准格式解析（包含 "Execution result:"）
       const executionMatch = resultText.match(
         /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
@@ -28,7 +28,7 @@ function parseEvaluateResult(result: unknown): Record<string, unknown> | null {
           }
         }
       }
-      
+
       // 如果标准格式解析失败，尝试查找 JSON 对象
       const jsonMatch = resultText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -38,11 +38,11 @@ function parseEvaluateResult(result: unknown): Record<string, unknown> | null {
           // 静默处理错误
         }
       }
-      
+
       // 最后尝试直接解析整个文本
       try {
         const parsed = JSON.parse(resultText);
-        if (typeof parsed === 'object' && parsed !== null) {
+        if (typeof parsed === "object" && parsed !== null) {
           return parsed as Record<string, unknown>;
         }
       } catch {
@@ -65,14 +65,14 @@ export const zhipinGetUsername = tool({
     try {
       const client = await getPuppeteerMCPClient();
       const tools = await client.tools();
-      
+
       if (!tools.puppeteer_evaluate) {
         throw new Error("MCP tool puppeteer_evaluate not available");
       }
-      
+
       // 添加初始延迟
       await randomDelay(100, 300);
-      
+
       // 执行获取用户名的脚本
       const script = wrapAntiDetectionScript(`
         // 批量定义所有选择器
@@ -121,20 +121,20 @@ export const zhipinGetUsername = tool({
           message: "未找到用户名元素",
         };
       `);
-      
+
       // 执行脚本
       const scriptResult = await tools.puppeteer_evaluate.execute({ script });
 
       // 解析结果
       const result = parseEvaluateResult(scriptResult);
-      
+
       if (!result) {
         throw new Error("未能解析执行结果");
       }
 
       if (result.success && result.userName) {
         let successMessage = `✅ 成功获取BOSS直聘用户名：${result.userName}`;
-        
+
         if (result.usedSelector) {
           successMessage += `\n🔍 使用选择器：${result.usedSelector}`;
         }
@@ -151,12 +151,12 @@ export const zhipinGetUsername = tool({
       }
     } catch (error) {
       // 静默处理错误
-      
+
       let errorMessage = "❌ 获取用户名时发生错误";
       if (error instanceof Error) {
         errorMessage += `：${error.message}`;
       }
-      
+
       return {
         type: "text" as const,
         text: errorMessage,

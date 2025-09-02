@@ -44,8 +44,8 @@ export function SearchPagination<T>({
     if (!searchKeyword.trim()) return data;
 
     const keyword = searchKeyword.toLowerCase();
-    return data.filter((item) =>
-      searchKeys.some((key) => {
+    return data.filter(item =>
+      searchKeys.some(key => {
         const value = item[key];
         if (typeof value === "string") {
           return value.toLowerCase().includes(keyword);
@@ -88,7 +88,7 @@ export function SearchPagination<T>({
           <Input
             placeholder={placeholder}
             value={searchKeyword}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={e => handleSearch(e.target.value)}
             className="pl-10 pr-10"
           />
           {searchKeyword.trim() && (
@@ -102,15 +102,12 @@ export function SearchPagination<T>({
             </Button>
           )}
         </div>
-        <Select
-          value={itemsPerPage.toString()}
-          onValueChange={handleItemsPerPageChange}
-        >
+        <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
           <SelectTrigger className="w-[120px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {itemsPerPageOptions.map((option) => (
+            {itemsPerPageOptions.map(option => (
               <SelectItem key={option} value={option.toString()}>
                 {option} 条/页
               </SelectItem>
@@ -164,13 +161,9 @@ export function SearchPagination<T>({
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
                 // 只显示当前页附近的页码
-                if (
-                  page === 1 ||
-                  page === totalPages ||
-                  Math.abs(page - currentPage) <= 2
-                ) {
+                if (page === 1 || page === totalPages || Math.abs(page - currentPage) <= 2) {
                   return (
                     <Button
                       key={page}
@@ -182,11 +175,12 @@ export function SearchPagination<T>({
                       {page}
                     </Button>
                   );
-                } else if (
-                  page === currentPage - 3 ||
-                  page === currentPage + 3
-                ) {
-                  return <span key={page} className="px-1">...</span>;
+                } else if (page === currentPage - 3 || page === currentPage + 3) {
+                  return (
+                    <span key={page} className="px-1">
+                      ...
+                    </span>
+                  );
                 }
                 return null;
               })}

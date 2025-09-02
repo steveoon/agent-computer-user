@@ -27,10 +27,10 @@ import { themes, type ToolMessageProps } from "./types";
 
 export function MyNewToolMessage(props: ToolMessageProps) {
   const { args, state, result, isLatestMessage, status, messageId, partIndex } = props;
-  
+
   // 从 args 中提取需要显示的信息
   const { param1, param2 } = args;
-  
+
   return (
     <BaseToolMessage
       icon={Globe}
@@ -86,7 +86,7 @@ export const toolRegistry: Record<string, ToolConfig> = {
 ```tsx
 return (
   <BaseToolMessage
-    // ... 其他属性
+  // ... 其他属性
   >
     <div className="mt-2">
       {/* 自定义内容 */}

@@ -74,24 +74,24 @@ export async function classifyUserMessage(
 
 ### 16 种回复类型
 
-| 分类类型                    | 描述                   | 关键词示例           |
-| --------------------------- | ---------------------- | -------------------- |
-| `initial_inquiry`           | 初次咨询工作机会       | "找兼职"、"有工作吗" |
+| 分类类型                    | 描述                   | 关键词示例             |
+| --------------------------- | ---------------------- | ---------------------- |
+| `initial_inquiry`           | 初次咨询工作机会       | "找兼职"、"有工作吗"   |
 | `location_inquiry`          | 询问位置信息           | "哪里有工作"、"杨浦区" |
-| `no_location_match`         | 提到位置但无法匹配     | "浦西有工作吗"       |
-| `schedule_inquiry`          | 询问工作时间安排       | "什么时候上班"       |
-| `salary_inquiry`            | 询问薪资待遇           | "工资多少"           |
-| `interview_request`         | 表达面试意向           | "什么时候面试"       |
-| `age_concern`               | 年龄相关问题（敏感）   | "我 XX 岁可以吗"     |
-| `insurance_inquiry`         | 保险福利问题（敏感）   | "有保险吗"           |
-| `followup_chat`             | 需要跟进的聊天         | 后续沟通             |
-| `general_chat`              | 一般性对话             | 其他话题             |
-| `attendance_inquiry`        | 出勤要求咨询（🆕）     | "一周要上几天班？"   |
-| `flexibility_inquiry`       | 排班灵活性咨询（🆕）   | "可以换班吗？"       |
-| `attendance_policy_inquiry` | 考勤政策咨询（🆕）     | "考勤严格吗？"       |
-| `work_hours_inquiry`        | 工时要求咨询（🆕）     | "一周工作多少小时？" |
-| `availability_inquiry`      | 时间段可用性咨询（🆕） | "现在还有位置吗？"   |
-| `part_time_support`         | 兼职支持咨询（🆕）     | "支持兼职吗？"       |
+| `no_location_match`         | 提到位置但无法匹配     | "浦西有工作吗"         |
+| `schedule_inquiry`          | 询问工作时间安排       | "什么时候上班"         |
+| `salary_inquiry`            | 询问薪资待遇           | "工资多少"             |
+| `interview_request`         | 表达面试意向           | "什么时候面试"         |
+| `age_concern`               | 年龄相关问题（敏感）   | "我 XX 岁可以吗"       |
+| `insurance_inquiry`         | 保险福利问题（敏感）   | "有保险吗"             |
+| `followup_chat`             | 需要跟进的聊天         | 后续沟通               |
+| `general_chat`              | 一般性对话             | 其他话题               |
+| `attendance_inquiry`        | 出勤要求咨询（🆕）     | "一周要上几天班？"     |
+| `flexibility_inquiry`       | 排班灵活性咨询（🆕）   | "可以换班吗？"         |
+| `attendance_policy_inquiry` | 考勤政策咨询（🆕）     | "考勤严格吗？"         |
+| `work_hours_inquiry`        | 工时要求咨询（🆕）     | "一周工作多少小时？"   |
+| `availability_inquiry`      | 时间段可用性咨询（🆕） | "现在还有位置吗？"     |
+| `part_time_support`         | 兼职支持咨询（🆕）     | "支持兼职吗？"         |
 
 ### 信息提取
 
@@ -233,10 +233,8 @@ export async function needsDataUpgrade(): Promise<boolean> {
   }
 
   // AttendanceRequirement 字段检查
-  const hasAttendanceRequirements = config.brandData.stores.every((store) =>
-    store.positions.every(
-      (position) => position.attendanceRequirement !== undefined
-    )
+  const hasAttendanceRequirements = config.brandData.stores.every(store =>
+    store.positions.every(position => position.attendanceRequirement !== undefined)
   );
 
   return !hasAttendanceRequirements;

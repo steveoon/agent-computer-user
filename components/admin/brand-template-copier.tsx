@@ -45,7 +45,7 @@ export function BrandTemplateCopier({ data, onCopy }: BrandTemplateCopierProps) 
   const getTemplateCount = (brandName: string) => {
     const templates = data.brands[brandName]?.templates;
     if (!templates) return 0;
-    
+
     return Object.entries(templates).reduce((acc, [_, templateArray]) => {
       return acc + (templateArray?.length || 0);
     }, 0);
@@ -75,7 +75,7 @@ export function BrandTemplateCopier({ data, onCopy }: BrandTemplateCopierProps) 
     try {
       await onCopy(sourceBrand, targetBrand);
       setSuccess(true);
-      
+
       // 2秒后关闭对话框
       setTimeout(() => {
         setOpen(false);
@@ -122,7 +122,7 @@ export function BrandTemplateCopier({ data, onCopy }: BrandTemplateCopierProps) 
                 <SelectValue placeholder="选择要复制的品牌" />
               </SelectTrigger>
               <SelectContent>
-                {brandNames.map((brand) => {
+                {brandNames.map(brand => {
                   const templateCount = getTemplateCount(brand);
                   const scenarioCount = getScenarioCount(brand);
                   return (
@@ -145,7 +145,8 @@ export function BrandTemplateCopier({ data, onCopy }: BrandTemplateCopierProps) 
             </Select>
             {sourceBrand && (
               <p className="text-xs text-muted-foreground">
-                该品牌有 {getScenarioCount(sourceBrand)} 个场景，共 {getTemplateCount(sourceBrand)} 条话术
+                该品牌有 {getScenarioCount(sourceBrand)} 个场景，共 {getTemplateCount(sourceBrand)}{" "}
+                条话术
               </p>
             )}
           </div>
@@ -153,18 +154,14 @@ export function BrandTemplateCopier({ data, onCopy }: BrandTemplateCopierProps) 
           {/* 目标品牌选择 */}
           <div className="space-y-2">
             <label className="text-sm font-medium">目标品牌（复制到）</label>
-            <Select 
-              value={targetBrand} 
-              onValueChange={setTargetBrand}
-              disabled={!sourceBrand}
-            >
+            <Select value={targetBrand} onValueChange={setTargetBrand} disabled={!sourceBrand}>
               <SelectTrigger>
                 <SelectValue placeholder="选择目标品牌" />
               </SelectTrigger>
               <SelectContent>
                 {brandNames
                   .filter(brand => brand !== sourceBrand)
-                  .map((brand) => {
+                  .map(brand => {
                     const templateCount = getTemplateCount(brand);
                     const scenarioCount = getScenarioCount(brand);
                     return (
@@ -189,7 +186,8 @@ export function BrandTemplateCopier({ data, onCopy }: BrandTemplateCopierProps) 
               <Alert className="bg-yellow-50 border-yellow-200">
                 <AlertCircle className="h-4 w-4 text-yellow-600" />
                 <AlertDescription className="text-xs">
-                  注意：{targetBrand} 现有的 {getTemplateCount(targetBrand)} 条话术将被 {sourceBrand} 的话术替换
+                  注意：{targetBrand} 现有的 {getTemplateCount(targetBrand)} 条话术将被{" "}
+                  {sourceBrand} 的话术替换
                 </AlertDescription>
               </Alert>
             )}
@@ -218,10 +216,7 @@ export function BrandTemplateCopier({ data, onCopy }: BrandTemplateCopierProps) 
           <Button variant="outline" onClick={handleReset} disabled={copying}>
             重置
           </Button>
-          <Button 
-            onClick={handleCopy} 
-            disabled={!sourceBrand || !targetBrand || copying}
-          >
+          <Button onClick={handleCopy} disabled={!sourceBrand || !targetBrand || copying}>
             {copying ? "复制中..." : "确认复制"}
           </Button>
         </DialogFooter>

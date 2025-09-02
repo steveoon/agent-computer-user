@@ -6,7 +6,7 @@
 /**
  * 创建动态CSS选择器，用于匹配CSS modules的class
  * 例如: _convItem_xxxxx_48 -> [class*="_convItem_"]
- * 
+ *
  * @param baseClassName - 基础class名称，如 "_convItem", "_name-text" 等
  * @returns 返回一个CSS属性选择器，可以匹配任何包含该模式的class
  */
@@ -19,7 +19,7 @@ export function createDynamicClassSelector(baseClassName: string): string {
 /**
  * 生成自适应的选择器数组
  * 为每种元素类型提供多个备用选择器策略
- * 
+ *
  * @param elementType - 元素类型
  * @returns 返回一个选择器数组，按优先级排序
  */
@@ -28,71 +28,68 @@ export function getAdaptiveSelectors(elementType: string): string[] {
     convItem: [
       createDynamicClassSelector("_convItem"),
       'div[style*="padding: 0px 12px"] > div',
-      'div:has(img[width="40"][height="40"]):has(span)'
+      'div:has(img[width="40"][height="40"]):has(span)',
     ],
     candidateName: [
       createDynamicClassSelector("_name-text"),
       'span:first-child:not([class*="time"]):not([class*="unread"])',
-      'div > div > div > span:first-child'
+      "div > div > div > span:first-child",
     ],
     jobTitle: [
       createDynamicClassSelector("_title-dec"),
-      'span:nth-child(2)',
-      'div > div > div > span:nth-child(2)'
+      "span:nth-child(2)",
+      "div > div > div > span:nth-child(2)",
     ],
     unreadNum: [
       `${createDynamicClassSelector("_imageBox")} ${createDynamicClassSelector("_unreadNum")}`,
       'div:has(img[width="40"]) > span:not([class*="name"])',
-      'span:matches(/^\\d+$/)'
+      "span:matches(/^\\d+$/)",
     ],
-    statusUnread: [
-      createDynamicClassSelector("_status-unread"),
-      'span:matches(/^\\[.*\\]$/)'
-    ],
+    statusUnread: [createDynamicClassSelector("_status-unread"), "span:matches(/^\\[.*\\]$/)"],
     messageTime: [
       createDynamicClassSelector("_time"),
-      'span:matches(/^(\\d{1,2}:\\d{2}|昨天|今天)$/)'
+      "span:matches(/^(\\d{1,2}:\\d{2}|昨天|今天)$/)",
     ],
     msgText: [
       createDynamicClassSelector("_msg-text"),
-      'div:last-child:not([class*="time"]):not([class*="name"])'
+      'div:last-child:not([class*="time"]):not([class*="name"])',
     ],
     // Say Hello page selectors
     candidateCard: [
       createDynamicClassSelector("_card"),
       'div[class*="_card_"][style*="margin-top"]',
-      'div[data-index]:has(button:contains("聊一聊"))'
+      'div[data-index]:has(button:contains("聊一聊"))',
     ],
     sayHelloName: [
       createDynamicClassSelector("_name_xejow"),
       createDynamicClassSelector("_name") + ':not([class*="_nameR_"])',
-      'span[class*="_name_"]:not([class*="_nameR_"])'
+      'span[class*="_name_"]:not([class*="_nameR_"])',
     ],
     sayHelloButton: [
       createDynamicClassSelector("_chatBtn"),
       'button[class*="_btn_"][class*="_lightPrimaryStroke_"]',
-      'button:contains("聊一聊"), button:contains("继续聊")'
+      'button:contains("聊一聊"), button:contains("继续聊")',
     ],
     candidateIntro: [
       createDynamicClassSelector("_introduce"),
       'p[class*="_introduce_"]',
-      'div[class*="_cardML_"] > p:last-child'
+      'div[class*="_cardML_"] > p:last-child',
     ],
     candidateBaseInfo: [
       createDynamicClassSelector("_baseInfoStr"),
       'p[class*="_baseInfoStr_"]',
-      'div[class*="_cardML_"] > p:first-child'
+      'div[class*="_cardML_"] > p:first-child',
     ],
     candidateSalary: [
       createDynamicClassSelector("_salary"),
       'span[class*="_salary_"]',
-      'span:matches(/\\d+[-~]\\d+元/)'
+      "span:matches(/\\d+[-~]\\d+元/)",
     ],
     candidateOnlineStatus: [
       createDynamicClassSelector("_onlineYes"),
       createDynamicClassSelector("_online"),
-      'p[class*="_online"]'
-    ]
+      'p[class*="_online"]',
+    ],
   };
 
   return selectors[elementType] || [];
@@ -101,7 +98,7 @@ export function getAdaptiveSelectors(elementType: string): string[] {
 /**
  * 生成在浏览器端执行的查找元素函数
  * 这个函数会尝试多个选择器直到找到元素
- * 
+ *
  * @returns 返回一个可以在浏览器端执行的JavaScript函数字符串
  */
 export function generateFindElementScript(): string {

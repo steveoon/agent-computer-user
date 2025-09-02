@@ -20,14 +20,17 @@
 ## 优化工具列表
 
 ### 1. get-unread-candidates-improved.tool.ts
+
 **风险等级**: 高  
 **主要问题**:
+
 - 在 evaluate 脚本内使用 `element.click()`
 - 高频 DOM 查询（遍历所有候选人）
 - 包含敏感日志输出
 - 缺少滚动行为模拟
 
 **优化措施**:
+
 - 使用 `puppeteer_click` 替代 `element.click()`
 - 实现分批处理，每批 5 个元素
 - 添加 `requestIdleCallback` 优化
@@ -35,14 +38,17 @@
 - 添加初始滚动模式 `performInitialScrollPattern`
 
 ### 2. get-chat-details.tool.ts
+
 **风险等级**: 中  
 **主要问题**:
+
 - 大量 DOM 查询操作（100条消息约600-800次查询）
 - 每条消息多次访问 textContent
 - 缺少人性化延迟
 - 未使用批处理模式
 
 **优化措施**:
+
 - **DOM访问优化**：
   - 一次性获取 `textContent`、`className`、`innerHTML`
   - 使用正则表达式从文本提取时间，避免 querySelector
@@ -52,26 +58,32 @@
 - **查询频率**：从 600-800次/100消息 降至 100-200次
 
 ### 3. open-candidate-chat-improved.tool.ts
+
 **风险等级**: 高  
 **主要问题**:
+
 - 使用 `targetCandidate.element.click()`
 - 包含 "Found X chat items" 等敏感日志
 - 使用不可靠的 `:nth-of-type` 选择器
 
 **优化措施**:
+
 - 改为返回选择器信息，由 Puppeteer 执行点击
 - 使用临时属性标记法代替 `:nth-of-type`
 - 集成鼠标轨迹模拟 `clickWithMouseTrajectory`
 - 添加随机滚动行为
 
 ### 4. send-message.tool.ts
+
 **风险等级**: 低（已使用 CDP 方法）  
 **主要问题**:
+
 - 固定延迟时间
 - 过多的选择器逐个尝试
 - 使用非空断言操作符
 
 **优化措施**:
+
 - 随机化延迟（300-800ms）
 - 批量查询选择器
 - 使用 Ctrl+A + Backspace 模拟真实清空操作
@@ -79,14 +91,17 @@
 - 类型断言替代非空断言，提升代码安全性
 
 ### 5. exchange-wechat.tool.ts
+
 **风险等级**: 高  
 **主要问题**:
+
 - evaluate 内的 `span.click()` 和 `btn.click()`
 - 固定的等待时间
 - 敏感日志输出
 - 使用不可靠的 `:nth-of-type` 选择器
 
 **优化措施**:
+
 - 全面改用 `puppeteer_click` 和鼠标轨迹模拟
 - 实现批量选择器查询
 - 添加元素可见性验证
@@ -94,12 +109,15 @@
 - 使用临时属性标记法提升选择器可靠性
 
 ### 6. zhipin-get-username.ts
+
 **风险等级**: 极高  
 **主要问题**:
+
 - 使用 `document.querySelectorAll("*")` 扫描所有元素
 - 可能触发每秒 >1000 次的 DOM 查询
 
 **优化措施**:
+
 - 完全移除全局元素扫描
 - 限制为 12 个精确选择器查询
 - 添加防检测包装
@@ -152,6 +170,7 @@ export const performRandomScroll = async (
 ### 2. 核心优化模式
 
 **批量查询模式**：
+
 ```typescript
 const findElementScript = wrapAntiDetectionScript(`
   const selectors = ${JSON.stringify(selectorList)};
@@ -164,26 +183,29 @@ const findElementScript = wrapAntiDetectionScript(`
 ```
 
 **可信点击模式**：
+
 ```typescript
 // 不再使用 element.click()
 // 使用带鼠标轨迹的点击
 await clickWithMouseTrajectory(client, selector, {
   preClickDelay: 200,
-  moveSteps: 18
+  moveSteps: 18,
 });
 ```
 
 **临时属性标记模式**（解决选择器问题）：
+
 ```typescript
 // 标记目标元素
-element.setAttribute('data-temp-click-target', 'true');
+element.setAttribute("data-temp-click-target", "true");
 // 使用临时属性选择器
 const selector = '.item[data-temp-click-target="true"]';
 // 点击后清理
-element.removeAttribute('data-temp-click-target');
+element.removeAttribute("data-temp-click-target");
 ```
 
 **选择器安全处理**：
+
 ```typescript
 // 使用 JSON.stringify 安全处理复杂选择器
 const selectorStr = ${JSON.stringify(selector)};
@@ -194,25 +216,25 @@ const element = document.querySelector(selectorStr);
 
 ### 性能指标改进
 
-| 指标 | 优化前 | 优化后 | 改进率 |
-|------|--------|--------|--------|
-| DOM 查询频率 | >500/秒 | <100/秒 | -80% |
-| Untrusted 事件 | 100% | 0% | -100% |
-| 固定延迟占比 | 100% | 0% | -100% |
-| 敏感日志数量 | 20+ | 0 | -100% |
-| 鼠标轨迹模拟 | 无 | 贝塞尔曲线 | +100% |
-| 滚动行为 | 无 | 随机滚动 | +100% |
+| 指标           | 优化前  | 优化后     | 改进率 |
+| -------------- | ------- | ---------- | ------ |
+| DOM 查询频率   | >500/秒 | <100/秒    | -80%   |
+| Untrusted 事件 | 100%    | 0%         | -100%  |
+| 固定延迟占比   | 100%    | 0%         | -100%  |
+| 敏感日志数量   | 20+     | 0          | -100%  |
+| 鼠标轨迹模拟   | 无      | 贝塞尔曲线 | +100%  |
+| 滚动行为       | 无      | 随机滚动   | +100%  |
 
 ### 检测风险评分（详细）
 
-| 维度 | 优化前 | 优化后 | 改进效果 |
-|------|--------|--------|----------|
-| Untrusted Click | 30分 | 5分 | -25分 ✅ |
-| 鼠标轨迹缺失 | 15分 | 7分 | -8分 ✅ |
-| DOM查询速率 | 20分 | 5分 | -15分 ✅ |
-| 操作时间间隔 | 10分 | 5分 | -5分 ✅ |
-| 行为模式单一 | 10分 | 8分 | -2分 ✅ |
-| **总分** | **85分** | **30分** | **-55分** |
+| 维度            | 优化前   | 优化后   | 改进效果  |
+| --------------- | -------- | -------- | --------- |
+| Untrusted Click | 30分     | 5分      | -25分 ✅  |
+| 鼠标轨迹缺失    | 15分     | 7分      | -8分 ✅   |
+| DOM查询速率     | 20分     | 5分      | -15分 ✅  |
+| 操作时间间隔    | 10分     | 5分      | -5分 ✅   |
+| 行为模式单一    | 10分     | 8分      | -2分 ✅   |
+| **总分**        | **85分** | **30分** | **-55分** |
 
 ### 关键技术突破
 
@@ -306,6 +328,6 @@ const element = document.querySelector(selectorStr);
 
 ---
 
-*优化完成日期: 2025年1月*  
-*技术实现: AI Assistant & 开发团队*  
-*代码审核: ✅ TypeScript 编译通过 | ✅ ESLint 检查通过 | ✅ 功能测试通过*
+_优化完成日期: 2025年1月_  
+_技术实现: AI Assistant & 开发团队_  
+_代码审核: ✅ TypeScript 编译通过 | ✅ ESLint 检查通过 | ✅ 功能测试通过_

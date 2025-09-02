@@ -4,7 +4,8 @@
 
 **设计原则**: 为简化数据转换逻辑，我们只使用列表接口的字段进行数据映射，不依赖详情接口的额外数据。缺失的字段将通过业务规则推断或设置合理默认值。
 
-**架构特点**: 
+**架构特点**:
+
 - **部分成功策略**: 支持岗位数据逐个验证，确保部分有效数据能够被处理，提升同步成功率
 - **服务端获取，客户端存储**: 同步服务只负责数据获取和转换，不直接保存数据，由客户端配置服务处理持久化
 - **错误处理增强**: 集成 `DulidayErrorFormatter` 提供详细的错误上下文和重试机制
@@ -133,13 +134,13 @@ function convertWeekdays(dulidayWeekdays: number[]): number[] {
 
 ### 2.5 排班灵活性映射（基于推断规则）
 
-| 推断来源                                | 我们系统字段                                        | 业务含义     | 推断规则                             |
-| --------------------------------------- | --------------------------------------------------- | ------------ | ------------------------------------ |
-| `workTimeArrangement.arrangementType`   | `Position.schedulingFlexibility.canSwapShifts`      | 可否换班     | 组合排班(3)=true, 固定排班(1)=false  |
-| `workTimeArrangement.maxWorkTakingTime` | `Position.schedulingFlexibility.advanceNoticeHours` | 提前通知时间 | 分钟转小时: `maxWorkTakingTime / 60` |
-| `cooperationMode`                       | `Position.schedulingFlexibility.partTimeAllowed`    | 允许兼职     | 兼职(2)=true, 全职(3)=false          |
+| 推断来源                                | 我们系统字段                                        | 业务含义     | 推断规则                                                               |
+| --------------------------------------- | --------------------------------------------------- | ------------ | ---------------------------------------------------------------------- |
+| `workTimeArrangement.arrangementType`   | `Position.schedulingFlexibility.canSwapShifts`      | 可否换班     | 组合排班(3)=true, 固定排班(1)=false                                    |
+| `workTimeArrangement.maxWorkTakingTime` | `Position.schedulingFlexibility.advanceNoticeHours` | 提前通知时间 | 分钟转小时: `maxWorkTakingTime / 60`                                   |
+| `cooperationMode`                       | `Position.schedulingFlexibility.partTimeAllowed`    | 允许兼职     | 兼职(2)=true, 全职(3)=false                                            |
 | `combinedArrangementTimes[].weekdays`   | `Position.schedulingFlexibility.weekendRequired`    | 需要周末班   | 仅当存在 `combinedArrangementTimes` 时检查，包含0或6=true，否则为false |
-| -                                       | `Position.schedulingFlexibility.holidayRequired`    | 需要节假日班 | 默认值: false                        |
+| -                                       | `Position.schedulingFlexibility.holidayRequired`    | 需要节假日班 | 默认值: false                                                          |
 
 ### 2.6 时间段可用性映射
 
@@ -193,6 +194,7 @@ function convertWeekdays(dulidayWeekdays: number[]): number[] {
 ### 4.1 部分成功同步策略
 
 **新增接口定义**:
+
 ```typescript
 export interface PartialSuccessResponse {
   validPositions: DulidayRaw.Position[];
@@ -205,6 +207,7 @@ export interface PartialSuccessResponse {
 ```
 
 **处理逻辑**:
+
 - 逐个验证每个岗位数据，使用 `DulidayRaw.PositionSchema.parse()`
 - 有效岗位进入 `validPositions`，失败岗位记录到 `invalidPositions`
 - 只要有任何有效数据就视为部分成功，继续处理转换
@@ -212,6 +215,7 @@ export interface PartialSuccessResponse {
 ### 4.2 错误处理与重试机制
 
 **超时控制**:
+
 ```typescript
 // 30秒超时控制
 const controller = new AbortController();
@@ -219,11 +223,13 @@ const timeoutId = setTimeout(() => controller.abort(), 30000);
 ```
 
 **网络错误重试**:
+
 - 自动重试最多 3 次网络相关错误
-- 延迟递增策略：第 n 次重试延迟 n*1000ms
+- 延迟递增策略：第 n 次重试延迟 n\*1000ms
 - 使用 `DulidayErrorFormatter.isNetworkError()` 判断是否需要重试
 
 **错误格式化**:
+
 ```typescript
 // 带组织上下文的错误格式化
 const contextualError = DulidayErrorFormatter.formatWithOrganizationContext(
@@ -233,29 +239,31 @@ const contextualError = DulidayErrorFormatter.formatWithOrganizationContext(
 );
 
 // 带岗位上下文的验证错误格式化
-const validationError = DulidayErrorFormatter.formatValidationErrorWithContext(
-  zodError,
-  { jobName: position.jobName, jobId: position.jobId }
-);
+const validationError = DulidayErrorFormatter.formatValidationErrorWithContext(zodError, {
+  jobName: position.jobName,
+  jobId: position.jobId,
+});
 ```
 
 ### 4.3 同步结果数据结构
 
 **更新后的 SyncResult 接口**:
+
 ```typescript
 export interface SyncResult {
   success: boolean;
   totalRecords: number;
-  processedRecords: number;  // 成功处理的岗位数量
+  processedRecords: number; // 成功处理的岗位数量
   storeCount: number;
   brandName: string;
-  errors: string[];          // 🆕 错误信息数组
+  errors: string[]; // 🆕 错误信息数组
   duration: number;
   convertedData?: Partial<ZhipinData>; // 🆕 可选的转换后数据
 }
 ```
 
 **成功判断逻辑**:
+
 ```typescript
 // 有任何有效数据就算部分成功
 const isSuccess = partialResponse.validPositions.length > 0;
@@ -264,12 +272,14 @@ const isSuccess = partialResponse.validPositions.length > 0;
 ### 4.4 数据流架构
 
 **服务端职责**:
+
 1. 从 Duliday API 获取原始数据
 2. 逐个验证岗位数据结构
 3. 转换有效数据为 ZhipinData 格式
 4. 返回 SyncResult（包含转换后的数据，但不保存）
 
 **客户端职责**:
+
 1. 调用同步服务获取转换后的数据
 2. 通过 `configService` 将数据持久化到 LocalForage
 3. 处理同步历史记录的本地存储
@@ -398,7 +408,15 @@ function setDefaultValues(position: Partial<Position>): Position {
 ### 6.1 核心转换函数（含部分成功逻辑）
 
 ```typescript
-import { Store, Position, ZhipinData, DulidayRaw, SalaryDetails, Benefits, BrandConfig } from "../types/zhipin";
+import {
+  Store,
+  Position,
+  ZhipinData,
+  DulidayRaw,
+  SalaryDetails,
+  Benefits,
+  BrandConfig,
+} from "../types/zhipin";
 
 // 主转换函数 - 支持部分成功的响应
 function convertDulidayListToZhipinData(
@@ -423,7 +441,9 @@ function convertDulidayListToZhipinData(
   const brandConfig: BrandConfig = {
     templates: {
       initial_inquiry: [`你好，${brandName}在上海各区有兼职，排班{hours}小时，时薪{salary}元。`],
-      location_inquiry: [`离你比较近在{location}的${brandName}门店有空缺，排班{schedule}，时薪{salary}元，有兴趣吗？`],
+      location_inquiry: [
+        `离你比较近在{location}的${brandName}门店有空缺，排班{schedule}，时薪{salary}元，有兴趣吗？`,
+      ],
       salary_inquiry: [`基本薪资是{salary}元/小时，{level_salary}。`],
       schedule_inquiry: [`排班比较灵活，一般是2-4小时，具体可以和店长商量。`],
       // ... 其他模板
@@ -444,7 +464,6 @@ function convertDulidayListToZhipinData(
     defaultBrand: brandName,
   };
 }
-
 
 // 门店转换
 function convertToStore(dulidayData: DulidayRaw.Position, brandName: string): Store {
@@ -604,7 +623,7 @@ function parseBenefits(welfare: DulidayRaw.Welfare): Benefits {
 
 // 🆕 带错误处理的岗位验证函数
 function validateAndConvertPosition(
-  positionData: any, 
+  positionData: any,
   index: number
 ): { position?: DulidayRaw.Position; error?: string } {
   try {
@@ -612,19 +631,16 @@ function validateAndConvertPosition(
     return { position: validatedPosition };
   } catch (validationError) {
     let errorMessage = "";
-    
+
     if (validationError instanceof z.ZodError) {
-      errorMessage = DulidayErrorFormatter.formatValidationErrorWithContext(
-        validationError,
-        { 
-          jobName: positionData?.jobName || `未知岗位_${index}`,
-          jobId: positionData?.jobId || `unknown_${index}`
-        }
-      );
+      errorMessage = DulidayErrorFormatter.formatValidationErrorWithContext(validationError, {
+        jobName: positionData?.jobName || `未知岗位_${index}`,
+        jobId: positionData?.jobId || `unknown_${index}`,
+      });
     } else {
       errorMessage = formatDulidayError(validationError);
     }
-    
+
     return { error: errorMessage };
   }
 }
@@ -638,18 +654,18 @@ function safeGetWorkingDays(workTimeArrangement: DulidayRaw.WorkTimeArrangement)
   if (workTimeArrangement?.perWeekWorkDays) {
     return workTimeArrangement.perWeekWorkDays;
   }
-  
+
   // 备用方案：从 customWorkTimes 中获取
   if (workTimeArrangement?.customWorkTimes?.length) {
     const minWorkDaysArray = workTimeArrangement.customWorkTimes
       .map(ct => ct.minWorkDays)
       .filter(days => days > 0);
-    
+
     if (minWorkDaysArray.length > 0) {
       return Math.min(...minWorkDaysArray);
     }
   }
-  
+
   return 5; // 默认值
 }
 ```
@@ -700,12 +716,12 @@ function safeGetWorkingDays(workTimeArrangement: DulidayRaw.WorkTimeArrangement)
 
 ## 8. 变更记录
 
-| 版本 | 日期       | 说明                                                                                                                                       |
-| ---- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| v1.0 | 2025-06-30 | 初始版本，基于列表接口和详情接口的双重映射                                                                                                 |
-| v2.0 | 2025-06-30 | 重构为仅基于列表接口的单一映射，简化实现逻辑                                                                                               |
-| v2.1 | 2025-06-30 | 修复福利字段映射冲突，使用 `promotionWelfare` 而非 `memo`                                                                                  |
-| v3.0 | 2025-06-30 | 引入结构化数据模型：SalaryDetails 和 Benefits，添加 DulidayRaw 命名空间                                                                    |
-| v3.1 | 2025-06-30 | 修复接口不一致：moreWelfares 数组结构，perDayMinWorkHours 和 perWeekWorkDays 可空                                                          |
-| v3.2 | 2025-07-01 | **[核心优化]** 为 `district`, `timeSlots`, `requiredDays`, `minimumDays`, `minHoursPerWeek` 等关键字段添加备用数据源逻辑，提高数据完整性。 |
+| 版本 | 日期       | 说明                                                                                                                                            |
+| ---- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| v1.0 | 2025-06-30 | 初始版本，基于列表接口和详情接口的双重映射                                                                                                      |
+| v2.0 | 2025-06-30 | 重构为仅基于列表接口的单一映射，简化实现逻辑                                                                                                    |
+| v2.1 | 2025-06-30 | 修复福利字段映射冲突，使用 `promotionWelfare` 而非 `memo`                                                                                       |
+| v3.0 | 2025-06-30 | 引入结构化数据模型：SalaryDetails 和 Benefits，添加 DulidayRaw 命名空间                                                                         |
+| v3.1 | 2025-06-30 | 修复接口不一致：moreWelfares 数组结构，perDayMinWorkHours 和 perWeekWorkDays 可空                                                               |
+| v3.2 | 2025-07-01 | **[核心优化]** 为 `district`, `timeSlots`, `requiredDays`, `minimumDays`, `minHoursPerWeek` 等关键字段添加备用数据源逻辑，提高数据完整性。      |
 | v4.0 | 2025-09-01 | **[架构重构]** 实现部分成功同步策略，增强错误处理和重试机制，服务端与客户端职责分离，新增 `PartialSuccessResponse` 和增强的 `SyncResult` 接口。 |

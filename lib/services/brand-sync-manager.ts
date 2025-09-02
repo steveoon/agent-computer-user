@@ -36,8 +36,8 @@ export class BrandSyncManager {
       // 找出缺失的映射品牌（只同步 ORGANIZATION_MAPPING 中定义的品牌）
       const missingBrands = forceSync
         ? mappedBrands
-        : mappedBrands.filter((brand) => !existingBrands.includes(brand.name));
-      
+        : mappedBrands.filter(brand => !existingBrands.includes(brand.name));
+
       // 记录非映射品牌（用户导入的额外品牌）
       const customBrands = existingBrands.filter(brand => !mappedBrandNames.includes(brand));
       if (customBrands.length > 0) {
@@ -51,11 +51,12 @@ export class BrandSyncManager {
 
       console.log(
         `🔍 发现 ${missingBrands.length} 个${forceSync ? "" : "缺失的"}品牌需要同步:`,
-        missingBrands.map((b) => b.name).join(", ")
+        missingBrands.map(b => b.name).join(", ")
       );
 
       // 获取 token
-      const token = dulidayToken || localStorage.getItem("duliday_token") || process.env.DULIDAY_TOKEN;
+      const token =
+        dulidayToken || localStorage.getItem("duliday_token") || process.env.DULIDAY_TOKEN;
       if (!token) {
         throw new Error("未找到 Duliday Token，请先配置 Token");
       }
@@ -127,12 +128,12 @@ export class BrandSyncManager {
     const mappedBrands = getAvailableBrands();
 
     const missingBrands = mappedBrands
-      .filter((brand) => !existingBrands.includes(brand.name))
-      .map((brand) => brand.name);
+      .filter(brand => !existingBrands.includes(brand.name))
+      .map(brand => brand.name);
 
     const syncedBrands = mappedBrands
-      .filter((brand) => existingBrands.includes(brand.name))
-      .map((brand) => brand.name);
+      .filter(brand => existingBrands.includes(brand.name))
+      .map(brand => brand.name);
 
     return {
       totalMapped: mappedBrands.length,

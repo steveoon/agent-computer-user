@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { EventEmitter } from 'events';
-import { experimental_createMCPClient } from 'ai';
-import { Experimental_StdioMCPTransport } from 'ai/mcp-stdio';
+import { EventEmitter } from "events";
+import { experimental_createMCPClient } from "ai";
+import { Experimental_StdioMCPTransport } from "ai/mcp-stdio";
 import {
   MCPClientConfig,
   MCPManagerStatus,
@@ -9,15 +9,14 @@ import {
   MCPTools,
   MCPClient,
   validateMCPClientConfig,
-} from '@/types/mcp';
+} from "@/types/mcp";
 
 // 增加最大监听器数量，避免警告
 EventEmitter.defaultMaxListeners = 20;
 
-
 /**
  * 通用MCP客户端管理器
- * 
+ *
  * 功能特性：
  * - 🔄 单例模式 - 避免重复连接，优化资源使用
  * - 🧹 自动清理 - 进程退出时自动关闭所有连接
@@ -33,18 +32,18 @@ class MCPClientManager {
   private constructor() {
     // 私有构造函数，防止外部直接实例化
     this.initializeClientConfigs();
-    
+
     // 添加进程退出时的资源清理
-    process.on('beforeExit', async () => {
+    process.on("beforeExit", async () => {
       await this.cleanupAllResources();
     });
 
-    process.on('SIGINT', async () => {
+    process.on("SIGINT", async () => {
       await this.cleanupAllResources();
       process.exit(0);
     });
 
-    process.on('SIGTERM', async () => {
+    process.on("SIGTERM", async () => {
       await this.cleanupAllResources();
       process.exit(0);
     });
@@ -66,32 +65,32 @@ class MCPClientManager {
   private initializeClientConfigs(): void {
     // Playwright MCP 配置 - 更适合 Docker 环境
     const playwrightConfig = validateMCPClientConfig({
-      name: 'playwright',
-      command: 'npx',
-      args: ['-y', '@playwright/mcp@latest', '--isolated'],
+      name: "playwright",
+      command: "npx",
+      args: ["-y", "@playwright/mcp@latest", "--isolated"],
       env: {
-        NODE_ENV: process.env.NODE_ENV || 'production',
+        NODE_ENV: process.env.NODE_ENV || "production",
       },
-      description: 'Playwright 浏览器自动化服务（Docker 友好）',
+      description: "Playwright 浏览器自动化服务（Docker 友好）",
       enabled: true,
     });
-    this.clientConfigs.set('playwright', playwrightConfig);
+    this.clientConfigs.set("playwright", playwrightConfig);
 
     // 保留原有的 Puppeteer MCP 配置（用于兼容性）
     const puppeteerConfig = validateMCPClientConfig({
-      name: 'puppeteer',
-      command: 'npx',
-      args: ['-y', 'puppeteer-mcp-server'],
+      name: "puppeteer",
+      command: "npx",
+      args: ["-y", "puppeteer-mcp-server"],
       env: {
-        NODE_ENV: process.env.NODE_ENV || 'production',
-        LOG_LEVEL: 'error',
+        NODE_ENV: process.env.NODE_ENV || "production",
+        LOG_LEVEL: "error",
         // 尝试禁用文件日志记录
-        NO_FILE_LOGGING: 'true',
+        NO_FILE_LOGGING: "true",
       },
-      description: 'Puppeteer浏览器自动化服务',
+      description: "Puppeteer浏览器自动化服务",
       enabled: true,
     });
-    this.clientConfigs.set('puppeteer', puppeteerConfig);
+    this.clientConfigs.set("puppeteer", puppeteerConfig);
   }
 
   /**
@@ -115,14 +114,17 @@ class MCPClientManager {
 
     try {
       // 过滤掉空的环境变量
-      const filteredEnv = config.env ? 
-        Object.entries(config.env).reduce((acc, [key, value]) => {
-          if (value) {
-            acc[key] = value;
-          }
-          return acc;
-        }, {} as Record<string, string>) : 
-        {}
+      const filteredEnv = config.env
+        ? Object.entries(config.env).reduce(
+            (acc, [key, value]) => {
+              if (value) {
+                acc[key] = value;
+              }
+              return acc;
+            },
+            {} as Record<string, string>
+          )
+        : {};
 
       // 创建传输层
       const transport = new Experimental_StdioMCPTransport({
@@ -153,16 +155,13 @@ class MCPClientManager {
    * @param schemas 可选的schema配置
    * @returns 工具对象
    */
-  public async getMCPTools(
-    clientName: string,
-    schemas?: Record<string, any>
-  ): Promise<MCPTools> {
+  public async getMCPTools(clientName: string, schemas?: Record<string, any>): Promise<MCPTools> {
     const client = await this.getMCPClient(clientName);
-    
+
     try {
       const tools = schemas ? await client.tools({ schemas }) : await client.tools();
       const config = this.clientConfigs.get(clientName);
-      console.log(`🔧 已获取 ${config?.description} 工具: ${Object.keys(tools).join(', ')}`);
+      console.log(`🔧 已获取 ${config?.description} 工具: ${Object.keys(tools).join(", ")}`);
       return tools;
     } catch (error) {
       console.error(`❌ 获取 ${clientName} 工具失败:`, error);
@@ -174,28 +173,28 @@ class MCPClientManager {
    * Puppeteer MCP 客户端
    */
   public async getPuppeteerMCPClient(): Promise<MCPClient> {
-    return this.getMCPClient('puppeteer') as Promise<MCPClient>;
+    return this.getMCPClient("puppeteer") as Promise<MCPClient>;
   }
 
   /**
    * Puppeteer MCP 工具
    */
   public async getPuppeteerMCPTools(): Promise<MCPTools> {
-    return this.getMCPTools('puppeteer');
+    return this.getMCPTools("puppeteer");
   }
 
   /**
    * Playwright MCP 客户端
    */
   public async getPlaywrightMCPClient(): Promise<any> {
-    return this.getMCPClient('playwright');
+    return this.getMCPClient("playwright");
   }
 
   /**
    * Playwright MCP 工具
    */
   public async getPlaywrightMCPTools(): Promise<MCPTools> {
-    return this.getMCPTools('playwright');
+    return this.getMCPTools("playwright");
   }
 
   /**
@@ -206,7 +205,7 @@ class MCPClientManager {
     if (this.mcpClients.has(clientName)) {
       const client = this.mcpClients.get(clientName);
       const config = this.clientConfigs.get(clientName);
-      
+
       try {
         if (client.close) {
           await client.close();
@@ -248,14 +247,14 @@ class MCPClientManager {
    * 清理所有资源
    */
   private async cleanupAllResources(): Promise<void> {
-    console.log('🧹 开始清理MCP客户端资源...');
-    
+    console.log("🧹 开始清理MCP客户端资源...");
+
     const closePromises = Array.from(this.mcpClients.keys()).map(clientName =>
       this.closeMCPClient(clientName)
     );
 
     await Promise.allSettled(closePromises);
-    console.log('✅ MCP客户端资源清理完成');
+    console.log("✅ MCP客户端资源清理完成");
   }
 
   /**
@@ -306,5 +305,6 @@ export const getPlaywrightMCPTools = () => mcpClientManager.getPlaywrightMCPTool
 
 // 客户端管理函数
 export const closeMCPClient = (clientName: string) => mcpClientManager.closeMCPClient(clientName);
-export const reconnectMCPClient = (clientName: string) => mcpClientManager.reconnectClient(clientName);
+export const reconnectMCPClient = (clientName: string) =>
+  mcpClientManager.reconnectClient(clientName);
 export const getMCPStatus = () => mcpClientManager.getStatus();

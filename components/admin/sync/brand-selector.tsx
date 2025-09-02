@@ -14,7 +14,8 @@ export const BrandSelector = () => {
   const availableBrands = getAvailableBrands();
 
   const isAllSelected = selectedBrands.length === availableBrands.length;
-  const isPartialSelected = selectedBrands.length > 0 && selectedBrands.length < availableBrands.length;
+  const isPartialSelected =
+    selectedBrands.length > 0 && selectedBrands.length < availableBrands.length;
 
   return (
     <div className="space-y-4">
@@ -24,13 +25,13 @@ export const BrandSelector = () => {
           <Checkbox
             id="select-all"
             checked={isAllSelected}
-            ref={(ref) => {
-              if (ref && 'indeterminate' in ref) {
+            ref={ref => {
+              if (ref && "indeterminate" in ref) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (ref as any).indeterminate = isPartialSelected;
               }
             }}
-            onCheckedChange={(checked) => {
+            onCheckedChange={checked => {
               if (checked) {
                 selectAllBrands();
               } else {
@@ -47,12 +48,7 @@ export const BrandSelector = () => {
         </div>
 
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={selectAllBrands}
-            disabled={isAllSelected}
-          >
+          <Button variant="outline" size="sm" onClick={selectAllBrands} disabled={isAllSelected}>
             <CheckSquare className="h-4 w-4 mr-1" />
             全选
           </Button>
@@ -70,15 +66,15 @@ export const BrandSelector = () => {
 
       {/* 品牌列表 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {availableBrands.map((brand) => {
+        {availableBrands.map(brand => {
           const isSelected = selectedBrands.includes(brand.id);
-          
+
           return (
             <Card
               key={brand.id}
               className={`cursor-pointer transition-all ${
-                isSelected 
-                  ? "border-primary bg-primary/5 shadow-sm" 
+                isSelected
+                  ? "border-primary bg-primary/5 shadow-sm"
                   : "border-border hover:border-primary/50 hover:bg-accent/50"
               }`}
               onClick={() => toggleBrand(brand.id)}
@@ -90,15 +86,13 @@ export const BrandSelector = () => {
                     onChange={() => {}} // 控制权交给父容器的 onClick
                     className="pointer-events-none"
                   />
-                  
+
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <Label className="font-medium cursor-pointer">
-                        {brand.name}
-                      </Label>
+                      <Label className="font-medium cursor-pointer">{brand.name}</Label>
                     </div>
-                    
+
                     <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground">
                       <Users className="h-3 w-3" />
                       <span>组织ID: {brand.id}</span>
@@ -122,16 +116,14 @@ export const BrandSelector = () => {
         <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
           <div className="flex items-center gap-2 text-sm">
             <CheckSquare className="h-4 w-4 text-primary" />
-            <span className="font-medium">
-              已选择 {selectedBrands.length} 个品牌进行数据同步
-            </span>
+            <span className="font-medium">已选择 {selectedBrands.length} 个品牌进行数据同步</span>
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            选中的品牌: {selectedBrands
+            选中的品牌:{" "}
+            {selectedBrands
               .map(id => availableBrands.find(b => b.id === id)?.name)
               .filter(Boolean)
-              .join(", ")
-            }
+              .join(", ")}
           </div>
         </div>
       )}
@@ -139,9 +131,7 @@ export const BrandSelector = () => {
       {/* 空状态提示 */}
       {selectedBrands.length === 0 && (
         <div className="mt-4 p-3 bg-muted/50 border border-muted rounded-lg text-center">
-          <div className="text-sm text-muted-foreground">
-            请选择至少一个品牌进行数据同步
-          </div>
+          <div className="text-sm text-muted-foreground">请选择至少一个品牌进行数据同步</div>
         </div>
       )}
     </div>

@@ -25,14 +25,12 @@ Error: Invalid literal value, expected "function"
 ```typescript
 // 检测到 tool_calls 时的处理逻辑
 if (data.choices?.[0]?.delta?.tool_calls) {
-  data.choices[0].delta.tool_calls = data.choices[0].delta.tool_calls.map(
-    (toolCall: any) => {
-      if (toolCall.type === '') {
-        return { ...toolCall, type: 'function' };
-      }
-      return toolCall;
+  data.choices[0].delta.tool_calls = data.choices[0].delta.tool_calls.map((toolCall: any) => {
+    if (toolCall.type === "") {
+      return { ...toolCall, type: "function" };
     }
-  );
+    return toolCall;
+  });
 }
 ```
 

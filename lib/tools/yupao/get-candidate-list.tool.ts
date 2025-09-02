@@ -31,7 +31,7 @@ function parseEvaluateResult(result: unknown): unknown {
 
 /**
  * Yupao获取候选人列表工具
- * 
+ *
  * 功能：
  * - 获取"牛人打招呼"页面的候选人列表
  * - 提取候选人的详细信息
@@ -50,34 +50,27 @@ export const yupaoGetCandidateListTool = () =>
     注意：
     - 需要先打开Yupao的"牛人打招呼"页面
     - 会自动处理动态CSS选择器`,
-    
+
     inputSchema: z.object({
-      skipContacted: z
-        .boolean()
-        .optional()
-        .default(false)
-        .describe("是否跳过已联系的候选人"),
-      maxResults: z
-        .number()
-        .optional()
-        .describe("最多返回的候选人数量")
+      skipContacted: z.boolean().optional().default(false).describe("是否跳过已联系的候选人"),
+      maxResults: z.number().optional().describe("最多返回的候选人数量"),
     }),
-    
+
     execute: async ({ skipContacted = false, maxResults }) => {
       try {
         const client = await getPuppeteerMCPClient();
         const tools = await client.tools();
-        
+
         // 检查必需的工具
         if (!tools.puppeteer_evaluate) {
           throw new Error("MCP tool puppeteer_evaluate not available");
         }
-        
+
         const puppeteerEvaluate = tools.puppeteer_evaluate;
-        
+
         // 初始延迟
         await randomDelay(300, 500);
-        
+
         // 获取所有候选人信息
         const getCandidatesScript = wrapAntiDetectionScript(`
           const candidates = [];
@@ -274,47 +267,48 @@ export const yupaoGetCandidateListTool = () =>
           
           return candidates;
         `);
-        
+
         const candidatesResult = await puppeteerEvaluate.execute({ script: getCandidatesScript });
         const candidates = parseEvaluateResult(candidatesResult) as YupaoCandidateCard[] | null;
-        
+
         if (!candidates || candidates.length === 0) {
           return {
             success: false,
             error: "未找到候选人列表",
-            message: "请确保已打开Yupao的牛人打招呼页面"
+            message: "请确保已打开Yupao的牛人打招呼页面",
           };
         }
-        
+
         // 过滤候选人
         let filteredCandidates = candidates;
         if (skipContacted) {
-          filteredCandidates = candidates.filter(c => c.onlineStatus !== 'contacted');
+          filteredCandidates = candidates.filter(c => c.onlineStatus !== "contacted");
         }
-        
+
         // 限制返回数量
         if (maxResults && maxResults > 0) {
           filteredCandidates = filteredCandidates.slice(0, maxResults);
         }
-        
+
         return {
           success: true,
           message: `成功获取 ${filteredCandidates.length} 个候选人信息`,
           data: {
             candidates: filteredCandidates,
             total: candidates.length,
-            filtered: skipContacted ? candidates.filter(c => c.onlineStatus === 'contacted').length : 0
-          }
+            filtered: skipContacted
+              ? candidates.filter(c => c.onlineStatus === "contacted").length
+              : 0,
+          },
         };
-        
       } catch (error) {
         return {
           success: false,
           error: error instanceof Error ? error.message : "Unknown error occurred",
-          message: "获取候选人列表时发生错误"
+          message: "获取候选人列表时发生错误",
         };
       }
-    }
+    },
   });
 
 /**

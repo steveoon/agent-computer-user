@@ -11,7 +11,7 @@ class SecureStorage {
 
   constructor(storeName: string) {
     this.isClient = typeof window !== "undefined";
-    
+
     if (this.isClient) {
       this.storage = localforage.createInstance({
         name: "ai-sdk-secure-storage",
@@ -30,7 +30,7 @@ class SecureStorage {
     if (!this.isClient || !this.storage) {
       return null;
     }
-    
+
     try {
       const value = await this.storage.getItem<string>(key);
       return value;
@@ -44,7 +44,7 @@ class SecureStorage {
     if (!this.isClient || !this.storage) {
       return;
     }
-    
+
     try {
       await this.storage.setItem(key, value);
     } catch (error) {
@@ -57,7 +57,7 @@ class SecureStorage {
     if (!this.isClient || !this.storage) {
       return;
     }
-    
+
     try {
       await this.storage.removeItem(key);
     } catch (error) {
@@ -70,7 +70,7 @@ class SecureStorage {
     if (!this.isClient || !this.storage) {
       return;
     }
-    
+
     try {
       await this.storage.clear();
     } catch (error) {

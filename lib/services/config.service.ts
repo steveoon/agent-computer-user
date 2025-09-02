@@ -40,7 +40,7 @@ class AppConfigService implements ConfigService {
       console.log("ℹ️ 服务器端环境，跳过配置加载");
       return null;
     }
-    
+
     try {
       const config = await configStorage.getItem<AppConfigData>(this.storageKey);
 
@@ -65,7 +65,7 @@ class AppConfigService implements ConfigService {
       console.log("ℹ️ 服务器端环境，跳过配置保存");
       return;
     }
-    
+
     try {
       // 更新元信息
       const configWithMetadata: AppConfigData = {
@@ -153,7 +153,7 @@ class AppConfigService implements ConfigService {
       console.log("ℹ️ 服务器端环境，跳过配置清除");
       return;
     }
-    
+
     try {
       await configStorage.removeItem(this.storageKey);
       console.log("✅ 配置数据已清除");
@@ -170,7 +170,7 @@ class AppConfigService implements ConfigService {
     if (!isClient || !configStorage) {
       return false;
     }
-    
+
     try {
       const config = await configStorage.getItem<AppConfigData>(this.storageKey);
       return config !== null;
@@ -462,21 +462,25 @@ export async function migrateFromHardcodedData(): Promise<void> {
  * @returns 升级后的配置数据
  */
 async function upgradeConfigData(
-  existingConfig: AppConfigData, 
+  existingConfig: AppConfigData,
   saveToStorage = true,
   forceRepair = false
 ): Promise<AppConfigData> {
   try {
     const currentVersion = existingConfig.metadata?.version || "undefined";
     const isLatestVersion = currentVersion === CONFIG_VERSION;
-    
+
     // 判断是升级还是修复
     const operation = isLatestVersion && forceRepair ? "修复" : "升级";
-    
-    console.log(`🔄 开始${operation}配置数据 ${
-      isLatestVersion ? `(版本 ${currentVersion} 保持不变)` : `从版本 ${currentVersion} 到 ${CONFIG_VERSION}`
-    }`);
-    
+
+    console.log(
+      `🔄 开始${operation}配置数据 ${
+        isLatestVersion
+          ? `(版本 ${currentVersion} 保持不变)`
+          : `从版本 ${currentVersion} 到 ${CONFIG_VERSION}`
+      }`
+    );
+
     console.log(`📊 ${operation}前数据状态:`, {
       replyPromptsCount: Object.keys(existingConfig.replyPrompts || {}).length,
       storesCount: existingConfig.brandData?.stores?.length || 0,
@@ -487,7 +491,7 @@ async function upgradeConfigData(
     // 导入最新的sample-data以获取attendanceRequirement示例，以及ReplyContextSchema获取所有模板键
     const [{ zhipinData }, { ReplyContextSchema }] = await Promise.all([
       import("../../lib/data/sample-data"),
-      import("../../types/zhipin")
+      import("../../types/zhipin"),
     ]);
 
     // 创建升级后的品牌数据，移除已废弃的顶层templates和screening字段
@@ -506,12 +510,12 @@ async function upgradeConfigData(
     // 🆕 升级品牌配置中的templates字段，确保包含所有必需的模板字段
     // 使用 ReplyContextSchema 的枚举值而不是硬编码
     const requiredTemplateKeys = ReplyContextSchema.options;
-    
+
     const upgradedBrands = { ...upgradedBrandData.brands };
     Object.keys(upgradedBrands).forEach(brandName => {
       const brand = upgradedBrands[brandName] as Record<string, unknown>;
       const templates = (brand.templates || {}) as Record<string, string[]>;
-      
+
       // 确保所有必需的模板字段都存在，缺失的设置为空数组
       requiredTemplateKeys.forEach(key => {
         if (!templates[key]) {
@@ -519,7 +523,7 @@ async function upgradeConfigData(
           console.log(`✅ 为品牌 ${brandName} 添加缺失的模板字段: ${key}`);
         }
       });
-      
+
       brand.templates = templates;
     });
     upgradedBrandData.brands = upgradedBrands;
@@ -618,15 +622,12 @@ async function upgradeConfigData(
       metadata: {
         ...existingConfig.metadata,
         // 只有在真正升级时才更新版本号，修复时保持原版本
-        version: isLatestVersion && forceRepair 
-          ? currentVersion 
-          : CONFIG_VERSION,
+        version: isLatestVersion && forceRepair ? currentVersion : CONFIG_VERSION,
         lastUpdated: new Date().toISOString(),
         // 根据操作类型设置不同的时间戳字段
-        ...(isLatestVersion && forceRepair 
+        ...(isLatestVersion && forceRepair
           ? { repairedAt: new Date().toISOString() }
-          : { upgradedAt: new Date().toISOString() }
-        ),
+          : { upgradedAt: new Date().toISOString() }),
       },
     };
 
@@ -648,7 +649,7 @@ async function upgradeConfigData(
         )
       ),
     });
-    
+
     return upgradedConfig;
   } catch (error) {
     console.error("❌ 配置数据升级失败:", error);

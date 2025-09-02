@@ -55,8 +55,7 @@ export const sendFeishuMessage = async (
       };
     } else {
       // 失败情况，提取错误信息
-      const errorMsg =
-        result.msg || result.StatusMessage || "Unknown error from Feishu API";
+      const errorMsg = result.msg || result.StatusMessage || "Unknown error from Feishu API";
       console.error(`❌ 飞书API返回错误: code=${result.code}, msg=${errorMsg}`);
 
       // 提供常见错误的友好提示
