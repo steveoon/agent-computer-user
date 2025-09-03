@@ -9,7 +9,7 @@ import { useInputHistoryStore } from "@/lib/stores/input-history-store";
 
 interface ChatInputFormProps {
   input: string;
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isInitializing: boolean;
   isLoading: boolean;

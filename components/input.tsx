@@ -1,11 +1,15 @@
 import { ArrowUp } from "lucide-react";
-import { Input as ShadcnInput } from "./ui/input";
+import { Textarea } from "./ui/textarea";
 import { useInputHistoryStore } from "@/lib/stores/input-history-store";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+
+// Constants for textarea dimensions
+const MIN_HEIGHT = 52;
+const MAX_HEIGHT = 200;
 
 interface InputProps {
   input: string;
-  handleInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  handleInputChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
   isInitializing: boolean;
   isLoading: boolean;
   status: string;
@@ -24,15 +28,65 @@ export const Input = ({
   error,
   isAuthenticated = true,
 }: InputProps) => {
-  const { navigateHistory, resetIndex, setTempInput } = useInputHistoryStore();
+  const { navigateHistory, resetIndex, setTempInput, history } = useInputHistoryStore();
   const hasNavigated = useRef(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [dynamicPlaceholder, setDynamicPlaceholder] = useState<string | null>(null);
 
   // 更智能的禁用逻辑：只有在真正加载中且没有错误时才禁用，或者用户未认证
   const shouldDisable = (isLoading && !error) || isInitializing || !isAuthenticated;
 
+  // Unified function to adjust textarea height
+  const adjustTextareaHeight = (element: HTMLTextAreaElement | null, scrollToBottom = false) => {
+    if (!element) return;
+    element.style.height = "auto";
+    const newHeight = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, element.scrollHeight));
+    element.style.height = `${newHeight}px`;
+    if (scrollToBottom) {
+      element.scrollTop = element.scrollHeight;
+    }
+  };
+
   // Handle keyboard navigation
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Handle ArrowUp key to fill last history when input is empty
+    if (e.key === "ArrowUp" && !input && history.length > 0 && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      const lastHistory = history[history.length - 1];
+      if (lastHistory) {
+        handleInputChange({
+          target: { value: lastHistory },
+        } as React.ChangeEvent<HTMLTextAreaElement>);
+        // Force resize after filling
+        setTimeout(() => {
+          adjustTextareaHeight(inputRef.current, true);
+        }, 0);
+      }
+      return;
+    }
+
+    // Handle shift+enter for new line
+    if (e.shiftKey && e.key === "Enter") {
+      // Allow default behavior for shift+enter (new line)
+      return;
+    }
+
+    // Prevent default enter behavior (form submission) when not holding shift
+    if (e.key === "Enter" && !e.shiftKey) {
+      // Critical: Don't submit during IME composition (Chinese/Japanese input)
+      const nativeEvent = e.nativeEvent as KeyboardEvent;
+      if ("isComposing" in nativeEvent && nativeEvent.isComposing) {
+        return;
+      }
+      e.preventDefault();
+      // Submit the form by finding the parent form and dispatching submit event
+      const form = inputRef.current?.closest("form");
+      if (form && input.trim()) {
+        form.requestSubmit();
+      }
+      return;
+    }
+
     // Check for Ctrl/Cmd + Arrow keys
     const isModifierPressed = e.ctrlKey || e.metaKey;
 
@@ -49,18 +103,40 @@ export const Input = ({
       if (historicalInput !== null) {
         handleInputChange({
           target: { value: historicalInput },
-        } as React.ChangeEvent<HTMLInputElement>);
+        } as React.ChangeEvent<HTMLTextAreaElement>);
       }
     }
   };
 
   // Reset navigation state when input changes manually
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (hasNavigated.current) {
       hasNavigated.current = false;
       resetIndex();
     }
     handleInputChange(e);
+
+    // Auto-resize textarea
+    adjustTextareaHeight(inputRef.current, !!e.target.value);
+  };
+
+  // Auto-resize on mount and when input changes
+  useEffect(() => {
+    adjustTextareaHeight(inputRef.current, !!input);
+  }, [input]);
+
+  // Handle focus and blur for dynamic placeholder
+  const handleFocus = () => {
+    if (!input && history.length > 0) {
+      const lastHistory = history[history.length - 1];
+      if (lastHistory) {
+        setDynamicPlaceholder(`${lastHistory} (按↑键填充)`);
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    setDynamicPlaceholder(null);
   };
 
   // Reset navigation state when status changes
@@ -72,24 +148,30 @@ export const Input = ({
 
   return (
     <div className="relative w-full">
-      <ShadcnInput
+      <Textarea
         ref={inputRef}
-        className="bg-secondary py-6 w-full rounded-xl pr-12"
+        className="bg-secondary px-3 py-4 min-h-[52px] max-h-[200px] w-full rounded-xl pr-12 resize-none overflow-hidden leading-normal"
         value={input}
         autoFocus
+        aria-label="聊天输入框"
         placeholder={
-          !isAuthenticated
+          dynamicPlaceholder ||
+          (!isAuthenticated
             ? "请先登录以使用AI助手..."
-            : "输入提示词...使用 Ctrl/Cmd + ↑↓ 键切换输入历史"
+            : "输入提示词...使用 Ctrl/Cmd + ↑↓ 键切换输入历史，Shift+Enter 换行")
         }
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         disabled={shouldDisable}
+        rows={1}
       />
       {status === "streaming" || status === "submitted" ? (
         <button
           type="button"
           onClick={stop}
+          aria-label="停止生成"
           className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-2 bg-black hover:bg-zinc-800 disabled:bg-zinc-300 disabled:cursor-not-allowed transition-colors"
         >
           <div className="animate-spin h-4 w-4">
@@ -115,6 +197,7 @@ export const Input = ({
         <button
           type="submit"
           disabled={shouldDisable || !input.trim()}
+          aria-label="发送消息"
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-2 bg-black hover:bg-zinc-800 disabled:bg-zinc-300 disabled:cursor-not-allowed transition-colors"
         >
           <ArrowUp className="h-4 w-4 text-white" />

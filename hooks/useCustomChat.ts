@@ -301,9 +301,12 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
   }, [stopGeneration, messages, setMessages]);
 
   // 🎯 AI SDK v5: 手动实现 handleInputChange
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
-  }, []);
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setInput(e.target.value);
+    },
+    []
+  );
 
   // 🎯 AI SDK v5: 手动实现 handleSubmit
   const handleSubmit = useCallback(

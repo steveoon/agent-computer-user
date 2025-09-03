@@ -484,7 +484,7 @@ function sortOrders(orders: Order[], sortBy: string, sortOrder: "ASC" | "DESC" =
       FIELD_NAMES.ORDER_DATE,
       FIELD_NAMES.SERVICE_DATE,
       "派发时间",
-      "剩余开始时间"
+      "剩余开始时间",
     ];
     if (dateFields.includes(sortBy)) {
       aValue = new Date(String(aValue || "")).getTime();
@@ -775,7 +775,7 @@ function formatSummary(
 function formatDetailed(orders: Order[], totalCount: number): string {
   let message = `📊 BI报表详细数据\n`;
   message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  
+
   // 限制详细显示的条数
   const ordersToDisplay = orders.slice(0, LIMITS.MAX_DETAILED_DISPLAY);
   message += `共 ${totalCount} 条记录，显示前 ${ordersToDisplay.length} 条\n\n`;
