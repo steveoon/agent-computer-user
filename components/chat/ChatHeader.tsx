@@ -49,7 +49,7 @@ export function ChatHeader({
       {/* 控制按钮行 */}
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/40">
         <div className="flex items-center gap-3">
-          <BrandSelector />
+          <BrandSelector showHistory />
           <div className="text-xs text-slate-500 bg-white/70 px-2 py-1 rounded-full font-medium">
             {messagesCount} 条消息
           </div>
