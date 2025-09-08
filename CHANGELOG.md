@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.7.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.7.0-develop.1...v1.7.0-develop.2) (2025-09-08)
+
+
+### Features
+
+* 添加微信号配置管理和修复Yupao交换微信功能 ([8e1d972](https://github.com/steveoon/agent-computer-user/commit/8e1d9728854954d3fbf05b6db54de6f570f09be6))
+
 # [1.7.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.6.0...v1.7.0-develop.1) (2025-09-04)
 
 
