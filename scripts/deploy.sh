@@ -32,6 +32,33 @@ docker build --no-cache . --platform linux/amd64 \
 echo "⬆️  推送镜像到 ghcr.io..."
 docker push ghcr.io/steveoon/ai-computer-use:latest
 
+# 3. 导出镜像到本地文件
+echo "💾 导出镜像到本地文件..."
+
+# 从 CHANGELOG.md 提取最新版本号
+VERSION=$(grep -E "^# \[[0-9]+\.[0-9]+\.[0-9]+\]" CHANGELOG.md | head -1 | sed 's/.*\[\(.*\)\].*/\1/')
+
+if [ -z "$VERSION" ]; then
+    echo "⚠️  无法从 CHANGELOG.md 提取版本号，使用默认版本 'latest'"
+    VERSION="latest"
+fi
+
+# 确保 Downloads 目录存在
+mkdir -p ~/Downloads
+
+# 导出镜像文件
+OUTPUT_FILE=~/Downloads/ai-computer-use-${VERSION}.tar
+echo "📦 导出镜像到: $OUTPUT_FILE"
+docker save -o "$OUTPUT_FILE" ghcr.io/steveoon/ai-computer-use:latest
+
+# 显示文件信息
+if [ -f "$OUTPUT_FILE" ]; then
+    FILE_SIZE=$(ls -lh "$OUTPUT_FILE" | awk '{print $5}')
+    echo "✅ 镜像已导出: $OUTPUT_FILE (大小: $FILE_SIZE)"
+else
+    echo "❌ 镜像导出失败"
+fi
+
 echo "✅ 部署完成!"
 echo ""
 echo "🖥️  在 VPS 上运行以下命令部署："
