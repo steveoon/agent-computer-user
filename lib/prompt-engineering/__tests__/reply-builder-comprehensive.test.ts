@@ -245,7 +245,7 @@ describe("ReplyPromptBuilder - 综合测试套件", () => {
 
       // 检查关键部分
       expect(result.prompt).toMatch(/\[指令\]/);
-      expect(result.prompt).toMatch(/\[当前上下文\]/);
+      expect(result.prompt).toMatch(/\[对话分析\]/);
       expect(result.prompt).toMatch(/\[候选人消息\]/);
     });
 
@@ -618,8 +618,8 @@ describe("ReplyPromptBuilder - 综合测试套件", () => {
 
         // 验证用户提示结构
         expect(result.prompt).toContain("[指令]");
-        expect(result.prompt).toContain("[参考示例]");
-        expect(result.prompt).toContain("[当前上下文]");
+        // 跳过 [参考示例] - 已被注释
+        expect(result.prompt).toContain("[对话分析]"); // 原 [当前上下文] 重命名为 [对话分析]
         expect(result.prompt).toContain("schedule_inquiry");
         expect(result.prompt).toContain("[对话历史]");
         expect(result.prompt).toContain("[招聘数据]");

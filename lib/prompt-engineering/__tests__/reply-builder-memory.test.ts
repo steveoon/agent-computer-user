@@ -592,7 +592,7 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
 
       // 验证包含关键部分
       expect(result.prompt).toContain("[指令]");
-      expect(result.prompt).toContain("[当前上下文]");
+      expect(result.prompt).toContain("[对话分析]"); // 原 [当前上下文] 重命名为 [对话分析]
       expect(result.prompt).toContain("[对话历史]");
       expect(result.prompt).toContain("[候选人消息]");
       expect(result.prompt).toContain("最新问题");

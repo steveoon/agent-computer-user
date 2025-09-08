@@ -80,7 +80,7 @@ describe("Dynamic Selector Utils", () => {
       expect(firstItem.className).toContain("_convItem_1rm6c_");
     });
 
-    it("应该在新HTML (hash: 1qq7t) 中找到会话项", () => {
+    it("应该在新HTML (hash: 8b9az) 中找到会话项", () => {
       const document = yupaoNewDOM.window.document;
       const selector = createDynamicClassSelector("_convItem");
 
@@ -90,7 +90,7 @@ describe("Dynamic Selector Utils", () => {
 
       // 验证找到的是正确的元素
       const firstItem = items[0];
-      expect(firstItem.className).toContain("_convItem_1qq7t_");
+      expect(firstItem.className).toContain("_convItem_8b9az_");
     });
 
     it("应该在两个不同的DOM中找到相同的语义元素", () => {

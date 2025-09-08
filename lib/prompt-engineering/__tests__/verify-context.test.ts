@@ -85,7 +85,7 @@ describe("ReplyPromptBuilder - 验证招聘数据上下文", () => {
     // 验证提示包含所有必要的结构部分
     expect(result.prompt).toContain("[指令]");
     expect(result.prompt).toContain("[招聘数据]");
-    expect(result.prompt).toContain("[当前上下文]");
+    expect(result.prompt).toContain("[对话分析]"); // 原 [当前上下文] 重命名为 [对话分析]
     expect(result.prompt).toContain("[对话历史]");
     expect(result.prompt).toContain("[候选人消息]");
     expect(result.prompt).toContain("[输出要求]");
