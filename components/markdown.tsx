@@ -37,12 +37,7 @@ const components: Partial<Components> = {
   a: ({ node, children, ...props }) => {
     return (
       // @ts-expect-error error
-      <Link
-        className="text-blue-500 hover:underline"
-        target="_blank"
-        rel="noreferrer"
-        {...props}
-      >
+      <Link className="text-blue-500 hover:underline" target="_blank" rel="noreferrer" {...props}>
         {children}
       </Link>
     );
@@ -103,5 +98,5 @@ const NonMemoizedMarkdown = ({ children }: { children: string }) => {
 
 export const Markdown = memo(
   NonMemoizedMarkdown,
-  (prevProps, nextProps) => prevProps.children === nextProps.children,
+  (prevProps, nextProps) => prevProps.children === nextProps.children
 );

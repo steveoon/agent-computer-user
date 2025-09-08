@@ -1,7 +1,14 @@
 "use client";
 
 import type { UIMessage } from "ai";
-import { isToolPart, getToolPartState, extractToolName, getToolPartInput, getToolPartOutput, getToolPartErrorText } from "@/types/tool-common";
+import {
+  isToolPart,
+  getToolPartState,
+  extractToolName,
+  getToolPartInput,
+  getToolPartOutput,
+  getToolPartErrorText,
+} from "@/types/tool-common";
 import { toolRegistry } from "./tool-messages";
 import { Markdown } from "./markdown";
 
@@ -45,7 +52,10 @@ export function MessagePartsAdapter({
             const input = getToolPartInput(part);
             const output = getToolPartOutput(part);
             const errorText = getToolPartErrorText(part);
-            const toolCallId = 'toolCallId' in part ? (part as unknown as { toolCallId: string }).toolCallId : `tool-${i}`;
+            const toolCallId =
+              "toolCallId" in part
+                ? (part as unknown as { toolCallId: string }).toolCallId
+                : `tool-${i}`;
 
             // 查找对应的工具配置
             const toolConfig = toolRegistry[toolName];

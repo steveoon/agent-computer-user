@@ -1,13 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Save, RefreshCw, Cpu, ToggleLeft, ToggleRight } from "lucide-react";
 import type { SystemPromptsConfig } from "@/types/config";
@@ -85,39 +79,42 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
   }, [data]);
 
   // 更新提示词
-  const updatePrompt = useCallback(
-    (key: keyof SystemPromptsConfig, value: string) => {
-      setPrompts((prev) => ({
-        ...prev,
-        [key]: value,
-      }));
-    },
-    []
-  );
+  const updatePrompt = useCallback((key: keyof SystemPromptsConfig, value: string) => {
+    setPrompts(prev => ({
+      ...prev,
+      [key]: value,
+    }));
+  }, []);
 
   // 切换活动提示词
   const handlePromptSwitch = useCallback(
     async (promptType: string) => {
       if (!onActivePromptChange) return;
-      
+
       // 类型保护，确保是有效的提示词类型
-      if (promptType !== 'bossZhipinSystemPrompt' && 
-          promptType !== 'generalComputerSystemPrompt' && 
-          promptType !== 'bossZhipinLocalSystemPrompt') {
-        setError('无效的提示词类型');
+      if (
+        promptType !== "bossZhipinSystemPrompt" &&
+        promptType !== "generalComputerSystemPrompt" &&
+        promptType !== "bossZhipinLocalSystemPrompt"
+      ) {
+        setError("无效的提示词类型");
         return;
       }
-      
+
       setSwitchingPrompt(true);
       setError(null);
-      
+
       try {
         await onActivePromptChange(promptType as keyof SystemPromptsConfig);
-        console.log(`✅ 已切换到 ${
-          promptType === 'bossZhipinSystemPrompt' ? 'Boss直聘' : 
-          promptType === 'bossZhipinLocalSystemPrompt' ? 'Boss直聘(本地版)' : 
-          '通用计算机'
-        } 系统提示词`);
+        console.log(
+          `✅ 已切换到 ${
+            promptType === "bossZhipinSystemPrompt"
+              ? "Boss直聘"
+              : promptType === "bossZhipinLocalSystemPrompt"
+                ? "Boss直聘(本地版)"
+                : "通用计算机"
+          } 系统提示词`
+        );
       } catch (error) {
         console.error("❌ 切换系统提示词失败:", error);
         setError(error instanceof Error ? error.message : "切换失败");
@@ -158,26 +155,14 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
                 <Cpu className="h-6 w-6" />
                 系统提示词编辑器
               </CardTitle>
-              <CardDescription>
-                配置AI助手在不同场景下的系统级行为指令
-              </CardDescription>
+              <CardDescription>配置AI助手在不同场景下的系统级行为指令</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleReset}
-                disabled={saving}
-              >
+              <Button variant="outline" size="sm" onClick={handleReset} disabled={saving}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 重置
               </Button>
-              <Button
-                onClick={handleSave}
-                size="sm"
-                disabled={saving}
-                className="min-w-20"
-              >
+              <Button onClick={handleSave} size="sm" disabled={saving} className="min-w-20">
                 {saving ? (
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
@@ -271,9 +256,7 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
         <CardContent>
           <textarea
             value={prompts.bossZhipinSystemPrompt || ""}
-            onChange={(e) =>
-              updatePrompt("bossZhipinSystemPrompt", e.target.value)
-            }
+            onChange={e => updatePrompt("bossZhipinSystemPrompt", e.target.value)}
             className="w-full h-64 p-4 text-sm border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring"
             placeholder="输入Boss直聘系统提示词..."
           />
@@ -295,9 +278,7 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
         <CardContent>
           <textarea
             value={prompts.bossZhipinLocalSystemPrompt || ""}
-            onChange={(e) =>
-              updatePrompt("bossZhipinLocalSystemPrompt", e.target.value)
-            }
+            onChange={e => updatePrompt("bossZhipinLocalSystemPrompt", e.target.value)}
             className="w-full h-64 p-4 text-sm border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring"
             placeholder="输入Boss直聘本地版系统提示词..."
           />
@@ -319,9 +300,7 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
         <CardContent>
           <textarea
             value={prompts.generalComputerSystemPrompt || ""}
-            onChange={(e) =>
-              updatePrompt("generalComputerSystemPrompt", e.target.value)
-            }
+            onChange={e => updatePrompt("generalComputerSystemPrompt", e.target.value)}
             className="w-full h-64 p-4 text-sm border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring"
             placeholder="输入通用计算机操作提示词..."
           />

@@ -9,9 +9,7 @@ import { SUPABASE_URL, SUPABASE_PUBLIC_ANON_KEY } from "@/lib/constants";
 export const createClient = async () => {
   // 环境变量检查
   if (!SUPABASE_URL || !SUPABASE_PUBLIC_ANON_KEY) {
-    throw new Error(
-      "[SUPABASE SERVER] 环境变量 SUPABASE_URL 或 SUPABASE_PUBLIC_ANON_KEY 未设置"
-    );
+    throw new Error("[SUPABASE SERVER] 环境变量 SUPABASE_URL 或 SUPABASE_PUBLIC_ANON_KEY 未设置");
   }
 
   try {
@@ -44,8 +42,6 @@ export const createClient = async () => {
   } catch (error) {
     // 统一错误处理，输出更详尽的日志
     console.error("[SUPABASE SERVER] 创建 Supabase Server 客户端失败:", error);
-    throw error instanceof Error
-      ? error
-      : new Error("[SUPABASE SERVER] 未知错误");
+    throw error instanceof Error ? error : new Error("[SUPABASE SERVER] 未知错误");
   }
 };

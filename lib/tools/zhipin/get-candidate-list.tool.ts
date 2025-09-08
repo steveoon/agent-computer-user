@@ -1,10 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
-import { 
-  wrapAntiDetectionScript, 
-  randomDelay
-} from "./anti-detection-utils";
+import { wrapAntiDetectionScript, randomDelay } from "./anti-detection-utils";
 import type { AutomationResult } from "./types";
 
 /**
@@ -52,12 +49,12 @@ function parseEvaluateResult(result: unknown): unknown {
 
 /**
  * Boss直聘获取候选人列表工具
- * 
+ *
  * 功能：
  * - 获取候选人推荐页面的候选人列表
  * - 提取候选人的详细信息
  * - 支持过滤已联系的候选人
- * 
+ *
  * 注意：
  * - Boss直聘使用两列布局，每个li.card-item包含两个候选人卡片
  * - 需要直接查找所有的候选人卡片，而不是li元素
@@ -76,40 +73,39 @@ export const zhipinGetCandidateListTool = () =>
     注意：
     - 需要先打开Boss直聘的候选人推荐页面
     - 页面URL通常为类似 zhipin.com/web/geek/recommend 的形式`,
-    
+
     inputSchema: z.object({
-      maxResults: z
-        .number()
-        .optional()
-        .describe("最多返回的候选人数量"),
+      maxResults: z.number().optional().describe("最多返回的候选人数量"),
       includeNoGreetButton: z
         .boolean()
         .optional()
         .default(false)
-        .describe("是否包含没有打招呼按钮的候选人")
+        .describe("是否包含没有打招呼按钮的候选人"),
     }),
-    
-    execute: async ({ 
+
+    execute: async ({
       maxResults,
-      includeNoGreetButton = false 
-    }): Promise<AutomationResult<{
-      candidates: ZhipinCandidateCard[];
-      total: number;
-    }>> => {
+      includeNoGreetButton = false,
+    }): Promise<
+      AutomationResult<{
+        candidates: ZhipinCandidateCard[];
+        total: number;
+      }>
+    > => {
       try {
         const client = await getPuppeteerMCPClient();
         const tools = await client.tools();
-        
+
         // 检查必需的工具
         if (!tools.puppeteer_evaluate) {
           throw new Error("MCP tool puppeteer_evaluate not available");
         }
-        
+
         const puppeteerEvaluate = tools.puppeteer_evaluate;
-        
+
         // 初始延迟
         await randomDelay(300, 500);
-        
+
         // 获取所有候选人信息
         const getCandidatesScript = wrapAntiDetectionScript(`
           const candidates = [];
@@ -279,62 +275,61 @@ export const zhipinGetCandidateListTool = () =>
           
           return { candidates, total: candidates.length };
         `);
-        
+
         const candidatesResult = await puppeteerEvaluate.execute({ script: getCandidatesScript });
-        const result = parseEvaluateResult(candidatesResult) as { 
-          candidates: ZhipinCandidateCard[]; 
-          total: number; 
-          error?: string; 
+        const result = parseEvaluateResult(candidatesResult) as {
+          candidates: ZhipinCandidateCard[];
+          total: number;
+          error?: string;
         } | null;
-        
+
         if (!result) {
           return {
             success: false,
-            error: "获取候选人列表数据解析失败"
+            error: "获取候选人列表数据解析失败",
           };
         }
-        
+
         if (result.error) {
           return {
             success: false,
-            error: result.error
+            error: result.error,
           };
         }
-        
+
         if (!result.candidates || result.candidates.length === 0) {
           return {
             success: false,
-            error: "未找到候选人列表，请确保已打开Boss直聘的候选人推荐页面"
+            error: "未找到候选人列表，请确保已打开Boss直聘的候选人推荐页面",
           };
         }
-        
+
         let filteredCandidates = result.candidates;
-        
+
         // 过滤没有打招呼按钮的候选人（除非明确要求包含）
         if (!includeNoGreetButton) {
           filteredCandidates = result.candidates.filter(c => c.buttonText);
         }
-        
+
         // 限制返回数量
         if (maxResults && maxResults > 0) {
           filteredCandidates = filteredCandidates.slice(0, maxResults);
         }
-        
+
         return {
           success: true,
           data: {
             candidates: filteredCandidates,
-            total: result.total
-          }
+            total: result.total,
+          },
         };
-        
       } catch (error) {
         return {
           success: false,
-          error: error instanceof Error ? error.message : "Unknown error occurred"
+          error: error instanceof Error ? error.message : "Unknown error occurred",
         };
       }
-    }
+    },
   });
 
 /**

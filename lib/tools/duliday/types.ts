@@ -60,10 +60,12 @@ export const jobItemSchema = z.object({
 export const jobListResponseSchema = z.object({
   code: z.number(),
   message: z.string(),
-  data: z.object({
-    result: z.array(jobItemSchema),
-    total: z.number(),
-  }).nullable(),
+  data: z
+    .object({
+      result: z.array(jobItemSchema),
+      total: z.number(),
+    })
+    .nullable(),
 });
 
 /**
@@ -77,13 +79,15 @@ export const interviewTimeSchema = z.object({
   weekdays: z.array(z.number()),
   start: z.number().nullable(),
   end: z.number().nullable(),
-  times: z.array(z.object({
-    start: z.number(),
-    end: z.number(),
-    fixedDeadline: z.string().nullable(),
-    cycleDeadlineDay: z.number(),
-    cycleDeadlineEnd: z.number(),
-  })),
+  times: z.array(
+    z.object({
+      start: z.number(),
+      end: z.number(),
+      fixedDeadline: z.string().nullable(),
+      cycleDeadlineDay: z.number(),
+      cycleDeadlineEnd: z.number(),
+    })
+  ),
 });
 
 /**
@@ -138,10 +142,12 @@ export const jobDetailsResponseSchema = z.object({
 export const interviewBookingResponseSchema = z.object({
   code: z.number(),
   message: z.string(),
-  data: z.object({
-    notice: z.string().optional(),
-    errorList: z.array(z.string()).nullable(),
-  }).nullable(),
+  data: z
+    .object({
+      notice: z.string().optional(),
+      errorList: z.array(z.string()).nullable(),
+    })
+    .nullable(),
 });
 
 // 导出类型

@@ -21,7 +21,7 @@ const signUpSchema = z
     password: z.string().min(6, "密码至少需要6位字符"),
     confirmPassword: z.string().min(6, "确认密码至少需要6位字符"),
   })
-  .refine((data) => data.password === data.confirmPassword, {
+  .refine(data => data.password === data.confirmPassword, {
     message: "两次密码输入不一致",
     path: ["confirmPassword"],
   });
@@ -72,9 +72,7 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
       return {
         success: false,
         error:
-          error.message === "Invalid login credentials"
-            ? "邮箱或密码错误"
-            : "登录失败，请稍后重试",
+          error.message === "Invalid login credentials" ? "邮箱或密码错误" : "登录失败，请稍后重试",
       };
     }
 
@@ -91,7 +89,7 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
     revalidatePath("/", "layout");
 
     // 给session一点时间来传播
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     return { success: true };
   } catch (error) {
@@ -141,9 +139,7 @@ export async function signUpAction(formData: FormData): Promise<ActionResult> {
       return {
         success: false,
         error:
-          error.message === "User already registered"
-            ? "该邮箱已被注册"
-            : "注册失败，请稍后重试",
+          error.message === "User already registered" ? "该邮箱已被注册" : "注册失败，请稍后重试",
       };
     }
 

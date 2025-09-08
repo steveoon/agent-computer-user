@@ -92,10 +92,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           break;
         case "TOKEN_REFRESHED":
           if (session?.user) {
-            console.log(
-              "[AUTH PROVIDER] Token refreshed for:",
-              session.user.email
-            );
+            console.log("[AUTH PROVIDER] Token refreshed for:", session.user.email);
             setUser(session.user);
           }
           break;

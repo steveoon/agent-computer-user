@@ -64,10 +64,7 @@ export const prunedMessages = async (
 
   try {
     // 🔍 Step 1: 分析当前token使用情况
-    const analysis = await analyzer.estimateMessageTokens(
-      messages,
-      finalConfig.targetTokens
-    );
+    const analysis = await analyzer.estimateMessageTokens(messages, finalConfig.targetTokens);
 
     console.log(
       `📊 Token分析: 总计${analysis.totalTokens} tokens (图片: ${analysis.imageTokens}), 需要优化: ${analysis.needsOptimization}`
@@ -83,12 +80,7 @@ export const prunedMessages = async (
     const strategy = selectOptimizationStrategy(analysis, finalConfig);
 
     // 🚀 Step 3: 执行优化策略
-    const optimizedMessages = await executeStrategy(
-      messages,
-      strategy,
-      finalConfig,
-      analyzer
-    );
+    const optimizedMessages = await executeStrategy(messages, strategy, finalConfig, analyzer);
 
     // 📊 Step 4: 验证优化结果
     const finalAnalysis = await analyzer.estimateMessageTokens(
@@ -147,9 +139,9 @@ function selectOptimizationStrategy(
   if (imageRatio > 0.6 && reductionRatio > 0.3) {
     return {
       type: "aggressive_image_removal",
-      reason: `图片占${(imageRatio * 100).toFixed(1)}%，需削减${(
-        reductionRatio * 100
-      ).toFixed(1)}%`,
+      reason: `图片占${(imageRatio * 100).toFixed(1)}%，需削减${(reductionRatio * 100).toFixed(
+        1
+      )}%`,
     };
   }
 
@@ -157,9 +149,9 @@ function selectOptimizationStrategy(
   if (imageRatio > 0.3 && reductionRatio > 0.2) {
     return {
       type: "hybrid_optimization",
-      reason: `图片占${(imageRatio * 100).toFixed(1)}%，需削减${(
-        reductionRatio * 100
-      ).toFixed(1)}%`,
+      reason: `图片占${(imageRatio * 100).toFixed(1)}%，需削减${(reductionRatio * 100).toFixed(
+        1
+      )}%`,
     };
   }
 
@@ -254,13 +246,8 @@ const pipeline =
       currentMessages = await processor(currentMessages, config, analyzer);
 
       // 实时检查是否已达到目标
-      const analysis = await analyzer.estimateMessageTokens(
-        currentMessages,
-        config.targetTokens
-      );
-      console.log(
-        `📊 处理器${processor.name}完成: ${analysis.totalTokens} tokens`
-      );
+      const analysis = await analyzer.estimateMessageTokens(currentMessages, config.targetTokens);
+      console.log(`📊 处理器${processor.name}完成: ${analysis.totalTokens} tokens`);
 
       if (!analysis.needsOptimization) {
         console.log("✅ 已达到目标，提前结束优化");
@@ -276,14 +263,8 @@ const pipeline =
 /**
  * 🗑️ 移除所有非保护图片
  */
-const removeAllImages: ProcessorFunction = async (
-  messages,
-  config = {} as TokenConfig
-) => {
-  const protectedCount = Math.min(
-    config.preserveRecentMessages || 3,
-    messages.length
-  );
+const removeAllImages: ProcessorFunction = async (messages, config = {} as TokenConfig) => {
+  const protectedCount = Math.min(config.preserveRecentMessages || 3, messages.length);
 
   return messages.map((message, index) => {
     // 保护最近的消息
@@ -298,14 +279,8 @@ const removeAllImages: ProcessorFunction = async (
 /**
  * 🗑️ 移除老旧图片
  */
-const removeOldImages: ProcessorFunction = async (
-  messages,
-  config = {} as TokenConfig
-) => {
-  const protectedCount = Math.min(
-    config.preserveRecentMessages || 3,
-    messages.length
-  );
+const removeOldImages: ProcessorFunction = async (messages, config = {} as TokenConfig) => {
+  const protectedCount = Math.min(config.preserveRecentMessages || 3, messages.length);
 
   return messages.map((message, index) => {
     // 保护最近的消息
@@ -323,16 +298,13 @@ const removeOldImages: ProcessorFunction = async (
 function removeImagesFromMessage(message: UIMessage): UIMessage {
   if (!message.parts) return message;
 
-  const optimizedParts = message.parts.map((part) => {
+  const optimizedParts = message.parts.map(part => {
     if (isToolPart(part)) {
       const toolPart = part as ToolPart;
       const state = getToolPartState(toolPart);
-      
+
       // 对于输入阶段的截图请求，标记为文本
-      if (
-        (state === "input-streaming" || state === "input-available") &&
-        'input' in toolPart
-      ) {
+      if ((state === "input-streaming" || state === "input-available") && "input" in toolPart) {
         const input = toolPart.input as Record<string, unknown>;
         if (input?.action === "screenshot") {
           return {
@@ -343,10 +315,10 @@ function removeImagesFromMessage(message: UIMessage): UIMessage {
       }
 
       // 对于输出阶段的图片结果，移除图片数据
-      if (state === "output-available" && 'output' in toolPart) {
+      if (state === "output-available" && "output" in toolPart) {
         const output = toolPart.output as Record<string, unknown>;
         if (output?.type === "image") {
-          const input = 'input' in toolPart ? toolPart.input as Record<string, unknown> : {};
+          const input = "input" in toolPart ? (toolPart.input as Record<string, unknown>) : {};
           const action = input?.action || "screenshot";
           return {
             type: "text",
@@ -367,10 +339,7 @@ function removeImagesFromMessage(message: UIMessage): UIMessage {
 /**
  * 🗑️ 移除冗余图片
  */
-const removeRedundantImages: ProcessorFunction = async (
-  messages,
-  config = {} as TokenConfig
-) => {
+const removeRedundantImages: ProcessorFunction = async (messages, config = {} as TokenConfig) => {
   // 简化实现：移除连续的截图消息中的重复项
   return removeOldImages(messages, config);
 };
@@ -378,19 +347,19 @@ const removeRedundantImages: ProcessorFunction = async (
 /**
  * 🔧 压缩工具结果 (AI SDK v5 版本)
  */
-const compressToolResults: ProcessorFunction = async (messages) => {
-  return messages.map((message) => {
+const compressToolResults: ProcessorFunction = async messages => {
+  return messages.map(message => {
     if (!message.parts) return message;
 
-    const compressedParts = message.parts.map((part) => {
+    const compressedParts = message.parts.map(part => {
       if (isToolPart(part)) {
         const toolPart = part as ToolPart;
         const state = getToolPartState(toolPart);
-        
+
         // 只处理输出阶段的结果
-        if (state === "output-available" && 'output' in toolPart) {
+        if (state === "output-available" && "output" in toolPart) {
           const output = toolPart.output as Record<string, unknown>;
-          
+
           // 压缩长文本结果
           if (output?.type === "text" && typeof output.data === "string") {
             const textData = output.data as string;
@@ -414,14 +383,8 @@ const compressToolResults: ProcessorFunction = async (messages) => {
 /**
  * 📝 总结旧消息
  */
-const summarizeOldMessages: ProcessorFunction = async (
-  messages,
-  config = {} as TokenConfig
-) => {
-  const protectedCount = Math.min(
-    config.preserveRecentMessages || 3,
-    messages.length
-  );
+const summarizeOldMessages: ProcessorFunction = async (messages, config = {} as TokenConfig) => {
+  const protectedCount = Math.min(config.preserveRecentMessages || 3, messages.length);
   const oldMessages = messages.slice(0, messages.length - protectedCount);
   const recentMessages = messages.slice(messages.length - protectedCount);
 
@@ -445,11 +408,11 @@ const summarizeOldMessages: ProcessorFunction = async (
 /**
  * 🔧 压缩冗长消息 (AI SDK v5 版本)
  */
-const compressVerboseMessages: ProcessorFunction = async (messages) => {
-  return messages.map((message) => {
+const compressVerboseMessages: ProcessorFunction = async messages => {
+  return messages.map(message => {
     if (!message.parts) return message;
-    
-    const compressedParts = message.parts.map((part) => {
+
+    const compressedParts = message.parts.map(part => {
       // 只处理文本部分
       if (part.type === "text" && part.text && part.text.length > 2000) {
         return {
@@ -459,7 +422,7 @@ const compressVerboseMessages: ProcessorFunction = async (messages) => {
       }
       return part;
     });
-    
+
     return {
       ...message,
       parts: compressedParts,
@@ -470,14 +433,14 @@ const compressVerboseMessages: ProcessorFunction = async (messages) => {
 /**
  * 🔧 优化工具调用
  */
-const optimizeToolCalls: ProcessorFunction = async (messages) => {
+const optimizeToolCalls: ProcessorFunction = async messages => {
   return compressToolResults(messages);
 };
 
 /**
  * 🧹 清理工具结果
  */
-const cleanupToolResults: ProcessorFunction = async (messages) => {
+const cleanupToolResults: ProcessorFunction = async messages => {
   return compressToolResults(messages);
 };
 
@@ -491,10 +454,7 @@ const truncateIfNeeded: ProcessorFunction = async (
 ) => {
   if (!analyzer) return messages;
 
-  const analysis = await analyzer.estimateMessageTokens(
-    messages,
-    config.targetTokens || 80000
-  );
+  const analysis = await analyzer.estimateMessageTokens(messages, config.targetTokens || 80000);
   if (analysis.needsOptimization) {
     return truncateToTarget(messages, config, analyzer);
   }
@@ -511,10 +471,7 @@ const validateTokenTarget: ProcessorFunction = async (
 ) => {
   if (!analyzer) return messages;
 
-  const analysis = await analyzer.estimateMessageTokens(
-    messages,
-    config.targetTokens || 80000
-  );
+  const analysis = await analyzer.estimateMessageTokens(messages, config.targetTokens || 80000);
   if (analysis.needsOptimization) {
     console.log("⚠️ 仍未达到目标，可能需要更激进的策略");
   }
@@ -524,7 +481,7 @@ const validateTokenTarget: ProcessorFunction = async (
 /**
  * 🔧 保留关键上下文
  */
-const preserveContext: ProcessorFunction = async (messages) => {
+const preserveContext: ProcessorFunction = async messages => {
   // 简化实现：保持消息原样
   return messages;
 };
@@ -547,26 +504,18 @@ const truncateToTarget: ProcessorFunction = async (
 
   // 从最老的消息开始移除
   while (optimizedMessages.length > protectedCount) {
-    const currentAnalysis = await analyzer.estimateMessageTokens(
-      optimizedMessages,
-      targetTokens
-    );
+    const currentAnalysis = await analyzer.estimateMessageTokens(optimizedMessages, targetTokens);
 
     if (!currentAnalysis.needsOptimization) {
       break;
     }
 
     // 智能选择要移除的消息（避免破坏对话连贯性）
-    const indexToRemove = findBestRemovalIndex(
-      optimizedMessages,
-      protectedCount
-    );
+    const indexToRemove = findBestRemovalIndex(optimizedMessages, protectedCount);
 
     optimizedMessages.splice(indexToRemove, 1);
 
-    console.log(
-      `📉 移除索引${indexToRemove}的消息，剩余${optimizedMessages.length}条`
-    );
+    console.log(`📉 移除索引${indexToRemove}的消息，剩余${optimizedMessages.length}条`);
   }
 
   return optimizedMessages;
@@ -575,10 +524,7 @@ const truncateToTarget: ProcessorFunction = async (
 /**
  * 🧠 智能选择要移除的消息
  */
-function findBestRemovalIndex(
-  messages: UIMessage[],
-  protectedCount: number
-): number {
+function findBestRemovalIndex(messages: UIMessage[], protectedCount: number): number {
   const removableRange = messages.length - protectedCount;
 
   // 优先移除：
@@ -604,38 +550,33 @@ function findBestRemovalIndex(
  */
 function isPureScreenshotMessage(message: UIMessage): boolean {
   return (
-    message.parts?.every(
-      (part) => {
-        if (!isToolPart(part)) return false;
-        const toolPart = part as ToolPart;
-        const state = getToolPartState(toolPart);
-        if (!state || !('input' in toolPart)) return false;
-        const input = toolPart.input as Record<string, unknown>;
-        return input?.action === "screenshot";
-      }
-    ) ?? false
+    message.parts?.every(part => {
+      if (!isToolPart(part)) return false;
+      const toolPart = part as ToolPart;
+      const state = getToolPartState(toolPart);
+      if (!state || !("input" in toolPart)) return false;
+      const input = toolPart.input as Record<string, unknown>;
+      return input?.action === "screenshot";
+    }) ?? false
   );
 }
 
 /**
  * 🚨 降级策略 (当智能优化失败时)
  */
-function fallbackPrunedMessages(
-  messages: UIMessage[],
-  protectedCount: number = 5
-): UIMessage[] {
+function fallbackPrunedMessages(messages: UIMessage[], protectedCount: number = 5): UIMessage[] {
   return messages.map((message, messageIndex) => {
     const isOldMessage = messageIndex < messages.length - protectedCount;
 
     if (!message.parts) return message;
 
-    const optimizedParts = message.parts.map((part) => {
+    const optimizedParts = message.parts.map(part => {
       if (isToolPart(part)) {
         const toolPart = part as ToolPart;
         const toolName = extractToolName(toolPart);
         const state = getToolPartState(toolPart);
-        
-        if (toolName === "computer" && 'input' in toolPart) {
+
+        if (toolName === "computer" && "input" in toolPart) {
           const input = toolPart.input as Record<string, unknown>;
           if (input?.action === "screenshot") {
             // 如果是输入阶段，替换为文本
@@ -645,9 +586,9 @@ function fallbackPrunedMessages(
                 text: "Screenshot request redacted to save tokens",
               } as UIMessagePart<UIDataTypes, UITools>;
             }
-            
+
             // 如果是输出阶段且是旧消息，移除图片
-            if (state === "output-available" && isOldMessage && 'output' in toolPart) {
+            if (state === "output-available" && isOldMessage && "output" in toolPart) {
               const output = toolPart.output as Record<string, unknown>;
               if (output?.type === "image") {
                 return {
@@ -684,12 +625,9 @@ export function shouldCleanupSandbox(error: unknown): boolean {
   // 如果是对象错误，检查错误类型
   if (error && typeof error === "object") {
     const errorObj = error as Record<string, unknown>;
-    const errorType =
-      errorObj.type || (errorObj.error as Record<string, unknown>)?.type;
+    const errorType = errorObj.type || (errorObj.error as Record<string, unknown>)?.type;
     const errorMessage =
-      errorObj.message ||
-      (errorObj.error as Record<string, unknown>)?.message ||
-      "";
+      errorObj.message || (errorObj.error as Record<string, unknown>)?.message || "";
 
     // 这些错误类型不需要清理沙箱（外部服务问题）
     const externalServiceErrors = [
@@ -708,12 +646,7 @@ export function shouldCleanupSandbox(error: unknown): boolean {
     }
 
     // 这些错误类型需要清理沙箱（沙箱环境问题）
-    const sandboxErrors = [
-      "sandbox_error",
-      "execution_error",
-      "timeout_error",
-      "connection_error",
-    ];
+    const sandboxErrors = ["sandbox_error", "execution_error", "timeout_error", "connection_error"];
 
     if (sandboxErrors.includes(errorType as string)) {
       console.log(`🧹 沙箱环境错误 (${errorType}), 需要清理`);
@@ -732,7 +665,7 @@ export function shouldCleanupSandbox(error: unknown): boolean {
       "session expired",
     ];
 
-    const messageContainsSandboxIssue = sandboxRelatedKeywords.some((keyword) =>
+    const messageContainsSandboxIssue = sandboxRelatedKeywords.some(keyword =>
       String(errorMessage).toLowerCase().includes(keyword.toLowerCase())
     );
 
@@ -744,14 +677,9 @@ export function shouldCleanupSandbox(error: unknown): boolean {
 
   // 对于严重的系统错误（如内存不足等），也进行清理
   if (error instanceof Error) {
-    const criticalErrors = [
-      "out of memory",
-      "system error",
-      "fatal error",
-      "process crashed",
-    ];
+    const criticalErrors = ["out of memory", "system error", "fatal error", "process crashed"];
 
-    const isCritical = criticalErrors.some((keyword) =>
+    const isCritical = criticalErrors.some(keyword =>
       error.message.toLowerCase().includes(keyword)
     );
 
@@ -793,7 +721,7 @@ export const mapKeySequence = (keySequence: string): string => {
   const parts = result.split("+");
   if (parts.length > 1) {
     // 映射每个部分，但只映射有问题的字符
-    const mappedParts = parts.map((part) => {
+    const mappedParts = parts.map(part => {
       const trimmedPart = part.trim();
 
       // 只映射真正有问题的字符，其他保持原样

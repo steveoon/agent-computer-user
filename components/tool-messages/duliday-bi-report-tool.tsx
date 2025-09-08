@@ -15,18 +15,18 @@ export function DulidayBiReportToolMessage(props: ToolMessageProps) {
   const limit = input.limit as number | undefined;
 
   const details: string[] = [];
-  
+
   // 日期范围
   if (startDate || endDate) {
     const dateRange = `${startDate || "开始"} ~ ${endDate || "至今"}`;
     details.push(dateRange);
   }
-  
+
   // 其他筛选条件
   if (orderStatus) details.push(orderStatus);
   if (storeName) details.push(storeName);
   if (regionName) details.push(regionName);
-  
+
   // 数据量和格式
   if (limit) details.push(`${limit}条`);
   if (formatType && formatType !== "summary") {

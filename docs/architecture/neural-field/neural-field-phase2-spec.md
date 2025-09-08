@@ -7,11 +7,13 @@ Phase 2的核心目标是将现有的Agent系统重构为场感知Agent，使其
 ## 技术背景
 
 ### 现有Agent系统问题
+
 - **串行执行**：分类Agent必须先完成，生成Agent才能开始
 - **上下文传递损失**：每次Agent调用都需要重新构建上下文
 - **缺乏实时交互**：Agent之间无法实时影响彼此的决策
 
 ### 场感知Agent优势
+
 - **并行处理**：所有Agent同时在场中工作
 - **实时共振**：Agent通过场的演化相互影响
 - **上下文保持**：信息在统一场中流动，无传递损失
@@ -28,10 +30,10 @@ abstract class BaseFieldAgent {
   protected field: SemanticField;
   protected regionStart: number;
   protected regionEnd: number;
-  
+
   // 核心方法
   abstract async process(input: string): Promise<AgentActivation>;
-  
+
   // 场交互方法
   protected async readFieldRegion(): Promise<Float32Array>;
   protected async writeActivation(activation: Float32Array): Promise<void>;
@@ -42,6 +44,7 @@ abstract class BaseFieldAgent {
 ### 2. 三个场感知Agent实现
 
 #### 2.1 IntentRecognizer (意图识别Agent)
+
 - **工作区域**: 0-384维
 - **职责**: 识别用户意图，生成意图向量
 - **特点**: 快速激活，为其他Agent提供方向信号
@@ -49,19 +52,19 @@ abstract class BaseFieldAgent {
 ```typescript
 class IntentRecognizer extends BaseFieldAgent {
   constructor(field: SemanticField) {
-    super('IntentRecognizer', field, 0, 384);
+    super("IntentRecognizer", field, 0, 384);
   }
-  
+
   async process(input: string): Promise<AgentActivation> {
     // 1. 将输入转换为向量
     const inputVector = await FieldOperations.textToVector(input);
-    
+
     // 2. 分析意图特征
     const intentFeatures = await this.extractIntentFeatures(inputVector);
-    
+
     // 3. 生成意图激活向量
     const activation = this.generateIntentActivation(intentFeatures);
-    
+
     // 4. 写入场并返回
     await this.writeActivation(activation);
     return { agentName: this.name, activation, confidence: 0.9 };
@@ -70,6 +73,7 @@ class IntentRecognizer extends BaseFieldAgent {
 ```
 
 #### 2.2 ReplyGenerator (回复生成Agent)
+
 - **工作区域**: 384-1152维
 - **职责**: 基于意图生成合适的回复
 - **特点**: 感知意图信号，动态调整生成策略
@@ -77,19 +81,19 @@ class IntentRecognizer extends BaseFieldAgent {
 ```typescript
 class ReplyGenerator extends BaseFieldAgent {
   constructor(field: SemanticField) {
-    super('ReplyGenerator', field, 384, 1152);
+    super("ReplyGenerator", field, 384, 1152);
   }
-  
+
   async process(input: string): Promise<AgentActivation> {
     // 1. 读取意图识别区域，感知意图
     const intentSignal = await this.field.getSlice(0, 384);
-    
+
     // 2. 基于意图和输入生成回复策略
     const replyStrategy = await this.planReplyStrategy(input, intentSignal);
-    
+
     // 3. 生成回复激活向量
     const activation = await this.generateReplyActivation(replyStrategy);
-    
+
     // 4. 写入场并返回
     await this.writeActivation(activation);
     return { agentName: this.name, activation, metadata: replyStrategy };
@@ -98,6 +102,7 @@ class ReplyGenerator extends BaseFieldAgent {
 ```
 
 #### 2.3 QualityValidator (质量验证Agent)
+
 - **工作区域**: 1152-1536维
 - **职责**: 验证回复质量，确保合规性
 - **特点**: 持续监控其他Agent，提供反馈信号
@@ -105,24 +110,24 @@ class ReplyGenerator extends BaseFieldAgent {
 ```typescript
 class QualityValidator extends BaseFieldAgent {
   constructor(field: SemanticField) {
-    super('QualityValidator', field, 1152, 1536);
+    super("QualityValidator", field, 1152, 1536);
   }
-  
+
   async process(input: string): Promise<AgentActivation> {
     // 1. 感知整个场的状态
     const fieldState = await this.field.getState();
-    
+
     // 2. 提取质量指标
     const qualityMetrics = await this.evaluateFieldQuality(fieldState);
-    
+
     // 3. 生成验证激活向量
     const activation = this.generateValidationActivation(qualityMetrics);
-    
+
     // 4. 如果发现问题，增强警告信号
     if (qualityMetrics.hasIssues) {
       await this.amplifyWarningSignal(activation);
     }
-    
+
     // 5. 写入场并返回
     await this.writeActivation(activation);
     return { agentName: this.name, activation, metrics: qualityMetrics };
@@ -183,19 +188,17 @@ class QualityValidator extends BaseFieldAgent {
 class FieldAgentOrchestrator {
   private field: SemanticField;
   private agents: BaseFieldAgent[];
-  
+
   async processWithField(input: string): Promise<SmartReplyResult> {
     // 1. 注入用户输入到场
     await this.field.inject(input);
-    
+
     // 2. 并行激活所有Agent
-    const activations = await Promise.all(
-      this.agents.map(agent => agent.process(input))
-    );
-    
+    const activations = await Promise.all(this.agents.map(agent => agent.process(input)));
+
     // 3. 让场演化达到稳定
     const finalState = await this.field.evolve();
-    
+
     // 4. 从稳定的场中提取最终回复
     return this.extractReplyFromField(finalState);
   }
@@ -213,11 +216,11 @@ export async function generateSmartReplyWithLLM(
   options: ReplyOptions
 ): Promise<SmartReplyResult> {
   // 检查是否启用场架构
-  if (process.env.ENABLE_FIELD_ARCHITECTURE === 'true') {
+  if (process.env.ENABLE_FIELD_ARCHITECTURE === "true") {
     const orchestrator = new FieldAgentOrchestrator();
     return await orchestrator.processWithField(message);
   }
-  
+
   // 否则使用原有逻辑
   return await legacyGenerateReply(message, options);
 }
@@ -226,34 +229,37 @@ export async function generateSmartReplyWithLLM(
 ### 5. 性能优化策略
 
 #### 5.1 Agent并行化
+
 - 使用Web Workers运行计算密集的Agent任务
 - 利用Promise.all确保真正的并行执行
 - 避免阻塞主线程
 
 #### 5.2 向量运算优化
+
 ```typescript
 // 使用TensorFlow.js批量处理Agent激活
 class BatchFieldProcessor {
   async processAgentActivations(activations: Float32Array[]): Promise<Float32Array> {
     // 将所有激活堆叠为2D张量
     const batch = tf.stack(activations.map(a => tf.tensor1d(a)));
-    
+
     // 批量计算共振效应
     const resonance = tf.matMul(batch, batch.transpose());
-    
+
     // 提取结果
     const result = await resonance.data();
-    
+
     // 清理内存
     batch.dispose();
     resonance.dispose();
-    
+
     return new Float32Array(result);
   }
 }
 ```
 
 #### 5.3 缓存策略
+
 - 缓存常见意图的激活模式
 - 预计算高频回复的向量表示
 - 使用LRU缓存管理内存
@@ -261,6 +267,7 @@ class BatchFieldProcessor {
 ### 6. 监控和调试
 
 #### 6.1 Agent活动监控
+
 ```typescript
 interface AgentMetrics {
   agentName: string;
@@ -271,6 +278,7 @@ interface AgentMetrics {
 ```
 
 #### 6.2 场状态可视化
+
 - 实时显示各Agent的激活强度
 - 可视化共振模式
 - 追踪场演化过程
@@ -280,20 +288,20 @@ interface AgentMetrics {
 ```typescript
 interface FieldAgentConfig {
   // Agent通用配置
-  parallelExecution: boolean;  // 是否并行执行
-  timeoutMs: number;           // 单个Agent超时时间
-  
+  parallelExecution: boolean; // 是否并行执行
+  timeoutMs: number; // 单个Agent超时时间
+
   // IntentRecognizer配置
-  intentConfidenceThreshold: number;  // 意图置信度阈值
-  intentCacheSize: number;            // 意图缓存大小
-  
-  // ReplyGenerator配置  
-  replyDiversity: number;      // 回复多样性(0-1)
+  intentConfidenceThreshold: number; // 意图置信度阈值
+  intentCacheSize: number; // 意图缓存大小
+
+  // ReplyGenerator配置
+  replyDiversity: number; // 回复多样性(0-1)
   templateCacheEnabled: boolean; // 是否缓存模板
-  
+
   // QualityValidator配置
-  strictnessLevel: number;     // 验证严格程度(1-10)
-  complianceRules: string[];   // 合规规则列表
+  strictnessLevel: number; // 验证严格程度(1-10)
+  complianceRules: string[]; // 合规规则列表
 }
 ```
 

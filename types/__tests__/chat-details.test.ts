@@ -29,7 +29,7 @@ describe("Chat Details Type System", () => {
             age: "25",
             experience: "3年",
             education: "本科",
-            customField: "额外字段" // passthrough should allow this
+            customField: "额外字段", // passthrough should allow this
           },
           chatMessages: [
             {
@@ -38,7 +38,7 @@ describe("Chat Details Type System", () => {
               messageType: "text",
               content: "你好",
               time: "10:30",
-              hasTime: true
+              hasTime: true,
             },
             {
               index: 1,
@@ -46,24 +46,24 @@ describe("Chat Details Type System", () => {
               messageType: "text",
               content: "您好，请问方便聊聊吗？",
               time: "10:31",
-              hasTime: true
-            }
+              hasTime: true,
+            },
           ],
           stats: {
             totalMessages: 2,
             candidateMessages: 1,
             recruiterMessages: 1,
             systemMessages: 0,
-            messagesWithTime: 2
-          }
+            messagesWithTime: 2,
+          },
         },
         summary: {
           candidateName: "张三",
           candidatePosition: "前端开发",
           totalMessages: 2,
-          lastMessageTime: "10:31"
+          lastMessageTime: "10:31",
         },
-        formattedHistory: ["求职者: 你好", "我: 您好，请问方便聊聊吗？"]
+        formattedHistory: ["求职者: 你好", "我: 您好，请问方便聊聊吗？"],
       };
 
       const parsed = ChatDetailsResultSchema.safeParse(validResult);
@@ -73,7 +73,7 @@ describe("Chat Details Type System", () => {
     it("should handle minimal valid result", () => {
       const minimalResult = {
         success: false,
-        error: "未找到聊天窗口"
+        error: "未找到聊天窗口",
       };
 
       const parsed = ChatDetailsResultSchema.safeParse(minimalResult);
@@ -87,7 +87,7 @@ describe("Chat Details Type System", () => {
         // Platform-specific fields
         zhipinSpecificField: "BOSS直聘特有字段",
         yupaoSpecificField: "Yupao特有字段",
-        someOtherData: { nested: "data" }
+        someOtherData: { nested: "data" },
       };
 
       const parsed = UnifiedCandidateInfoSchema.safeParse(candidateInfo);
@@ -104,7 +104,7 @@ describe("Chat Details Type System", () => {
         { sender: "candidate", messageType: "text" },
         { sender: "recruiter", messageType: "system" },
         { sender: "system", messageType: "resume" },
-        { sender: "unknown", messageType: "wechat-exchange" }
+        { sender: "unknown", messageType: "wechat-exchange" },
       ];
 
       validMessages.forEach(msg => {
@@ -113,7 +113,7 @@ describe("Chat Details Type System", () => {
           index: 0,
           content: "test",
           time: "",
-          hasTime: false
+          hasTime: false,
         };
         const parsed = ChatMessageSchema.safeParse(fullMsg);
         expect(parsed.success).toBe(true);
@@ -127,8 +127,8 @@ describe("Chat Details Type System", () => {
         success: true,
         data: {
           candidateInfo: { name: "测试" },
-          chatMessages: []
-        }
+          chatMessages: [],
+        },
       };
 
       expect(isSuccessfulChatDetailsResult(successResult as any)).toBe(true);
@@ -138,7 +138,7 @@ describe("Chat Details Type System", () => {
     it("should correctly identify error results", () => {
       const errorResult = {
         success: false,
-        error: "错误信息"
+        error: "错误信息",
       };
 
       expect(isSuccessfulChatDetailsResult(errorResult as any)).toBe(false);
@@ -149,19 +149,19 @@ describe("Chat Details Type System", () => {
   describe("Utility Functions", () => {
     it("should extract candidate name correctly", () => {
       const resultWithSummary = {
-        summary: { 
+        summary: {
           candidateName: "从摘要获取",
           candidatePosition: "职位",
           totalMessages: 0,
-          lastMessageTime: ""
-        }
+          lastMessageTime: "",
+        },
       };
       expect(extractCandidateName(resultWithSummary)).toBe("从摘要获取");
 
       const resultWithData = {
         data: {
-          candidateInfo: { name: "从数据获取" }
-        }
+          candidateInfo: { name: "从数据获取" },
+        },
       };
       expect(extractCandidateName(resultWithData)).toBe("从数据获取");
 
@@ -171,25 +171,25 @@ describe("Chat Details Type System", () => {
 
     it("should extract total messages correctly", () => {
       const resultWithSummary = {
-        summary: { 
+        summary: {
           candidateName: "",
           candidatePosition: "",
           totalMessages: 10,
-          lastMessageTime: ""
-        }
+          lastMessageTime: "",
+        },
       };
       expect(extractTotalMessages(resultWithSummary)).toBe(10);
 
       const resultWithStats = {
         data: {
-          stats: { 
+          stats: {
             totalMessages: 20,
             candidateMessages: 10,
             recruiterMessages: 10,
             systemMessages: 0,
-            messagesWithTime: 20
-          }
-        }
+            messagesWithTime: 20,
+          },
+        },
       };
       expect(extractTotalMessages(resultWithStats)).toBe(20);
 
@@ -201,9 +201,9 @@ describe("Chat Details Type System", () => {
             messageType: "text",
             content: "test",
             time: "",
-            hasTime: false
-          })
-        }
+            hasTime: false,
+          }),
+        },
       };
       expect(extractTotalMessages(resultWithMessages)).toBe(5);
     });
@@ -236,8 +236,8 @@ describe("Chat Details Type System", () => {
           candidateName: "test",
           candidatePosition: "test",
           totalMessages: 0,
-          lastMessageTime: ""
-        }
+          lastMessageTime: "",
+        },
       };
 
       const migrated = migrateToUnifiedType(validData);
@@ -248,7 +248,7 @@ describe("Chat Details Type System", () => {
       const oldData = {
         success: true,
         message: "old message",
-        someUnknownField: "will be ignored"
+        someUnknownField: "will be ignored",
       };
 
       const migrated = migrateToUnifiedType(oldData);
@@ -261,7 +261,7 @@ describe("Chat Details Type System", () => {
     it("should parse valid results", () => {
       const validResult = {
         success: true,
-        message: "Success"
+        message: "Success",
       };
 
       const parsed = parseChatDetailsResult(validResult);
@@ -271,16 +271,16 @@ describe("Chat Details Type System", () => {
 
     it("should return null for invalid results", () => {
       const invalidResult = {
-        notAValidField: "test"
+        notAValidField: "test",
       };
 
       // Suppress console.warn for this test
       const originalWarn = console.warn;
       console.warn = () => {};
-      
+
       const parsed = parseChatDetailsResult(invalidResult);
       expect(parsed).toBeNull();
-      
+
       console.warn = originalWarn;
     });
   });

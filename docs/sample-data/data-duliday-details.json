@@ -348,12 +348,7 @@
       "introduction": "主营业务：连锁快餐店\n品牌介绍：肯德基KFC坚持“立足中国、融入生活”,打造新快餐,提供早餐,午餐,下午茶,晚餐,夜宵和甜品站等丰富选择。上海肯德基有限公司坚持以人为本，重视队伍建设和人才培养，已拥有一批专业的管理队伍和业务精英。我们热心公益，承担企业社会责任，履行企业公民职责，努力“用社会给予的关怀积极回馈社会”。",
       "oneSentenceIntro": "",
       "logo": "kendejilogo.png",
-      "images": [
-        "kendejishoutu.png",
-        "kendejishoutu3.png",
-        "kenduji1.png",
-        "kendeji2.png"
-      ]
+      "images": ["kendejishoutu.png", "kendejishoutu3.png", "kenduji1.png", "kendeji2.png"]
     },
     "signUpNum": null,
     "changedFields": null,

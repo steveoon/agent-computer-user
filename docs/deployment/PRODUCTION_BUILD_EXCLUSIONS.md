@@ -6,23 +6,20 @@
 
 我们通过以下配置确保了这一点：
 
-### 1. TypeScript 配置 
+### 1. TypeScript 配置
 
 **重要更新**：为了避免测试文件的类型推断问题，我们使用两个 TypeScript 配置文件：
 
 #### `tsconfig.json`（主配置）
+
 ```json
 {
-  "exclude": [
-    "node_modules",
-    ".next",
-    "dist",
-    "coverage"
-  ]
+  "exclude": ["node_modules", ".next", "dist", "coverage"]
 }
 ```
 
 #### `tsconfig.test.json`（测试专用配置）
+
 ```json
 {
   "extends": "./tsconfig.json",
@@ -41,6 +38,7 @@
 ```
 
 这样可以确保：
+
 - ✅ 测试文件有正确的类型推断
 - ✅ 生产构建时仍然排除测试文件
 - ✅ IDE 中的类型提示正常工作
@@ -69,7 +67,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // 不需要额外的 ESLint 配置
   // 通过正确配置 eslint.config.mjs，测试文件已被自动忽略
-}
+};
 ```
 
 ### 4. ESLint 配置 (`eslint.config.mjs`)
@@ -92,7 +90,7 @@ const eslintConfig = [
       "**/*.spec.tsx",
       "vitest.config.*",
       "vitest.setup.*",
-      "coverage/**"
+      "coverage/**",
     ],
   },
   // 然后应用规则到其他文件
@@ -127,12 +125,14 @@ docker build -t myapp .
 ## 验证方法
 
 1. **检查 standalone 构建**：
+
    ```bash
    find .next/standalone -name "*.test.*" -o -name "__tests__"
    # 应该没有输出
    ```
 
 2. **检查构建大小**：
+
    ```bash
    du -sh .next/standalone
    # 79M - 不包含测试文件
@@ -160,8 +160,8 @@ docker build -t myapp .
 2. ESLint flat config 的关键点：
    - `ignores` 必须作为单独的配置对象放在配置数组的第一位
    - 使用 glob 模式时要注意路径格式（如 `**/__tests__/**` 而不是 `**/__tests__`）
-   
 3. 现在可以安全地在 CI/CD 流程中运行所有检查：
+
    ```bash
    pnpm lint    # ✅ 不会检查测试文件
    pnpm test    # ✅ 运行所有测试
@@ -173,6 +173,7 @@ docker build -t myapp .
 ## 总结
 
 通过以上配置，我们成功地：
+
 - ✅ 排除了测试文件在生产构建中
 - ✅ 保持了开发体验不受影响
 - ✅ 减小了生产镜像的大小

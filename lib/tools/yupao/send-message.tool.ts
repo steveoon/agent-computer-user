@@ -69,9 +69,11 @@ export const yupaoSendMessageTool = () =>
             throw new Error(`MCP tool ${toolName} not available`);
           }
         }
-        
+
         // 类型断言：在检查后这些工具一定存在
-        const puppeteerEvaluate = tools.puppeteer_evaluate as NonNullable<typeof tools.puppeteer_evaluate>;
+        const puppeteerEvaluate = tools.puppeteer_evaluate as NonNullable<
+          typeof tools.puppeteer_evaluate
+        >;
         const puppeteerClick = tools.puppeteer_click as NonNullable<typeof tools.puppeteer_click>;
 
         // 步骤1: 验证输入框是否存在
@@ -91,7 +93,7 @@ export const yupaoSendMessageTool = () =>
 
         const inputResult = await puppeteerEvaluate.execute({ script: checkInputScript });
         const inputData = parseEvaluateResult(inputResult);
-        
+
         if (!inputData?.exists) {
           return {
             success: false,
@@ -132,7 +134,7 @@ export const yupaoSendMessageTool = () =>
               }
               return { cleared: false };
             `);
-            
+
             await puppeteerEvaluate.execute({ script: clearScript });
             await randomDelay(50, 150);
           } catch {
@@ -143,7 +145,7 @@ export const yupaoSendMessageTool = () =>
         // 步骤4: 输入消息内容
         // 由于 fb-editor 是 contenteditable，使用特殊的方式输入
         await randomDelay(100, 200);
-        
+
         const fillScript = wrapAntiDetectionScript(`
           const editor = document.querySelector('${YUPAO_INPUT_SELECTORS.fbEditor}');
           if (editor) {
@@ -177,22 +179,23 @@ export const yupaoSendMessageTool = () =>
           }
           return { filled: false };
         `);
-        
+
         const fillResult = await puppeteerEvaluate.execute({ script: fillScript });
         const fillData = parseEvaluateResult(fillResult);
-        
+
         if (!fillData?.filled) {
           // 对于contenteditable元素，puppeteer_fill不适用
           // 直接返回错误，需要检查页面状态
           return {
             success: false,
-            error: "Failed to fill message in contenteditable div. Please check if the page is loaded correctly.",
+            error:
+              "Failed to fill message in contenteditable div. Please check if the page is loaded correctly.",
             message: "填充消息失败，请检查页面是否正确加载",
             details: {
               selector: YUPAO_INPUT_SELECTORS.fbEditor,
               attemptedMessage: message,
-              hint: "fb-editor is a contenteditable div, not a standard input field"
-            }
+              hint: "fb-editor is a contenteditable div, not a standard input field",
+            },
           };
         }
 
@@ -225,7 +228,7 @@ export const yupaoSendMessageTool = () =>
 
         const sendButtonResult = await puppeteerEvaluate.execute({ script: findSendButtonScript });
         const sendButtonData = parseEvaluateResult(sendButtonResult);
-        
+
         if (!sendButtonData?.exists) {
           return {
             success: false,
@@ -233,19 +236,19 @@ export const yupaoSendMessageTool = () =>
             message: "未找到发送按钮",
           };
         }
-        
+
         // 点击发送按钮前添加随机延迟
         await randomDelay(200, 400);
-        
+
         try {
           const sendSelector = sendButtonData.selector as string;
           await puppeteerClick.execute({ selector: sendSelector });
-          
+
           // 等待消息发送完成
           if (waitAfterSend > 0) {
             await randomDelay(waitAfterSend * 0.8, waitAfterSend * 1.2);
           }
-          
+
           // 验证消息是否发送成功（检查输入框是否已清空）
           const verifyScript = wrapAntiDetectionScript(`
             const editor = document.querySelector('${YUPAO_INPUT_SELECTORS.fbEditor}');
@@ -255,10 +258,10 @@ export const yupaoSendMessageTool = () =>
               charCountZero: charCount ? charCount.textContent === '0' : false
             };
           `);
-          
+
           const verifyResult = await puppeteerEvaluate.execute({ script: verifyScript });
           const verifyData = parseEvaluateResult(verifyResult);
-          
+
           return {
             success: true,
             message: `成功发送消息: "${message}"`,
@@ -275,7 +278,6 @@ export const yupaoSendMessageTool = () =>
             message: "点击发送按钮失败",
           };
         }
-
       } catch (error) {
         // 静默处理错误，避免暴露
 

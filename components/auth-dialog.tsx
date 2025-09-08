@@ -90,13 +90,9 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>
-            {mode === "login" ? "登录账户" : "注册账户"}
-          </DialogTitle>
+          <DialogTitle>{mode === "login" ? "登录账户" : "注册账户"}</DialogTitle>
           <DialogDescription>
-            {mode === "login"
-              ? "请输入您的邮箱和密码进行登录"
-              : "创建新账户以开始使用服务"}
+            {mode === "login" ? "请输入您的邮箱和密码进行登录" : "创建新账户以开始使用服务"}
           </DialogDescription>
         </DialogHeader>
 
@@ -148,8 +144,8 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                   ? "登录中..."
                   : "注册中..."
                 : mode === "login"
-                ? "登录"
-                : "注册"}
+                  ? "登录"
+                  : "注册"}
             </Button>
 
             <Button

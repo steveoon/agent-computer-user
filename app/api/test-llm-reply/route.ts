@@ -7,10 +7,7 @@ export async function POST(request: NextRequest) {
       await request.json();
 
     if (!message || typeof message !== "string") {
-      return NextResponse.json(
-        { error: "请提供有效的消息内容" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "请提供有效的消息内容" }, { status: 400 });
     }
 
     // 🔧 验证客户端传递的配置数据

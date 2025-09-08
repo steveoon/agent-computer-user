@@ -16,41 +16,41 @@ server {
 
     # 增加请求体大小限制（如果需要处理大数据）
     client_max_body_size 50M;
-    
+
     # 补充连接超时配置（你已有 read/send，需要添加 connect）
     proxy_connect_timeout 3600;  # 添加连接超时，与现有配置保持一致
-    
+
     # 关键：优化 keepalive 设置
     keepalive_timeout 300s;
     keepalive_requests 100;
-    
+
     # 针对同步 API 的特殊 location 块（优先级更高）
     location ~ ^/api/(sync|diagnose) {
         proxy_pass http://127.0.0.1:4000;
         proxy_http_version 1.1;
-        
+
         # 保持你现有的长超时设置
         proxy_connect_timeout 3600;
         proxy_read_timeout 3600;
         proxy_send_timeout 3600;
-        
+
         # 关键配置：处理长连接和流式响应
         proxy_set_header Connection '';
         proxy_buffering off;
         proxy_cache off;
-        
+
         # 支持 SSE/流式响应（重要！）
         proxy_set_header X-Accel-Buffering no;
-        
+
         # 标准代理头部
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        
+
         chunked_transfer_encoding on;
     }
-    
+
     # 默认 location（保持你现有的配置）
     location / {
         proxy_pass http://127.0.0.1:4000;
@@ -61,15 +61,15 @@ server {
         proxy_read_timeout 3600;
         proxy_send_timeout 3600;
         proxy_connect_timeout 3600;  # 添加这行
-        
+
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        
+
         chunked_transfer_encoding on;
     }
-    
+
     # SSL 配置保持不变
     listen 443 ssl;
     ssl_certificate /etc/nginx/ssl/recruiter-agent.duliday.com.pem;
@@ -87,11 +87,13 @@ server {
 ## 应用更改
 
 1. 编辑 Nginx 配置文件：
+
    ```bash
    sudo nano /etc/nginx/sites-available/your-site
    ```
 
 2. 测试配置是否正确：
+
    ```bash
    sudo nginx -t
    ```
@@ -106,21 +108,23 @@ server {
 在 VPS 上，你可能还需要调整系统级的网络参数：
 
 1. 编辑 sysctl 配置：
+
    ```bash
    sudo nano /etc/sysctl.conf
    ```
 
 2. 添加以下配置：
+
    ```bash
    # 增加 TCP keepalive 时间
    net.ipv4.tcp_keepalive_time = 600
    net.ipv4.tcp_keepalive_intvl = 60
    net.ipv4.tcp_keepalive_probes = 20
-   
+
    # 增加连接队列
    net.core.somaxconn = 1024
    net.ipv4.tcp_max_syn_backlog = 1024
-   
+
    # 优化 TCP 性能
    net.ipv4.tcp_fin_timeout = 30
    net.ipv4.tcp_tw_reuse = 1
@@ -151,11 +155,13 @@ services:
 ## 监控和调试
 
 1. 查看 Nginx 错误日志：
+
    ```bash
    sudo tail -f /var/log/nginx/error.log
    ```
 
 2. 查看应用日志：
+
    ```bash
    docker logs -f ai-computer-use
    ```
@@ -196,6 +202,7 @@ ping k8s.duliday.com
 ```
 
 如果问题持续，可以考虑：
+
 1. 使用 HTTP 代理服务
 2. 部署到地理位置更近的 VPS
 3. 联系 Duliday API 支持团队了解是否有 IP 限制

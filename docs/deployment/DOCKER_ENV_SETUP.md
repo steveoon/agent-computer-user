@@ -25,6 +25,7 @@ WARN[0000] The "FEISHU_APP_ID" variable is not set. Defaulting to a blank string
 ```
 
 **这些警告可以忽略**，因为：
+
 1. 这些是可选服务的环境变量
 2. 如果你不使用 OpenAI、飞书等服务，不需要设置它们
 3. 只要你设置了至少一个 AI Provider（如 ANTHROPIC_API_KEY），应用就能正常工作
@@ -52,11 +53,13 @@ E2B_API_KEY=your_key
 ## 快速设置步骤
 
 1. **复制环境变量模板**
+
    ```bash
    cp .env.example .env
    ```
 
 2. **编辑 .env 文件**
+
    ```bash
    # 编辑并填入你的 API 密钥
    nano .env
@@ -65,6 +68,7 @@ E2B_API_KEY=your_key
    ```
 
 3. **最小配置示例**
+
    ```bash
    # .env 文件内容
    ANTHROPIC_API_KEY=sk-ant-xxxxx
@@ -100,17 +104,21 @@ docker compose exec app env | grep API_KEY
 ## 故障排除
 
 ### 问题：仍然显示环境变量警告
+
 即使设置了 .env 文件，仍然看到警告。
 
 **解决方案**：
+
 1. 确保 .env 文件在项目根目录
 2. 检查 .env 文件权限：`ls -la .env`
 3. 确保变量名拼写正确
 
 ### 问题：API 调用失败
+
 应用运行但 API 调用失败。
 
 **解决方案**：
+
 1. 检查 API 密钥是否有效
 2. 查看容器日志：`docker compose logs -f`
 3. 确保至少有一个 AI Provider 密钥设置正确

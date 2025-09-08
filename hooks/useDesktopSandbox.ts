@@ -7,20 +7,20 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 
 // 调用受保护的 API 端点获取 Desktop URL
 async function fetchDesktopURL(sandboxId?: string) {
-  const params = sandboxId ? `?sandboxId=${encodeURIComponent(sandboxId)}` : '';
+  const params = sandboxId ? `?sandboxId=${encodeURIComponent(sandboxId)}` : "";
   const response = await fetch(`/api/desktop-url${params}`);
-  
+
   if (!response.ok) {
     // 处理认证错误
     if (response.status === 401) {
       const error = await response.json();
-      throw new Error(error.message || '未授权访问，请先登录');
+      throw new Error(error.message || "未授权访问，请先登录");
     }
-    
+
     const error = await response.json();
-    throw new Error(error.error || 'Failed to get desktop URL');
+    throw new Error(error.error || "Failed to get desktop URL");
   }
-  
+
   return response.json();
 }
 
@@ -57,9 +57,7 @@ export function useDesktopSandbox() {
         });
       }
 
-      const { streamUrl: newStreamUrl, id } = await fetchDesktopURL(
-        sandboxId || undefined
-      );
+      const { streamUrl: newStreamUrl, id } = await fetchDesktopURL(sandboxId || undefined);
       console.log("Desktop connection established with ID:", id);
       setStreamUrl(newStreamUrl);
       setSandboxId(id);
@@ -83,14 +81,7 @@ export function useDesktopSandbox() {
     } finally {
       setIsInitializing(false);
     }
-  }, [
-    sandboxId,
-    sandboxStatus,
-    setSandboxId,
-    setStreamUrl,
-    setSandboxStatus,
-    setIsInitializing,
-  ]);
+  }, [sandboxId, sandboxStatus, setSandboxId, setStreamUrl, setSandboxStatus, setIsInitializing]);
 
   // 暂停桌面
   const pauseDesktop = useCallback(async () => {
@@ -185,9 +176,7 @@ export function useDesktopSandbox() {
       if (!sandboxId) return;
 
       // Use sendBeacon which is best supported across browsers
-      navigator.sendBeacon(
-        `/api/kill-desktop?sandboxId=${encodeURIComponent(sandboxId)}`
-      );
+      navigator.sendBeacon(`/api/kill-desktop?sandboxId=${encodeURIComponent(sandboxId)}`);
     };
 
     // Detect iOS / Safari
@@ -240,9 +229,7 @@ export function useDesktopSandbox() {
       console.log("Starting desktop initialization...");
 
       // Use the provided ID or create a new one
-      const { streamUrl: newStreamUrl, id } = await fetchDesktopURL(
-        sandboxId ?? undefined
-      );
+      const { streamUrl: newStreamUrl, id } = await fetchDesktopURL(sandboxId ?? undefined);
 
       console.log("Desktop initialized successfully:", {
         sandboxId: id,
@@ -272,10 +259,7 @@ export function useDesktopSandbox() {
           richColors: true,
           position: "top-center",
         });
-      } else if (
-        errorMessage.includes("network") ||
-        errorMessage.includes("fetch")
-      ) {
+      } else if (errorMessage.includes("network") || errorMessage.includes("fetch")) {
         toast.error("网络连接失败", {
           description: "请检查网络连接后重试",
           richColors: true,
@@ -296,13 +280,7 @@ export function useDesktopSandbox() {
     } finally {
       setIsInitializing(false);
     }
-  }, [
-    sandboxId,
-    setIsInitializing,
-    setStreamUrl,
-    setSandboxId,
-    setSandboxStatus,
-  ]);
+  }, [sandboxId, setIsInitializing, setStreamUrl, setSandboxId, setSandboxStatus]);
 
   useEffect(() => {
     // 只有在用户认证后才初始化E2B桌面

@@ -100,10 +100,10 @@ export const MODEL_DICTIONARY = {
     description: "通过OpenRouter访问的Qwen Max",
     categories: ["general"] as ModelCategory[],
   },
-  "openrouter/moonshotai/kimi-k2": {
+  "openrouter/moonshotai/kimi-k2-0905": {
     provider: "openrouter",
-    name: "Kimi K2",
-    description: "通过OpenRouter访问的Kimi K2",
+    name: "Kimi K2 0905",
+    description: "通过OpenRouter访问的Kimi K2 0905",
     categories: ["chat", "general"] as ModelCategory[],
   },
   "openrouter/deepseek/deepseek-chat-v3-0324": {
@@ -158,10 +158,10 @@ export const MODEL_DICTIONARY = {
   },
 
   // MoonshotAI 模型
-  "moonshotai/kimi-k2-0711-preview": {
+  "moonshotai/kimi-k2-0905-preview": {
     provider: "moonshotai",
-    name: "Kimi K2 0711 Preview",
-    description: "通过MoonshotAI访问的Kimi K2 0711 Preview",
+    name: "Kimi K2 0905 Preview",
+    description: "通过MoonshotAI访问的Kimi K2 0905 Preview",
     categories: ["chat", "general"] as ModelCategory[],
   },
 } as const;

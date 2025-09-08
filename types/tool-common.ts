@@ -7,7 +7,7 @@ import { z } from "zod";
 import type { UIMessagePart, UIDataTypes, UITools, Tool } from "ai";
 import type { ModelConfig } from "@/lib/config/models";
 import type { ZhipinData } from "./zhipin";
-import type { SystemPromptsConfig, ReplyPromptsConfig } from "./config"
+import type { SystemPromptsConfig, ReplyPromptsConfig } from "./config";
 
 // ========== 工具注册表类型定义 ==========
 
@@ -22,18 +22,19 @@ export interface ToolCreationContext {
   configData?: ZhipinData;
   replyPrompts?: ReplyPromptsConfig;
   dulidayToken?: string;
+  defaultWechatId?: string; // 默认微信号
 }
 
 /**
  * 工具类别
  * 用于组织和管理工具
  */
-export type ToolCategory = 
-  | "universal"       // 通用工具
-  | "sandbox"         // 沙盒工具（需要 E2B）
-  | "automation"      // 自动化工具（Puppeteer等）
-  | "business"        // 业务工具（招聘相关）
-  | "communication";  // 通信工具（飞书、微信等）
+export type ToolCategory =
+  | "universal" // 通用工具
+  | "sandbox" // 沙盒工具（需要 E2B）
+  | "automation" // 自动化工具（Puppeteer等）
+  | "business" // 业务工具（招聘相关）
+  | "communication"; // 通信工具（飞书、微信等）
 
 /**
  * 工具定义
@@ -94,10 +95,7 @@ export type ImageOutput = z.infer<typeof ImageOutputSchema>;
  * 统一的工具输出类型
  * 所有工具都应该返回这个类型
  */
-export const ToolOutputSchema = z.discriminatedUnion("type", [
-  TextOutputSchema,
-  ImageOutputSchema,
-]);
+export const ToolOutputSchema = z.discriminatedUnion("type", [TextOutputSchema, ImageOutputSchema]);
 
 export type ToolOutput = z.infer<typeof ToolOutputSchema>;
 
@@ -138,28 +136,23 @@ export function isImageOutput(output: ToolOutput): output is ImageOutput {
  * 从 UIMessagePart 中提取工具部分
  * AI SDK v5 中工具部分的 type 是 `tool-${string}` 格式
  */
-export type ToolPart = Extract<
-  UIMessagePart<UIDataTypes, UITools>,
-  { type: `tool-${string}` }
->;
+export type ToolPart = Extract<UIMessagePart<UIDataTypes, UITools>, { type: `tool-${string}` }>;
 
 /**
  * 工具部分的状态联合类型
  * 根据 AI SDK v5 文档定义
  */
-export type ToolPartState = 
-  | "input-streaming"  // 正在流式传输输入
-  | "input-available"  // 输入已就绪
+export type ToolPartState =
+  | "input-streaming" // 正在流式传输输入
+  | "input-available" // 输入已就绪
   | "output-available" // 输出已就绪
-  | "output-error";    // 输出错误
+  | "output-error"; // 输出错误
 
 /**
  * 检查消息部分是否为工具调用
  * 检查 type 是否以 "tool-" 开头
  */
-export function isToolPart(
-  part: UIMessagePart<UIDataTypes, UITools>
-): part is ToolPart {
+export function isToolPart(part: UIMessagePart<UIDataTypes, UITools>): part is ToolPart {
   return typeof part.type === "string" && part.type.startsWith("tool-");
 }
 
@@ -259,7 +252,7 @@ export function parseToolOutput(output: unknown): StructuredToolOutput | null {
   if (!output || typeof output !== "object") {
     return null;
   }
-  
+
   return output as StructuredToolOutput;
 }
 
@@ -283,7 +276,7 @@ export function normalizeToolOutput(output: unknown): ToolOutput {
         data: String(structured.data),
       };
     }
-    
+
     // 处理文本类型
     if (structured.type === "text" && (structured.text || structured.data)) {
       return {
@@ -321,12 +314,10 @@ export function validateToolContext(
 /**
  * 创建带验证的工具定义
  */
-export function createToolDefinition(
-  definition: ToolDefinition
-): ToolDefinition {
+export function createToolDefinition(definition: ToolDefinition): ToolDefinition {
   // 如果定义了必需字段，自动添加验证器
   if (definition.requiredContext && !definition.validateContext) {
-    definition.validateContext = (context) => 
+    definition.validateContext = context =>
       validateToolContext(context, definition.requiredContext!);
   }
   return definition;
@@ -344,13 +335,13 @@ export function safeCreateTool(
     console.error(`❌ 工具 ${definition.name} 上下文验证失败`);
     return null;
   }
-  
+
   // 检查沙盒需求
   if (definition.requiresSandbox && !context.sandboxId) {
     console.log(`⏭️ 跳过工具 ${definition.name}: 需要sandboxId`);
     return null;
   }
-  
+
   // 创建工具
   try {
     return definition.create(context);
@@ -386,10 +377,8 @@ export function createImageOutput(data: string): ImageOutput {
  * 创建错误输出（作为文本）
  */
 export function createErrorOutput(error: unknown): TextOutput {
-  const errorMessage = error instanceof Error 
-    ? error.message 
-    : String(error);
-  
+  const errorMessage = error instanceof Error ? error.message : String(error);
+
   return {
     type: "text",
     text: `❌ 错误: ${errorMessage}`,

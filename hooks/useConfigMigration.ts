@@ -41,7 +41,7 @@ export function useConfigMigration() {
         if (shouldMigrate) {
           console.log("🔄 开始执行浏览器端配置迁移...");
 
-          setState((prev) => ({
+          setState(prev => ({
             ...prev,
             needsMigration: true,
             isLoading: true,
@@ -54,22 +54,24 @@ export function useConfigMigration() {
 
           console.log("✅ 浏览器端配置迁移完成");
         }
-        
+
         // 检查并同步缺失的品牌（无论是否执行了迁移）
         console.log("🔍 检查缺失的品牌...");
         const syncStatus = await BrandSyncManager.getBrandSyncStatus();
-        
+
         if (syncStatus.missingBrands.length > 0) {
-          console.log(`🔄 发现 ${syncStatus.missingBrands.length} 个缺失的品牌: ${syncStatus.missingBrands.join(", ")}`);
-          
+          console.log(
+            `🔄 发现 ${syncStatus.missingBrands.length} 个缺失的品牌: ${syncStatus.missingBrands.join(", ")}`
+          );
+
           // 尝试自动同步缺失的品牌
           try {
             const syncResult = await BrandSyncManager.syncMissingBrands();
-            
+
             if (syncResult.syncedBrands.length > 0) {
               console.log(`✅ 成功同步品牌: ${syncResult.syncedBrands.join(", ")}`);
             }
-            
+
             if (syncResult.failedBrands.length > 0) {
               console.warn(`⚠️ 部分品牌同步失败: ${syncResult.failedBrands.join(", ")}`);
               console.warn("失败详情:", syncResult.errors);
@@ -81,7 +83,7 @@ export function useConfigMigration() {
         } else {
           console.log("✅ 所有映射的品牌都已存在");
         }
-        
+
         setState({
           isLoading: false,
           isSuccess: true,
@@ -93,17 +95,19 @@ export function useConfigMigration() {
         console.error("错误详情:", {
           name: error instanceof Error ? error.name : typeof error,
           message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined
+          stack: error instanceof Error ? error.stack : undefined,
         });
-        
+
         // 获取当前配置状态用于调试
         try {
           const currentConfig = await configService.getConfig();
           console.log("📊 当前配置状态:", {
             hasConfig: !!currentConfig,
             version: currentConfig?.metadata?.version,
-            replyPromptsCount: currentConfig ? Object.keys(currentConfig.replyPrompts || {}).length : 0,
-            storesCount: currentConfig?.brandData?.stores?.length || 0
+            replyPromptsCount: currentConfig
+              ? Object.keys(currentConfig.replyPrompts || {}).length
+              : 0,
+            storesCount: currentConfig?.brandData?.stores?.length || 0,
           });
         } catch (debugError) {
           console.error("获取调试信息失败:", debugError);
@@ -132,7 +136,7 @@ export function useConfigMigration() {
    * 手动重试迁移
    */
   const retryMigration = async () => {
-    setState((prev) => ({
+    setState(prev => ({
       ...prev,
       isLoading: true,
       isError: false,

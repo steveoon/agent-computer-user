@@ -7,6 +7,7 @@
 ## 版本管理策略
 
 ### 1. 版本升级 (Version Upgrade)
+
 - **触发条件**：导入的配置版本号低于当前系统版本
 - **操作内容**：
   - 更新版本号到最新版本
@@ -15,6 +16,7 @@
 - **示例**：从 v1.0.0 升级到 v1.2.0
 
 ### 2. 数据修复 (Data Repair)
+
 - **触发条件**：导入的配置版本号已是最新，但某些字段缺失
 - **操作内容**：
   - **保持版本号不变**
@@ -25,15 +27,17 @@
 ## 技术实现
 
 ### upgradeConfigData 函数签名
+
 ```typescript
 async function upgradeConfigData(
-  existingConfig: AppConfigData, 
+  existingConfig: AppConfigData,
   saveToStorage = true,
-  forceRepair = false  // 新增参数
-): Promise<AppConfigData>
+  forceRepair = false // 新增参数
+): Promise<AppConfigData>;
 ```
 
 ### 参数说明
+
 - `existingConfig`: 需要升级或修复的配置数据
 - `saveToStorage`: 是否保存到本地存储（导入时设为 false）
 - `forceRepair`: 强制执行修复而非升级（当版本号已是最新时自动设置）
@@ -55,16 +59,19 @@ metadata: {
 ## 使用场景
 
 ### 场景1：导入旧版本配置
+
 ```
 导入 v1.0.0 配置 → 检测版本差异 → 执行版本升级 → 更新到 v1.2.0
 ```
 
 ### 场景2：导入最新版本但不完整的配置
+
 ```
 导入 v1.2.0 配置（缺少字段）→ 检测版本相同 → 执行数据修复 → 版本号保持 v1.2.0
 ```
 
 ### 场景3：导出后再导入
+
 ```
 导出配置（可能缺少字段）→ 导入同一配置 → 仅修复缺失字段 → 避免版本号循环更新
 ```
@@ -79,6 +86,7 @@ metadata: {
 ## 测试覆盖
 
 系统包含完整的测试用例：
+
 - ✅ 旧版本配置升级测试
 - ✅ 最新版本配置修复测试
 - ✅ 版本号保持不变验证

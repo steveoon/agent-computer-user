@@ -53,10 +53,7 @@ export function UserNav() {
         {/* 紧凑的用户信息显示 */}
         <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-white/80 border border-slate-200 shadow-sm">
           <User className="w-3.5 h-3.5 text-slate-600" />
-          <span
-            className="text-xs font-medium text-slate-700 truncate max-w-20"
-            title={user.email}
-          >
+          <span className="text-xs font-medium text-slate-700 truncate max-w-20" title={user.email}>
             {displayName}
           </span>
         </div>

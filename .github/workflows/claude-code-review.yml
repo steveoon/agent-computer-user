@@ -18,12 +18,12 @@ jobs:
       pull-requests: read
       issues: read
       id-token: write
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Need full history to check commits
+          fetch-depth: 0 # Need full history to check commits
 
       - name: Check if PR has non-semantic-release changes
         id: check-changes
@@ -31,14 +31,14 @@ jobs:
           # Get all commits in this PR
           BASE_SHA="${{ github.event.pull_request.base.sha }}"
           HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-          
+
           # Check if there are any commits that are NOT from semantic-release-bot
           # and do NOT have [skip ci] in the message
           NON_RELEASE_COMMITS=$(git log --format="%an|%s" $BASE_SHA..$HEAD_SHA 2>/dev/null | \
             grep -v "semantic-release-bot" | \
             grep -v "\[skip ci\]" | \
             wc -l | tr -d ' ')
-          
+
           # Also check if there are meaningful file changes beyond version/changelog
           MEANINGFUL_CHANGES=$(git diff --name-only $BASE_SHA..$HEAD_SHA 2>/dev/null | \
             grep -v "^CHANGELOG.md$" | \
@@ -46,7 +46,7 @@ jobs:
             grep -v "^package-lock.json$" | \
             grep -v "^pnpm-lock.yaml$" | \
             wc -l | tr -d ' ')
-          
+
           if [ "$NON_RELEASE_COMMITS" -gt 0 ] || [ "$MEANINGFUL_CHANGES" -gt 0 ]; then
             echo "should_review=true" >> $GITHUB_OUTPUT
             echo "✅ Found code changes that need review"
@@ -64,7 +64,7 @@ jobs:
 
           # Optional: Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4)
           # model: "claude-opus-4-20250514"
-          
+
           # Direct prompt for automated review (no @claude mention needed)
           direct_prompt: |
             Please review this pull request and provide feedback on:
@@ -73,12 +73,12 @@ jobs:
             - Performance considerations
             - Security concerns
             - Test coverage
-            
+
             Be constructive and helpful in your feedback.
 
           # Optional: Use sticky comments to make Claude reuse the same comment on subsequent pushes to the same PR
           # use_sticky_comment: true
-          
+
           # Optional: Customize review based on file types
           # direct_prompt: |
           #   Review this PR focusing on:
@@ -86,18 +86,17 @@ jobs:
           #   - For API endpoints: Security, input validation, and error handling
           #   - For React components: Performance, accessibility, and best practices
           #   - For tests: Coverage, edge cases, and test quality
-          
+
           # Optional: Different prompts for different authors
           # direct_prompt: |
-          #   ${{ github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' && 
+          #   ${{ github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' &&
           #   'Welcome! Please review this PR from a first-time contributor. Be encouraging and provide detailed explanations for any suggestions.' ||
           #   'Please provide a thorough code review focusing on our coding standards and best practices.' }}
-          
+
           # Optional: Add specific tools for running tests or linting
           # allowed_tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
-          
+
           # Optional: Skip review for certain conditions
           # if: |
           #   !contains(github.event.pull_request.title, '[skip-review]') &&
           #   !contains(github.event.pull_request.title, '[WIP]')
-

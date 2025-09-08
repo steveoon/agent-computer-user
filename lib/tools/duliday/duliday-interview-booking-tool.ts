@@ -52,8 +52,15 @@ export const dulidayInterviewBookingTool = (customToken?: string) =>
       customerLabelList = [],
       operateType = 3,
     }) => {
-      console.log("🔍 duliday_interview_booking tool called with:", { 
-        name, phone, age, genderId, jobId, interviewTime, education, hasHealthCertificate 
+      console.log("🔍 duliday_interview_booking tool called with:", {
+        name,
+        phone,
+        age,
+        genderId,
+        jobId,
+        interviewTime,
+        education,
+        hasHealthCertificate,
       });
       try {
         // 优先使用自定义token，否则使用环境变量
@@ -129,7 +136,7 @@ export const dulidayInterviewBookingTool = (customToken?: string) =>
         }
 
         const rawData = await response.json();
-        
+
         // 使用 zod 验证响应数据
         const parseResult = interviewBookingResponseSchema.safeParse(rawData);
         if (!parseResult.success) {
@@ -139,7 +146,7 @@ export const dulidayInterviewBookingTool = (customToken?: string) =>
             text: `❌ API响应格式错误，请联系管理员`,
           };
         }
-        
+
         const data = parseResult.data;
 
         // 返回原始API响应数据，让组件处理展示

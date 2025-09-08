@@ -48,7 +48,7 @@ export function BrandSyncStatus() {
     setIsSyncing(true);
     try {
       const result = await BrandSyncManager.syncMissingBrands();
-      
+
       if (result.syncedBrands.length > 0) {
         // 重新加载状态
         await loadSyncStatus();

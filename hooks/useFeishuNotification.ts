@@ -1,10 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import type {
-  FeishuNotificationType,
-  FeishuNotificationOptions,
-} from "@/types";
+import type { FeishuNotificationType, FeishuNotificationOptions } from "@/types";
 import { FEISHU_NOTIFICATION_LABELS } from "@/types";
 
 interface UseFeishuNotificationProps {
@@ -19,10 +16,7 @@ export function useFeishuNotification({ append }: UseFeishuNotificationProps) {
 
   // 📢 统一的飞书通知发送函数
   const sendFeishuNotification = useCallback(
-    (
-      notificationType: FeishuNotificationType,
-      options: FeishuNotificationOptions = {}
-    ) => {
+    (notificationType: FeishuNotificationType, options: FeishuNotificationOptions = {}) => {
       const {
         candidate_name,
         wechat_id,
@@ -44,9 +38,7 @@ export function useFeishuNotification({ append }: UseFeishuNotificationProps) {
       if (customMessage) toolParams.message = customMessage;
 
       // 生成格式化的消息内容
-      const formattedContent = `请使用feishu工具发送${getNotificationLabel(
-        notificationType
-      )}：
+      const formattedContent = `请使用feishu工具发送${getNotificationLabel(notificationType)}：
 ${JSON.stringify(toolParams, null, 2)}`;
 
       console.log(`📢 准备发送飞书通知 [${notificationType}]`);

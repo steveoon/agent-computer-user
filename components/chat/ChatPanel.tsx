@@ -16,7 +16,7 @@ interface ChatPanelProps {
   status: "ready" | "error" | "submitted" | "streaming";
   error: Error | undefined;
   isLoading: boolean;
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   stop: () => void;
   append: (message: { role: "user"; content: string }) => void;
@@ -133,23 +133,29 @@ export function ChatPanel({
       {/* 错误状态显示 */}
       {error && (
         <div className="mx-4 mb-4">
-          <div className={`border rounded-lg p-3 ${
-            isOverloadedError(error) || isRateLimitError(error) 
-              ? "bg-yellow-50 border-yellow-200" 
-              : "bg-red-50 border-red-200"
-          }`}>
+          <div
+            className={`border rounded-lg p-3 ${
+              isOverloadedError(error) || isRateLimitError(error)
+                ? "bg-yellow-50 border-yellow-200"
+                : "bg-red-50 border-red-200"
+            }`}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  isOverloadedError(error) || isRateLimitError(error)
-                    ? "bg-yellow-500"
-                    : "bg-red-500"
-                }`}></div>
-                <span className={`text-sm font-medium ${
-                  isOverloadedError(error) || isRateLimitError(error)
-                    ? "text-yellow-700"
-                    : "text-red-700"
-                }`}>
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    isOverloadedError(error) || isRateLimitError(error)
+                      ? "bg-yellow-500"
+                      : "bg-red-500"
+                  }`}
+                ></div>
+                <span
+                  className={`text-sm font-medium ${
+                    isOverloadedError(error) || isRateLimitError(error)
+                      ? "text-yellow-700"
+                      : "text-red-700"
+                  }`}
+                >
                   {getErrorTitle(error)}
                 </span>
               </div>
@@ -178,11 +184,13 @@ export function ChatPanel({
                 </Button>
               </div>
             </div>
-            <p className={`text-xs mt-1 ${
-              isOverloadedError(error) || isRateLimitError(error)
-                ? "text-yellow-600"
-                : "text-red-600"
-            }`}>
+            <p
+              className={`text-xs mt-1 ${
+                isOverloadedError(error) || isRateLimitError(error)
+                  ? "text-yellow-600"
+                  : "text-red-600"
+              }`}
+            >
               {getErrorDescription(error)}
             </p>
           </div>

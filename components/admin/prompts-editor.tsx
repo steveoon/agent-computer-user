@@ -1,13 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Save, RefreshCw, MessageSquare } from "lucide-react";
@@ -56,10 +50,7 @@ const getPromptName = (key: string): string => {
   return isValidReplyContext(key) ? PROMPT_NAMES[key] : key;
 };
 
-export const PromptsEditor: React.FC<PromptsEditorProps> = ({
-  data,
-  onSave,
-}) => {
+export const PromptsEditor: React.FC<PromptsEditorProps> = ({ data, onSave }) => {
   const [prompts, setPrompts] = useState<ReplyPromptsConfig>(
     () => data || ({} as ReplyPromptsConfig)
   );
@@ -85,9 +76,7 @@ export const PromptsEditor: React.FC<PromptsEditorProps> = ({
 
       if (emptyPrompts.length > 0) {
         throw new Error(
-          `以下回复指令不能为空: ${emptyPrompts
-            .map(([key]) => getPromptName(key))
-            .join(", ")}`
+          `以下回复指令不能为空: ${emptyPrompts.map(([key]) => getPromptName(key)).join(", ")}`
         );
       }
 
@@ -111,7 +100,7 @@ export const PromptsEditor: React.FC<PromptsEditorProps> = ({
 
   // 更新回复指令
   const updatePrompt = useCallback((key: string, value: string) => {
-    setPrompts((prev) => ({
+    setPrompts(prev => ({
       ...prev,
       [key]: value,
     }));
@@ -152,21 +141,11 @@ export const PromptsEditor: React.FC<PromptsEditorProps> = ({
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleReset}
-                disabled={saving}
-              >
+              <Button variant="outline" size="sm" onClick={handleReset} disabled={saving}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 重置
               </Button>
-              <Button
-                onClick={handleSave}
-                size="sm"
-                disabled={saving}
-                className="min-w-20"
-              >
+              <Button onClick={handleSave} size="sm" disabled={saving} className="min-w-20">
                 {saving ? (
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
@@ -197,33 +176,26 @@ export const PromptsEditor: React.FC<PromptsEditorProps> = ({
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-4 bg-muted rounded-lg">
-              <div className="text-2xl font-bold text-primary">
-                {Object.keys(prompts).length}
-              </div>
+              <div className="text-2xl font-bold text-primary">{Object.keys(prompts).length}</div>
               <div className="text-sm text-muted-foreground">总指令数</div>
             </div>
             <div className="text-center p-4 bg-muted rounded-lg">
               <div className="text-2xl font-bold text-primary">
-                {Object.values(prompts).filter((p) => p && p.length > 0).length}
+                {Object.values(prompts).filter(p => p && p.length > 0).length}
               </div>
               <div className="text-sm text-muted-foreground">已配置</div>
             </div>
             <div className="text-center p-4 bg-muted rounded-lg">
               <div className="text-2xl font-bold text-primary">
-                {Object.values(prompts).reduce(
-                  (acc, p) => acc + (p?.length || 0),
-                  0
-                )}
+                {Object.values(prompts).reduce((acc, p) => acc + (p?.length || 0), 0)}
               </div>
               <div className="text-sm text-muted-foreground">总字符数</div>
             </div>
             <div className="text-center p-4 bg-muted rounded-lg">
               <div className="text-2xl font-bold text-primary">
                 {Math.round(
-                  Object.values(prompts).reduce(
-                    (acc, p) => acc + (p?.length || 0),
-                    0
-                  ) / Object.keys(prompts).length
+                  Object.values(prompts).reduce((acc, p) => acc + (p?.length || 0), 0) /
+                    Object.keys(prompts).length
                 )}
               </div>
               <div className="text-sm text-muted-foreground">平均长度</div>
@@ -239,9 +211,7 @@ export const PromptsEditor: React.FC<PromptsEditorProps> = ({
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg">
-                    {getPromptName(key)}
-                  </CardTitle>
+                  <CardTitle className="text-lg">{getPromptName(key)}</CardTitle>
                   <CardDescription className="text-xs font-mono text-muted-foreground">
                     {key}
                   </CardDescription>
@@ -254,13 +224,12 @@ export const PromptsEditor: React.FC<PromptsEditorProps> = ({
             <CardContent>
               <textarea
                 value={value || ""}
-                onChange={(e) => updatePrompt(key, e.target.value)}
+                onChange={e => updatePrompt(key, e.target.value)}
                 className="w-full h-32 p-3 text-sm border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring"
                 placeholder={`输入 ${getPromptName(key)} 的回复模板...`}
               />
               <div className="mt-2 text-xs text-muted-foreground">
-                支持变量：{"{brand}"}, {"{city}"}, {"{location}"}, {"{salary}"},{" "}
-                {"{schedule}"} 等
+                支持变量：{"{brand}"}, {"{city}"}, {"{location}"}, {"{salary}"}, {"{schedule}"} 等
               </div>
             </CardContent>
           </Card>

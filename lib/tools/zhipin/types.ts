@@ -21,7 +21,7 @@ export const CandidateInfoSchema = z.object({
   healthCertificate: z.boolean().optional(), // 是否有健康证
   activeTime: z.string().optional(), // 最近活跃时间
   info: z.array(z.string()).optional(), // 其他标签信息
-  fullText: z.string().optional()
+  fullText: z.string().optional(),
 });
 
 export type CandidateInfo = z.infer<typeof CandidateInfoSchema>;
@@ -57,7 +57,7 @@ export interface CandidateDetail {
 }
 
 export interface ChatMsg {
-  sender: 'user' | 'candidate';
+  sender: "user" | "candidate";
   message: string;
   timestamp?: string;
   isSystemMessage?: boolean;
@@ -73,7 +73,7 @@ export interface Conversation {
 
 export interface ZhipinPageState {
   url: string;
-  pageType: 'chat' | 'candidate-list' | 'candidate-detail' | 'unknown';
+  pageType: "chat" | "candidate-list" | "candidate-detail" | "unknown";
   isLoaded: boolean;
   hasUnreadMessages: boolean;
 }

@@ -11,7 +11,7 @@ interface MobileChatLayoutProps {
   status: "ready" | "error" | "submitted" | "streaming";
   error: Error | undefined;
   isLoading: boolean;
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   stop: () => void;
   append: (message: { role: "user"; content: string }) => void;

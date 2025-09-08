@@ -45,10 +45,7 @@ const REPLY_TYPE_LABELS: Record<
 
 const ALL_REPLY_TYPES = Object.keys(REPLY_TYPE_LABELS) as ReplyContext[];
 
-export function TemplateEditor({
-  brandName,
-  onDataUpdate,
-}: TemplateEditorProps) {
+export function TemplateEditor({ brandName, onDataUpdate }: TemplateEditorProps) {
   const { localData, updateTemplates } = useBrandEditorStore();
 
   const [editingTemplate, setEditingTemplate] = useState<{
@@ -77,9 +74,7 @@ export function TemplateEditor({
     return (
       <Card>
         <CardContent className="py-8">
-          <div className="text-center text-muted-foreground">
-            品牌数据未找到
-          </div>
+          <div className="text-center text-muted-foreground">品牌数据未找到</div>
         </CardContent>
       </Card>
     );
@@ -135,9 +130,7 @@ export function TemplateEditor({
     // 深拷贝模板以避免修改共享引用
     const updatedTemplates = structuredClone(templates);
     if (updatedTemplates[type]) {
-      updatedTemplates[type] = updatedTemplates[type].filter(
-        (_, i) => i !== index
-      );
+      updatedTemplates[type] = updatedTemplates[type].filter((_, i) => i !== index);
       if (updatedTemplates[type].length === 0) {
         delete updatedTemplates[type];
       }
@@ -148,20 +141,17 @@ export function TemplateEditor({
   };
 
   const recruitmentTypes = ALL_REPLY_TYPES.filter(
-    (type) => REPLY_TYPE_LABELS[type].category === "recruitment"
+    type => REPLY_TYPE_LABELS[type].category === "recruitment"
   );
   const attendanceTypes = ALL_REPLY_TYPES.filter(
-    (type) => REPLY_TYPE_LABELS[type].category === "attendance"
+    type => REPLY_TYPE_LABELS[type].category === "attendance"
   );
 
-  const renderTemplateSection = (
-    types: ReplyContext[],
-    categoryLabel: string
-  ) => (
+  const renderTemplateSection = (types: ReplyContext[], categoryLabel: string) => (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold">{categoryLabel}</h3>
       <Accordion type="single" collapsible className="w-full">
-        {types.map((type) => {
+        {types.map(type => {
           const typeTemplates = templates[type] || [];
           const isConfigured = typeTemplates.length > 0;
 
@@ -184,12 +174,11 @@ export function TemplateEditor({
                 <div className="space-y-3 pt-2">
                   {typeTemplates.map((template, index) => (
                     <div key={index} className="relative group">
-                      {editingTemplate?.type === type &&
-                      editingTemplate?.index === index ? (
+                      {editingTemplate?.type === type && editingTemplate?.index === index ? (
                         <div className="space-y-2">
                           <Textarea
                             value={editingTemplate.value}
-                            onChange={(e) =>
+                            onChange={e =>
                               setEditingTemplate({
                                 ...editingTemplate,
                                 value: e.target.value,
@@ -216,9 +205,7 @@ export function TemplateEditor({
                       ) : (
                         <div className="flex items-start gap-2">
                           <div className="flex-1 p-3 bg-muted rounded-md">
-                            <p className="text-sm whitespace-pre-wrap">
-                              {template}
-                            </p>
+                            <p className="text-sm whitespace-pre-wrap">{template}</p>
                           </div>
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button
@@ -245,7 +232,7 @@ export function TemplateEditor({
                     <div className="space-y-2">
                       <Textarea
                         value={newTemplate.value}
-                        onChange={(e) =>
+                        onChange={e =>
                           setNewTemplate({
                             ...newTemplate,
                             value: e.target.value,
@@ -260,11 +247,7 @@ export function TemplateEditor({
                           <Save className="h-4 w-4 mr-1" />
                           保存并添加
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setNewTemplate(null)}
-                        >
+                        <Button size="sm" variant="outline" onClick={() => setNewTemplate(null)}>
                           <X className="h-4 w-4 mr-1" />
                           取消
                         </Button>
@@ -297,9 +280,7 @@ export function TemplateEditor({
         <p className="text-sm text-muted-foreground">
           配置品牌专属的回复话术，支持16种不同的对话场景
         </p>
-        <p className="text-xs text-green-600 mt-1">
-          💡 提示：话术修改后会自动保存
-        </p>
+        <p className="text-xs text-green-600 mt-1">💡 提示：话术修改后会自动保存</p>
       </CardHeader>
       <CardContent className="space-y-6">
         {renderTemplateSection(recruitmentTypes, "招聘相关话术 (1-10)")}

@@ -9,14 +9,17 @@ Puppeteer MCP Server通过Model Context Protocol提供了8个浏览器自动化�
 ## 前置条件
 
 ### 连接现有Chrome浏览器
+
 如需连接到已打开的Chrome浏览器，需要启动Chrome时开启远程调试：
 
 **Windows:**
+
 ```bash
 chrome.exe --remote-debugging-port=9222
 ```
 
 **Mac:**
+
 ```bash
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
 ```
@@ -24,8 +27,9 @@ chrome.exe --remote-debugging-port=9222
 ## API 接口列表
 
 ### 1. 连接到Chrome浏览器
+
 ```typescript
-Tool: puppeteer_connect_active_tab
+Tool: puppeteer_connect_active_tab;
 ```
 
 **功能描述：** 连接到现有的Chrome浏览器实例或创建新实例
@@ -37,24 +41,29 @@ Tool: puppeteer_connect_active_tab
 | debugPort | number | 否 | 9222 | Chrome远程调试端口 |
 
 **返回示例：**
+
 ```json
 {
-  "content": [{
-    "type": "text",
-    "text": "Successfully connected to active tab: Example Page"
-  }]
+  "content": [
+    {
+      "type": "text",
+      "text": "Successfully connected to active tab: Example Page"
+    }
+  ]
 }
 ```
 
 **错误处理：**
+
 - 如果Chrome未启动或未开启远程调试，会返回详细的启动指令
 - 如果无法找到目标标签页，会列出所有可用标签页
 
 ---
 
 ### 2. 导航到URL
+
 ```typescript
-Tool: puppeteer_navigate
+Tool: puppeteer_navigate;
 ```
 
 **功能描述：** 导航浏览器到指定URL
@@ -65,16 +74,20 @@ Tool: puppeteer_navigate
 | url | string | 是 | 要访问的完整URL地址 |
 
 **返回示例：**
+
 ```json
 {
-  "content": [{
-    "type": "text",
-    "text": "Successfully navigated to https://example.com"
-  }]
+  "content": [
+    {
+      "type": "text",
+      "text": "Successfully navigated to https://example.com"
+    }
+  ]
 }
 ```
 
 **注意事项：**
+
 - 导航超时时间为30秒
 - HTTP状态码>=400会被视为错误
 - 会等待页面load事件完成
@@ -82,8 +95,9 @@ Tool: puppeteer_navigate
 ---
 
 ### 3. 截图
+
 ```typescript
-Tool: puppeteer_screenshot
+Tool: puppeteer_screenshot;
 ```
 
 **功能描述：** 对当前页面或指定元素进行截图
@@ -97,12 +111,15 @@ Tool: puppeteer_screenshot
 | height | number | 否 | 600 | 视口高度（像素） |
 
 **返回示例：**
+
 ```json
 {
-  "content": [{
-    "type": "text",
-    "text": "Screenshot saved as 'homepage'"
-  }]
+  "content": [
+    {
+      "type": "text",
+      "text": "Screenshot saved as 'homepage'"
+    }
+  ]
 }
 ```
 
@@ -112,8 +129,9 @@ Tool: puppeteer_screenshot
 ---
 
 ### 4. 点击元素
+
 ```typescript
-Tool: puppeteer_click
+Tool: puppeteer_click;
 ```
 
 **功能描述：** 点击页面上的指定元素
@@ -124,24 +142,29 @@ Tool: puppeteer_click
 | selector | string | 是 | 要点击元素的CSS选择器 |
 
 **返回示例：**
+
 ```json
 {
-  "content": [{
-    "type": "text",
-    "text": "Successfully clicked element: button#submit"
-  }]
+  "content": [
+    {
+      "type": "text",
+      "text": "Successfully clicked element: button#submit"
+    }
+  ]
 }
 ```
 
 **注意事项：**
+
 - 会等待元素出现在页面上
 - 如果元素不存在会返回错误
 
 ---
 
 ### 5. 填充输入框
+
 ```typescript
-Tool: puppeteer_fill
+Tool: puppeteer_fill;
 ```
 
 **功能描述：** 向输入框填充文本
@@ -153,24 +176,29 @@ Tool: puppeteer_fill
 | value | string | 是 | 要填充的文本内容 |
 
 **返回示例：**
+
 ```json
 {
-  "content": [{
-    "type": "text",
-    "text": "Successfully filled element: input#username"
-  }]
+  "content": [
+    {
+      "type": "text",
+      "text": "Successfully filled element: input#username"
+    }
+  ]
 }
 ```
 
 **注意事项：**
+
 - 会先清空输入框再填充新内容
 - 支持各种input类型和textarea
 
 ---
 
 ### 6. 选择下拉菜单
+
 ```typescript
-Tool: puppeteer_select
+Tool: puppeteer_select;
 ```
 
 **功能描述：** 在下拉菜单中选择指定选项
@@ -182,20 +210,24 @@ Tool: puppeteer_select
 | value | string | 是 | 要选择的option的value值 |
 
 **返回示例：**
+
 ```json
 {
-  "content": [{
-    "type": "text",
-    "text": "Successfully selected value in element: select#country"
-  }]
+  "content": [
+    {
+      "type": "text",
+      "text": "Successfully selected value in element: select#country"
+    }
+  ]
 }
 ```
 
 ---
 
 ### 7. 悬停元素
+
 ```typescript
-Tool: puppeteer_hover
+Tool: puppeteer_hover;
 ```
 
 **功能描述：** 将鼠标悬停在指定元素上
@@ -206,20 +238,24 @@ Tool: puppeteer_hover
 | selector | string | 是 | 要悬停元素的CSS选择器 |
 
 **返回示例：**
+
 ```json
 {
-  "content": [{
-    "type": "text",
-    "text": "Successfully hovered over element: div.menu-item"
-  }]
+  "content": [
+    {
+      "type": "text",
+      "text": "Successfully hovered over element: div.menu-item"
+    }
+  ]
 }
 ```
 
 ---
 
 ### 8. 执行JavaScript
+
 ```typescript
-Tool: puppeteer_evaluate
+Tool: puppeteer_evaluate;
 ```
 
 **功能描述：** 在页面上下文中执行JavaScript代码
@@ -230,16 +266,20 @@ Tool: puppeteer_evaluate
 | script | string | 是 | 要执行的JavaScript代码 |
 
 **返回示例：**
+
 ```json
 {
-  "content": [{
-    "type": "text",
-    "text": "Script result: {\"title\":\"Example Page\",\"url\":\"https://example.com\"}"
-  }]
+  "content": [
+    {
+      "type": "text",
+      "text": "Script result: {\"title\":\"Example Page\",\"url\":\"https://example.com\"}"
+    }
+  ]
 }
 ```
 
 **特殊功能：**
+
 - 自动捕获console.log输出
 - 支持异步代码执行
 - 返回值会被JSON序列化
@@ -249,10 +289,12 @@ Tool: puppeteer_evaluate
 ## 资源访问
 
 ### 控制台日志
+
 **URI:** `console://logs`  
 **描述:** 获取所有捕获的控制台输出
 
 ### 截图
+
 **URI:** `screenshot://{name}`  
 **描述:** 获取指定名称的截图（Base64格式）
 
@@ -264,34 +306,34 @@ await use_mcp_tool("puppeteer_connect_active_tab", {});
 
 // 2. 导航到网站
 await use_mcp_tool("puppeteer_navigate", {
-  url: "https://example.com"
+  url: "https://example.com",
 });
 
 // 3. 填充登录表单
 await use_mcp_tool("puppeteer_fill", {
   selector: "#username",
-  value: "user@example.com"
+  value: "user@example.com",
 });
 
 await use_mcp_tool("puppeteer_fill", {
   selector: "#password",
-  value: "password123"
+  value: "password123",
 });
 
 // 4. 点击登录按钮
 await use_mcp_tool("puppeteer_click", {
-  selector: "#login-button"
+  selector: "#login-button",
 });
 
 // 5. 等待并截图
 await use_mcp_tool("puppeteer_screenshot", {
   name: "dashboard",
-  selector: ".main-content"
+  selector: ".main-content",
 });
 
 // 6. 执行自定义脚本
 await use_mcp_tool("puppeteer_evaluate", {
-  script: "return document.title"
+  script: "return document.title",
 });
 ```
 

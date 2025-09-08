@@ -37,9 +37,7 @@ export function DiagnosticButton({ sandboxId }: DiagnosticButtonProps) {
         setResult(`❌ 诊断失败: ${data.error}`);
       }
     } catch (error) {
-      setResult(
-        `❌ 请求失败: ${error instanceof Error ? error.message : "未知错误"}`
-      );
+      setResult(`❌ 请求失败: ${error instanceof Error ? error.message : "未知错误"}`);
     } finally {
       setIsRunning(false);
     }

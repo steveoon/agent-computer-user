@@ -223,9 +223,7 @@ export function BrandSyncResultCard({ result, forceShowErrors = false }: BrandSy
       </div>
 
       {/* 错误详情 - 条件渲染优化性能 */}
-      {hasErrors && isErrorsVisible && (
-        <ErrorDetailsSection errors={result.errors} />
-      )}
+      {hasErrors && isErrorsVisible && <ErrorDetailsSection errors={result.errors} />}
     </div>
   );
 }

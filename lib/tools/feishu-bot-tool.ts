@@ -23,17 +23,9 @@ export const feishuBotTool = () =>
         .optional()
         .default("boss")
         .describe("招聘平台：boss(Boss直聘) 或 yupao(鱼泡直聘)"),
-      boss_username: z
-        .string()
-        .describe("招聘平台当前登录账号用户名（必填）"),
-      candidate_name: z
-        .string()
-        .optional()
-        .describe("候选人姓名（candidate_wechat类型时必需）"),
-      wechat_id: z
-        .string()
-        .optional()
-        .describe("候选人微信号（candidate_wechat类型时必需）"),
+      boss_username: z.string().describe("招聘平台当前登录账号用户名（必填）"),
+      candidate_name: z.string().optional().describe("候选人姓名（candidate_wechat类型时必需）"),
+      wechat_id: z.string().optional().describe("候选人微信号（candidate_wechat类型时必需）"),
       candidate_info: z
         .object({
           age: z.union([z.number(), z.string()]).optional().describe("候选人年龄"),
@@ -64,10 +56,7 @@ export const feishuBotTool = () =>
         .optional()
         .default("text")
         .describe("消息类型，默认为text"),
-      additional_info: z
-        .string()
-        .optional()
-        .describe("附加信息，用于生成更详细的通知内容"),
+      additional_info: z.string().optional().describe("附加信息，用于生成更详细的通知内容"),
     }),
     execute: async ({
       notification_type,
@@ -107,47 +96,50 @@ export const feishuBotTool = () =>
         switch (notification_type) {
           case "candidate_wechat":
             // 构建候选人微信通知的详细模板
-            let candidateMessage = `📋 候选人微信通知${candidate_name ? ` - ${candidate_name.trim()}` : ''}\n\n`;
-            
+            let candidateMessage = `📋 候选人微信通知${candidate_name ? ` - ${candidate_name.trim()}` : ""}\n\n`;
+
             // 平台账号信息
             const platformName = platform === "yupao" ? "鱼泡" : "Boss";
             candidateMessage += `${platformName}账号：${boss_username}\n\n`;
-            
+
             // 候选人基本信息
             candidateMessage += `候选人信息：\n`;
-            candidateMessage += `- 姓名：${candidate_name?.trim() || '未知'}`;
-            
+            candidateMessage += `- 姓名：${candidate_name?.trim() || "未知"}`;
+
             // 添加详细信息（如果有）
             if (candidate_info) {
               const infoDetails = [];
               if (candidate_info.age) infoDetails.push(`${candidate_info.age}岁`);
               if (candidate_info.experience) infoDetails.push(candidate_info.experience);
               if (candidate_info.education) infoDetails.push(candidate_info.education);
-              
+
               if (infoDetails.length > 0) {
-                candidateMessage += `（${infoDetails.join('，')}）`;
+                candidateMessage += `（${infoDetails.join("，")}）`;
               }
             }
-            
-            candidateMessage += `\n- 微信号：${wechat_id?.trim() || '未知'}\n`;
-            
+
+            candidateMessage += `\n- 微信号：${wechat_id?.trim() || "未知"}\n`;
+
             // 意向岗位信息（如果有）
             if (position_intent && Object.values(position_intent).some(v => v)) {
               candidateMessage += `\n意向岗位：\n`;
-              if (position_intent.position) candidateMessage += `- 岗位：${position_intent.position}\n`;
-              if (position_intent.location) candidateMessage += `- 地点：${position_intent.location}\n`;
-              if (position_intent.schedule) candidateMessage += `- 时间：${position_intent.schedule}\n`;
+              if (position_intent.position)
+                candidateMessage += `- 岗位：${position_intent.position}\n`;
+              if (position_intent.location)
+                candidateMessage += `- 地点：${position_intent.location}\n`;
+              if (position_intent.schedule)
+                candidateMessage += `- 时间：${position_intent.schedule}\n`;
               if (position_intent.salary) candidateMessage += `- 薪资：${position_intent.salary}\n`;
             }
-            
+
             // 沟通状态（如果有）
             if (communication_status) {
               candidateMessage += `\n沟通状态：${communication_status}`;
             }
-            
+
             // 添加时间戳
             candidateMessage += `\n\n⏰ 记录时间：${timestamp}`;
-            
+
             finalMessage = candidateMessage;
             break;
 
@@ -176,8 +168,7 @@ export const feishuBotTool = () =>
             break;
 
           case "custom":
-            finalMessage =
-              additional_info || `📢 【自定义通知】\n⏰ 发送时间: ${timestamp}`;
+            finalMessage = additional_info || `📢 【自定义通知】\n⏰ 发送时间: ${timestamp}`;
             break;
 
           default:

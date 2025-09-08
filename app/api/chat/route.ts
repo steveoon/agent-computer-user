@@ -16,7 +16,7 @@ async function cleanupSandboxIfNeeded(sandboxId: string | null, error: unknown, 
   if (!sandboxId) {
     return;
   }
-  
+
   if (shouldCleanupSandbox(error)) {
     try {
       console.log(`🧹 开始清理沙箱: ${sandboxId} (${context})`);
@@ -41,6 +41,7 @@ export async function POST(req: Request) {
     replyPrompts,
     activeSystemPrompt,
     dulidayToken,
+    defaultWechatId,
   }: ChatRequestBody = await req.json();
 
   try {
@@ -124,6 +125,7 @@ export async function POST(req: Request) {
         configData,
         replyPrompts,
         dulidayToken,
+        defaultWechatId,
       },
       promptType
     );

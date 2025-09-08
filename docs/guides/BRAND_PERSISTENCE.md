@@ -143,7 +143,7 @@ const { currentBrand, setCurrentBrand, availableBrands, isLoaded } = useBrand();
 
 ```javascript
 // 浏览器控制台中查看存储内容
-import("localforage").then((lf) => {
+import("localforage").then(lf => {
   lf.getItem("brand_preference").then(console.log);
   lf.getItem("brand_history").then(console.log);
 });

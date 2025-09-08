@@ -5,21 +5,25 @@
 我们已经修复了Puppeteer MCP服务器在Docker容器中的权限问题。主要修改包括：
 
 ### 1. Dockerfile更新
+
 - 预创建了`/app/logs`目录并设置正确的权限
 - 移除了不必要的 Chromium 安装（节省 755MB+ 空间）
 - Puppeteer MCP Server 会自动管理 Chromium
 
 ### 2. MCP配置更新
+
 - 添加了环境变量控制日志级别
 - 配置了Puppeteer使用系统安装的Chromium
 - 尝试禁用文件日志记录
 
 ### 3. Docker Compose配置
+
 - 创建了docker-compose.yml文件简化部署
 - 添加了健康检查
 - 配置了所有必要的环境变量
 
 ### 4. 环境变量安全处理
+
 - 更新了`.dockerignore`确保`.env`文件不会被打包进镜像
 - 分离了构建时和运行时的环境变量
 - `NEXT_PUBLIC_`前缀的变量在构建时注入，其他敏感变量在运行时注入
@@ -35,6 +39,7 @@
 #### 选择正确的配置文件
 
 **macOS (Apple Silicon) 用户：**
+
 ```bash
 # 使用专为 ARM64 优化的配置
 docker compose -f docker-compose.local.yml build
@@ -42,6 +47,7 @@ docker compose -f docker-compose.local.yml up -d
 ```
 
 **其他平台或需要测试生产镜像：**
+
 ```bash
 # 使用默认配置（构建 linux/amd64 镜像）
 docker compose build
@@ -49,6 +55,7 @@ docker compose up -d
 ```
 
 **最简单的方式（推荐）：**
+
 ```bash
 # 直接运行，避免 Docker 架构问题
 pnpm dev
@@ -116,6 +123,7 @@ docker-compose -f docker-compose.prod.yml up -d
 ```
 
 **重要说明**：
+
 - `docker-compose.prod.yml` 和 `.env` 必须在同一目录
 - Docker Compose 会自动从同目录加载 `.env` 文件
 - `.env` 包含敏感信息，务必通过安全方式传输
@@ -224,6 +232,7 @@ curl http://localhost:4000/api/health
 ### 环境变量警告
 
 运行时看到类似警告是正常的：
+
 ```
 WARN[0000] The "OPENAI_API_KEY" variable is not set. Defaulting to a blank string.
 ```
@@ -233,6 +242,7 @@ WARN[0000] The "OPENAI_API_KEY" variable is not set. Defaulting to a blank strin
 ### 如果仍然出现权限错误
 
 1. **确保Dockerfile正确构建**
+
    ```bash
    # 清理并重新构建
    docker-compose down
@@ -241,6 +251,7 @@ WARN[0000] The "OPENAI_API_KEY" variable is not set. Defaulting to a blank strin
    ```
 
 2. **检查容器内的权限**
+
    ```bash
    # 进入容器检查
    docker-compose exec app sh
@@ -258,6 +269,7 @@ WARN[0000] The "OPENAI_API_KEY" variable is not set. Defaulting to a blank strin
 ### 如果Puppeteer无法启动
 
 1. **验证Chromium安装**
+
    ```bash
    docker-compose exec app sh -c "which chromium-browser"
    docker-compose exec app sh -c "chromium-browser --version"
@@ -271,8 +283,9 @@ WARN[0000] The "OPENAI_API_KEY" variable is not set. Defaulting to a blank strin
 ### 调试MCP连接
 
 1. **启用详细日志**
-   
+
    修改`lib/mcp/client-manager.ts`中的环境变量：
+
    ```typescript
    env: {
      LOG_LEVEL: 'debug',  // 改为debug
@@ -281,8 +294,9 @@ WARN[0000] The "OPENAI_API_KEY" variable is not set. Defaulting to a blank strin
    ```
 
 2. **检查MCP状态**
-   
+
    访问诊断端点：
+
    ```bash
    curl http://localhost:3000/api/diagnose
    ```
@@ -290,25 +304,27 @@ WARN[0000] The "OPENAI_API_KEY" variable is not set. Defaulting to a blank strin
 ## 性能优化建议
 
 1. **使用构建缓存**
+
    ```bash
    docker build --cache-from ai-sdk-computer-use:latest -t ai-sdk-computer-use .
    ```
 
 2. **限制资源使用**
-   
+
    在docker-compose.yml中添加：
+
    ```yaml
    services:
      app:
        deploy:
          resources:
            limits:
-             cpus: '2'
+             cpus: "2"
              memory: 4G
    ```
 
 3. **使用健康检查自动重启**
-   
+
    容器已配置健康检查，如果服务不健康会自动重启。
 
 ## 安全建议
@@ -318,6 +334,7 @@ WARN[0000] The "OPENAI_API_KEY" variable is not set. Defaulting to a blank strin
    - 不要在Dockerfile中硬编码API密钥
 
 2. **定期更新基础镜像**
+
    ```bash
    docker pull node:18-alpine
    docker-compose build --no-cache
@@ -330,11 +347,13 @@ WARN[0000] The "OPENAI_API_KEY" variable is not set. Defaulting to a blank strin
 ## 监控和日志
 
 1. **查看实时日志**
+
    ```bash
    docker-compose logs -f --tail=100
    ```
 
 2. **导出日志**
+
    ```bash
    docker-compose logs > deployment.log
    ```
@@ -347,20 +366,24 @@ WARN[0000] The "OPENAI_API_KEY" variable is not set. Defaulting to a blank strin
 ## 常见问题
 
 ### Q: 为什么选择Alpine Linux？
+
 A: Alpine Linux体积小、安全性高，适合生产环境。但需要注意某些Node.js包可能需要额外的依赖。
 
 ### Q: macOS 上 Puppeteer 报错 "rosetta error: failed to open elf"
+
 A: 这是因为在 Apple Silicon Mac (M1/M2/M3) 上运行 linux/amd64 架构的镜像导致的。
 
 **解决方案：**
 
 1. **使用本地开发专用配置（推荐）**
+
    ```bash
    # 使用专为 macOS 优化的配置
    docker compose -f docker-compose.local.yml up -d
    ```
 
 2. **直接本地运行（最简单）**
+
    ```bash
    # 不使用 Docker，直接运行
    pnpm install
@@ -371,21 +394,25 @@ A: 这是因为在 Apple Silicon Mac (M1/M2/M3) 上运行 linux/amd64 架构的�
    如果暂时不需要 Puppeteer 功能，可以在 `lib/mcp/client-manager.ts` 中设置 `enabled: false`
 
 **原因说明：**
+
 - Apple Silicon Mac 是 ARM64 架构
 - 生产环境 VPS 通常是 x86_64 (amd64) 架构
 - Puppeteer/Chromium 需要与运行环境架构匹配的二进制文件
 
 ### Q: 如何处理中文输入？
+
 A: Dockerfile已包含必要的字体包（ttf-freefont），Chromium应该能够正确处理中文。
 
 ### Q: 如何更新应用？
 
 **本地环境：**
+
 1. 拉取最新代码
 2. 重新构建镜像：`docker-compose build`
 3. 重启容器：`docker-compose up -d`
 
 **生产环境：**
+
 1. 本地构建并推送：`./scripts/deploy.sh`
 2. VPS上拉取新镜像：`docker pull ghcr.io/steveoon/ai-computer-use:latest`
 3. 重启容器：
@@ -393,4 +420,5 @@ A: Dockerfile已包含必要的字体包（ttf-freefont），Chromium应该能�
    - 或直接重启: `docker restart ai-computer-use`
 
 ### Q: 如何备份数据？
+
 A: 应用使用IndexedDB存储配置数据，这些数据存储在浏览器端。服务器端主要是无状态的。

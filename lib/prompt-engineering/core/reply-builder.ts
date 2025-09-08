@@ -170,25 +170,25 @@ class ContextOptimizer {
       name: info.name || "未知",
       gender: info.gender,
       age: info.age,
-      
+
       // 职业信息
       position: info.position,
       expectedSalary: info.expectedSalary,
       expectedLocation: info.expectedLocation,
       experience: info.experience,
       education: info.education,
-      
+
       // 身体条件
       height: info.height,
       weight: info.weight,
       healthCertificate: info.healthCertificate,
-      
+
       // 活跃度
       activeTime: info.activeTime,
-      
+
       // 其他信息
       info: info.info,
-      
+
       // 计算相关性分数
       relevanceScore: this.calculateRelevanceScore(info),
     };
@@ -202,36 +202,40 @@ class ContextOptimizer {
     let score = 0;
     const weights = {
       // 基础信息权重
-      name: 0.05,        // 有真实姓名
-      position: 0.15,    // 期望职位匹配
-      age: 0.10,         // 年龄信息
-      gender: 0.02,      // 性别信息
-      
+      name: 0.05, // 有真实姓名
+      position: 0.15, // 期望职位匹配
+      age: 0.1, // 年龄信息
+      gender: 0.02, // 性别信息
+
       // 关键匹配因素权重
-      expectedSalary: 0.15,     // 薪资期望
-      expectedLocation: 0.15,   // 工作地点期望
-      healthCertificate: 0.20,  // 健康证（服务行业关键）
-      
+      expectedSalary: 0.15, // 薪资期望
+      expectedLocation: 0.15, // 工作地点期望
+      healthCertificate: 0.2, // 健康证（服务行业关键）
+
       // 其他因素权重
-      experience: 0.08,   // 工作经验
-      education: 0.05,    // 学历
-      activeTime: 0.05,   // 活跃度（越近越好）
+      experience: 0.08, // 工作经验
+      education: 0.05, // 学历
+      activeTime: 0.05, // 活跃度（越近越好）
     };
 
     // 基础信息评分
     if (info.name && info.name !== "未知" && info.name !== "候选人") {
       score += weights.name;
     }
-    
+
     if (info.position) {
       score += weights.position;
       // 如果职位包含"店员"、"服务员"等关键词，额外加分
-      if (info.position.includes("店员") || info.position.includes("服务员") || 
-          info.position.includes("营业员") || info.position.includes("补货")) {
+      if (
+        info.position.includes("店员") ||
+        info.position.includes("服务员") ||
+        info.position.includes("营业员") ||
+        info.position.includes("补货")
+      ) {
         score += 0.05;
       }
     }
-    
+
     if (info.age) {
       score += weights.age;
       // 如果年龄在18-45岁之间（服务行业黄金年龄），额外加分
@@ -240,7 +244,7 @@ class ContextOptimizer {
         score += 0.03;
       }
     }
-    
+
     if (info.gender) {
       score += weights.gender;
     }
@@ -249,12 +253,15 @@ class ContextOptimizer {
     if (info.expectedSalary) {
       score += weights.expectedSalary;
       // 如果薪资期望在合理范围内（如6000-8000），额外加分
-      if (info.expectedSalary.includes("6000") || info.expectedSalary.includes("7000") || 
-          info.expectedSalary.includes("8000")) {
+      if (
+        info.expectedSalary.includes("6000") ||
+        info.expectedSalary.includes("7000") ||
+        info.expectedSalary.includes("8000")
+      ) {
         score += 0.05;
       }
     }
-    
+
     if (info.expectedLocation) {
       score += weights.expectedLocation;
       // 如果期望地点是"上海"或包含具体区域，额外加分
@@ -262,11 +269,11 @@ class ContextOptimizer {
         score += 0.03;
       }
     }
-    
+
     // 健康证 - 服务行业最重要的因素之一
     if (info.healthCertificate === true) {
       score += weights.healthCertificate;
-      score += 0.10; // 有健康证额外大幅加分
+      score += 0.1; // 有健康证额外大幅加分
     } else if (info.healthCertificate === false) {
       // 明确没有健康证要扣分
       score -= 0.05;
@@ -276,11 +283,11 @@ class ContextOptimizer {
     if (info.experience) {
       score += weights.experience;
     }
-    
+
     if (info.education) {
       score += weights.education;
     }
-    
+
     // 活跃度评分 - 越近期越好
     if (info.activeTime) {
       score += weights.activeTime;
@@ -292,7 +299,7 @@ class ContextOptimizer {
         score += 0.01; // 一般活跃
       }
     }
-    
+
     // 身高体重（某些岗位可能有要求）
     if (info.height) {
       score += 0.02;
@@ -300,7 +307,7 @@ class ContextOptimizer {
     if (info.weight) {
       score += 0.01;
     }
-    
+
     // 其他信息完整度
     if (info.info && Array.isArray(info.info) && info.info.length > 0) {
       score += 0.02 * Math.min(info.info.length, 3); // 最多加0.06分
@@ -359,7 +366,12 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
   /**
    * 构建原子化系统提示
    */
-  buildAtomicSystemPrompt(): AtomicPrompt {
+  buildAtomicSystemPrompt(defaultWechatId?: string): AtomicPrompt {
+    // 构建微信号相关的约束
+    const wechatConstraint = defaultWechatId
+      ? `当候选人询问微信号或需要交换联系方式时，引导使用平台交换微信功能，必要时才告知招聘人员的微信号: ${defaultWechatId}`
+      : "微信号询问时不要编造，引导使用平台交换微信功能";
+
     return {
       role: {
         identity: "资深餐饮连锁招聘专员",
@@ -373,7 +385,7 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
         "品牌专属话术优先于通用指令",
         "敏感问题使用固定安全话术",
         "不编造事实，信息不足时追问",
-        "微信号询问时不要编造，引导使用平台交换微信功能",
+        wechatConstraint,
         "年龄问题先确认可行性再引导",
         "兼职岗位不提供五险一金，严禁承诺五险一金福利",
         "使用口语化表达，像日常聊天一样自然",
@@ -394,7 +406,7 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
           "无表情符号",
           "口语化表达",
           "使用逗号和句号即可，避免感叹号",
-          "像平常聊天一样自然"
+          "像平常聊天一样自然",
         ],
       },
     };
@@ -452,8 +464,8 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
    * 主构建方法
    */
   build(params: ReplyBuilderParams): ReplyResult {
-    // 构建原子提示
-    const atomic = this.buildAtomicSystemPrompt();
+    // 构建原子提示，传入微信号参数
+    const atomic = this.buildAtomicSystemPrompt(params.defaultWechatId);
     const systemPrompt = this.formatAtomicPrompt(atomic);
 
     // 添加品牌信息到系统提示
@@ -490,7 +502,6 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
     };
   }
 
-
   /**
    * 格式化带记忆的分子提示
    */
@@ -503,23 +514,23 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
     // 1. 任务指令
     prompt += `[指令]\n${molecular.instruction}\n\n`;
 
-    // 2. Few-shot示例
-    if (molecular.examples.length > 0) {
-      prompt += `[参考示例]\n`;
-      molecular.examples.forEach((example, index) => {
-        prompt += `示例${index + 1}：\n`;
-        prompt += `场景: ${example.scenario}\n`;
-        prompt += `输入: "${example.input}"\n`;
-        prompt += `输出: ${example.output}\n`;
-        if (example.reasoning) {
-          prompt += `思路: ${example.reasoning}\n`;
-        }
-        prompt += "\n";
-      });
-    }
+    // 2. Few-shot示例 - 暂时禁用以测试是否影响生成质量
+    // if (molecular.examples.length > 0) {
+    //   prompt += `[参考示例]\n`;
+    //   molecular.examples.forEach((example, index) => {
+    //     prompt += `示例${index + 1}：\n`;
+    //     prompt += `场景: ${example.scenario}\n`;
+    //     prompt += `输入: "${example.input}"\n`;
+    //     prompt += `输出: ${example.output}\n`;
+    //     if (example.reasoning) {
+    //       prompt += `思路: ${example.reasoning}\n`;
+    //     }
+    //     prompt += "\n";
+    //   });
+    // }
 
-    // 3. 当前上下文
-    prompt += `[当前上下文]\n`;
+    // 3. 对话分析（分类结果及情绪判断）
+    prompt += `[对话分析]\n`;
     const ctx = molecular.context;
 
     if (ctx.conversationState) {
@@ -553,39 +564,39 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
     if (ctx.candidateProfile) {
       const profile = ctx.candidateProfile;
       prompt += `[候选人资料]\n`;
-      
+
       // 基本信息
       prompt += `- 姓名: ${profile.name || "未知"}\n`;
       if (profile.gender) prompt += `- 性别: ${profile.gender}\n`;
       if (profile.age) prompt += `- 年龄: ${profile.age}\n`;
-      
+
       // 职业信息
       if (profile.position) prompt += `- 期望职位: ${profile.position}\n`;
       if (profile.expectedSalary) prompt += `- 期望薪资: ${profile.expectedSalary}\n`;
       if (profile.expectedLocation) prompt += `- 期望工作地: ${profile.expectedLocation}\n`;
       if (profile.experience) prompt += `- 工作经验: ${profile.experience}\n`;
       if (profile.education) prompt += `- 学历: ${profile.education}\n`;
-      
+
       // 身体条件（服务行业重要）
       if (profile.height) prompt += `- 身高: ${profile.height}\n`;
       if (profile.weight) prompt += `- 体重: ${profile.weight}\n`;
       if (profile.healthCertificate !== undefined) {
         prompt += `- 健康证: ${profile.healthCertificate ? "有" : "无"}\n`;
       }
-      
+
       // 活跃度信息
       if (profile.activeTime) prompt += `- 最近活跃: ${profile.activeTime}\n`;
-      
+
       // 其他信息
       if (profile.info && Array.isArray(profile.info) && profile.info.length > 0) {
         prompt += `- 其他信息: ${profile.info.join("、")}\n`;
       }
-      
+
       // 匹配度评分
       if ("relevanceScore" in profile && typeof profile.relevanceScore === "number") {
         prompt += `- 匹配度: ${(profile.relevanceScore * 100).toFixed(0)}%\n`;
       }
-      
+
       prompt += "\n";
     }
 

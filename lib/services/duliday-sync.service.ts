@@ -1,6 +1,10 @@
 import { DulidayRaw, ZhipinData } from "@/types/zhipin";
 import { convertDulidayListToZhipinData } from "@/lib/mappers/duliday-to-zhipin.mapper";
-import { DulidayErrorFormatter, formatDulidayError, formatHttpError } from "@/lib/utils/duliday-error-formatter";
+import {
+  DulidayErrorFormatter,
+  formatDulidayError,
+  formatHttpError,
+} from "@/lib/utils/duliday-error-formatter";
 import { getBrandNameByOrgId } from "@/lib/constants/organization-mapping";
 import { z } from "zod";
 // 注意：服务器端不使用 configService，数据保存逻辑在客户端处理
@@ -121,7 +125,7 @@ export class DulidaySyncService {
       // 逐个验证每个岗位
       for (let index = 0; index < data.data.result.length; index++) {
         const positionData = data.data.result[index];
-        
+
         try {
           // 尝试验证单个岗位数据
           const validatedPosition = DulidayRaw.PositionSchema.parse(positionData);
@@ -129,23 +133,20 @@ export class DulidaySyncService {
         } catch (validationError) {
           // 记录失败的岗位和错误信息
           let errorMessage = "";
-          
+
           if (validationError instanceof z.ZodError) {
             // 使用带上下文的错误格式化
-            errorMessage = DulidayErrorFormatter.formatValidationErrorWithContext(
-              validationError,
-              { 
-                jobName: positionData?.jobName || `未知岗位_${index}`,
-                jobId: positionData?.jobId || `unknown_${index}`
-              }
-            );
+            errorMessage = DulidayErrorFormatter.formatValidationErrorWithContext(validationError, {
+              jobName: positionData?.jobName || `未知岗位_${index}`,
+              jobId: positionData?.jobId || `unknown_${index}`,
+            });
           } else {
             errorMessage = formatDulidayError(validationError);
           }
 
           invalidPositions.push({
             position: positionData || {},
-            error: errorMessage
+            error: errorMessage,
           });
 
           console.warn(`岗位数据验证失败 (索引 ${index}):`, errorMessage);
@@ -154,18 +155,18 @@ export class DulidaySyncService {
 
       // 如果没有任何有效的岗位，抛出错误
       if (validPositions.length === 0 && invalidPositions.length > 0) {
-        const allErrors = invalidPositions.map(item => item.error).join('\n\n');
+        const allErrors = invalidPositions.map(item => item.error).join("\n\n");
         throw new Error(`所有岗位数据验证失败:\n${allErrors}`);
       }
 
       return {
         validPositions,
         invalidPositions,
-        totalCount
+        totalCount,
       };
     } catch (error) {
       clearTimeout(timeoutId);
-      
+
       // 处理不同类型的错误
       if (error instanceof Error) {
         // 检查是否是网络相关错误并需要重试
@@ -175,13 +176,13 @@ export class DulidaySyncService {
           await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
           return this.fetchJobList(organizationIds, pageSize, retryCount + 1);
         }
-        
+
         // 格式化网络错误信息
         if (retryCount >= 3) {
           throw new Error(`${formatDulidayError(error)}（已重试${retryCount}次）`);
         }
       }
-      
+
       console.error("Failed to fetch job list from Duliday API:", error);
       throw error;
     }
@@ -199,10 +200,7 @@ export class DulidaySyncService {
     const errors: string[] = [];
 
     try {
-      onProgress?.(
-        10,
-        `正在从 Duliday API 获取组织 ${organizationId} 的数据...`
-      );
+      onProgress?.(10, `正在从 Duliday API 获取组织 ${organizationId} 的数据...`);
 
       // 获取数据（支持部分成功）
       const partialResponse = await this.fetchJobList([organizationId]);
@@ -234,15 +232,12 @@ export class DulidaySyncService {
           message: "success",
           data: {
             result: partialResponse.validPositions,
-            total: partialResponse.validPositions.length
-          }
+            total: partialResponse.validPositions.length,
+          },
         };
 
-        zhipinData = convertDulidayListToZhipinData(
-          validListResponse,
-          organizationId
-        );
-        
+        zhipinData = convertDulidayListToZhipinData(validListResponse, organizationId);
+
         storeCount = zhipinData.stores?.length || 0;
       }
 
@@ -272,7 +267,7 @@ export class DulidaySyncService {
         errorMessage,
         brandName
       );
-      
+
       errors.push(contextualError);
 
       const duration = Date.now() - startTime;
@@ -294,11 +289,7 @@ export class DulidaySyncService {
    */
   async syncMultipleOrganizations(
     organizationIds: number[],
-    onProgress?: (
-      overallProgress: number,
-      currentOrg: number,
-      message: string
-    ) => void
+    onProgress?: (overallProgress: number, currentOrg: number, message: string) => void
   ): Promise<SyncRecord> {
     const startTime = Date.now();
     const syncId = `sync_${Date.now()}`;
@@ -311,16 +302,12 @@ export class DulidaySyncService {
       onProgress?.(orgProgress, orgId, `开始同步组织 ${orgId}...`);
 
       try {
-        const result = await this.syncOrganization(
-          orgId,
-          (progress, message) => {
-            const currentOrgProgress = Math.floor(
-              (i / organizationIds.length) * 100 +
-                progress / organizationIds.length
-            );
-            onProgress?.(currentOrgProgress, orgId, message);
-          }
-        );
+        const result = await this.syncOrganization(orgId, (progress, message) => {
+          const currentOrgProgress = Math.floor(
+            (i / organizationIds.length) * 100 + progress / organizationIds.length
+          );
+          onProgress?.(currentOrgProgress, orgId, message);
+        });
 
         results.push(result);
       } catch (error) {
@@ -331,7 +318,7 @@ export class DulidaySyncService {
           errorMessage,
           brandName
         );
-        
+
         results.push({
           success: false,
           totalRecords: 0,
@@ -345,7 +332,7 @@ export class DulidaySyncService {
     }
 
     const totalDuration = Date.now() - startTime;
-    const overallSuccess = results.every((r) => r.success);
+    const overallSuccess = results.every(r => r.success);
 
     onProgress?.(100, 0, `所有同步任务完成！`);
 

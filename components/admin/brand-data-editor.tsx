@@ -15,12 +15,15 @@ import type { ZhipinData } from "@/types";
 
 interface BrandDataEditorProps {
   data: ZhipinData | undefined;
-  onSave: (data: ZhipinData, options?: { 
-    customToast?: { 
-      title: string; 
-      description?: string; 
-    } 
-  }) => Promise<void>;
+  onSave: (
+    data: ZhipinData,
+    options?: {
+      customToast?: {
+        title: string;
+        description?: string;
+      };
+    }
+  ) => Promise<void>;
 }
 
 export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }) => {
@@ -50,19 +53,19 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
     }
 
     const sourceTemplates = localData.brands[sourceBrand].templates;
-    
+
     // 深拷贝模板对象，确保每个品牌有独立的副本
     const clonedTemplates = structuredClone(sourceTemplates);
-    
+
     // 更新目标品牌的模板
     const updatedData = updateTemplates(targetBrand, clonedTemplates);
-    
+
     if (updatedData) {
       await onSave(updatedData, {
         customToast: {
           title: "话术复制成功",
-          description: `成功将 ${sourceBrand} 的话术复制到 ${targetBrand}`
-        }
+          description: `成功将 ${sourceBrand} 的话术复制到 ${targetBrand}`,
+        },
       });
       console.log(`✅ 成功将 ${sourceBrand} 的话术复制到 ${targetBrand}`);
     }
@@ -74,8 +77,8 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
       await onSave(data, {
         customToast: {
           title: `${brandName} 话术更新成功`,
-          description: `品牌话术模板已保存`
-        }
+          description: `品牌话术模板已保存`,
+        },
       });
     } else {
       await onSave(data);
@@ -171,7 +174,10 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
                   </Button>
                 </div>
                 {editingType === "templates" && (
-                  <TemplateEditor brandName={editingBrand} onDataUpdate={handleBrandTemplateUpdate} />
+                  <TemplateEditor
+                    brandName={editingBrand}
+                    onDataUpdate={handleBrandTemplateUpdate}
+                  />
                 )}
                 {editingType === "schedule" && (
                   <ScheduleEditor brandName={editingBrand} onDataUpdate={onSave} />
@@ -188,7 +194,10 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
                       </Badge>
                     </div>
                     <div className="text-sm text-muted-foreground space-y-1">
-                      <div>模板：{brandConfig.templates ? Object.keys(brandConfig.templates).length : 0} 类</div>
+                      <div>
+                        模板：
+                        {brandConfig.templates ? Object.keys(brandConfig.templates).length : 0} 类
+                      </div>
                       <div>
                         筛选：年龄 {brandConfig.screening.age.min}-{brandConfig.screening.age.max}
                       </div>

@@ -21,19 +21,14 @@ import {
 } from "@/components/ui/accordion";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
-import { 
-  Calendar, 
-  Clock, 
-  Users, 
-  Building, 
-  Save, 
+import {
+  Calendar,
+  Clock,
+  Users,
+  Building,
+  Save,
   CheckCircle2,
   Settings,
   Zap,
@@ -44,7 +39,7 @@ import {
   Search,
   X,
   Loader2,
-  RefreshCw
+  RefreshCw,
 } from "lucide-react";
 import { useBrandEditorStore } from "@/lib/stores/brand-editor-store";
 import type { ScheduleType, SchedulingFlexibility, ZhipinData } from "@/types";
@@ -54,47 +49,50 @@ interface ScheduleEditorProps {
   onDataUpdate?: (data: ZhipinData) => Promise<void>;
 }
 
-const SCHEDULE_TYPE_CONFIG: Record<ScheduleType, {
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
-}> = {
-  fixed: { 
-    label: "固定排班", 
-    description: "固定时间段工作，时间相对稳定", 
+const SCHEDULE_TYPE_CONFIG: Record<
+  ScheduleType,
+  {
+    label: string;
+    description: string;
+    icon: React.ComponentType<{ className?: string }>;
+    color: string;
+  }
+> = {
+  fixed: {
+    label: "固定排班",
+    description: "固定时间段工作，时间相对稳定",
     icon: Clock,
-    color: "text-blue-600"
+    color: "text-blue-600",
   },
-  flexible: { 
-    label: "灵活排班", 
-    description: "可以灵活调整工作时间，适应不同需求", 
+  flexible: {
+    label: "灵活排班",
+    description: "可以灵活调整工作时间，适应不同需求",
     icon: Zap,
-    color: "text-green-600"
+    color: "text-green-600",
   },
-  rotating: { 
-    label: "轮班制", 
-    description: "按轮班表轮流工作，适合24小时营业", 
+  rotating: {
+    label: "轮班制",
+    description: "按轮班表轮流工作，适合24小时营业",
     icon: CalendarDays,
-    color: "text-purple-600"
+    color: "text-purple-600",
   },
-  on_call: { 
-    label: "随叫随到", 
-    description: "根据需要随时待命工作，灵活性最高", 
+  on_call: {
+    label: "随叫随到",
+    description: "根据需要随时待命工作，灵活性最高",
     icon: Timer,
-    color: "text-orange-600"
+    color: "text-orange-600",
   },
 };
 
 export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps) {
   const { localData, updateSchedulingInfo } = useBrandEditorStore();
-  
+
   // 搜索状态
   const [searchKeyword, setSearchKeyword] = useState<string>("");
-  
+
   // 批量操作状态
   const [isApplying, setIsApplying] = useState<boolean>(false);
-  
+
   // 批量设置的状态
   const [batchScheduleType, setBatchScheduleType] = useState<ScheduleType>("flexible");
   const [batchFlexibility, setBatchFlexibility] = useState<SchedulingFlexibility>({
@@ -117,11 +115,13 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
     if (!localData) return [];
     return localData.stores
       .map((store, index) => ({ ...store, originalIndex: index }))
-      .filter((store) => store.brand === brandName)
-      .filter((store) => {
+      .filter(store => store.brand === brandName)
+      .filter(store => {
         if (!searchKeyword.trim()) return true;
-        return store.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-               store.location.toLowerCase().includes(searchKeyword.toLowerCase());
+        return (
+          store.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+          store.location.toLowerCase().includes(searchKeyword.toLowerCase())
+        );
       });
   }, [localData, brandName, searchKeyword]);
 
@@ -136,13 +136,13 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
           partTimeAllowed: true,
           weekendRequired: false,
           holidayRequired: false,
-        } as SchedulingFlexibility
+        } as SchedulingFlexibility,
       };
     }
 
     // 收集所有岗位的设置
     const allPositions = brandStores.flatMap(store => store.positions);
-    
+
     if (allPositions.length === 0) {
       return {
         scheduleType: "flexible" as ScheduleType,
@@ -152,7 +152,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
           partTimeAllowed: true,
           weekendRequired: false,
           holidayRequired: false,
-        } as SchedulingFlexibility
+        } as SchedulingFlexibility,
       };
     }
 
@@ -171,12 +171,13 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
     });
 
     // 找到最常见的排班类型
-    const mostCommonScheduleType = Object.entries(scheduleTypeCount)
-      .sort(([, a], [, b]) => b - a)[0][0] as ScheduleType;
+    const mostCommonScheduleType = Object.entries(scheduleTypeCount).sort(
+      ([, a], [, b]) => b - a
+    )[0][0] as ScheduleType;
 
     // 获取使用最常见排班类型的第一个岗位的设置
     const samplePosition = allPositions.find(p => p.scheduleType === mostCommonScheduleType);
-    
+
     return {
       scheduleType: mostCommonScheduleType,
       flexibility: samplePosition?.schedulingFlexibility || {
@@ -185,7 +186,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
         partTimeAllowed: true,
         weekendRequired: false,
         holidayRequired: false,
-      }
+      },
     };
   }, [localData, brandStores]);
 
@@ -198,7 +199,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
       console.log("🔄 初始化批量设置为最常见配置", {
         scheduleType: commonConfig.scheduleType,
         flexibility: commonConfig.flexibility,
-        basedOnPositions: brandStores.flatMap(store => store.positions).length
+        basedOnPositions: brandStores.flatMap(store => store.positions).length,
       });
     }
   }, [localData, brandStores, getMostCommonConfig]);
@@ -220,9 +221,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
     return (
       <Card>
         <CardContent className="py-8">
-          <div className="text-center text-muted-foreground">
-            品牌数据未找到
-          </div>
+          <div className="text-center text-muted-foreground">品牌数据未找到</div>
         </CardContent>
       </Card>
     );
@@ -230,45 +229,52 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
 
   const handleBatchApply = async () => {
     if (isApplying) return;
-    
+
     // 获取当前品牌下的门店数量和岗位数量
     const currentBrandStores = localData?.stores.filter(store => store.brand === brandName) || [];
-    const totalPositions = currentBrandStores.reduce((total, store) => total + store.positions.length, 0);
-    
+    const totalPositions = currentBrandStores.reduce(
+      (total, store) => total + store.positions.length,
+      0
+    );
+
     // 显示确认提示
     const confirmed = window.confirm(
       `确定要批量应用排班设置吗？\n\n这将更新 ${brandName} 品牌下：\n• ${currentBrandStores.length} 家门店\n• ${totalPositions} 个岗位\n\n此操作将覆盖现有的排班设置。`
     );
-    
+
     if (!confirmed) return;
-    
+
     setIsApplying(true);
-    
+
     try {
       // 显示开始应用的提示
       const loadingToastId = toast.loading("正在批量应用排班设置...", {
         description: `即将更新 ${currentBrandStores.length} 家门店的 ${totalPositions} 个岗位`,
       });
-      
+
       // 模拟一个短暂的延迟来显示加载状态
       await new Promise(resolve => setTimeout(resolve, 800));
-      
+
       // 执行批量更新（更新Zustand store）并获取更新后的数据
-      const updatedData = updateSchedulingInfo(brandName, batchScheduleType, batchFlexibility, "all");
-      
+      const updatedData = updateSchedulingInfo(
+        brandName,
+        batchScheduleType,
+        batchFlexibility,
+        "all"
+      );
+
       // 保存更新后的数据
       if (updatedData && onDataUpdate) {
         await onDataUpdate(updatedData);
         console.log("✅ 排班设置已自动保存并同步状态");
       }
-      
+
       // 关闭加载提示并显示成功提示
       toast.dismiss(loadingToastId);
       toast.success("批量设置成功！", {
         description: `已成功更新 ${currentBrandStores.length} 家门店的所有岗位排班设置并自动保存`,
         duration: 3000,
       });
-      
     } catch (error) {
       console.error("批量应用失败:", error);
       // 确保关闭加载提示
@@ -286,9 +292,8 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
     const store = brandStores[storeIndex];
     if (!store) return;
 
-    const currentPosition = positionIndex !== undefined 
-      ? store.positions[positionIndex]
-      : store.positions[0];
+    const currentPosition =
+      positionIndex !== undefined ? store.positions[positionIndex] : store.positions[0];
 
     if (currentPosition) {
       setEditingStore({
@@ -321,13 +326,11 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
       }
 
       const isIndividualPosition = editingStore.positionIndex !== undefined;
-      const successMessage = isIndividualPosition 
-        ? "岗位排班设置已更新" 
-        : "门店排班设置已更新";
-      
+      const successMessage = isIndividualPosition ? "岗位排班设置已更新" : "门店排班设置已更新";
+
       toast.success(successMessage, {
-        description: isIndividualPosition 
-          ? "已成功更新该岗位的排班规则并保存" 
+        description: isIndividualPosition
+          ? "已成功更新该岗位的排班规则并保存"
           : "已成功更新该门店所有岗位的排班规则并保存",
         duration: 2000,
       });
@@ -386,7 +389,9 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
     size: "default" | "compact" = "default"
   ) => (
     <div className={`space-y-${size === "compact" ? "3" : "4"}`}>
-      <div className={`grid grid-cols-1 ${size === "compact" ? "md:grid-cols-4" : "md:grid-cols-2"} gap-${size === "compact" ? "3" : "4"}`}>
+      <div
+        className={`grid grid-cols-1 ${size === "compact" ? "md:grid-cols-4" : "md:grid-cols-2"} gap-${size === "compact" ? "3" : "4"}`}
+      >
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -397,7 +402,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
                 </div>
                 <Switch
                   checked={flexibility.canSwapShifts}
-                  onCheckedChange={(checked) => onChange("canSwapShifts", checked)}
+                  onCheckedChange={checked => onChange("canSwapShifts", checked)}
                 />
               </div>
             </TooltipTrigger>
@@ -417,7 +422,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
                 </div>
                 <Switch
                   checked={flexibility.partTimeAllowed}
-                  onCheckedChange={(checked) => onChange("partTimeAllowed", checked)}
+                  onCheckedChange={checked => onChange("partTimeAllowed", checked)}
                 />
               </div>
             </TooltipTrigger>
@@ -437,7 +442,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
                 </div>
                 <Switch
                   checked={flexibility.weekendRequired}
-                  onCheckedChange={(checked) => onChange("weekendRequired", checked)}
+                  onCheckedChange={checked => onChange("weekendRequired", checked)}
                 />
               </div>
             </TooltipTrigger>
@@ -457,7 +462,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
                 </div>
                 <Switch
                   checked={flexibility.holidayRequired}
-                  onCheckedChange={(checked) => onChange("holidayRequired", checked)}
+                  onCheckedChange={checked => onChange("holidayRequired", checked)}
                 />
               </div>
             </TooltipTrigger>
@@ -482,7 +487,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
                   min="1"
                   max="168"
                   value={flexibility.advanceNoticeHours}
-                  onChange={(e) => onChange("advanceNoticeHours", parseInt(e.target.value) || 24)}
+                  onChange={e => onChange("advanceNoticeHours", parseInt(e.target.value) || 24)}
                   className="w-20"
                 />
                 <span className="text-sm text-muted-foreground">小时</span>
@@ -519,11 +524,13 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
           </Button>
         </div>
         <div className="text-sm text-muted-foreground">
-          为 <Badge variant="outline" className="mx-1">{brandName}</Badge> 品牌下所有门店统一设置排班规则
+          为{" "}
+          <Badge variant="outline" className="mx-1">
+            {brandName}
+          </Badge>{" "}
+          品牌下所有门店统一设置排班规则
           <br />
-          <span className="text-xs text-blue-600">
-            💡 当前显示的是基于现有门店数据的最常见配置
-          </span>
+          <span className="text-xs text-blue-600">💡 当前显示的是基于现有门店数据的最常见配置</span>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -544,17 +551,16 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
             <Zap className="h-4 w-4 text-gray-600" />
             <Label className="text-base font-medium">排班灵活性设置</Label>
           </div>
-          {renderFlexibilitySettings(
-            batchFlexibility,
-            (key, value) => setBatchFlexibility({ ...batchFlexibility, [key]: value })
+          {renderFlexibilitySettings(batchFlexibility, (key, value) =>
+            setBatchFlexibility({ ...batchFlexibility, [key]: value })
           )}
         </div>
 
         <Separator />
 
-        <Button 
-          onClick={handleBatchApply} 
-          className="w-full" 
+        <Button
+          onClick={handleBatchApply}
+          className="w-full"
           size="lg"
           disabled={isApplying || brandStores.length === 0}
         >
@@ -572,10 +578,16 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
   // 渲染岗位状态标识
   const renderPositionStatus = (position: { schedulingFlexibility: SchedulingFlexibility }) => (
     <div className="flex flex-wrap gap-1 text-xs">
-      <Badge variant={position.schedulingFlexibility.canSwapShifts ? "default" : "secondary"} className="text-xs">
+      <Badge
+        variant={position.schedulingFlexibility.canSwapShifts ? "default" : "secondary"}
+        className="text-xs"
+      >
         {position.schedulingFlexibility.canSwapShifts ? "可换班" : "不可换班"}
       </Badge>
-      <Badge variant={position.schedulingFlexibility.partTimeAllowed ? "default" : "secondary"} className="text-xs">
+      <Badge
+        variant={position.schedulingFlexibility.partTimeAllowed ? "default" : "secondary"}
+        className="text-xs"
+      >
         {position.schedulingFlexibility.partTimeAllowed ? "支持兼职" : "仅全职"}
       </Badge>
       <Badge variant="outline" className="text-xs">
@@ -585,7 +597,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
   );
 
   // 渲染单个门店
-  const renderStore = (store: typeof brandStores[0], storeIndex: number) => (
+  const renderStore = (store: (typeof brandStores)[0], storeIndex: number) => (
     <AccordionItem key={store.originalIndex} value={store.originalIndex.toString()}>
       <AccordionTrigger className="hover:no-underline">
         <div className="flex items-center justify-between w-full pr-4">
@@ -612,11 +624,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
                 <Settings className="h-4 w-4 text-gray-600" />
                 <span className="text-sm font-medium">门店统一设置</span>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleStartEdit(storeIndex)}
-              >
+              <Button size="sm" variant="outline" onClick={() => handleStartEdit(storeIndex)}>
                 <Edit3 className="h-4 w-4 mr-1" />
                 编辑所有岗位
               </Button>
@@ -628,15 +636,26 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
             {store.positions.map((position, positionIndex) => {
               const TypeIcon = SCHEDULE_TYPE_CONFIG[position.scheduleType].icon;
               return (
-                <div key={position.id} className="border rounded-lg p-4 bg-white hover:shadow-sm transition-shadow">
+                <div
+                  key={position.id}
+                  className="border rounded-lg p-4 bg-white hover:shadow-sm transition-shadow"
+                >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className={`p-1.5 rounded-md ${
-                        position.scheduleType === 'fixed' ? 'bg-blue-100' :
-                        position.scheduleType === 'flexible' ? 'bg-green-100' :
-                        position.scheduleType === 'rotating' ? 'bg-purple-100' : 'bg-orange-100'
-                      }`}>
-                        <TypeIcon className={`h-4 w-4 ${SCHEDULE_TYPE_CONFIG[position.scheduleType].color}`} />
+                      <div
+                        className={`p-1.5 rounded-md ${
+                          position.scheduleType === "fixed"
+                            ? "bg-blue-100"
+                            : position.scheduleType === "flexible"
+                              ? "bg-green-100"
+                              : position.scheduleType === "rotating"
+                                ? "bg-purple-100"
+                                : "bg-orange-100"
+                        }`}
+                      >
+                        <TypeIcon
+                          className={`h-4 w-4 ${SCHEDULE_TYPE_CONFIG[position.scheduleType].color}`}
+                        />
                       </div>
                       <div>
                         <span className="font-medium">{position.name}</span>
@@ -654,7 +673,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
                       编辑
                     </Button>
                   </div>
-                  
+
                   {renderPositionStatus(position)}
                 </div>
               );
@@ -687,14 +706,14 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
               </span>
             )}
           </div>
-          
+
           {/* 搜索框 */}
           <div className="relative mt-4">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="搜索门店名称或地址..."
               value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
+              onChange={e => setSearchKeyword(e.target.value)}
               className="pl-10 pr-10"
             />
             {searchKeyword.trim() && (
@@ -750,10 +769,9 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
                 编辑排班设置
               </CardTitle>
               <div className="text-sm text-muted-foreground">
-                {editingStore.positionIndex !== undefined 
-                  ? "设置单个岗位的排班规则" 
-                  : "批量设置门店所有岗位的排班规则"
-                }
+                {editingStore.positionIndex !== undefined
+                  ? "设置单个岗位的排班规则"
+                  : "批量设置门店所有岗位的排班规则"}
               </div>
             </CardHeader>
             <CardContent className="space-y-6 p-6">
@@ -763,9 +781,8 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
                   <Settings className="h-4 w-4 text-gray-600" />
                   <Label className="text-base font-medium">排班类型</Label>
                 </div>
-                {renderScheduleTypeSelector(
-                  editingStore.scheduleType,
-                  (value) => setEditingStore({ ...editingStore, scheduleType: value })
+                {renderScheduleTypeSelector(editingStore.scheduleType, value =>
+                  setEditingStore({ ...editingStore, scheduleType: value })
                 )}
               </div>
 
@@ -779,10 +796,11 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
                 </div>
                 {renderFlexibilitySettings(
                   editingStore.flexibility,
-                  (key, value) => setEditingStore({
-                    ...editingStore,
-                    flexibility: { ...editingStore.flexibility, [key]: value }
-                  }),
+                  (key, value) =>
+                    setEditingStore({
+                      ...editingStore,
+                      flexibility: { ...editingStore.flexibility, [key]: value },
+                    }),
                   "compact"
                 )}
               </div>

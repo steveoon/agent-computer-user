@@ -92,7 +92,7 @@ export function createMockToolCallStream(
 ): MockLanguageModelV2 {
   const toolCallId = mockId({ prefix: "call" })();
   const toolInputId = mockId({ prefix: "tool" })();
-  
+
   return new MockLanguageModelV2({
     doGenerate: async _options => ({
       content: [
@@ -101,7 +101,7 @@ export function createMockToolCallStream(
           toolCallId,
           toolName,
           input: JSON.stringify(args),
-        }
+        },
       ],
       finishReason: "stop" as const,
       usage: {

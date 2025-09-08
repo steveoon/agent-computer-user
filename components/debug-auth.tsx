@@ -5,10 +5,7 @@ import { createClient } from "@/lib/utils/supabase/client";
 import { useAuthStore } from "@/lib/stores/auth-store";
 
 export function DebugAuth() {
-  const [clientStatus, setClientStatus] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
+  const [clientStatus, setClientStatus] = useState<Record<string, unknown> | null>(null);
   const authStore = useAuthStore();
 
   useEffect(() => {

@@ -69,9 +69,11 @@ export const zhipinSendMessageTool = () =>
             throw new Error(`MCP tool ${toolName} not available`);
           }
         }
-        
+
         // 类型断言：在检查后这些工具一定存在
-        const puppeteerEvaluate = tools.puppeteer_evaluate as NonNullable<typeof tools.puppeteer_evaluate>;
+        const puppeteerEvaluate = tools.puppeteer_evaluate as NonNullable<
+          typeof tools.puppeteer_evaluate
+        >;
         const puppeteerClick = tools.puppeteer_click as NonNullable<typeof tools.puppeteer_click>;
         const puppeteerFill = tools.puppeteer_fill as NonNullable<typeof tools.puppeteer_fill>;
 
@@ -108,7 +110,7 @@ export const zhipinSendMessageTool = () =>
 
         const inputResult = await puppeteerEvaluate.execute({ script: findInputScript });
         const inputData = parseEvaluateResult(inputResult);
-        
+
         if (!inputData?.exists) {
           return {
             success: false,
@@ -117,7 +119,7 @@ export const zhipinSendMessageTool = () =>
             message: "未找到输入框",
           };
         }
-        
+
         const usedInputSelector = inputData.selector as string;
 
         // 步骤2: 点击输入框获取焦点（添加随机延迟）
@@ -134,12 +136,12 @@ export const zhipinSendMessageTool = () =>
             // 先聚焦
             await puppeteerClick.execute({ selector: usedInputSelector });
             await randomDelay(50, 150);
-            
+
             // Ctrl+A 全选
             if (tools.puppeteer_key) {
               await tools.puppeteer_key.execute({ key: "Control+a" });
               await randomDelay(50, 100);
-              
+
               // Backspace 删除
               await tools.puppeteer_key.execute({ key: "Backspace" });
             } else {
@@ -198,7 +200,7 @@ export const zhipinSendMessageTool = () =>
 
         const sendButtonResult = await puppeteerEvaluate.execute({ script: findSendButtonScript });
         const sendButtonData = parseEvaluateResult(sendButtonResult);
-        
+
         if (!sendButtonData?.exists) {
           return {
             success: false,
@@ -208,19 +210,19 @@ export const zhipinSendMessageTool = () =>
             message: "未找到发送按钮",
           };
         }
-        
+
         // 点击发送按钮前添加随机延迟
         await randomDelay(200, 400);
-        
+
         try {
           const sendSelector = sendButtonData.selector as string;
           await puppeteerClick.execute({ selector: sendSelector });
-          
+
           // 等待消息发送完成
           if (waitAfterSend > 0) {
             await randomDelay(waitAfterSend * 0.8, waitAfterSend * 1.2);
           }
-          
+
           return {
             success: true,
             message: `成功发送消息: "${message}"`,
@@ -237,7 +239,6 @@ export const zhipinSendMessageTool = () =>
             message: "点击发送按钮失败",
           };
         }
-
       } catch (error) {
         // 静默处理错误，避免暴露
 

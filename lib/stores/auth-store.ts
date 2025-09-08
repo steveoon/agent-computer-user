@@ -25,7 +25,7 @@ const secureStorage = createSecureStorage("auth-store");
 
 export const useAuthStore = create<AuthStore>()(
   persist(
-    (set) => ({
+    set => ({
       // State
       user: null,
       isLoading: false,
@@ -33,29 +33,29 @@ export const useAuthStore = create<AuthStore>()(
       error: null,
 
       // Actions
-      setUser: (user) =>
-        set((state) => ({
+      setUser: user =>
+        set(state => ({
           ...state,
           user,
           isAuthenticated: !!user,
           error: null,
         })),
 
-      setLoading: (loading) =>
-        set((state) => ({
+      setLoading: loading =>
+        set(state => ({
           ...state,
           isLoading: loading,
         })),
 
-      setError: (error) =>
-        set((state) => ({
+      setError: error =>
+        set(state => ({
           ...state,
           error,
           isLoading: false,
         })),
 
       clearError: () =>
-        set((state) => ({
+        set(state => ({
           ...state,
           error: null,
         })),
@@ -71,7 +71,7 @@ export const useAuthStore = create<AuthStore>()(
     {
       name: "auth-storage",
       storage: createJSONStorage(() => secureStorage),
-      partialize: (state) => ({
+      partialize: state => ({
         // 🎯 只存储必要的认证状态
         user: state.user,
         isAuthenticated: state.isAuthenticated,

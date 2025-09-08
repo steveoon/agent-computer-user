@@ -18,13 +18,8 @@ import { getBrandHistory } from "@/lib/utils/brand-storage";
  * 允许用户在不同品牌之间切换，影响数据加载和消息生成
  * 支持显示最近使用的品牌历史记录
  */
-export function BrandSelector({
-  showHistory = false,
-}: {
-  showHistory?: boolean;
-}) {
-  const { currentBrand, setCurrentBrand, availableBrands, isLoaded } =
-    useBrand();
+export function BrandSelector({ showHistory = false }: { showHistory?: boolean }) {
+  const { currentBrand, setCurrentBrand, availableBrands, isLoaded } = useBrand();
   const [brandHistory, setBrandHistory] = useState<string[]>([]);
 
   // 📊 加载品牌历史记录
@@ -44,12 +39,8 @@ export function BrandSelector({
           {showHistory && brandHistory.length > 0 ? (
             <>
               {/* 历史记录部分 - 最近使用的品牌（最多3个） */}
-              {brandHistory.slice(0, 3).map((brand) => (
-                <SelectItem
-                  key={`history-${brand}`}
-                  value={brand}
-                  className="text-xs"
-                >
+              {brandHistory.slice(0, 3).map(brand => (
+                <SelectItem key={`history-${brand}`} value={brand} className="text-xs">
                   <div className="flex items-center gap-2">
                     <span className="text-blue-600">📋</span>
                     <span>{brand}</span>
@@ -62,8 +53,8 @@ export function BrandSelector({
 
               {/* 所有品牌列表（去重显示） */}
               {availableBrands
-                .filter((brand) => !brandHistory.slice(0, 3).includes(brand))
-                .map((brand) => (
+                .filter(brand => !brandHistory.slice(0, 3).includes(brand))
+                .map(brand => (
                   <SelectItem key={brand} value={brand} className="text-xs">
                     {brand}
                   </SelectItem>
@@ -71,7 +62,7 @@ export function BrandSelector({
             </>
           ) : (
             /* 不显示历史记录时的标准列表 */
-            availableBrands.map((brand) => (
+            availableBrands.map(brand => (
               <SelectItem key={brand} value={brand} className="text-xs">
                 {brand}
               </SelectItem>

@@ -109,7 +109,7 @@ async function saveBrandToHistory(brand: string): Promise<void> {
     const history = await getBrandHistory();
 
     // 移除重复项并添加到首位
-    const updatedHistory = [brand, ...history.filter((b) => b !== brand)];
+    const updatedHistory = [brand, ...history.filter(b => b !== brand)];
 
     // 限制历史记录数量为10个
     const limitedHistory = updatedHistory.slice(0, 10);

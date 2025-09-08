@@ -110,12 +110,9 @@ export const sendWeChatMessage = async (
     } else {
       // 失败情况，提取错误信息
       const errorMsg = validatedResult.errmsg || "Unknown error from WeChat API";
-      const friendlyError =
-        WECHAT_ERROR_MESSAGES[validatedResult.errcode] || errorMsg;
+      const friendlyError = WECHAT_ERROR_MESSAGES[validatedResult.errcode] || errorMsg;
 
-      console.error(
-        `❌ WeChat API返回错误: code=${validatedResult.errcode}, msg=${errorMsg}`
-      );
+      console.error(`❌ WeChat API返回错误: code=${validatedResult.errcode}, msg=${errorMsg}`);
 
       return {
         success: false,
@@ -171,18 +168,12 @@ export const sendWeChatMarkdownMessage = async (
 
   // 如果不是v2版本，可以添加颜色标签
   if (!use_v2 && color) {
-    markdownContent = markdownContent.replace(
-      /(\d+)/g,
-      `<font color="${color}">$1</font>`
-    );
+    markdownContent = markdownContent.replace(/(\d+)/g, `<font color="${color}">$1</font>`);
   }
 
   // 添加时间戳
   const timestamp = new Date().toLocaleString("zh-CN");
   markdownContent += `\n\n> 发送时间: ${timestamp}`;
 
-  return sendWeChatMessage(
-    markdownContent,
-    use_v2 ? "markdown_v2" : "markdown"
-  );
+  return sendWeChatMessage(markdownContent, use_v2 ? "markdown_v2" : "markdown");
 };

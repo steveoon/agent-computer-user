@@ -24,11 +24,11 @@ import type { ModelConfig } from "@/lib/config/models";
 import type { CandidateInfo } from "@/lib/tools/zhipin/types";
 import type { SalaryDetails } from "../../types/zhipin";
 // 使用新的模块化 prompt engineering
-import { 
+import {
   ClassificationPromptBuilder,
   ReplyPromptBuilder,
   type ClassificationParams,
-  type ReplyBuilderParams
+  type ReplyBuilderParams,
 } from "@/lib/prompt-engineering";
 
 /**
@@ -39,16 +39,16 @@ import {
  */
 function buildSalaryDescription(salary: SalaryDetails): string {
   const { base, range, memo } = salary;
-  
+
   // 🎯 简单启发式判断：base值很小时可能是计件制
   const isPossiblyPieceRate = base < 10; // 小于10元通常不是时薪
-  
+
   // 🔧 构建基础薪资信息
-  let description = '';
-  
+  let description = "";
+
   if (isPossiblyPieceRate && memo) {
     // 可能是计件制，包含memo信息让LLM理解
-    description = `${base}元（${memo.replace(/\n/g, ' ').trim()}）`;
+    description = `${base}元（${memo.replace(/\n/g, " ").trim()}）`;
   } else {
     // 常规时薪
     description = `${base}元/时`;
@@ -57,10 +57,10 @@ function buildSalaryDescription(salary: SalaryDetails): string {
     }
     // 如果有memo且不太长，也包含进来
     if (memo && memo.length < 50) {
-      description += `（${memo.replace(/\n/g, ' ').trim()}）`;
+      description += `（${memo.replace(/\n/g, " ").trim()}）`;
     }
   }
-  
+
   return description;
 }
 
@@ -80,14 +80,27 @@ export async function loadZhipinData(
     if (configData) {
       console.log("✅ 使用传入的配置数据");
 
-      // 如果指定了品牌，动态更新默认品牌
-      const effectiveData =
-        preferredBrand && configData.brands[preferredBrand]
-          ? {
-              ...configData,
-              defaultBrand: preferredBrand,
-            }
-          : configData;
+      // 如果指定了品牌，尝试匹配
+      let effectiveBrand = configData.defaultBrand || Object.keys(configData.brands)[0];
+
+      if (preferredBrand) {
+        const matchedBrand = fuzzyMatchBrand(preferredBrand, Object.keys(configData.brands));
+        if (matchedBrand) {
+          effectiveBrand = matchedBrand;
+          if (matchedBrand === preferredBrand) {
+            console.log(`✅ 品牌精确匹配成功: ${preferredBrand}`);
+          } else {
+            console.log(`🔄 品牌模糊匹配成功: ${preferredBrand} → ${matchedBrand}`);
+          }
+        } else {
+          console.warn(`⚠️ 品牌 "${preferredBrand}" 未找到匹配，使用默认品牌: ${effectiveBrand}`);
+        }
+      }
+
+      const effectiveData = {
+        ...configData,
+        defaultBrand: effectiveBrand,
+      };
 
       const totalPositions = effectiveData.stores.reduce(
         (sum, store) => sum + store.positions.length,
@@ -123,11 +136,27 @@ export async function loadZhipinData(
         throw new Error("浏览器环境配置数据未找到");
       }
 
-      // 应用品牌选择
-      const effectiveData =
-        preferredBrand && brandData.brands[preferredBrand]
-          ? { ...brandData, defaultBrand: preferredBrand }
-          : brandData;
+      // 应用品牌选择（与上面的逻辑保持一致）
+      let effectiveBrand = brandData.defaultBrand || Object.keys(brandData.brands)[0];
+
+      if (preferredBrand) {
+        const matchedBrand = fuzzyMatchBrand(preferredBrand, Object.keys(brandData.brands));
+        if (matchedBrand) {
+          effectiveBrand = matchedBrand;
+          if (matchedBrand === preferredBrand) {
+            console.log(`✅ 品牌精确匹配成功: ${preferredBrand}`);
+          } else {
+            console.log(`🔄 品牌模糊匹配成功: ${preferredBrand} → ${matchedBrand}`);
+          }
+        } else {
+          console.warn(`⚠️ 品牌 "${preferredBrand}" 未找到匹配，使用默认品牌: ${effectiveBrand}`);
+        }
+      }
+
+      const effectiveData = {
+        ...brandData,
+        defaultBrand: effectiveBrand,
+      };
 
       const totalPositions = effectiveData.stores.reduce(
         (sum, store) => sum + store.positions.length,
@@ -147,6 +176,49 @@ export async function loadZhipinData(
     console.error("❌ 数据加载失败:", error);
     throw error; // 不再降级，明确报错
   }
+}
+
+/**
+ * 模糊匹配品牌名称
+ * @param inputBrand 用户输入的品牌名
+ * @param availableBrands 可用的品牌列表
+ * @returns 匹配的品牌名或null
+ */
+function fuzzyMatchBrand(inputBrand: string, availableBrands: string[]): string | null {
+  if (!inputBrand) return null;
+
+  const inputLower = inputBrand.toLowerCase();
+
+  // 1. 精确匹配（忽略大小写）
+  const exactMatch = availableBrands.find(brand => brand.toLowerCase() === inputLower);
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  // 2. 包含匹配（品牌名包含输入或输入包含品牌名，忽略大小写）
+  // 收集所有匹配项，然后选择最具体的（最长的）
+  const containsMatches = availableBrands.filter(brand => {
+    const brandLower = brand.toLowerCase();
+    return brandLower.includes(inputLower) || inputLower.includes(brandLower);
+  });
+
+  if (containsMatches.length > 0) {
+    // 优先返回最长的匹配（更具体的品牌名）
+    return containsMatches.sort((a, b) => b.length - a.length)[0];
+  }
+
+  // 3. 特殊处理：山姆相关的匹配
+  if (inputLower.includes("山姆") || inputLower.includes("sam")) {
+    const samBrand = availableBrands.find(brand => {
+      const brandLower = brand.toLowerCase();
+      return brandLower.includes("山姆") || brandLower.includes("sam");
+    });
+    if (samBrand) {
+      return samBrand;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -186,14 +258,21 @@ export function generateSmartReply(
     // 🎯 使用数据对象中的默认品牌（已在 loadZhipinData 中设置为用户选择的品牌）
     const targetBrand = getBrandName(data);
     const brandStores = data.stores.filter(store => store.brand === targetBrand);
-    const availableStores = brandStores.length > 0 ? brandStores : data.stores;
+
+    // 如果指定品牌没有门店，返回明确的提示
+    const availableStores = brandStores;
+    if (brandStores.length === 0) {
+      console.warn(`⚠️ 品牌 "${targetBrand}" 没有找到任何门店`);
+      return `抱歉，${targetBrand}暂时没有招聘信息，请稍后再试或联系客服了解详情。`;
+    }
 
     const randomStore = availableStores[Math.floor(Math.random() * availableStores.length)];
     const randomPosition =
       randomStore.positions[Math.floor(Math.random() * randomStore.positions.length)];
 
-    const brandName = getBrandName(data);
-    let reply = `你好，${data.city}各区有${brandName}门店岗位空缺，兼职排班 ${randomPosition.workHours} 小时。基本薪资：${randomPosition.salary.base} 元/小时。`;
+    // 使用实际选中门店的品牌名，而不是目标品牌名
+    const actualBrand = randomStore.brand;
+    let reply = `你好，${data.city}各区有${actualBrand}门店岗位空缺，兼职排班 ${randomPosition.workHours} 小时。基本薪资：${randomPosition.salary.base} 元/小时。`;
     if (randomPosition.salary.range) {
       reply += `薪资范围：${randomPosition.salary.range}。`;
     }
@@ -223,26 +302,22 @@ export function generateSmartReply(
     msg.includes("地址") ||
     msg.includes("哪里")
   ) {
-    // 简单的区域匹配逻辑
-    const districts = [
-      "徐汇",
-      "静安",
-      "浦东",
-      "黄浦",
-      "长宁",
-      "普陀",
-      "杨浦",
-      "虹口",
-      "闵行",
-      "宝山",
-    ];
+    // 动态提取所有区域名称
+    const districts = new Set<string>();
+    data.stores.forEach(store => {
+      if (store.district) districts.add(store.district);
+      if (store.subarea) districts.add(store.subarea);
+    });
+
     let matchedStore = null;
 
     // 检查消息中是否包含任何区域名称
     for (const district of districts) {
-      if (msg.includes(district)) {
+      if (msg.includes(district.toLowerCase())) {
         matchedStore = data.stores.find(
-          store => store.district.includes(district) || store.subarea.includes(district)
+          store =>
+            store.district.toLowerCase().includes(district.toLowerCase()) ||
+            store.subarea.toLowerCase().includes(district.toLowerCase())
         );
         if (matchedStore) break;
       }
@@ -269,7 +344,13 @@ export function generateSmartReply(
     // 🎯 使用数据对象中的默认品牌（已在 loadZhipinData 中设置为用户选择的品牌）
     const targetBrand = getBrandName(data);
     const brandStores = data.stores.filter(store => store.brand === targetBrand);
-    const availableStores = brandStores.length > 0 ? brandStores : data.stores;
+
+    // 如果指定品牌没有门店，返回明确的提示
+    const availableStores = brandStores;
+    if (brandStores.length === 0) {
+      console.warn(`⚠️ 品牌 "${targetBrand}" 没有找到任何门店`);
+      return `抱歉，${targetBrand}暂时没有招聘信息，请稍后再试或联系客服了解详情。`;
+    }
 
     const randomStore = availableStores[Math.floor(Math.random() * availableStores.length)];
     const position = randomStore.positions[0];
@@ -392,8 +473,8 @@ export async function classifyUserMessage(
       city: data.city,
       defaultBrand: data.defaultBrand || getBrandName(data),
       availableBrands: Object.keys(data.brands),
-      storeCount: data.stores.length
-    }
+      storeCount: data.stores.length,
+    },
   };
 
   // 构建分类提示
@@ -440,7 +521,7 @@ export async function classifyUserMessage(
       reasoningText: z.string().describe("分类依据和分析过程"),
     }),
     system: classificationPrompts.system,
-    prompt: classificationPrompts.prompt
+    prompt: classificationPrompts.prompt,
   });
 
   return classification;
@@ -464,7 +545,8 @@ export async function generateSmartReplyWithLLM(
   modelConfig?: ModelConfig,
   configData?: ZhipinData,
   replyPrompts?: ReplyPromptsConfig,
-  candidateInfo?: CandidateInfo
+  candidateInfo?: CandidateInfo,
+  defaultWechatId?: string
 ): Promise<{ replyType: string; text: string; reasoningText: string }> {
   try {
     // 🎯 获取配置的模型和provider设置
@@ -529,7 +611,8 @@ export async function generateSmartReplyWithLLM(
       systemInstruction: systemPromptInstruction,
       conversationHistory,
       candidateInfo,
-      targetBrand
+      targetBrand,
+      defaultWechatId,
     };
 
     // 使用新的构建器生成提示
@@ -618,16 +701,24 @@ function buildContextInfo(data: ZhipinData, classification: MessageClassificatio
   let targetBrand = data.defaultBrand || getBrandName(data);
   let relevantStores = data.stores;
 
-  // 获取目标品牌的所有门店，用于后续判断是否已经进行过位置过滤
-  const brandStores = data.stores.filter(store => store.brand === (mentionedBrand || targetBrand));
+  // 如果提到了品牌，使用模糊匹配
+  if (mentionedBrand) {
+    const matchedBrand = fuzzyMatchBrand(mentionedBrand, Object.keys(data.brands));
+    if (matchedBrand) {
+      targetBrand = matchedBrand;
+      console.log(`✅ 品牌匹配成功: ${mentionedBrand} → ${matchedBrand}`);
+    } else {
+      console.warn(`⚠️ 品牌 "${mentionedBrand}" 未找到匹配，使用默认品牌: ${targetBrand}`);
+    }
+  }
 
-  if (mentionedBrand && data.brands[mentionedBrand]) {
-    // 有明确提到的品牌，使用该品牌
-    relevantStores = brandStores;
-    targetBrand = mentionedBrand;
-  } else {
-    // 没有提到品牌，使用默认品牌的门店
-    relevantStores = brandStores;
+  // 获取目标品牌的所有门店
+  const brandStores = data.stores.filter(store => store.brand === targetBrand);
+  relevantStores = brandStores; // 保持品牌过滤，即使为空
+
+  // 如果没有门店数据，构建空的上下文
+  if (relevantStores.length === 0) {
+    return `品牌：${targetBrand}\n注意：该品牌当前没有门店数据。**门店可能暂时没有在招岗位**。`;
   }
 
   // 优先使用明确提到的工作城市进行过滤
@@ -702,7 +793,7 @@ function buildContextInfo(data: ZhipinData, classification: MessageClassificatio
         // 🔧 智能薪资信息构建（包含memo解析）
         const salaryInfo = buildSalaryDescription(pos.salary);
         context += `  职位：${pos.name}，时间：${pos.timeSlots.join("、")}，薪资：${salaryInfo}\n`;
-        
+
         if (pos.salary.bonus) {
           context += `  奖金：${pos.salary.bonus}\n`;
         }
@@ -839,26 +930,32 @@ function buildContextInfo(data: ZhipinData, classification: MessageClassificatio
 /**
  * 获取排班类型的中文描述
  */
-function getScheduleTypeText(scheduleType: "fixed" | "flexible" | "rotating" | "on_call"): string {
-  const typeMap = {
+function getScheduleTypeText(
+  scheduleType: "fixed" | "flexible" | "rotating" | "on_call" | string
+): string {
+  if (!scheduleType) return "灵活排班"; // 默认值
+
+  const typeMap: Record<string, string> = {
     fixed: "固定排班",
     flexible: "灵活排班",
     rotating: "轮班制",
     on_call: "随叫随到",
   };
-  return typeMap[scheduleType] || scheduleType;
+  return typeMap[scheduleType] || "灵活排班";
 }
 
 /**
  * 获取优先级的中文描述
  */
-function getPriorityText(priority: "high" | "medium" | "low"): string {
-  const priorityMap = {
+function getPriorityText(priority: "high" | "medium" | "low" | string): string {
+  if (!priority) return "中"; // 默认值
+
+  const priorityMap: Record<string, string> = {
     high: "高",
     medium: "中",
     low: "低",
   };
-  return priorityMap[priority] || priority;
+  return priorityMap[priority] || "中";
 }
 
 /**

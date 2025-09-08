@@ -6,10 +6,7 @@ export async function POST(request: Request) {
   const sandboxId = searchParams.get("sandboxId");
 
   if (!sandboxId) {
-    return NextResponse.json(
-      { error: "No sandboxId provided" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "No sandboxId provided" }, { status: 400 });
   }
 
   try {

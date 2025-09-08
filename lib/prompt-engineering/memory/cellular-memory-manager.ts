@@ -1,6 +1,6 @@
 /**
  * Cellular Memory Manager - 细胞内存管理器
- * 
+ *
  * 基于Context Engineering的Cellular Memory原则
  * 管理短期、工作和长期记忆系统
  */
@@ -9,25 +9,19 @@ import type {
   WorkingMemoryValue,
   LongTermFact,
   CompressedLongTermMemory,
-  OptimizedMemoryContext
-} from '@/types/context-engineering';
+  OptimizedMemoryContext,
+} from "@/types/context-engineering";
 
-import {
-  MEMORY_CONSTANTS,
-  EXTRACTION_PATTERNS
-} from '@/types/context-engineering';
+import { MEMORY_CONSTANTS, EXTRACTION_PATTERNS } from "@/types/context-engineering";
 
-import { SmartExtractor } from './smart-patterns';
+import { SmartExtractor } from "./smart-patterns";
 
 // 从types重新导出常量
-export {
-  MEMORY_CONSTANTS,
-  EXTRACTION_PATTERNS
-} from '@/types/context-engineering';
+export { MEMORY_CONSTANTS, EXTRACTION_PATTERNS } from "@/types/context-engineering";
 
 /**
  * Cellular Memory Manager - 细胞内存管理器
- * 
+ *
  * 三层记忆系统：
  * 1. 短期记忆：最近的对话历史
  * 2. 工作记忆：当前会话的临时状态
@@ -66,40 +60,40 @@ export class CellularMemoryManager {
    */
   private extractToLongTerm(content: string): void {
     const timestamp = Date.now();
-    
+
     // 使用智能提取器提取所有信息
     const extracted = SmartExtractor.extractAll(content);
-    
+
     // 存储品牌信息
     extracted.brands.forEach((brand, index) => {
       this.longTermMemory.set(`brand_${timestamp}_${index}`, brand);
     });
-    
+
     // 存储位置信息
     extracted.locations.forEach((location, index) => {
       this.longTermMemory.set(`location_${timestamp}_${index}`, location);
     });
-    
+
     // 存储年龄信息
     if (extracted.age !== null) {
       this.longTermMemory.set(`age_${timestamp}`, extracted.age);
     }
-    
+
     // 存储时间偏好
     extracted.timePreferences.forEach((pref, index) => {
       this.longTermMemory.set(`schedule_${timestamp}_${index}`, pref);
     });
-    
+
     // 存储紧急度
     if (extracted.urgency !== null) {
       this.longTermMemory.set(`urgency_${timestamp}`, extracted.urgency);
     }
-    
+
     // 保留原有的正则提取作为备用（处理特殊格式）
     const patterns = EXTRACTION_PATTERNS;
     for (const [key, pattern] of Object.entries(patterns)) {
       // 只处理智能提取器未覆盖的模式
-      if (!['brand', 'location', 'age', 'schedule'].includes(key)) {
+      if (!["brand", "location", "age", "schedule"].includes(key)) {
         const matches = content.matchAll(pattern);
         for (const match of matches) {
           this.longTermMemory.set(`${key}_${timestamp}_regex`, match[1]);
@@ -113,21 +107,24 @@ export class CellularMemoryManager {
    */
   getOptimizedContext(tokenBudget?: number): OptimizedMemoryContext {
     const budget = tokenBudget || this.TOKEN_BUDGET;
-    
+
     // 预先截断对话历史以避免内存溢出
     // 根据token预算估算可以保留多少对话历史
     const maxHistorySize = Math.floor(budget * 0.3); // 30%的预算用于对话历史
     const estimatedCharsPerEntry = 120; // 每条对话估算120个字符（实际测试中较长）
     const maxEntries = Math.min(
-      Math.floor((maxHistorySize * MEMORY_CONSTANTS.TOKEN_ESTIMATE_DIVISOR) / estimatedCharsPerEntry),
+      Math.floor(
+        (maxHistorySize * MEMORY_CONSTANTS.TOKEN_ESTIMATE_DIVISOR) / estimatedCharsPerEntry
+      ),
       20 // 最多保留20条对话历史
     );
-    
+
     // 如果对话历史过长，只保留最近的部分
-    const recentHistory = this.shortTermMemory.length > maxEntries
-      ? this.shortTermMemory.slice(-maxEntries)
-      : this.shortTermMemory;
-    
+    const recentHistory =
+      this.shortTermMemory.length > maxEntries
+        ? this.shortTermMemory.slice(-maxEntries)
+        : this.shortTermMemory;
+
     // 优先级排序：工作内存 > 优化后的对话历史 > 长期事实
     const context = {
       recent: recentHistory,
@@ -144,10 +141,10 @@ export class CellularMemoryManager {
    */
   private compressLongTermMemory(): CompressedLongTermMemory {
     const compressed: CompressedLongTermMemory = {};
-    
+
     // 按类型聚合事实
     for (const [key, value] of this.longTermMemory.entries()) {
-      const [type] = key.split('_');
+      const [type] = key.split("_");
       if (!compressed[type]) {
         compressed[type] = [];
       }
@@ -170,8 +167,9 @@ export class CellularMemoryManager {
     budget: number
   ): OptimizedMemoryContext {
     // 简化实现：根据预算截断内容
-    const estimatedTokens = JSON.stringify(context).length / MEMORY_CONSTANTS.TOKEN_ESTIMATE_DIVISOR;
-    
+    const estimatedTokens =
+      JSON.stringify(context).length / MEMORY_CONSTANTS.TOKEN_ESTIMATE_DIVISOR;
+
     if (estimatedTokens <= budget) {
       return context;
     }
@@ -181,12 +179,12 @@ export class CellularMemoryManager {
       // 计算需要保留多少对话
       const keepRatio = budget / estimatedTokens;
       const keepCount = Math.max(
-        MEMORY_CONSTANTS.MIN_CONVERSATION_HISTORY, 
+        MEMORY_CONSTANTS.MIN_CONVERSATION_HISTORY,
         Math.floor(context.recent.length * keepRatio)
       );
       context.recent = context.recent.slice(-keepCount);
     }
-    
+
     return context;
   }
 
@@ -213,7 +211,7 @@ export class CellularMemoryManager {
     if (this.longTermMemory.size > maxEntries) {
       const entries = Array.from(this.longTermMemory.entries());
       const toKeep = entries.slice(-maxEntries);
-      
+
       // 清空现有Map并重新填充，而不是创建新Map
       // 这样可以保持引用不变，避免测试和其他代码的引用失效
       this.longTermMemory.clear();
@@ -242,13 +240,14 @@ export class CellularMemoryManager {
     estimatedTokens: number;
   } {
     const context = this.getOptimizedContext();
-    const estimatedTokens = JSON.stringify(context).length / MEMORY_CONSTANTS.TOKEN_ESTIMATE_DIVISOR;
+    const estimatedTokens =
+      JSON.stringify(context).length / MEMORY_CONSTANTS.TOKEN_ESTIMATE_DIVISOR;
 
     return {
       shortTermCount: this.shortTermMemory.length,
       workingMemoryCount: this.workingMemory.size,
       longTermCount: this.longTermMemory.size,
-      estimatedTokens: Math.ceil(estimatedTokens)
+      estimatedTokens: Math.ceil(estimatedTokens),
     };
   }
 }

@@ -47,14 +47,14 @@ components/
 ### 单元测试示例
 
 ```typescript
-import { describe, it, expect } from 'vitest'
-import { myFunction } from '../myModule'
+import { describe, it, expect } from "vitest";
+import { myFunction } from "../myModule";
 
-describe('myFunction', () => {
-  it('should return expected value', () => {
-    expect(myFunction('input')).toBe('expected output')
-  })
-})
+describe("myFunction", () => {
+  it("should return expected value", () => {
+    expect(myFunction("input")).toBe("expected output");
+  });
+});
 ```
 
 ### 组件测试示例
@@ -74,7 +74,7 @@ describe('MyComponent', () => {
   it('handles user interaction', async () => {
     const user = userEvent.setup()
     render(<MyComponent />)
-    
+
     await user.click(screen.getByRole('button'))
     expect(screen.getByText('Clicked!')).toBeInTheDocument()
   })
@@ -122,18 +122,20 @@ describe('MyComponent', () => {
 ### 高级配置选项
 
 1. **自动更新覆盖率阈值**（实验性功能）：
+
    ```typescript
    coverage: {
      thresholds: {
-       autoUpdate: true // 当覆盖率提升时自动更新阈值
+       autoUpdate: true; // 当覆盖率提升时自动更新阈值
      }
    }
    ```
 
 2. **AST-aware V8 Coverage**（实验性功能）：
+
    ```typescript
    coverage: {
-     experimentalAstAwareRemapping: true // 提升性能并与 Istanbul 对齐
+     experimentalAstAwareRemapping: true; // 提升性能并与 Istanbul 对齐
    }
    ```
 
@@ -141,7 +143,7 @@ describe('MyComponent', () => {
    除了 `jsdom`，Vitest 还支持 `happy-dom` 和 `node` 环境：
    ```typescript
    test: {
-     environment: 'happy-dom' // 或 'jsdom', 'node'
+     environment: "happy-dom"; // 或 'jsdom', 'node'
    }
    ```
 

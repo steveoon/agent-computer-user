@@ -5,6 +5,7 @@
 ## 工具清单
 
 ### BOSS直聘工具
+
 - `lib/tools/zhipin/get-unread-candidates-improved.tool.ts` - 获取未读候选人列表
 - `lib/tools/zhipin/get-chat-details.tool.ts` - 获取聊天详情和历史记录
 - `lib/tools/zhipin/exchange-wechat.tool.ts` - 交换微信功能
@@ -12,24 +13,25 @@
 - `lib/tools/zhipin/open-candidate-chat-improved.tool.ts` - 打开候选人聊天窗口
 
 ### Duliday系统工具
+
 - `lib/tools/duliday/duliday-interview-booking-tool.ts` - 预约面试（用于统计面试转化）
 
 ## 数据采集能力矩阵
 
-| 数据类型 | 获取能力 | 数据来源 | 备注 |
-|---------|---------|---------|-----|
-| 候选人姓名 | ✅ 可直接获取 | `get-chat-details.tool.ts` | candidateInfo.name |
-| 候选人职位 | ✅ 可直接获取 | `get-chat-details.tool.ts` | candidateInfo.position |
-| 消息时间戳 | ✅ 可直接获取 | `get-chat-details.tool.ts` | 支持 MM-DD HH:MM 格式 |
-| 未读消息数 | ✅ 可直接获取 | `get-unread-candidates-improved.tool.ts` | unreadCount |
-| 聊天记录 | ✅ 可直接获取 | `get-chat-details.tool.ts` | chatMessages |
-| 微信交换记录 | ✅ 可直接获取 | `get-chat-details.tool.ts` | messageType === 'wechat-exchange' |
-| 面试预约 | 🔄 间接统计 | `duliday-interview-booking-tool.ts` | 通过调用次数统计 |
-| 候选人手机号 | ❌ 无法获取 | - | 平台不显示 |
-| 候选人微信号 | ⚠️ 交换后可见 | `get-chat-details.tool.ts` | 仅在交换成功后的消息中显示 |
-| 候选人唯一ID | ❌ 无法获取 | - | 平台不提供 |
-| 上岗数据 | ❌ 无法获取 | - | 需要外部系统或人工输入 |
-| 跨账号关联 | ❌ 无法实现 | - | 只能基于姓名推断，存在重名风险 |
+| 数据类型     | 获取能力      | 数据来源                                 | 备注                              |
+| ------------ | ------------- | ---------------------------------------- | --------------------------------- |
+| 候选人姓名   | ✅ 可直接获取 | `get-chat-details.tool.ts`               | candidateInfo.name                |
+| 候选人职位   | ✅ 可直接获取 | `get-chat-details.tool.ts`               | candidateInfo.position            |
+| 消息时间戳   | ✅ 可直接获取 | `get-chat-details.tool.ts`               | 支持 MM-DD HH:MM 格式             |
+| 未读消息数   | ✅ 可直接获取 | `get-unread-candidates-improved.tool.ts` | unreadCount                       |
+| 聊天记录     | ✅ 可直接获取 | `get-chat-details.tool.ts`               | chatMessages                      |
+| 微信交换记录 | ✅ 可直接获取 | `get-chat-details.tool.ts`               | messageType === 'wechat-exchange' |
+| 面试预约     | 🔄 间接统计   | `duliday-interview-booking-tool.ts`      | 通过调用次数统计                  |
+| 候选人手机号 | ❌ 无法获取   | -                                        | 平台不显示                        |
+| 候选人微信号 | ⚠️ 交换后可见 | `get-chat-details.tool.ts`               | 仅在交换成功后的消息中显示        |
+| 候选人唯一ID | ❌ 无法获取   | -                                        | 平台不提供                        |
+| 上岗数据     | ❌ 无法获取   | -                                        | 需要外部系统或人工输入            |
+| 跨账号关联   | ❌ 无法实现   | -                                        | 只能基于姓名推断，存在重名风险    |
 
 时间窗口说明：除特别说明外，以下"今日/当日"均指一个明确统计窗口（建议以自然日 + 时区统一）。所有计数应以"候选人入站消息事件"为基础，再派生去重、回复、微信交换等衍生指标。
 
@@ -175,7 +177,7 @@
 | Avg Repeat Degree               | 重复者平均重复次数（消息口径，参考）         | Σ\_{m_i>1} m_i / count(m_i>1)                                  | 补充刻画重复强度（消息层），可做分析特征       | （可选）              | 可作为分析特征，模型中默认2.5             |
 | WeChat Conversion Rate          | 微信转化率                                   | WeChatObtained / UniqueCandidates_day                          | RecruitFlow-Estimator 的 wechat_conversions    | wechat_conversions    | WeChatObtained 为"当日获得微信的候选人数" |
 | Interview Rate                  | 面试转化率                                   | duliday_interview_booking调用次数 / wechat_adds                | 通过Duliday工具调用统计                        | interview_rates       | 使用duliday-interview-booking-tool.ts统计 |
-| Onboard Rate                    | 上岗转化率                                   | onboards / interviews                                          | 需要外部系统或人工输入                         | onboard_rates         | 暂时通过人工预估或默认分布采样             |
+| Onboard Rate                    | 上岗转化率                                   | onboards / interviews                                          | 需要外部系统或人工输入                         | onboard_rates         | 暂时通过人工预估或默认分布采样            |
 
 说明：
 
@@ -212,10 +214,10 @@ wechat_conversions = WeChatObtained / UniqueCandidates_day
 ```ts
 // 1) 拉取会话详情（需包含消息方向与时间），按账号分别执行
 //    注意：仅当某会话当日存在至少一条候选人入站消息，才视为一条"会话事件"
-const sessionsDay: Array<{ 
-  accountId: string; 
-  candidateName: string;  // 使用姓名作为标识
-  positionKey?: string 
+const sessionsDay: Array<{
+  accountId: string;
+  candidateName: string; // 使用姓名作为标识
+  positionKey?: string;
 }> = [];
 
 // 面试预约统计
@@ -230,12 +232,12 @@ for (const account of allAccounts) {
   if (inboundToday.length > 0) {
     // 使用候选人姓名作为标识（接受重名风险）
     const candidateName = candidateInfo?.name || "未知";
-    const positionKey = candidateInfo?.position;  // 岗位名称需要与Duliday保持一致
-    
-    sessionsDay.push({ 
-      accountId: account.id, 
-      candidateName, 
-      positionKey 
+    const positionKey = candidateInfo?.position; // 岗位名称需要与Duliday保持一致
+
+    sessionsDay.push({
+      accountId: account.id,
+      candidateName,
+      positionKey,
     });
   }
 }
@@ -255,7 +257,7 @@ const wechatConversionRate =
 
 // 6) 面试转化率（通过Duliday工具统计）
 // 注意：需要在Agent层统计duliday_interview_booking的调用次数
-const interviewRate = 
+const interviewRate =
   wechatObtainedCandidates > 0 ? interviewBookings / wechatObtainedCandidates : 0;
 
 // 7) 映射到模型字段
@@ -265,7 +267,7 @@ const sample = {
   repeat_rates: repeatRate,
   wechat_conversions: wechatConversionRate,
   interview_rates: interviewRate,
-  onboard_rates: 0.08  // 暂时使用默认值或人工输入
+  onboard_rates: 0.08, // 暂时使用默认值或人工输入
 };
 ```
 
@@ -291,49 +293,58 @@ const sample = {
 ## 数据质量与工程建议
 
 ### 时间处理
+
 - **当前能力**：支持提取 `MM-DD HH:MM` 和 `昨天/今天 HH:MM` 格式
 - **建议增强**：改进正则表达式以完整识别相对时间标记，转换为绝对时间戳
 - **实现建议**：在采集时记录系统时间作为参考基准
 
 ### 候选人去重策略
+
 - **当前限制**：只能基于候选人姓名进行去重
 - **风险说明**：存在重名可能性，但概率较低（可接受）
 - **记录格式**：`候选人姓名_账号名称_日期` 作为会话唯一标识
 - **未来优化**：若能获取微信号（交换后），可作为辅助去重依据
 
 ### 数据采集埋点
+
 - **Unread Replied指标**：需要在Agent层实现发送前的数据采集
 - **面试转化统计**：在Agent层统计 `duliday_interview_booking` 调用次数
 - **微信交换验证**：以聊天记录中的 `messageType === 'wechat-exchange'` 为准
 
 ### 岗位归一化
+
 - **业务规范**：BOSS直聘发布的岗位名称必须与Duliday系统保持一致
 - **技术方案**：建立岗位名称映射表（需要业务层面维护）
 - **降级策略**：无法映射时，使用原始岗位名称
 
 ### 账号维度采集
+
 - 若能按账号采集，则 `flows` 可直接取"账号平均值"，避免等分误差
 - 建议记录每个账号的独立统计数据，便于分析账号质量差异
 
 ## 实施优先级建议
 
 ### 立即可实现 ✅
+
 1. 基于姓名的候选人去重统计
 2. 消息时间戳提取和统计
 3. 微信交换数据统计（从聊天记录）
 4. 基础的流量和回复统计
 
 ### 需要Agent层配合 🔄
+
 1. Unread Replied指标（发送前记录未读数）
 2. 面试转化率统计（统计Duliday工具调用）
 3. 跨账号数据聚合
 
 ### 需要业务流程改进 ⚠️
+
 1. 岗位名称统一规范
 2. 上岗数据收集流程
 3. 账号质量分级体系
 
 ### 未来优化方向 🚀
+
 1. 增强时间解析能力
 2. 基于微信号的辅助去重（交换后）
 3. 接入外部系统获取上岗数据

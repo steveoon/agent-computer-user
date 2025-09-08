@@ -19,11 +19,7 @@ export const dulidayBiRefreshTool = () =>
     description:
       "刷新Duliday BI报表的数据源，确保数据是最新的。此操作通常需要30秒以上才能完成，刷新后需要等待一段时间再使用bi_report工具获取数据。建议在发现数据过时或需要最新数据时使用。",
     inputSchema: z.object({
-      waitReminder: z
-        .boolean()
-        .optional()
-        .default(true)
-        .describe("是否提醒用户等待数据刷新完成"),
+      waitReminder: z.boolean().optional().default(true).describe("是否提醒用户等待数据刷新完成"),
     }),
     execute: async ({ waitReminder = true }) => {
       console.log("🔄 开始刷新Duliday BI数据源...");
@@ -31,12 +27,12 @@ export const dulidayBiRefreshTool = () =>
       try {
         // 构建请求URL
         const url = `${REFRESH_CONFIG.REFRESH_URL}?token=${REFRESH_CONFIG.TOKEN}`;
-        
+
         // 发起刷新请求
         const response = await fetch(url, {
           method: "GET",
           headers: {
-            "Accept": "application/json",
+            Accept: "application/json",
           },
         });
 
@@ -45,7 +41,7 @@ export const dulidayBiRefreshTool = () =>
         }
 
         const data = await response.json();
-        
+
         if (data.result !== "ok") {
           throw new Error(`数据源刷新失败: ${data.message || "未知错误"}`);
         }
@@ -55,7 +51,7 @@ export const dulidayBiRefreshTool = () =>
 
         // 构建返回消息
         let message = "";
-        
+
         if (waitReminder) {
           message = `✅ 刷新任务已成功触发\n`;
           message += `任务ID: ${taskId || "未返回"}\n`;
@@ -74,7 +70,7 @@ export const dulidayBiRefreshTool = () =>
         };
       } catch (error) {
         console.error("刷新BI数据源失败:", error);
-        
+
         return {
           type: "text" as const,
           text: `❌ 刷新失败: ${error instanceof Error ? error.message : "未知错误"}`,

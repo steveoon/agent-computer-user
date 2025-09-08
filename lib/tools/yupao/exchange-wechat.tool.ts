@@ -2,7 +2,11 @@ import { tool } from "ai";
 import { z } from "zod";
 import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
 import { YUPAO_EXCHANGE_WECHAT_SELECTORS } from "./constants";
-import { wrapAntiDetectionScript, randomDelay, clickWithMouseTrajectory } from "../zhipin/anti-detection-utils";
+import {
+  wrapAntiDetectionScript,
+  randomDelay,
+  clickWithMouseTrajectory,
+} from "../zhipin/anti-detection-utils";
 import { createDynamicClassSelector } from "./dynamic-selector-utils";
 
 /**
@@ -73,7 +77,12 @@ export const yupaoExchangeWechatTool = () =>
         .describe("交换完成后的最大等待时间（毫秒）"),
     }),
 
-    execute: async ({ waitBetweenClicksMin = 400, waitBetweenClicksMax = 800, waitAfterExchangeMin = 800, waitAfterExchangeMax = 1500 }) => {
+    execute: async ({
+      waitBetweenClicksMin = 400,
+      waitBetweenClicksMax = 800,
+      waitAfterExchangeMin = 800,
+      waitAfterExchangeMax = 1500,
+    }) => {
       try {
         const client = await getPuppeteerMCPClient();
         const tools = await client.tools();
@@ -85,16 +94,18 @@ export const yupaoExchangeWechatTool = () =>
             throw new Error(`MCP tool ${toolName} not available`);
           }
         }
-        
+
         // 类型断言：在检查后这些工具一定存在
-        const puppeteerEvaluate = tools.puppeteer_evaluate as NonNullable<typeof tools.puppeteer_evaluate>;
+        const puppeteerEvaluate = tools.puppeteer_evaluate as NonNullable<
+          typeof tools.puppeteer_evaluate
+        >;
 
         // 添加初始延迟
         await randomDelay(100, 300);
 
         // 第一步：查找交换微信按钮 - 使用动态选择器
-        const exchangeBtnSelector = createDynamicClassSelector('_exchange-tel-btn');
-        
+        const exchangeBtnSelector = createDynamicClassSelector("_exchange-tel-btn");
+
         const findExchangeButtonScript = wrapAntiDetectionScript(`
           // 策略1: 尝试精确的选择器（如果constants中的选择器有效）
           const exchangeBtn = document.querySelector('${YUPAO_EXCHANGE_WECHAT_SELECTORS.exchangeButton}');
@@ -137,7 +148,9 @@ export const yupaoExchangeWechatTool = () =>
           return { exists: false };
         `);
 
-        const exchangeResult = await puppeteerEvaluate.execute({ script: findExchangeButtonScript });
+        const exchangeResult = await puppeteerEvaluate.execute({
+          script: findExchangeButtonScript,
+        });
         const exchangeData = parseEvaluateResult(exchangeResult);
 
         if (!exchangeData?.exists) {
@@ -151,7 +164,7 @@ export const yupaoExchangeWechatTool = () =>
         // 点击交换按钮
         let exchangeClicked = false;
         try {
-          if (exchangeData.index !== undefined && typeof exchangeData.index === 'number') {
+          if (exchangeData.index !== undefined && typeof exchangeData.index === "number") {
             // 使用索引点击
             const markScript = wrapAntiDetectionScript(`
               const selector = '${exchangeData.selector || exchangeBtnSelector}';
@@ -163,30 +176,30 @@ export const yupaoExchangeWechatTool = () =>
               }
               return { success: false };
             `);
-            
+
             const markResult = await puppeteerEvaluate.execute({ script: markScript });
             const marked = parseEvaluateResult(markResult);
-            
+
             if (marked?.success) {
               await clickWithMouseTrajectory(client, '[data-exchange-wechat-temp="true"]', {
                 preClickDelay: 100,
-                moveSteps: 20
+                moveSteps: 20,
               });
               exchangeClicked = true;
-              
+
               // 清理临时属性
-              await puppeteerEvaluate.execute({ 
+              await puppeteerEvaluate.execute({
                 script: wrapAntiDetectionScript(`
                   const btn = document.querySelector('[data-exchange-wechat-temp="true"]');
                   if (btn) btn.removeAttribute('data-exchange-wechat-temp');
-                `)
+                `),
               });
             }
-          } else if (exchangeData.selector && typeof exchangeData.selector === 'string') {
+          } else if (exchangeData.selector && typeof exchangeData.selector === "string") {
             // 直接使用选择器
             await clickWithMouseTrajectory(client, exchangeData.selector, {
               preClickDelay: 100,
-              moveSteps: 20
+              moveSteps: 20,
             });
             exchangeClicked = true;
           }
@@ -202,15 +215,15 @@ export const yupaoExchangeWechatTool = () =>
             }
             return { success: false };
           `);
-          
+
           const fallbackResult = await puppeteerEvaluate.execute({ script: fallbackScript });
           const fallback = parseEvaluateResult(fallbackResult);
-          
+
           if (fallback?.success) {
             try {
               await clickWithMouseTrajectory(client, 'div[data-exchange-wechat-fallback="true"]', {
                 preClickDelay: 100,
-                moveSteps: 20
+                moveSteps: 20,
               });
               exchangeClicked = true;
             } catch (_err) {
@@ -222,18 +235,18 @@ export const yupaoExchangeWechatTool = () =>
         if (!exchangeClicked) {
           return {
             success: false,
-            error: '点击交换微信按钮失败',
+            error: "点击交换微信按钮失败",
             message: "请确保已打开候选人聊天窗口",
           };
         }
 
         // 等待弹窗出现
         await randomDelay(waitBetweenClicksMin, waitBetweenClicksMax);
-        
+
         // 检查弹窗是否出现 - 使用动态选择器
-        const dialogSelector = createDynamicClassSelector('_exchangeTipPop');
-        const wechatPopSelector = createDynamicClassSelector('_wechatPop');
-        
+        const dialogSelector = createDynamicClassSelector("_exchangeTipPop");
+        const wechatPopSelector = createDynamicClassSelector("_wechatPop");
+
         const checkDialogScript = wrapAntiDetectionScript(`
           // 策略1: 尝试精确的选择器
           let dialog = document.querySelector('${YUPAO_EXCHANGE_WECHAT_SELECTORS.exchangeTipPop}');
@@ -262,10 +275,10 @@ export const yupaoExchangeWechatTool = () =>
             hasConfirmButton: !!confirmBtn
           };
         `);
-        
+
         const dialogCheck = await puppeteerEvaluate.execute({ script: checkDialogScript });
         const dialogData = parseEvaluateResult(dialogCheck);
-        
+
         if (!dialogData?.visible || !dialogData?.hasConfirmButton) {
           // 如果弹窗还没出现，再等待一下
           await randomDelay(500, 800);
@@ -273,36 +286,103 @@ export const yupaoExchangeWechatTool = () =>
 
         // 第二步：查找并点击确认按钮 - 使用动态选择器
         const findConfirmButtonScript = wrapAntiDetectionScript(`
-          // 策略1: 先尝试精确选择器
-          let confirmBtn = document.querySelector('${YUPAO_EXCHANGE_WECHAT_SELECTORS.exchangeTipPop} ${YUPAO_EXCHANGE_WECHAT_SELECTORS.confirmButton}');
-          if (confirmBtn && confirmBtn.offsetParent !== null) {
-            return {
-              exists: true,
-              selector: '${YUPAO_EXCHANGE_WECHAT_SELECTORS.exchangeTipPop} ${YUPAO_EXCHANGE_WECHAT_SELECTORS.confirmButton}',
-              text: confirmBtn.textContent?.trim() || ''
-            };
+          // 策略1: 查找所有可能的对话框，只选择可见的
+          let dialog = null;
+          
+          // 先查找所有包含 _exchangeTipPop 的元素
+          const allDialogs = document.querySelectorAll('[class*="_exchangeTipPop"]');
+          for (const d of allDialogs) {
+            // 检查是否可见（display: block 或不是 none）
+            const style = window.getComputedStyle(d);
+            if (style.display !== 'none' && style.visibility !== 'hidden') {
+              dialog = d;
+              console.log('找到可见的对话框:', d.className, 'display:', style.display);
+              break;
+            }
           }
           
-          // 策略2: 使用动态选择器查找对话框内的确认按钮
-          const dialog = document.querySelector('${dialogSelector}') || 
-                         document.querySelector('[class*="_exchangeTipPop"]');
+          // 如果没找到，尝试使用动态选择器
+          if (!dialog) {
+            dialog = document.querySelector('${dialogSelector}');
+            if (dialog) {
+              const style = window.getComputedStyle(dialog);
+              if (style.display === 'none' || style.visibility === 'hidden') {
+                dialog = null; // 如果不可见，重置为null
+              }
+            }
+          }
+          
+          // 最后尝试 _wechatPop
+          if (!dialog) {
+            const wechatPops = document.querySelectorAll('[class*="_wechatPop"]');
+            for (const d of wechatPops) {
+              const style = window.getComputedStyle(d);
+              if (style.display !== 'none' && style.visibility !== 'hidden') {
+                dialog = d;
+                break;
+              }
+            }
+          }
           
           if (dialog) {
-            // 查找包含"确定"的按钮
+            console.log('使用对话框:', dialog.className);
+            // 策略1.1: 查找primary样式的确定按钮
+            const primaryBtns = dialog.querySelectorAll('button[class*="_primary"]');
+            for (let i = 0; i < primaryBtns.length; i++) {
+              const btn = primaryBtns[i];
+              if (btn.textContent && btn.textContent.includes('确定')) {
+                // 验证按钮是否可见
+                const btnStyle = window.getComputedStyle(btn);
+                const isVisible = btnStyle.display !== 'none' && 
+                                 btnStyle.visibility !== 'hidden' &&
+                                 btn.offsetParent !== null;
+                
+                if (isVisible) {
+                  // 为按钮添加唯一标识（不使用引号避免转义问题）
+                  btn.setAttribute('data-yupao-confirm-btn', 'yes');
+                  console.log('找到可见的确定按钮，类名:', btn.className);
+                  return {
+                    exists: true,
+                    selector: '[data-yupao-confirm-btn=yes]',
+                    text: btn.textContent.trim(),
+                    isInDialog: true,
+                    buttonClass: btn.className
+                  };
+                }
+              }
+            }
+            
+            // 策略1.2: 查找所有按钮，找包含"确定"的
             const buttons = dialog.querySelectorAll('button');
             for (let i = 0; i < buttons.length; i++) {
               const btn = buttons[i];
               if (btn.textContent && btn.textContent.includes('确定')) {
-                // 检查是否是primary按钮
-                if (btn.classList.toString().includes('_primary')) {
+                // 检查是否是primary按钮（通过类名或样式）
+                if (btn.classList.toString().includes('_primary') || 
+                    btn.className.includes('primary')) {
+                  btn.setAttribute('data-yupao-confirm-btn', 'yes');
                   return {
                     exists: true,
-                    selector: 'button',
-                    index: i,
+                    selector: '[data-yupao-confirm-btn=yes]',
                     text: btn.textContent.trim(),
-                    needsIndex: true
+                    isInDialog: true
                   };
                 }
+              }
+            }
+            
+            // 策略1.3: 如果没有primary样式，选择最后一个"确定"按钮（通常是确认按钮）
+            for (let i = buttons.length - 1; i >= 0; i--) {
+              const btn = buttons[i];
+              if (btn.textContent && btn.textContent.includes('确定')) {
+                btn.setAttribute('data-yupao-confirm-btn', 'yes');
+                return {
+                  exists: true,
+                  selector: '[data-yupao-confirm-btn=yes]',
+                  text: btn.textContent.trim(),
+                  isInDialog: true,
+                  fallback: true
+                };
               }
             }
           }
@@ -328,66 +408,48 @@ export const yupaoExchangeWechatTool = () =>
         // 点击确认按钮
         let confirmClicked = false;
         try {
-          if (confirmData.index !== undefined && typeof confirmData.index === 'number') {
-            // 使用索引点击
-            const markConfirmScript = wrapAntiDetectionScript(`
-              const dialog = document.querySelector('${dialogSelector}') || 
-                             document.querySelector('[class*="_exchangeTipPop"]');
-              if (dialog) {
-                const buttons = dialog.querySelectorAll('button');
-                const targetBtn = buttons[${confirmData.index}];
-                if (targetBtn) {
-                  targetBtn.setAttribute('data-confirm-wechat-temp', 'true');
-                  return { success: true };
-                }
-              }
-              return { success: false };
-            `);
-            
-            const markResult = await puppeteerEvaluate.execute({ script: markConfirmScript });
-            const marked = parseEvaluateResult(markResult);
-            
-            if (marked?.success) {
-              await clickWithMouseTrajectory(client, 'button[data-confirm-wechat-temp="true"]', {
-                preClickDelay: 150,
-                moveSteps: 15
-              });
-              confirmClicked = true;
-              
-              // 清理临时属性
-              await puppeteerEvaluate.execute({ 
-                script: wrapAntiDetectionScript(`
-                  const btn = document.querySelector('button[data-confirm-wechat-temp="true"]');
-                  if (btn) btn.removeAttribute('data-confirm-wechat-temp');
-                `)
-              });
-            }
-          } else if (confirmData.selector && typeof confirmData.selector === 'string') {
-            // 直接使用选择器
+          // 由于我们已经在查找时添加了唯一标识，直接使用选择器点击
+          if (confirmData.selector && typeof confirmData.selector === "string") {
             await clickWithMouseTrajectory(client, confirmData.selector, {
               preClickDelay: 150,
-              moveSteps: 15
+              moveSteps: 15,
             });
             confirmClicked = true;
+            
+            // 清理标识属性
+            await puppeteerEvaluate.execute({
+              script: wrapAntiDetectionScript(`
+                const btn = document.querySelector('[data-yupao-confirm-btn=yes]');
+                if (btn) btn.removeAttribute('data-yupao-confirm-btn');
+              `),
+            });
           }
         } catch (_error) {
-          // 最后的备用方案
+          // 最后的备用方案：直接点击
           const lastResortScript = wrapAntiDetectionScript(`
-            const dialog = document.querySelector('${dialogSelector}') || 
-                           document.querySelector('[class*="_exchangeTipPop"]') ||
-                           document.querySelector('${YUPAO_EXCHANGE_WECHAT_SELECTORS.exchangeTipPop}');
+            const dialog = document.querySelector('[class*="_exchangeTipPop"]') || 
+                           document.querySelector('[class*="_wechatPop"]') ||
+                           document.querySelector('.ant-modal');
             if (dialog) {
+              // 优先查找带primary样式的确定按钮
+              const primaryBtn = dialog.querySelector('button[class*="_primary"]');
+              if (primaryBtn && primaryBtn.textContent && primaryBtn.textContent.includes('确定')) {
+                primaryBtn.click();
+                return { success: true, method: 'primary' };
+              }
+              
+              // 否则查找任何包含"确定"的按钮
               const btns = dialog.querySelectorAll('button');
               for (const btn of btns) {
                 if (btn.textContent && btn.textContent.includes('确定')) {
                   btn.click();
-                  return { success: true };
+                  return { success: true, method: 'text' };
                 }
               }
             }
             return { success: false };
           `);
-          
+
           const lastResult = await puppeteerEvaluate.execute({ script: lastResortScript });
           const lastData = parseEvaluateResult(lastResult);
           confirmClicked = !!lastData?.success;
@@ -396,7 +458,7 @@ export const yupaoExchangeWechatTool = () =>
         if (!confirmClicked) {
           return {
             success: false,
-            error: '点击确认按钮失败',
+            error: "点击确认按钮失败",
             exchangeButtonClicked: true,
             message: "已点击交换微信按钮，但未能点击确认按钮",
           };
@@ -409,8 +471,8 @@ export const yupaoExchangeWechatTool = () =>
           success: true,
           message: "成功交换微信",
           details: {
-            exchangeButtonSelector: exchangeData.selector as string || 'unknown',
-            confirmButtonSelector: confirmData.selector as string || 'unknown',
+            exchangeButtonSelector: (exchangeData.selector as string) || "unknown",
+            confirmButtonSelector: (confirmData.selector as string) || "unknown",
           },
         };
       } catch (error) {

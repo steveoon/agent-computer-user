@@ -1,20 +1,20 @@
 /**
  * Prompt Engineering Module
- * 
+ *
  * 基于Context Engineering原则的统一提示构建框架
  * 为分类和回复模型提供优化的prompt构建能力
  */
 
 // ========== 核心构建器 ==========
-export { BasePromptBuilder } from './core/base-prompt-builder';
-export { ClassificationPromptBuilder, classificationBuilder } from './core/classification-builder';
-export { ReplyPromptBuilder, replyBuilder } from './core/reply-builder';
+export { BasePromptBuilder } from "./core/base-prompt-builder";
+export { ClassificationPromptBuilder, classificationBuilder } from "./core/classification-builder";
+export { ReplyPromptBuilder, replyBuilder } from "./core/reply-builder";
 
 // ========== 内存管理 ==========
-export { CellularMemoryManager } from './memory/cellular-memory-manager';
+export { CellularMemoryManager } from "./memory/cellular-memory-manager";
 
 // ========== 示例库 ==========
-export { ReplyExampleRepository, replyExampleRepository } from './examples/reply-examples';
+export { ReplyExampleRepository, replyExampleRepository } from "./examples/reply-examples";
 
 // ========== 类型导出 ==========
 // 所有类型都从统一的类型文件导出
@@ -43,18 +43,18 @@ export type {
   // Other types
   StructuredContext,
   ConversationState,
-  OutputFormat
-} from '@/types/context-engineering';
+  OutputFormat,
+} from "@/types/context-engineering";
 
 // ========== 常量导出 ==========
-export { ClassificationTypes } from './core/classification-builder';
-export { DEFAULT_BUILDER_CONFIG } from '@/types/context-engineering';
+export { ClassificationTypes } from "./core/classification-builder";
+export { DEFAULT_BUILDER_CONFIG } from "@/types/context-engineering";
 
 // ========== 工厂函数 ==========
 
-import { ClassificationPromptBuilder } from './core/classification-builder';
-import { ReplyPromptBuilder } from './core/reply-builder';
-import type { BuilderConfig } from '@/types/context-engineering';
+import { ClassificationPromptBuilder } from "./core/classification-builder";
+import { ReplyPromptBuilder } from "./core/reply-builder";
+import type { BuilderConfig } from "@/types/context-engineering";
 
 /**
  * 创建分类提示构建器实例
@@ -78,7 +78,7 @@ export function createReplyBuilder(config?: Partial<BuilderConfig>) {
 export const HIGH_PERFORMANCE_CONFIG = {
   maxExamples: 1,
   tokenBudget: 1500,
-  enableMemory: false
+  enableMemory: false,
 };
 
 /**
@@ -87,7 +87,7 @@ export const HIGH_PERFORMANCE_CONFIG = {
 export const HIGH_QUALITY_CONFIG = {
   maxExamples: 5,
   tokenBudget: 4000,
-  enableMemory: true
+  enableMemory: true,
 };
 
 /**
@@ -96,5 +96,5 @@ export const HIGH_QUALITY_CONFIG = {
 export const BALANCED_CONFIG = {
   maxExamples: 3,
   tokenBudget: 2500,
-  enableMemory: true
+  enableMemory: true,
 };

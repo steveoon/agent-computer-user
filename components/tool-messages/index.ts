@@ -1,9 +1,9 @@
-import { 
-  Camera, 
-  ScrollText, 
-  MessageCircle, 
-  MessageSquare, 
-  Briefcase, 
+import {
+  Camera,
+  ScrollText,
+  MessageCircle,
+  MessageSquare,
+  Briefcase,
   Globe,
   Bot,
   Users,
@@ -16,7 +16,7 @@ import {
   RefreshCwIcon,
   ListChecks,
   ClipboardList,
-  HandshakeIcon
+  HandshakeIcon,
 } from "lucide-react";
 import { ComputerToolMessage } from "./computer-tool";
 import { BashToolMessage } from "./bash-tool";

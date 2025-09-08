@@ -40,8 +40,7 @@ export function DesktopStream({
           </div>
           <h2 className="text-xl font-semibold mb-3">AI 助手沙盒环境</h2>
           <p className="text-gray-300 mb-6 leading-relaxed">
-            沙盒环境需要用户登录后才能启动。请先登录您的账户以使用完整的 AI
-            助手功能。
+            沙盒环境需要用户登录后才能启动。请先登录您的账户以使用完整的 AI 助手功能。
           </p>
           <div className="space-y-3 text-sm text-gray-400">
             <div className="flex items-center justify-center gap-2">
@@ -91,15 +90,15 @@ export function DesktopStream({
               sandboxStatus === "running"
                 ? "bg-green-500/80 text-white"
                 : sandboxStatus === "paused"
-                ? "bg-yellow-500/80 text-white"
-                : "bg-gray-500/80 text-white"
+                  ? "bg-yellow-500/80 text-white"
+                  : "bg-gray-500/80 text-white"
             }`}
           >
             {sandboxStatus === "running"
               ? "运行中"
               : sandboxStatus === "paused"
-              ? "已暂停"
-              : "未知状态"}
+                ? "已暂停"
+                : "未知状态"}
           </div>
 
           {sandboxStatus === "running" && (

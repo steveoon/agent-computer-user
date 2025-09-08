@@ -11,7 +11,10 @@ export class DulidayErrorFormatter {
    * @param context - 可选的上下文信息
    * @returns 格式化后的错误消息
    */
-  static formatValidationError(error: z.ZodError, context?: { jobName?: string; jobId?: number }): string {
+  static formatValidationError(
+    error: z.ZodError,
+    context?: { jobName?: string; jobId?: number }
+  ): string {
     const errorDetails = error.issues.map(issue => {
       const path = issue.path.join(".");
 
@@ -73,7 +76,7 @@ export class DulidayErrorFormatter {
     dataItem?: { jobName?: string; jobId?: number; [key: string]: unknown }
   ): string {
     // 提取数据上下文信息
-    const jobInfo = dataItem?.jobName 
+    const jobInfo = dataItem?.jobName
       ? `"${dataItem.jobName}" (ID: ${dataItem.jobId || "未知"})`
       : null;
 

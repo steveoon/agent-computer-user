@@ -32,16 +32,10 @@ export async function compressImageServerV2(
   };
 
   try {
-    const result = await processImageWithStrategy(
-      base64Data,
-      finalConfig,
-      startTime
-    );
+    const result = await processImageWithStrategy(base64Data, finalConfig, startTime);
 
     console.log(
-      `🚀 压缩完成: ${result.originalSizeKB.toFixed(
-        2
-      )}KB → ${result.finalSizeKB.toFixed(
+      `🚀 压缩完成: ${result.originalSizeKB.toFixed(2)}KB → ${result.finalSizeKB.toFixed(
         2
       )}KB (${result.compressionRatio.toFixed(1)}% 压缩) 质量: ${
         result.quality
@@ -76,13 +70,7 @@ async function processImageWithStrategy(
   }
 
   if (config.enableAdaptive) {
-    return await adaptiveCompression(
-      buffer,
-      originalSizeKB,
-      config,
-      imageAnalysis,
-      startTime
-    );
+    return await adaptiveCompression(buffer, originalSizeKB, config, imageAnalysis, startTime);
   } else {
     return await standardCompression(buffer, originalSizeKB, config, startTime);
   }
@@ -140,11 +128,7 @@ async function adaptiveCompression(
 
     const resultSizeKB = (result.length * 3) / 4 / 1024;
 
-    console.log(
-      `🔍 迭代 ${iterations}: 质量=${midQuality}, 大小=${resultSizeKB.toFixed(
-        2
-      )}KB`
-    );
+    console.log(`🔍 迭代 ${iterations}: 质量=${midQuality}, 大小=${resultSizeKB.toFixed(2)}KB`);
 
     if (resultSizeKB <= config.targetSizeKB) {
       bestResult = {
@@ -173,8 +157,7 @@ async function adaptiveCompression(
       base64: bestResult.base64,
       originalSizeKB,
       finalSizeKB: bestResult.sizeKB,
-      compressionRatio:
-        ((originalSizeKB - bestResult.sizeKB) / originalSizeKB) * 100,
+      compressionRatio: ((originalSizeKB - bestResult.sizeKB) / originalSizeKB) * 100,
       quality: bestResult.quality,
       processingTime: Date.now() - startTime,
     };
@@ -207,10 +190,7 @@ function calculateOptimalDimensions(
 
   // 📏 确保最小可读性
   const minWidth = config.preserveText ? 800 : 600; // 根据文本保留需求调整最小宽度
-  const targetWidth = Math.max(
-    minWidth,
-    Math.round(analysis.width * scaleFactor)
-  );
+  const targetWidth = Math.max(minWidth, Math.round(analysis.width * scaleFactor));
 
   return {
     width: targetWidth,
@@ -221,10 +201,7 @@ function calculateOptimalDimensions(
 /**
  * ⚙️ 参数化压缩执行器
  */
-async function compressWithParams(
-  buffer: Buffer,
-  params: CompressionParams
-): Promise<string> {
+async function compressWithParams(buffer: Buffer, params: CompressionParams): Promise<string> {
   const sharpInstance = sharp(buffer);
 
   // 🎨 智能预处理
@@ -317,10 +294,7 @@ async function standardCompression(
       100, // 最大值100
       Math.max(
         Math.min(100, config.minQuality), // 确保minQuality不超过100
-        Math.min(
-          Math.min(100, config.maxQuality),
-          originalSizeKB > 300 ? 60 : 65
-        )
+        Math.min(Math.min(100, config.maxQuality), originalSizeKB > 300 ? 60 : 65)
       )
     )
   );
@@ -356,9 +330,7 @@ async function standardCompression(
 async function fallbackCompression(base64Data: string): Promise<string> {
   try {
     const buffer = Buffer.from(base64Data, "base64");
-    const fallbackBuffer = await sharp(buffer)
-      .jpeg({ quality: 60, force: true })
-      .toBuffer();
+    const fallbackBuffer = await sharp(buffer).jpeg({ quality: 60, force: true }).toBuffer();
     return fallbackBuffer.toString("base64");
   } catch {
     console.error("🆘 所有压缩策略失败，返回原图");

@@ -5,11 +5,7 @@ import {
   getReplyPrompts,
   getActiveSystemPromptType,
 } from "@/lib/services/config.service";
-import type {
-  ZhipinData,
-  SystemPromptsConfig,
-  ReplyPromptsConfig,
-} from "@/types";
+import type { ZhipinData, SystemPromptsConfig, ReplyPromptsConfig } from "@/types";
 
 interface ConfigDataForChat {
   configData: ZhipinData | null;
@@ -40,13 +36,12 @@ export function useConfigDataForChat(): ConfigDataForChat {
         console.log("🔄 开始加载聊天所需的配置数据...");
 
         // 并行加载所有配置数据
-        const [brandData, systemPromptsData, replyPromptsData, activePrompt] =
-          await Promise.all([
-            getBrandData(),
-            getSystemPrompts(),
-            getReplyPrompts(),
-            getActiveSystemPromptType(),
-          ]);
+        const [brandData, systemPromptsData, replyPromptsData, activePrompt] = await Promise.all([
+          getBrandData(),
+          getSystemPrompts(),
+          getReplyPrompts(),
+          getActiveSystemPromptType(),
+        ]);
 
         console.log("✅ 配置数据加载完成", {
           hasBrandData: !!brandData,
@@ -65,7 +60,7 @@ export function useConfigDataForChat(): ConfigDataForChat {
         });
       } catch (error) {
         console.error("❌ 配置数据加载失败:", error);
-        setState((prev) => ({
+        setState(prev => ({
           ...prev,
           isLoading: false,
           error: error instanceof Error ? error.message : "配置数据加载失败",
@@ -78,7 +73,7 @@ export function useConfigDataForChat(): ConfigDataForChat {
       loadConfigData();
     } else {
       // 服务端环境设置为非加载状态，将使用服务端降级逻辑
-      setState((prev) => ({
+      setState(prev => ({
         ...prev,
         isLoading: false,
       }));

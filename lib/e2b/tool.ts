@@ -542,7 +542,8 @@ export const computerTool = (
   preferredBrand: string,
   modelConfig: ModelConfig,
   configData?: ZhipinData,
-  replyPrompts?: ReplyPromptsConfig
+  replyPrompts?: ReplyPromptsConfig,
+  defaultWechatId?: string
 ) =>
   tool({
     description:
@@ -1121,7 +1122,9 @@ export const computerTool = (
               preferredBrand,
               modelConfig,
               configData, // 传递配置数据
-              replyPrompts // 传递回复指令
+              replyPrompts, // 传递回复指令
+              undefined, // candidateInfo - 在此上下文中不可用
+              defaultWechatId // 传递默认微信号
             );
 
             console.log(`📝 生成的回复内容: ${replyResult.text}`);

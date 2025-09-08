@@ -137,7 +137,7 @@ export default function SyncPage() {
                       <div className="text-xs text-slate-600 dark:text-slate-400">品牌</div>
                     </div>
                   </div>
-                  
+
                   <div className="relative p-3 bg-violet-50 dark:bg-violet-900/20 rounded-lg border border-violet-200 dark:border-violet-800">
                     <Store className="absolute top-3 left-3 h-4 w-4 text-violet-500 dark:text-violet-400" />
                     <div className="ml-6">
@@ -147,7 +147,7 @@ export default function SyncPage() {
                       <div className="text-xs text-violet-600 dark:text-violet-400">门店</div>
                     </div>
                   </div>
-                  
+
                   <div className="relative p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
                     <CheckCircle className="absolute top-3 left-3 h-4 w-4 text-emerald-500 dark:text-emerald-400" />
                     <div className="ml-6">
@@ -157,17 +157,20 @@ export default function SyncPage() {
                       <div className="text-xs text-emerald-600 dark:text-emerald-400">成功岗位</div>
                     </div>
                   </div>
-                  
+
                   <div className="relative p-3 bg-rose-50 dark:bg-rose-900/20 rounded-lg border border-rose-200 dark:border-rose-800">
                     <XCircle className="absolute top-3 left-3 h-4 w-4 text-rose-500 dark:text-rose-400" />
                     <div className="ml-6">
                       <div className="text-2xl font-bold text-rose-900 dark:text-rose-100">
-                        {currentSyncResult.results.reduce((sum, r) => sum + (r.totalRecords - r.processedRecords), 0)}
+                        {currentSyncResult.results.reduce(
+                          (sum, r) => sum + (r.totalRecords - r.processedRecords),
+                          0
+                        )}
                       </div>
                       <div className="text-xs text-rose-600 dark:text-rose-400">失败岗位</div>
                     </div>
                   </div>
-                  
+
                   <div className="relative p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
                     <Clock className="absolute top-3 left-3 h-4 w-4 text-amber-500 dark:text-amber-400" />
                     <div className="ml-6">
@@ -189,8 +192,8 @@ export default function SyncPage() {
                   </h4>
                   <div className="space-y-3">
                     {currentSyncResult.results.map((result, index) => (
-                      <BrandSyncResultCard 
-                        key={`${result.brandName}-${result.totalRecords}-${index}`} 
+                      <BrandSyncResultCard
+                        key={`${result.brandName}-${result.totalRecords}-${index}`}
                         result={result}
                       />
                     ))}

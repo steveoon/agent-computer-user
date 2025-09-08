@@ -1,15 +1,15 @@
 "use client";
 
-import { 
-  Users, 
-  UserCheck, 
-  ListChecks, 
+import {
+  Users,
+  UserCheck,
+  ListChecks,
   MessageSquare,
   Smartphone,
   ScrollText,
   ClipboardList,
   HandshakeIcon,
-  type LucideIcon 
+  type LucideIcon,
 } from "lucide-react";
 import { BaseToolMessage } from "./base-tool-message";
 import { themes, type ToolMessageProps } from "./types";
@@ -50,7 +50,7 @@ export function YupaoToolMessage(props: ToolMessageProps) {
   if (toolName === "yupao_get_unread_messages") {
     const max = input.max as number | undefined;
     const skipFirstMessage = input.skipFirstMessage as boolean | undefined;
-    
+
     const details: string[] = [];
     if (max) details.push(`最多${max}条`);
     if (skipFirstMessage) details.push("跳过第一条");
@@ -58,7 +58,7 @@ export function YupaoToolMessage(props: ToolMessageProps) {
   } else if (toolName === "yupao_open_candidate_chat") {
     const candidateName = input.candidateName as string | undefined;
     const candidateInfo = input.candidateInfo as string | undefined;
-    
+
     if (candidateName) {
       detail = `候选人: ${candidateName}`;
     } else if (candidateInfo) {
@@ -67,7 +67,7 @@ export function YupaoToolMessage(props: ToolMessageProps) {
   } else if (toolName === "yupao_get_chat_details") {
     const includeMessages = input.includeMessages as boolean | undefined;
     const includeProfile = input.includeProfile as boolean | undefined;
-    
+
     const details: string[] = [];
     if (includeMessages) details.push("包含消息");
     if (includeProfile) details.push("包含资料");
@@ -75,17 +75,17 @@ export function YupaoToolMessage(props: ToolMessageProps) {
   } else if (toolName === "yupao_send_message") {
     const message = input.message as string | undefined;
     if (message) {
-      detail = `消息: "${message.slice(0, 30)}${message.length > 30 ? '...' : ''}"`;
+      detail = `消息: "${message.slice(0, 30)}${message.length > 30 ? "..." : ""}"`;
     }
   } else if (toolName === "yupao_exchange_wechat") {
     const timeout = input.timeout as number | undefined;
     if (timeout) {
-      detail = `超时: ${timeout/1000}秒`;
+      detail = `超时: ${timeout / 1000}秒`;
     }
   } else if (toolName === "yupao_get_candidate_list") {
     const skipContacted = input.skipContacted as boolean | undefined;
     const maxResults = input.maxResults as number | undefined;
-    
+
     const details: string[] = [];
     if (skipContacted) details.push("跳过已联系");
     if (maxResults) details.push(`最多${maxResults}个`);
@@ -93,7 +93,7 @@ export function YupaoToolMessage(props: ToolMessageProps) {
   } else if (toolName === "yupao_say_hello") {
     const candidateIndices = input.candidateIndices as number[] | undefined;
     const scrollBehavior = input.scrollBehavior as boolean | undefined;
-    
+
     const details: string[] = [];
     if (candidateIndices?.length) {
       details.push(`${candidateIndices.length}个候选人`);
@@ -115,7 +115,7 @@ export function YupaoToolMessage(props: ToolMessageProps) {
         };
       };
     };
-    
+
     if (toolName === "yupao_get_candidate_list" && result.data?.candidates) {
       const candidates = result.data.candidates;
       const resultDetails: string[] = [];

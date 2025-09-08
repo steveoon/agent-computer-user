@@ -50,15 +50,13 @@ const canUseDevtools = () => {
 
 // 创建 store 的函数
 const createStore = () => {
-  const storeCreator: StateCreator<DesktopSandboxState> = (set) => ({
+  const storeCreator: StateCreator<DesktopSandboxState> = set => ({
     ...initialState,
 
     setSandboxId: (id: string | null) => set({ sandboxId: id }),
     setStreamUrl: (url: string | null) => set({ streamUrl: url }),
-    setSandboxStatus: (status: "running" | "paused" | "unknown") =>
-      set({ sandboxStatus: status }),
-    setIsInitializing: (initializing: boolean) =>
-      set({ isInitializing: initializing }),
+    setSandboxStatus: (status: "running" | "paused" | "unknown") => set({ sandboxStatus: status }),
+    setIsInitializing: (initializing: boolean) => set({ isInitializing: initializing }),
     setIsPausing: (pausing: boolean) => set({ isPausing: pausing }),
     setManualInit: (manual: boolean) => set({ manualInit: manual }),
 

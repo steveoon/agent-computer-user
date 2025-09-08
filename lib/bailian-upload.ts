@@ -49,9 +49,7 @@ async function getUploadPolicy(
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(
-        `Failed to get upload policy: ${response.status} ${errorText}`
-      );
+      throw new Error(`Failed to get upload policy: ${response.status} ${errorText}`);
     }
 
     const result: BailianUploadResponse = await response.json();
@@ -59,9 +57,7 @@ async function getUploadPolicy(
   } catch (error) {
     console.error("❌ 获取上传凭证失败:", error);
     throw new Error(
-      `Failed to get upload policy: ${
-        error instanceof Error ? error.message : String(error)
-      }`
+      `Failed to get upload policy: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 }
@@ -97,10 +93,7 @@ async function uploadImageToOSS(
     formData.append("Signature", policyData.signature);
     formData.append("key", key);
     formData.append("x-oss-object-acl", policyData.x_oss_object_acl);
-    formData.append(
-      "x-oss-forbid-overwrite",
-      policyData.x_oss_forbid_overwrite
-    );
+    formData.append("x-oss-forbid-overwrite", policyData.x_oss_forbid_overwrite);
     formData.append("success_action_status", "200");
     formData.append("file", imageBlob, fileName);
 
@@ -120,9 +113,7 @@ async function uploadImageToOSS(
   } catch (error) {
     console.error("❌ 图片上传失败:", error);
     throw new Error(
-      `Failed to upload image: ${
-        error instanceof Error ? error.message : String(error)
-      }`
+      `Failed to upload image: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 }
@@ -150,9 +141,7 @@ export async function uploadScreenshotToBalian(
 
     // 1. 获取上传凭证
     const policyData = await getUploadPolicy(apiKey, modelName);
-    console.log(
-      `✅ 上传凭证获取成功，有效期: ${policyData.expire_in_seconds}秒`
-    );
+    console.log(`✅ 上传凭证获取成功，有效期: ${policyData.expire_in_seconds}秒`);
 
     // 2. 上传文件到OSS
     console.log("📤 正在上传截图到阿里云OSS...");

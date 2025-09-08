@@ -168,11 +168,11 @@ export const MCPToolBaseSchema = z.object({
  * execute字段使用自定义验证确保是函数类型
  */
 export const MCPToolSchema = MCPToolBaseSchema.extend({
-  execute: z.any()
-    .refine(
-      (val): val is Function => typeof val === 'function',
-      { message: "execute必须是一个函数" }
-    )
+  execute: z
+    .any()
+    .refine((val): val is Function => typeof val === "function", {
+      message: "execute必须是一个函数",
+    })
     .describe("工具执行函数"),
 });
 

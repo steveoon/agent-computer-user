@@ -28,13 +28,15 @@ export function WechatToolMessage(props: ToolMessageProps) {
   const wechat_id = input.wechat_id as string | undefined;
 
   // 微信默认使用绿色主题
-  const theme = notification_type && notificationThemes[notification_type] 
-    ? notificationThemes[notification_type] 
-    : themes.green;
-    
-  const label = notification_type && notificationLabels[notification_type] 
-    ? notificationLabels[notification_type] 
-    : "发送微信消息";
+  const theme =
+    notification_type && notificationThemes[notification_type]
+      ? notificationThemes[notification_type]
+      : themes.green;
+
+  const label =
+    notification_type && notificationLabels[notification_type]
+      ? notificationLabels[notification_type]
+      : "发送微信消息";
 
   let detail = "";
   if (notification_type === "candidate_wechat") {

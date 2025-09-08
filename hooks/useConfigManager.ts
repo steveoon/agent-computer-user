@@ -17,12 +17,15 @@ interface ConfigState {
 
   // 操作方法
   loadConfig: () => Promise<void>;
-  updateBrandData: (brandData: ZhipinData, options?: { 
-    customToast?: { 
-      title: string; 
-      description?: string; 
-    } 
-  }) => Promise<void>;
+  updateBrandData: (
+    brandData: ZhipinData,
+    options?: {
+      customToast?: {
+        title: string;
+        description?: string;
+      };
+    }
+  ) => Promise<void>;
   updateReplyPrompts: (replyPrompts: ReplyPromptsConfig) => Promise<void>;
   updateSystemPrompts: (systemPrompts: SystemPromptsConfig) => Promise<void>;
   updateActiveSystemPrompt: (promptType: keyof SystemPromptsConfig) => Promise<void>;
@@ -115,7 +118,7 @@ const useConfigStore = create<ConfigState>()(
           };
 
           console.log("✅ 品牌数据更新成功", stats);
-          
+
           // 使用自定义 toast 或默认 toast
           if (options?.customToast) {
             toast.success(options.customToast.title, {
@@ -131,7 +134,7 @@ const useConfigStore = create<ConfigState>()(
           console.error("❌ 品牌数据更新失败:", error);
           const errorMessage = error instanceof Error ? error.message : "更新失败";
           set({ error: errorMessage });
-          
+
           // 显示错误 toast 通知
           toast.error("品牌数据更新失败", {
             description: errorMessage,
@@ -164,7 +167,7 @@ const useConfigStore = create<ConfigState>()(
 
           const count = Object.keys(replyPrompts).length;
           console.log("✅ 回复指令更新成功", { count });
-          
+
           // 显示成功 toast 通知
           toast.success("回复指令更新成功", {
             description: `已保存 ${count} 个智能回复模板`,
@@ -173,7 +176,7 @@ const useConfigStore = create<ConfigState>()(
           console.error("❌ 回复指令更新失败:", error);
           const errorMessage = error instanceof Error ? error.message : "更新失败";
           set({ error: errorMessage });
-          
+
           // 显示错误 toast 通知
           toast.error("回复指令更新失败", {
             description: errorMessage,
@@ -206,7 +209,7 @@ const useConfigStore = create<ConfigState>()(
 
           const count = Object.keys(systemPrompts).length;
           console.log("✅ 系统提示词更新成功", { count });
-          
+
           // 显示成功 toast 通知
           toast.success("系统提示词更新成功", {
             description: `已保存 ${count} 个系统提示词配置`,
@@ -215,7 +218,7 @@ const useConfigStore = create<ConfigState>()(
           console.error("❌ 系统提示词更新失败:", error);
           const errorMessage = error instanceof Error ? error.message : "更新失败";
           set({ error: errorMessage });
-          
+
           // 显示错误 toast 通知
           toast.error("系统提示词更新失败", {
             description: errorMessage,
@@ -281,7 +284,7 @@ const useConfigStore = create<ConfigState>()(
 
           URL.revokeObjectURL(url);
           console.log("✅ 配置导出成功");
-          
+
           // 显示成功 toast 通知
           toast.success("配置导出成功", {
             description: `配置文件已保存为 app-config-${new Date().toISOString().split("T")[0]}.json`,
@@ -290,7 +293,7 @@ const useConfigStore = create<ConfigState>()(
           console.error("❌ 配置导出失败:", error);
           const errorMessage = error instanceof Error ? error.message : "导出失败";
           set({ error: errorMessage });
-          
+
           // 显示错误 toast 通知
           toast.error("配置导出失败", {
             description: errorMessage,
@@ -320,44 +323,45 @@ const useConfigStore = create<ConfigState>()(
 
           if (!validationResult.success) {
             console.log("⚠️ 初始校验失败，尝试升级数据格式...");
-            
+
             // 尝试升级或修复数据（补全缺失字段）
             try {
               const { upgradeConfigData } = await import("../lib/services/config.service");
               const { CONFIG_VERSION } = await import("../types/config");
-              
+
               // 创建一个临时配置对象，尽可能保留原有数据
               const tempConfig = parsedData as AppConfigData;
-              
+
               // 检查是否是最新版本
               const currentVersion = tempConfig.metadata?.version;
               const isLatestVersion = currentVersion === CONFIG_VERSION;
-              
-              console.log(`🔧 ${isLatestVersion ? '修复' : '升级'}配置数据...`);
-              
+
+              console.log(`🔧 ${isLatestVersion ? "修复" : "升级"}配置数据...`);
+
               // 调用升级函数
               // 第二个参数: false = 不保存到存储
               // 第三个参数: 如果是最新版本，则设置 forceRepair = true
               const upgradedConfig = await upgradeConfigData(tempConfig, false, isLatestVersion);
-              
+
               // 重新验证升级后的数据
               validationResult = AppConfigDataSchema.safeParse(upgradedConfig);
-              
+
               if (validationResult.success) {
-                console.log(`✅ 数据${isLatestVersion ? '修复' : '升级'}成功，已补全缺失字段`);
+                console.log(`✅ 数据${isLatestVersion ? "修复" : "升级"}成功，已补全缺失字段`);
               } else {
-                throw new Error(`数据${isLatestVersion ? '修复' : '升级'}后仍无法通过验证`);
+                throw new Error(`数据${isLatestVersion ? "修复" : "升级"}后仍无法通过验证`);
               }
             } catch (upgradeError) {
               console.error("❌ 数据升级失败:", upgradeError);
-              
+
               // 生成用户友好的错误信息
-              const errorMessages = validationResult.error?.issues
-                ?.map(err => {
-                  const path = err.path.length > 0 ? err.path.join(".") : "根级别";
-                  return `• ${path}: ${err.message}`;
-                })
-                .slice(0, 10) || []; // 限制显示前10个错误
+              const errorMessages =
+                validationResult.error?.issues
+                  ?.map(err => {
+                    const path = err.path.length > 0 ? err.path.join(".") : "根级别";
+                    return `• ${path}: ${err.message}`;
+                  })
+                  .slice(0, 10) || []; // 限制显示前10个错误
 
               const errorSummary = [
                 `配置文件数据格式校验失败，发现以下问题:`,
@@ -457,7 +461,7 @@ const useConfigStore = create<ConfigState>()(
         } catch (error) {
           console.error("❌ 配置导入失败:", error);
           const errorMessage = error instanceof Error ? error.message : "导入失败";
-          
+
           set({
             loading: false,
             error: errorMessage,
@@ -486,7 +490,7 @@ const useConfigStore = create<ConfigState>()(
           await get().loadConfig();
 
           console.log("✅ 配置重置成功");
-          
+
           // 显示成功 toast 通知
           toast.success("配置重置成功", {
             description: "已恢复到默认配置状态",
@@ -494,12 +498,12 @@ const useConfigStore = create<ConfigState>()(
         } catch (error) {
           console.error("❌ 配置重置失败:", error);
           const errorMessage = error instanceof Error ? error.message : "重置失败";
-          
+
           set({
             loading: false,
             error: errorMessage,
           });
-          
+
           // 显示错误 toast 通知
           toast.error("配置重置失败", {
             description: errorMessage,
