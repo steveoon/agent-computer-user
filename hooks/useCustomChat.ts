@@ -100,11 +100,15 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
 
   // 从 localStorage 获取 dulidayToken
   const [dulidayToken, setDulidayToken] = useState<string | null>(null);
+  // 从 localStorage 获取默认微信号
+  const [defaultWechatId, setDefaultWechatId] = useState<string | null>(null);
 
   useEffect(() => {
-    // 在客户端获取 token
+    // 在客户端获取 token 和默认微信号
     const token = localStorage.getItem("duliday_token");
+    const wechatId = localStorage.getItem("default_wechat_id");
     setDulidayToken(token);
+    setDefaultWechatId(wechatId);
   }, []);
 
   // 🎯 AI SDK v5: 手动管理 input 状态
@@ -161,6 +165,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       if (replyPrompts) requestBody.replyPrompts = replyPrompts;
       if (activeSystemPrompt) requestBody.activeSystemPrompt = activeSystemPrompt;
       if (dulidayToken) requestBody.dulidayToken = dulidayToken;
+      if (defaultWechatId) requestBody.defaultWechatId = defaultWechatId;
 
       await sendMessage({ text: message.content }, { body: requestBody });
     },
@@ -377,6 +382,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       if (replyPrompts) requestBody.replyPrompts = replyPrompts;
       if (activeSystemPrompt) requestBody.activeSystemPrompt = activeSystemPrompt;
       if (dulidayToken) requestBody.dulidayToken = dulidayToken;
+      if (defaultWechatId) requestBody.defaultWechatId = defaultWechatId;
 
       sendMessage({ text: input }, { body: requestBody });
 
@@ -401,6 +407,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       replyPrompts,
       activeSystemPrompt,
       dulidayToken,
+      defaultWechatId,
       chatId,
     ]
   );
@@ -463,6 +470,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       replyPrompts,
       activeSystemPrompt,
       dulidayToken,
+      defaultWechatId,
     ]
   );
 

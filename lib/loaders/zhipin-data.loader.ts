@@ -545,7 +545,8 @@ export async function generateSmartReplyWithLLM(
   modelConfig?: ModelConfig,
   configData?: ZhipinData,
   replyPrompts?: ReplyPromptsConfig,
-  candidateInfo?: CandidateInfo
+  candidateInfo?: CandidateInfo,
+  defaultWechatId?: string
 ): Promise<{ replyType: string; text: string; reasoningText: string }> {
   try {
     // 🎯 获取配置的模型和provider设置
@@ -611,6 +612,7 @@ export async function generateSmartReplyWithLLM(
       conversationHistory,
       candidateInfo,
       targetBrand,
+      defaultWechatId,
     };
 
     // 使用新的构建器生成提示
@@ -716,7 +718,7 @@ function buildContextInfo(data: ZhipinData, classification: MessageClassificatio
 
   // 如果没有门店数据，构建空的上下文
   if (relevantStores.length === 0) {
-    return `品牌：${targetBrand}\n注意：该品牌当前没有门店数据。`;
+    return `品牌：${targetBrand}\n注意：该品牌当前没有门店数据。**门店可能暂时没有在招岗位**。`;
   }
 
   // 优先使用明确提到的工作城市进行过滤

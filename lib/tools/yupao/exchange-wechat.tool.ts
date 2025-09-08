@@ -286,36 +286,103 @@ export const yupaoExchangeWechatTool = () =>
 
         // 第二步：查找并点击确认按钮 - 使用动态选择器
         const findConfirmButtonScript = wrapAntiDetectionScript(`
-          // 策略1: 先尝试精确选择器
-          let confirmBtn = document.querySelector('${YUPAO_EXCHANGE_WECHAT_SELECTORS.exchangeTipPop} ${YUPAO_EXCHANGE_WECHAT_SELECTORS.confirmButton}');
-          if (confirmBtn && confirmBtn.offsetParent !== null) {
-            return {
-              exists: true,
-              selector: '${YUPAO_EXCHANGE_WECHAT_SELECTORS.exchangeTipPop} ${YUPAO_EXCHANGE_WECHAT_SELECTORS.confirmButton}',
-              text: confirmBtn.textContent?.trim() || ''
-            };
+          // 策略1: 查找所有可能的对话框，只选择可见的
+          let dialog = null;
+          
+          // 先查找所有包含 _exchangeTipPop 的元素
+          const allDialogs = document.querySelectorAll('[class*="_exchangeTipPop"]');
+          for (const d of allDialogs) {
+            // 检查是否可见（display: block 或不是 none）
+            const style = window.getComputedStyle(d);
+            if (style.display !== 'none' && style.visibility !== 'hidden') {
+              dialog = d;
+              console.log('找到可见的对话框:', d.className, 'display:', style.display);
+              break;
+            }
           }
           
-          // 策略2: 使用动态选择器查找对话框内的确认按钮
-          const dialog = document.querySelector('${dialogSelector}') || 
-                         document.querySelector('[class*="_exchangeTipPop"]');
+          // 如果没找到，尝试使用动态选择器
+          if (!dialog) {
+            dialog = document.querySelector('${dialogSelector}');
+            if (dialog) {
+              const style = window.getComputedStyle(dialog);
+              if (style.display === 'none' || style.visibility === 'hidden') {
+                dialog = null; // 如果不可见，重置为null
+              }
+            }
+          }
+          
+          // 最后尝试 _wechatPop
+          if (!dialog) {
+            const wechatPops = document.querySelectorAll('[class*="_wechatPop"]');
+            for (const d of wechatPops) {
+              const style = window.getComputedStyle(d);
+              if (style.display !== 'none' && style.visibility !== 'hidden') {
+                dialog = d;
+                break;
+              }
+            }
+          }
           
           if (dialog) {
-            // 查找包含"确定"的按钮
+            console.log('使用对话框:', dialog.className);
+            // 策略1.1: 查找primary样式的确定按钮
+            const primaryBtns = dialog.querySelectorAll('button[class*="_primary"]');
+            for (let i = 0; i < primaryBtns.length; i++) {
+              const btn = primaryBtns[i];
+              if (btn.textContent && btn.textContent.includes('确定')) {
+                // 验证按钮是否可见
+                const btnStyle = window.getComputedStyle(btn);
+                const isVisible = btnStyle.display !== 'none' && 
+                                 btnStyle.visibility !== 'hidden' &&
+                                 btn.offsetParent !== null;
+                
+                if (isVisible) {
+                  // 为按钮添加唯一标识（不使用引号避免转义问题）
+                  btn.setAttribute('data-yupao-confirm-btn', 'yes');
+                  console.log('找到可见的确定按钮，类名:', btn.className);
+                  return {
+                    exists: true,
+                    selector: '[data-yupao-confirm-btn=yes]',
+                    text: btn.textContent.trim(),
+                    isInDialog: true,
+                    buttonClass: btn.className
+                  };
+                }
+              }
+            }
+            
+            // 策略1.2: 查找所有按钮，找包含"确定"的
             const buttons = dialog.querySelectorAll('button');
             for (let i = 0; i < buttons.length; i++) {
               const btn = buttons[i];
               if (btn.textContent && btn.textContent.includes('确定')) {
-                // 检查是否是primary按钮
-                if (btn.classList.toString().includes('_primary')) {
+                // 检查是否是primary按钮（通过类名或样式）
+                if (btn.classList.toString().includes('_primary') || 
+                    btn.className.includes('primary')) {
+                  btn.setAttribute('data-yupao-confirm-btn', 'yes');
                   return {
                     exists: true,
-                    selector: 'button',
-                    index: i,
+                    selector: '[data-yupao-confirm-btn=yes]',
                     text: btn.textContent.trim(),
-                    needsIndex: true
+                    isInDialog: true
                   };
                 }
+              }
+            }
+            
+            // 策略1.3: 如果没有primary样式，选择最后一个"确定"按钮（通常是确认按钮）
+            for (let i = buttons.length - 1; i >= 0; i--) {
+              const btn = buttons[i];
+              if (btn.textContent && btn.textContent.includes('确定')) {
+                btn.setAttribute('data-yupao-confirm-btn', 'yes');
+                return {
+                  exists: true,
+                  selector: '[data-yupao-confirm-btn=yes]',
+                  text: btn.textContent.trim(),
+                  isInDialog: true,
+                  fallback: true
+                };
               }
             }
           }
@@ -341,60 +408,42 @@ export const yupaoExchangeWechatTool = () =>
         // 点击确认按钮
         let confirmClicked = false;
         try {
-          if (confirmData.index !== undefined && typeof confirmData.index === "number") {
-            // 使用索引点击
-            const markConfirmScript = wrapAntiDetectionScript(`
-              const dialog = document.querySelector('${dialogSelector}') || 
-                             document.querySelector('[class*="_exchangeTipPop"]');
-              if (dialog) {
-                const buttons = dialog.querySelectorAll('button');
-                const targetBtn = buttons[${confirmData.index}];
-                if (targetBtn) {
-                  targetBtn.setAttribute('data-confirm-wechat-temp', 'true');
-                  return { success: true };
-                }
-              }
-              return { success: false };
-            `);
-
-            const markResult = await puppeteerEvaluate.execute({ script: markConfirmScript });
-            const marked = parseEvaluateResult(markResult);
-
-            if (marked?.success) {
-              await clickWithMouseTrajectory(client, 'button[data-confirm-wechat-temp="true"]', {
-                preClickDelay: 150,
-                moveSteps: 15,
-              });
-              confirmClicked = true;
-
-              // 清理临时属性
-              await puppeteerEvaluate.execute({
-                script: wrapAntiDetectionScript(`
-                  const btn = document.querySelector('button[data-confirm-wechat-temp="true"]');
-                  if (btn) btn.removeAttribute('data-confirm-wechat-temp');
-                `),
-              });
-            }
-          } else if (confirmData.selector && typeof confirmData.selector === "string") {
-            // 直接使用选择器
+          // 由于我们已经在查找时添加了唯一标识，直接使用选择器点击
+          if (confirmData.selector && typeof confirmData.selector === "string") {
             await clickWithMouseTrajectory(client, confirmData.selector, {
               preClickDelay: 150,
               moveSteps: 15,
             });
             confirmClicked = true;
+            
+            // 清理标识属性
+            await puppeteerEvaluate.execute({
+              script: wrapAntiDetectionScript(`
+                const btn = document.querySelector('[data-yupao-confirm-btn=yes]');
+                if (btn) btn.removeAttribute('data-yupao-confirm-btn');
+              `),
+            });
           }
         } catch (_error) {
-          // 最后的备用方案
+          // 最后的备用方案：直接点击
           const lastResortScript = wrapAntiDetectionScript(`
-            const dialog = document.querySelector('${dialogSelector}') || 
-                           document.querySelector('[class*="_exchangeTipPop"]') ||
-                           document.querySelector('${YUPAO_EXCHANGE_WECHAT_SELECTORS.exchangeTipPop}');
+            const dialog = document.querySelector('[class*="_exchangeTipPop"]') || 
+                           document.querySelector('[class*="_wechatPop"]') ||
+                           document.querySelector('.ant-modal');
             if (dialog) {
+              // 优先查找带primary样式的确定按钮
+              const primaryBtn = dialog.querySelector('button[class*="_primary"]');
+              if (primaryBtn && primaryBtn.textContent && primaryBtn.textContent.includes('确定')) {
+                primaryBtn.click();
+                return { success: true, method: 'primary' };
+              }
+              
+              // 否则查找任何包含"确定"的按钮
               const btns = dialog.querySelectorAll('button');
               for (const btn of btns) {
                 if (btn.textContent && btn.textContent.includes('确定')) {
                   btn.click();
-                  return { success: true };
+                  return { success: true, method: 'text' };
                 }
               }
             }

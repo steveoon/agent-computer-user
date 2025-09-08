@@ -1,8 +1,8 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
-import { YUPAO_CHAT_DETAILS_SELECTORS } from "./constants";
 import { wrapAntiDetectionScript } from "../zhipin/anti-detection-utils";
+import { createDynamicClassSelector, generateFindElementScript } from "./dynamic-selector-utils";
 
 /**
  * 获取聊天详情工具
@@ -66,43 +66,196 @@ export const yupaoChatDetailsTool = () =>
 
         // 创建获取聊天详情的脚本
         const script = wrapAntiDetectionScript(`
+          ${generateFindElementScript()}
+          
+          // 定义动态选择器
+          const selectors = {
+            topInfo: [
+              '[class*="_top-info_"]:not([class*="wrap"])',
+              'div[class*="_top-info_"]',
+              '[class*="_chat-conversation"] > div:first-child'
+            ],
+            candidateName: [
+              '[class*="_base-info"] p[class*="_name"]',
+              '[class*="_user-info"] p[class*="_name"]',
+              'p[class*="_name_"]:not([class*="wrap"])'
+            ],
+            candidateStats: [
+              '${createDynamicClassSelector("_stats")}',
+              'p[class*="_stats_"]',
+              'p[class*="_stats_"] span'
+            ],
+            occName: [
+              '${createDynamicClassSelector("_occ-name")}',
+              'p[class*="_occ-name_"]',
+              'div[class*="_title-resume"] p[class*="_occ-name"]'
+            ],
+            salary: [
+              '${createDynamicClassSelector("_salary")}',
+              'p[class*="_salary_"]',
+              'div[class*="_info_"] p[class*="_salary"]'
+            ],
+            resumeTag: [
+              '${createDynamicClassSelector("_resume-tag")}',
+              'span[class*="_resume-tag_"]',
+              'div[class*="_title-resume"] span[class*="_resume-tag"]'
+            ],
+            tagValue: [
+              '${createDynamicClassSelector("_it-val")}',
+              'p[class*="_it-val_"]',
+              'div[class*="_tag_"] p[class*="_it-val"]'
+            ],
+            chatRecordBody: [
+              '.chat-record-body',
+              'div[class*="chat-record-body"]'
+            ],
+            msgWrap: [
+              '.msg-wrap',
+              'div[class*="msg-wrap"]'
+            ],
+            extraTime: [
+              '.extra-time',
+              'div[class*="extra-time"]'
+            ],
+            msgTip: [
+              '.msg-tip',
+              'div[class*="msg-tip"]'
+            ],
+            msgInner: [
+              '.msg-inner',
+              'div[class*="msg-inner"]'
+            ],
+            statusRead: [
+              '.status-read',
+              'span[class*="status-read"]'
+            ],
+            messageJobBox: [
+              '.message-job-box',
+              'div[class*="message-job-box"]'
+            ],
+            jobTitle: [
+              '.message-job-box .title',
+              'div[class*="message-job-box"] div[class*="title"]'
+            ],
+            jobTags: [
+              '.message-job-box .tag-item',
+              'div[class*="message-job-box"] span[class*="tag-item"]'
+            ],
+            jobAddress: [
+              '.message-job-box .address',
+              'div[class*="message-job-box"] div[class*="address"]'
+            ],
+            jobDescription: [
+              '.message-job-box .dec',
+              'div[class*="message-job-box"] div[class*="dec"]'
+            ],
+            viewPhoneBox: [
+              '.view-phone-box',
+              'div[class*="view-phone-box"]'
+            ],
+            contactNumber: [
+              '.view-phone-box .text',
+              'div[class*="view-phone-box"] span[class*="text"]'
+            ],
+            contactTitle: [
+              '.view-phone-box .title',
+              'div[class*="view-phone-box"] div[class*="title"]'
+            ],
+            phoneIcon: [
+              '.yp-pc.yp-shouji3',
+              'i[class*="yp-shouji"]'
+            ],
+            wechatIcon: [
+              '.yp-pc.yp-weixinlogo',
+              'i[class*="yp-weixin"]'
+            ],
+            exchangePhoneBox: [
+              '.exchange-phone-box',
+              'div[class*="exchange-phone-box"]'
+            ],
+            messageTextBox: [
+              '.message-text-box',
+              'div[class*="message-text-box"]'
+            ],
+            messageTextContent: [
+              '.message-text pre p',
+              'div[class*="message-text"] pre p',
+              'div[class*="message-text"] p'
+            ]
+          };
+          
           // 获取候选人基本信息
           let candidateInfo = null;
           
-          // 优先从顶部候选人信息区域提取
-          const candidateNameEl = document.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.candidateName}');
-          const candidateName = candidateNameEl ? candidateNameEl.textContent.trim() : '候选人';
+          // 首先找到顶部候选人信息区域
+          const topInfoArea = findElement(document, selectors.topInfo);
           
-          // 获取活跃时间
-          const statsEl = document.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.candidateStats}');
-          const activeTime = statsEl ? statsEl.textContent.trim() : '';
+          // 在顶部信息区域内查找候选人信息
+          let candidateName = '候选人';
+          let activeTime = '';
+          let expectedPosition = '';
+          let expectedSalary = '';
           
-          // 获取期望职位和薪资
-          const occNameEl = document.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.occName}');
-          const expectedPosition = occNameEl ? occNameEl.textContent.replace('期望：', '').trim() : '';
-          
-          const salaryEl = document.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.salary}');
-          const expectedSalary = salaryEl ? salaryEl.textContent.trim() : '';
+          if (topInfoArea) {
+            // 在限定的区域内查找候选人姓名
+            const candidateNameEl = findElement(topInfoArea, selectors.candidateName);
+            candidateName = candidateNameEl ? candidateNameEl.textContent.trim() : '候选人';
+            
+            // 获取活跃时间
+            const statsEl = findElement(topInfoArea, selectors.candidateStats);
+            activeTime = statsEl ? statsEl.textContent.trim() : '';
+            
+            // 获取期望职位和薪资
+            const occNameEl = findElement(topInfoArea, selectors.occName);
+            expectedPosition = occNameEl ? occNameEl.textContent.replace('期望：', '').trim() : '';
+            
+            const salaryEl = findElement(topInfoArea, selectors.salary);
+            expectedSalary = salaryEl ? salaryEl.textContent.trim() : '';
+          }
           
           // 获取简历标签（性别、年龄、期望工作地）
-          const resumeTags = Array.from(document.querySelectorAll('${YUPAO_CHAT_DETAILS_SELECTORS.resumeTag}'));
+          let resumeTags = [];
           let gender = '';
           let age = '';
           let expectedLocation = '';
           
-          resumeTags.forEach(tag => {
-            const text = tag.textContent.trim();
-            if (text === '男' || text === '女') {
-              gender = text;
-            } else if (text.includes('岁')) {
-              age = text;
-            } else if (text.includes('期望工作地')) {
-              expectedLocation = text.replace('期望工作地：', '').trim();
+          if (topInfoArea) {
+            for (const selector of selectors.resumeTag) {
+              try {
+                const tags = topInfoArea.querySelectorAll(selector);
+                if (tags.length > 0) {
+                  resumeTags = Array.from(tags);
+                  break;
+                }
+              } catch (e) {}
             }
-          });
+            
+            resumeTags.forEach(tag => {
+              const text = tag.textContent.trim();
+              if (text === '男' || text === '女') {
+                gender = text;
+              } else if (text.includes('岁')) {
+                age = text;
+              } else if (text.includes('期望工作地')) {
+                expectedLocation = text.replace('期望工作地：', '').trim();
+              }
+            });
+          }
           
           // 获取额外标签信息（身高、体重、健康证等）
-          const extraTags = Array.from(document.querySelectorAll('${YUPAO_CHAT_DETAILS_SELECTORS.tagValue}'));
+          let extraTags = [];
+          if (topInfoArea) {
+            for (const selector of selectors.tagValue) {
+              try {
+                const tags = topInfoArea.querySelectorAll(selector);
+                if (tags.length > 0) {
+                  extraTags = Array.from(tags);
+                  break;
+                }
+              } catch (e) {}
+            }
+          }
+          
           let height = '';
           let weight = '';
           let hasHealthCertificate = false;
@@ -121,30 +274,49 @@ export const yupaoChatDetailsTool = () =>
           });
           
           // 尝试从岗位信息框中提取补充信息（如果顶部信息不完整）
-          const jobBox = document.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.messageJobBox}');
+          // 注意：岗位信息框在聊天记录中，不在topInfoArea内
+          const jobBox = findElement(document, selectors.messageJobBox);
           let jobInfo = {};
           if (jobBox) {
-            const jobTitle = jobBox.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.jobTitle}');
-            const jobTags = Array.from(jobBox.querySelectorAll('${YUPAO_CHAT_DETAILS_SELECTORS.jobTags}'));
-            const jobAddress = jobBox.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.jobAddress}');
-            const jobDesc = jobBox.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.jobDescription}');
+            const jobTitle = findElement(jobBox, selectors.jobTitle);
+            let jobTags = [];
+            for (const selector of selectors.jobTags) {
+              try {
+                const tags = jobBox.querySelectorAll(selector);
+                if (tags.length > 0) {
+                  jobTags = Array.from(tags);
+                  break;
+                }
+              } catch (e) {}
+            }
+            const jobAddress = findElement(jobBox, selectors.jobAddress);
+            const jobDesc = findElement(jobBox, selectors.jobDescription);
             
             const position = jobTitle ? jobTitle.textContent.trim() : '';
             const tags = jobTags.map(tag => tag.textContent.trim());
             const address = jobAddress ? jobAddress.textContent.trim() : '';
             const description = jobDesc ? jobDesc.textContent.trim() : '';
             
-            // 从描述中提取经验要求（如果还没有）
-            const experienceMatch = description.match(/(\\d+年|\\d+年以上|应届生|在校生|经验优先)/);
-            const experience = experienceMatch ? experienceMatch[1] : '';
+            // 注意：这里是岗位的经验要求，不是候选人的经验
+            const jobRequirementMatch = description.match(/(\\d+年|\\d+年以上|应届生|在校生|经验优先)/);
+            const jobRequirement = jobRequirementMatch ? jobRequirementMatch[1] : '';
             
             jobInfo = {
               jobPosition: position,
               jobTags: tags,
               jobAddress: address,
               jobDescription: description,
-              experience: experience
+              jobRequirement: jobRequirement  // 岗位要求，不是候选人经验
             };
+          }
+          
+          // 从候选人的标签中获取工作经验（直接使用标签内容）
+          let candidateExperience = '';
+          // additionalInfo 包含了所有 _tags 元素中的标签（如：超市、便利店等）
+          // 这些标签本身就代表了候选人的工作经验
+          if (additionalInfo.length > 0) {
+            // 直接使用标签作为候选人的经验
+            candidateExperience = additionalInfo.join('、');
           }
           
           // 组装候选人信息
@@ -153,7 +325,7 @@ export const yupaoChatDetailsTool = () =>
             position: expectedPosition || jobInfo.jobPosition || '',
             age: age,
             gender: gender,
-            experience: jobInfo.experience || '',
+            experience: candidateExperience,  // 使用候选人的实际经验
             education: '', // Yupao通常不在这里显示学历
             expectedSalary: expectedSalary,
             expectedLocation: expectedLocation,
@@ -166,17 +338,26 @@ export const yupaoChatDetailsTool = () =>
           };
           
           // 获取聊天记录
-          const chatBody = document.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.chatRecordBody}');
+          const chatBody = findElement(document, selectors.chatRecordBody);
           
           let chatMessages = [];
           if (chatBody) {
             // 获取所有消息包装器
-            const messageWraps = Array.from(chatBody.querySelectorAll('${YUPAO_CHAT_DETAILS_SELECTORS.msgWrap}'));
+            let messageWraps = [];
+            for (const selector of selectors.msgWrap) {
+              try {
+                const wraps = chatBody.querySelectorAll(selector);
+                if (wraps.length > 0) {
+                  messageWraps = Array.from(wraps);
+                  break;
+                }
+              } catch (e) {}
+            }
             
             // 同步处理每条消息
             messageWraps.forEach((msgWrap, i) => {
               // 获取时间信息（如果有）
-              const timeElement = msgWrap.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.extraTime}');
+              const timeElement = findElement(msgWrap, selectors.extraTime);
               let time = '';
               let extraInfo = '';
               
@@ -194,7 +375,7 @@ export const yupaoChatDetailsTool = () =>
               }
               
               // 检查是否是系统提示消息
-              const msgTip = msgWrap.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.msgTip}');
+              const msgTip = findElement(msgWrap, selectors.msgTip);
               if (msgTip) {
                 chatMessages.push({
                   index: i,
@@ -208,7 +389,7 @@ export const yupaoChatDetailsTool = () =>
               }
               
               // 获取消息主体
-              const msgInner = msgWrap.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.msgInner}');
+              const msgInner = findElement(msgWrap, selectors.msgInner);
               if (!msgInner) return;
               
               // 判断发送者
@@ -217,13 +398,13 @@ export const yupaoChatDetailsTool = () =>
               sender = isSelf ? 'recruiter' : 'candidate';
               
               // 检查已读状态
-              const readStatus = msgInner.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.statusRead}');
+              const readStatus = findElement(msgInner, selectors.statusRead);
               const isRead = readStatus ? readStatus.textContent.includes('已读') : false;
               
               // 检查是否是岗位信息
-              const jobBox = msgInner.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.messageJobBox}');
+              const jobBox = findElement(msgInner, selectors.messageJobBox);
               if (jobBox) {
-                const jobTitle = jobBox.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.jobTitle}');
+                const jobTitle = findElement(jobBox, selectors.jobTitle);
                 const position = jobTitle ? jobTitle.textContent.trim() : '';
                 
                 chatMessages.push({
@@ -240,16 +421,16 @@ export const yupaoChatDetailsTool = () =>
               }
               
               // 检查是否是联系方式交换消息（电话或微信）
-              const viewPhoneBox = msgInner.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.viewPhoneBox}');
+              const viewPhoneBox = findElement(msgInner, selectors.viewPhoneBox);
               if (viewPhoneBox) {
-                const contactEl = viewPhoneBox.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.contactNumber}');
+                const contactEl = findElement(viewPhoneBox, selectors.contactNumber);
                 const contactValue = contactEl ? contactEl.textContent.trim() : '';
-                const titleEl = viewPhoneBox.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.contactTitle}');
+                const titleEl = findElement(viewPhoneBox, selectors.contactTitle);
                 const contactTitle = titleEl ? titleEl.textContent.trim() : '';
                 
                 // 判断是电话还是微信
-                const hasPhoneIcon = viewPhoneBox.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.phoneIcon}');
-                const hasWechatIcon = viewPhoneBox.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.wechatIcon}');
+                const hasPhoneIcon = findElement(viewPhoneBox, selectors.phoneIcon);
+                const hasWechatIcon = findElement(viewPhoneBox, selectors.wechatIcon);
                 const contactType = hasPhoneIcon ? 'phone' : (hasWechatIcon ? 'wechat' : 'unknown');
                 
                 if (contactValue) {
@@ -272,7 +453,7 @@ export const yupaoChatDetailsTool = () =>
               }
               
               // 检查是否是交换电话请求消息
-              const exchangePhoneBox = msgInner.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.exchangePhoneBox}');
+              const exchangePhoneBox = findElement(msgInner, selectors.exchangePhoneBox);
               if (exchangePhoneBox) {
                 const requestText = exchangePhoneBox.querySelector('.tip-ss');
                 const content = requestText ? requestText.textContent.trim() : '请求交换联系方式';
@@ -293,9 +474,9 @@ export const yupaoChatDetailsTool = () =>
               }
               
               // 获取文本消息
-              const textBox = msgInner.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.messageTextBox}');
+              const textBox = findElement(msgInner, selectors.messageTextBox);
               if (textBox) {
-                const messageTextEl = textBox.querySelector('${YUPAO_CHAT_DETAILS_SELECTORS.messageTextContent}');
+                const messageTextEl = findElement(textBox, selectors.messageTextContent);
                 if (messageTextEl) {
                   const content = messageTextEl.textContent.trim();
                   

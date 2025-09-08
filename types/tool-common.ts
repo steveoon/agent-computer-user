@@ -22,6 +22,7 @@ export interface ToolCreationContext {
   configData?: ZhipinData;
   replyPrompts?: ReplyPromptsConfig;
   dulidayToken?: string;
+  defaultWechatId?: string; // 默认微信号
 }
 
 /**

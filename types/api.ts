@@ -31,6 +31,7 @@ export const ChatRequestBodySchema = z.object({
   replyPrompts: z.any().optional(), // ReplyPromptsConfig
   activeSystemPrompt: z.string().optional(), // keyof SystemPromptsConfig
   dulidayToken: z.string().optional(),
+  defaultWechatId: z.string().optional(), // 默认微信号
 });
 
 /**
@@ -50,6 +51,7 @@ export interface ChatRequestBody {
   replyPrompts?: ReplyPromptsConfig;
   activeSystemPrompt?: keyof SystemPromptsConfig;
   dulidayToken?: string;
+  defaultWechatId?: string; // 默认微信号
 }
 
 /**

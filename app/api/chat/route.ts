@@ -41,6 +41,7 @@ export async function POST(req: Request) {
     replyPrompts,
     activeSystemPrompt,
     dulidayToken,
+    defaultWechatId,
   }: ChatRequestBody = await req.json();
 
   try {
@@ -124,6 +125,7 @@ export async function POST(req: Request) {
         configData,
         replyPrompts,
         dulidayToken,
+        defaultWechatId,
       },
       promptType
     );

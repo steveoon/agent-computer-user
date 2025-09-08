@@ -366,7 +366,12 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
   /**
    * 构建原子化系统提示
    */
-  buildAtomicSystemPrompt(): AtomicPrompt {
+  buildAtomicSystemPrompt(defaultWechatId?: string): AtomicPrompt {
+    // 构建微信号相关的约束
+    const wechatConstraint = defaultWechatId
+      ? `当候选人询问微信号或需要交换联系方式时，引导使用平台交换微信功能，必要时才告知招聘人员的微信号: ${defaultWechatId}`
+      : "微信号询问时不要编造，引导使用平台交换微信功能";
+
     return {
       role: {
         identity: "资深餐饮连锁招聘专员",
@@ -380,7 +385,7 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
         "品牌专属话术优先于通用指令",
         "敏感问题使用固定安全话术",
         "不编造事实，信息不足时追问",
-        "微信号询问时不要编造，引导使用平台交换微信功能",
+        wechatConstraint,
         "年龄问题先确认可行性再引导",
         "兼职岗位不提供五险一金，严禁承诺五险一金福利",
         "使用口语化表达，像日常聊天一样自然",
@@ -459,8 +464,8 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
    * 主构建方法
    */
   build(params: ReplyBuilderParams): ReplyResult {
-    // 构建原子提示
-    const atomic = this.buildAtomicSystemPrompt();
+    // 构建原子提示，传入微信号参数
+    const atomic = this.buildAtomicSystemPrompt(params.defaultWechatId);
     const systemPrompt = this.formatAtomicPrompt(atomic);
 
     // 添加品牌信息到系统提示
@@ -509,23 +514,23 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
     // 1. 任务指令
     prompt += `[指令]\n${molecular.instruction}\n\n`;
 
-    // 2. Few-shot示例
-    if (molecular.examples.length > 0) {
-      prompt += `[参考示例]\n`;
-      molecular.examples.forEach((example, index) => {
-        prompt += `示例${index + 1}：\n`;
-        prompt += `场景: ${example.scenario}\n`;
-        prompt += `输入: "${example.input}"\n`;
-        prompt += `输出: ${example.output}\n`;
-        if (example.reasoning) {
-          prompt += `思路: ${example.reasoning}\n`;
-        }
-        prompt += "\n";
-      });
-    }
+    // 2. Few-shot示例 - 暂时禁用以测试是否影响生成质量
+    // if (molecular.examples.length > 0) {
+    //   prompt += `[参考示例]\n`;
+    //   molecular.examples.forEach((example, index) => {
+    //     prompt += `示例${index + 1}：\n`;
+    //     prompt += `场景: ${example.scenario}\n`;
+    //     prompt += `输入: "${example.input}"\n`;
+    //     prompt += `输出: ${example.output}\n`;
+    //     if (example.reasoning) {
+    //       prompt += `思路: ${example.reasoning}\n`;
+    //     }
+    //     prompt += "\n";
+    //   });
+    // }
 
-    // 3. 当前上下文
-    prompt += `[当前上下文]\n`;
+    // 3. 对话分析（分类结果及情绪判断）
+    prompt += `[对话分析]\n`;
     const ctx = molecular.context;
 
     if (ctx.conversationState) {

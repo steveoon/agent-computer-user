@@ -1,7 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { YUPAO_UNREAD_SELECTORS } from "./constants";
 import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
+import { getAdaptiveSelectors, generateFindElementScript } from "./dynamic-selector-utils";
 import {
   wrapAntiDetectionScript,
   clickWithMouseTrajectory,
@@ -35,30 +35,53 @@ export const openCandidateChatTool = tool({
 
       // 创建脚本
       const script = `
+          ${generateFindElementScript()}
+          
           const candidateName = ${candidateName ? `'${candidateName}'` : "null"};
           const targetIndex = ${index !== undefined ? index : "null"};
           const preferUnread = ${preferUnread};
           const listOnly = ${listOnly};
           
-          // 获取所有对话项
-          const convItems = document.querySelectorAll('${YUPAO_UNREAD_SELECTORS.convItem}');
+          // 动态选择器定义
+          const convItemSelectors = ${JSON.stringify(getAdaptiveSelectors('convItem'))};
+          const nameSelectors = ${JSON.stringify(getAdaptiveSelectors('candidateName'))};
+          const jobTitleSelectors = ${JSON.stringify(getAdaptiveSelectors('jobTitle'))};
+          const unreadNumSelectors = ${JSON.stringify(getAdaptiveSelectors('unreadNum'))};
+          const statusSelectors = ${JSON.stringify(getAdaptiveSelectors('statusUnread'))};
+          const timeSelectors = ${JSON.stringify(getAdaptiveSelectors('messageTime'))};
+          const msgSelectors = ${JSON.stringify(getAdaptiveSelectors('msgText'))};
+          
+          // 使用第一个成功的选择器获取所有对话项
+          let convItems = [];
+          for (const selector of convItemSelectors) {
+            try {
+              const items = document.querySelectorAll(selector);
+              if (items.length > 0) {
+                convItems = items;
+                break;
+              }
+            } catch (e) {
+              // 继续尝试下一个选择器
+            }
+          }
+          
           const candidates = [];
           
           // 处理每个对话项
           convItems.forEach((item, idx) => {
             try {
               // 查找名字元素
-              const nameElement = item.querySelector('${YUPAO_UNREAD_SELECTORS.candidateName}');
+              const nameElement = findElement(item, nameSelectors);
               const name = nameElement ? nameElement.textContent.trim() : '';
               
               if (!name) return;
               
               // 获取职位信息
-              const positionElement = item.querySelector('${YUPAO_UNREAD_SELECTORS.jobTitle}');
+              const positionElement = findElement(item, jobTitleSelectors);
               const position = positionElement ? positionElement.textContent.trim() : '';
               
               // 检查未读状态 - 只看未读数字标签
-              const unreadNumElement = item.querySelector('${YUPAO_UNREAD_SELECTORS.imageBox} ${YUPAO_UNREAD_SELECTORS.unreadNum}');
+              const unreadNumElement = findElement(item, unreadNumSelectors);
               let hasUnread = false;
               let unreadCount = 0;
               
@@ -71,15 +94,15 @@ export const openCandidateChatTool = tool({
               }
               
               // 获取时间
-              const timeElement = item.querySelector('${YUPAO_UNREAD_SELECTORS.messageTime}');
+              const timeElement = findElement(item, timeSelectors);
               const lastMessageTime = timeElement ? timeElement.textContent.trim() : '';
               
               // 获取最新消息
-              const msgElement = item.querySelector('${YUPAO_UNREAD_SELECTORS.msgText}');
+              const msgElement = findElement(item, msgSelectors);
               const messagePreview = msgElement ? msgElement.textContent.trim().substring(0, 50) : '';
               
               // 获取消息状态
-              const statusElement = item.querySelector('${YUPAO_UNREAD_SELECTORS.statusUnread}');
+              const statusElement = findElement(item, statusSelectors);
               const messageStatus = statusElement ? statusElement.textContent.trim() : '';
               
               candidates.push({
@@ -149,18 +172,32 @@ export const openCandidateChatTool = tool({
           // 执行点击 - 返回选择器信息而不是直接点击
           if (targetCandidate) {
             // 查找目标元素并返回选择器
-            const items = document.querySelectorAll('${YUPAO_UNREAD_SELECTORS.convItem}');
+            // 使用同样的动态选择器重新获取元素
+            let items = [];
+            let usedSelector = '';
+            for (const selector of convItemSelectors) {
+              try {
+                const foundItems = document.querySelectorAll(selector);
+                if (foundItems.length > 0) {
+                  items = foundItems;
+                  usedSelector = selector;
+                  break;
+                }
+              } catch (e) {
+                // 继续尝试下一个选择器
+              }
+            }
             
             // 方案1：通过名称匹配
             for (let i = 0; i < items.length; i++) {
               const item = items[i];
-              const nameEl = item.querySelector('${YUPAO_UNREAD_SELECTORS.candidateName}');
+              const nameEl = findElement(item, nameSelectors);
               if (nameEl && nameEl.textContent.trim() === targetCandidate.name) {
                 return {
                   success: true,
                   action: 'found',
                   clickTarget: {
-                    selector: '${YUPAO_UNREAD_SELECTORS.convItem}',
+                    selector: usedSelector,
                     index: i,
                     name: targetCandidate.name
                   },
@@ -185,7 +222,7 @@ export const openCandidateChatTool = tool({
                 success: true,
                 action: 'found',
                 clickTarget: {
-                  selector: '${YUPAO_UNREAD_SELECTORS.convItem}',
+                  selector: usedSelector,
                   index: targetCandidate.index,
                   name: targetCandidate.name
                 },
@@ -281,6 +318,10 @@ export const openCandidateChatTool = tool({
 
                 // 使用临时属性标记目标元素，避免选择器问题
                 const markScript = wrapAntiDetectionScript(`
+                  ${generateFindElementScript()}
+                  
+                  const nameSelectors = ${JSON.stringify(getAdaptiveSelectors('candidateName'))};
+                  
                   const items = document.querySelectorAll('${selector}');
                   if (items[${index}]) {
                     // 先清理可能存在的旧标记
@@ -292,7 +333,7 @@ export const openCandidateChatTool = tool({
                     items[${index}].setAttribute('data-temp-click-target', 'true');
                     
                     // 验证标记的元素确实是我们要的候选人
-                    const nameEl = items[${index}].querySelector('${YUPAO_UNREAD_SELECTORS.candidateName}');
+                    const nameEl = findElement(items[${index}], nameSelectors);
                     const actualName = nameEl ? nameEl.textContent.trim() : '';
                     
                     return { 

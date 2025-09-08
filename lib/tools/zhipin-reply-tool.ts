@@ -44,7 +44,8 @@ export const zhipinReplyTool = (
   preferredBrand?: string,
   modelConfig?: ModelConfig,
   configData?: ZhipinData,
-  replyPrompts?: ReplyPromptsConfig
+  replyPrompts?: ReplyPromptsConfig,
+  defaultWechatId?: string
 ) =>
   tool({
     description: `
@@ -78,7 +79,7 @@ export const zhipinReplyTool = (
         .string()
         .optional()
         .describe(
-          "从聊天详情中获取品牌名称，通常来说可以根据岗位信息来判断，如果不指定则使用默认品牌"
+          "从聊天详情中获取品牌名称，Boss直聘和鱼泡直聘可以根据招聘或应聘的岗位内容来获取，如果不指定则使用默认品牌"
         ),
 
       include_stats: z
@@ -130,7 +131,8 @@ export const zhipinReplyTool = (
           effectiveModelConfig,
           configData,
           replyPrompts,
-          candidate_info
+          candidate_info,
+          defaultWechatId
         );
 
         console.log(`✅ 回复生成成功`);

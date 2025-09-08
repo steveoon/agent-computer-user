@@ -8,7 +8,7 @@ import { Settings, Database, MessageSquare, Cpu, RefreshCw } from "lucide-react"
 import { BrandDataEditor } from "@/components/admin/brand-data-editor";
 import { PromptsEditor } from "@/components/admin/prompts-editor";
 import { SystemPromptsEditor } from "@/components/admin/system-prompts-editor";
-import { DulidayTokenManager } from "@/components/admin/duliday-token-manager";
+import { GeneralConfigManager } from "@/components/admin/general-config-manager";
 import { useConfigManager } from "@/hooks/useConfigManager";
 import { useRouter } from "next/navigation";
 
@@ -135,9 +135,9 @@ export default function AdminSettingsPage() {
             <Database className="h-4 w-4" />
             总览
           </TabsTrigger>
-          <TabsTrigger value="token" className="flex items-center gap-2">
+          <TabsTrigger value="general" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
-            Token配置
+            通用配置
           </TabsTrigger>
           <TabsTrigger value="brands" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
@@ -282,9 +282,9 @@ export default function AdminSettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* Token配置页面 */}
-        <TabsContent value="token">
-          <DulidayTokenManager />
+        {/* 通用配置页面 */}
+        <TabsContent value="general">
+          <GeneralConfigManager />
         </TabsContent>
 
         {/* 品牌数据编辑 */}

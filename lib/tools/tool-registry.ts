@@ -51,7 +51,8 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
         ctx.preferredBrand || "",
         ctx.modelConfig || DEFAULT_MODEL_CONFIG,
         ctx.configData,
-        ctx.replyPrompts
+        ctx.replyPrompts,
+        ctx.defaultWechatId
       );
     },
   }),
@@ -101,7 +102,8 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
         ctx.preferredBrand,
         ctx.modelConfig || DEFAULT_MODEL_CONFIG,
         ctx.configData,
-        ctx.replyPrompts
+        ctx.replyPrompts,
+        ctx.defaultWechatId
       ),
   },
 
