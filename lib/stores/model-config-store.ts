@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ModelId, ProviderConfig } from "@/lib/config/models";
-import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
+import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS, MODEL_DICTIONARY } from "@/lib/config/models";
 
 /**
  * 🤖 模型配置管理Store
@@ -33,6 +33,23 @@ interface ModelConfigActions {
 }
 
 type ModelConfigStore = ModelConfigState & ModelConfigActions;
+
+/**
+ * 验证模型 ID 是否有效
+ */
+function validateModelId(modelId: ModelId | undefined, defaultModelId: ModelId): ModelId {
+  if (!modelId) {
+    console.warn(`[MODEL CONFIG] 模型 ID 未定义，使用默认值: ${defaultModelId}`);
+    return defaultModelId;
+  }
+  
+  if (!(modelId in MODEL_DICTIONARY)) {
+    console.warn(`[MODEL CONFIG] 无效的模型 ID: ${modelId}，已重置为默认值: ${defaultModelId}`);
+    return defaultModelId;
+  }
+  
+  return modelId;
+}
 
 /**
  * 合并Provider配置：确保新增的Provider不会被localStorage中的旧数据覆盖
@@ -136,13 +153,29 @@ export const useModelConfigStore = create<ModelConfigStore>()(
         replyModel: state.replyModel,
         providerConfigs: state.providerConfigs,
       }),
-      // 自定义合并逻辑：解决新增Provider被覆盖的问题
+      // 自定义合并逻辑：解决新增Provider被覆盖的问题和无效模型ID问题
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<ModelConfigState>;
 
+        // 验证并修正模型 ID
+        const validatedChatModel = validateModelId(
+          persisted.chatModel as ModelId | undefined,
+          DEFAULT_MODEL_CONFIG.chatModel
+        );
+        const validatedClassifyModel = validateModelId(
+          persisted.classifyModel as ModelId | undefined,
+          DEFAULT_MODEL_CONFIG.classifyModel
+        );
+        const validatedReplyModel = validateModelId(
+          persisted.replyModel as ModelId | undefined,
+          DEFAULT_MODEL_CONFIG.replyModel
+        );
+
         return {
           ...currentState,
-          ...persisted,
+          chatModel: validatedChatModel,
+          classifyModel: validatedClassifyModel,
+          replyModel: validatedReplyModel,
           // 关键：智能合并Provider配置
           providerConfigs: mergeProviderConfigs(
             persisted.providerConfigs,

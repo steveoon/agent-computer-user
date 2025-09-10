@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { toast } from "sonner";
+import { toastConfirm } from "@/lib/ui/toast-confirm";
 import type { UIMessage } from "@ai-sdk/react";
 
 interface UseSmartCleanProps {
@@ -124,6 +125,16 @@ export function useSmartClean({ messages, setMessages, envLimits, envInfo }: Use
   }, [messages, setMessages, cleanHistoricalImages]);
 
   // 🎯 智能部分清理 - 支持自动和手动清理
+  /**
+   * 智能清理消息历史
+   * @param autoClean - 是否自动清理（true: 自动清理不需要确认, false: 手动清理需要用户确认）
+   * @returns
+   *   - 自动清理模式：立即执行清理并返回 true
+   *   - 手动清理模式：显示确认对话框并立即返回 false（清理操作在用户确认后异步执行）
+   *
+   * 注意：手动清理模式下，函数会立即返回 false，实际清理会在用户点击确认后才执行。
+   * 这是从 window.confirm（同步阻塞）到 toastConfirm（异步非阻塞）的行为变化。
+   */
   const smartClean = useCallback(
     (autoClean = false) => {
       if (messages.length <= 2) {
@@ -140,20 +151,34 @@ export function useSmartClean({ messages, setMessages, envLimits, envInfo }: Use
       const removeCount = messages.length - keepCount;
       const recentMessages = messages.slice(-keepCount);
 
-      // 🎯 自动清理模式或用户确认手动清理
-      if (autoClean || window.confirm(`保留最近的${keepCount}条消息，清理其余历史记录？`)) {
+      // 🎯 自动清理模式
+      if (autoClean) {
         setMessages(recentMessages);
-
-        const actionText = autoClean ? "已自动清理" : "已清理";
-        toast.success(`${actionText}${removeCount}条历史消息`, {
+        toast.success(`已自动清理${removeCount}条历史消息`, {
           description: `保持了最近的${keepCount}条消息`,
           richColors: true,
           position: "top-center",
-          duration: autoClean ? 6000 : 4000,
+          duration: 6000,
         });
-
         return true;
       }
+
+      // 手动清理模式 - 使用 toast 确认
+      toastConfirm({
+        title: "清理历史消息",
+        description: `保留最近的${keepCount}条消息，清理其余${removeCount}条历史记录？`,
+        confirmLabel: "确定清理",
+        cancelLabel: "取消",
+        onConfirm: () => {
+          setMessages(recentMessages);
+          toast.success(`已清理${removeCount}条历史消息`, {
+            description: `保持了最近的${keepCount}条消息`,
+            richColors: true,
+            position: "top-center",
+            duration: 4000,
+          });
+        },
+      });
 
       return false;
     },
@@ -161,6 +186,13 @@ export function useSmartClean({ messages, setMessages, envLimits, envInfo }: Use
   );
 
   // 清空对话记录
+  /**
+   * 清空所有对话记录
+   * 显示确认对话框，用户确认后异步清空消息
+   *
+   * 注意：此函数不会阻塞，会立即返回。清空操作在用户点击确认后才执行。
+   * 这是从 window.confirm（同步阻塞）到 toastConfirm（异步非阻塞）的行为变化。
+   */
   const clearMessages = useCallback(() => {
     if (messages.length === 0) {
       toast.info("对话记录已经为空", {
@@ -170,14 +202,21 @@ export function useSmartClean({ messages, setMessages, envLimits, envInfo }: Use
       return;
     }
 
-    // 添加确认提示
-    if (window.confirm("确定要清空所有对话记录吗？此操作无法撤销。")) {
-      setMessages([]);
-      toast.success("对话记录已清空", {
-        richColors: true,
-        position: "top-center",
-      });
-    }
+    // 使用 toast 确认
+    toastConfirm({
+      title: "清空对话记录",
+      description: "确定要清空所有对话记录吗？此操作无法撤销。",
+      confirmLabel: "确定清空",
+      cancelLabel: "取消",
+      variant: "destructive",
+      onConfirm: () => {
+        setMessages([]);
+        toast.success("对话记录已清空", {
+          richColors: true,
+          position: "top-center",
+        });
+      },
+    });
   }, [messages, setMessages]);
 
   // 检查是否需要显示清理提示

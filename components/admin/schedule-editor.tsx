@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
+import { toastConfirm } from "@/lib/ui/toast-confirm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -237,55 +238,62 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
       0
     );
 
-    // 显示确认提示
-    const confirmed = window.confirm(
-      `确定要批量应用排班设置吗？\n\n这将更新 ${brandName} 品牌下：\n• ${currentBrandStores.length} 家门店\n• ${totalPositions} 个岗位\n\n此操作将覆盖现有的排班设置。`
-    );
+    // 使用 toast 确认
+    toastConfirm({
+      title: "批量应用排班设置",
+      description: `这将更新 ${brandName} 品牌下的 ${currentBrandStores.length} 家门店和 ${totalPositions} 个岗位。此操作将覆盖现有的排班设置。`,
+      confirmLabel: "确定应用",
+      cancelLabel: "取消",
+      onConfirm: async () => {
+        setIsApplying(true);
 
-    if (!confirmed) return;
+        // 将 loadingToastId 声明提到 try 外部，以便在 catch 中访问
+        let loadingToastId: string | number | undefined;
 
-    setIsApplying(true);
+        try {
+          // 显示开始应用的提示
+          loadingToastId = toast.loading("正在批量应用排班设置...", {
+            description: `即将更新 ${currentBrandStores.length} 家门店的 ${totalPositions} 个岗位`,
+          });
 
-    try {
-      // 显示开始应用的提示
-      const loadingToastId = toast.loading("正在批量应用排班设置...", {
-        description: `即将更新 ${currentBrandStores.length} 家门店的 ${totalPositions} 个岗位`,
-      });
+          // 模拟一个短暂的延迟来显示加载状态
+          await new Promise(resolve => setTimeout(resolve, 800));
 
-      // 模拟一个短暂的延迟来显示加载状态
-      await new Promise(resolve => setTimeout(resolve, 800));
+          // 执行批量更新（更新Zustand store）并获取更新后的数据
+          const updatedData = updateSchedulingInfo(
+            brandName,
+            batchScheduleType,
+            batchFlexibility,
+            "all"
+          );
 
-      // 执行批量更新（更新Zustand store）并获取更新后的数据
-      const updatedData = updateSchedulingInfo(
-        brandName,
-        batchScheduleType,
-        batchFlexibility,
-        "all"
-      );
+          // 保存更新后的数据
+          if (updatedData && onDataUpdate) {
+            await onDataUpdate(updatedData);
+            console.log("✅ 排班设置已自动保存并同步状态");
+          }
 
-      // 保存更新后的数据
-      if (updatedData && onDataUpdate) {
-        await onDataUpdate(updatedData);
-        console.log("✅ 排班设置已自动保存并同步状态");
-      }
-
-      // 关闭加载提示并显示成功提示
-      toast.dismiss(loadingToastId);
-      toast.success("批量设置成功！", {
-        description: `已成功更新 ${currentBrandStores.length} 家门店的所有岗位排班设置并自动保存`,
-        duration: 3000,
-      });
-    } catch (error) {
-      console.error("批量应用失败:", error);
-      // 确保关闭加载提示
-      toast.dismiss();
-      toast.error("批量设置失败", {
-        description: "请稍后重试或检查网络连接",
-        duration: 3000,
-      });
-    } finally {
-      setIsApplying(false);
-    }
+          // 关闭加载提示并显示成功提示
+          toast.dismiss(loadingToastId);
+          toast.success("批量设置成功！", {
+            description: `已成功更新 ${currentBrandStores.length} 家门店的所有岗位排班设置并自动保存`,
+            duration: 3000,
+          });
+        } catch (error) {
+          console.error("批量应用失败:", error);
+          // 只关闭当前的 loading toast，避免误关其他 toast
+          if (loadingToastId) {
+            toast.dismiss(loadingToastId);
+          }
+          toast.error("批量设置失败", {
+            description: "请稍后重试或检查网络连接",
+            duration: 3000,
+          });
+        } finally {
+          setIsApplying(false);
+        }
+      },
+    });
   };
 
   const handleStartEdit = (storeIndex: number, positionIndex?: number) => {

@@ -33,7 +33,20 @@ import {
   getGeneralModels,
   DEFAULT_PROVIDER_CONFIGS,
   type ProviderConfig,
+  type ModelId,
 } from "@/lib/config/models";
+
+/**
+ * 安全地获取模型名称，如果模型不存在则返回模型ID本身或默认值
+ */
+function getModelName(modelId: ModelId): string {
+  const model = MODEL_DICTIONARY[modelId];
+  if (!model) {
+    console.warn(`[AGENT CONFIG] 模型 ${modelId} 不存在于 MODEL_DICTIONARY 中`);
+    return modelId || "未知模型";
+  }
+  return model.name;
+}
 
 export default function AgentConfigPage() {
   const {
@@ -152,6 +165,10 @@ export default function AgentConfigPage() {
               <SelectContent>
                 {getChatModels().map(modelId => {
                   const model = MODEL_DICTIONARY[modelId];
+                  if (!model) {
+                    console.warn(`[AGENT CONFIG] 跳过无效模型: ${modelId}`);
+                    return null;
+                  }
                   return (
                     <SelectItem key={modelId} value={modelId}>
                       <div className="flex flex-col items-start">
@@ -164,7 +181,7 @@ export default function AgentConfigPage() {
               </SelectContent>
             </Select>
             <Badge variant="outline" className="text-xs">
-              当前: {MODEL_DICTIONARY[chatModel].name}
+              当前: {getModelName(chatModel)}
             </Badge>
           </CardContent>
         </Card>
@@ -186,6 +203,10 @@ export default function AgentConfigPage() {
               <SelectContent>
                 {getGeneralModels().map(modelId => {
                   const model = MODEL_DICTIONARY[modelId];
+                  if (!model) {
+                    console.warn(`[AGENT CONFIG] 跳过无效模型: ${modelId}`);
+                    return null;
+                  }
                   return (
                     <SelectItem key={modelId} value={modelId}>
                       <div className="flex flex-col items-start">
@@ -198,7 +219,7 @@ export default function AgentConfigPage() {
               </SelectContent>
             </Select>
             <Badge variant="outline" className="text-xs">
-              当前: {MODEL_DICTIONARY[classifyModel].name}
+              当前: {getModelName(classifyModel)}
             </Badge>
           </CardContent>
         </Card>
@@ -220,6 +241,10 @@ export default function AgentConfigPage() {
               <SelectContent>
                 {getGeneralModels().map(modelId => {
                   const model = MODEL_DICTIONARY[modelId];
+                  if (!model) {
+                    console.warn(`[AGENT CONFIG] 跳过无效模型: ${modelId}`);
+                    return null;
+                  }
                   return (
                     <SelectItem key={modelId} value={modelId}>
                       <div className="flex flex-col items-start">
@@ -232,7 +257,7 @@ export default function AgentConfigPage() {
               </SelectContent>
             </Select>
             <Badge variant="outline" className="text-xs">
-              当前: {MODEL_DICTIONARY[replyModel].name}
+              当前: {getModelName(replyModel)}
             </Badge>
           </CardContent>
         </Card>
@@ -314,15 +339,15 @@ export default function AgentConfigPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Chat模型</Label>
-              <p className="font-medium">{MODEL_DICTIONARY[chatModel].name}</p>
+              <p className="font-medium">{getModelName(chatModel)}</p>
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">分类模型</Label>
-              <p className="font-medium">{MODEL_DICTIONARY[classifyModel].name}</p>
+              <p className="font-medium">{getModelName(classifyModel)}</p>
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">回复模型</Label>
-              <p className="font-medium">{MODEL_DICTIONARY[replyModel].name}</p>
+              <p className="font-medium">{getModelName(replyModel)}</p>
             </div>
           </div>
         </CardContent>
