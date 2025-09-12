@@ -3,6 +3,53 @@
  * 根据官方文档实现的文件上传和获取公网URL功能
  */
 
+// 重试配置
+const RETRY_CONFIG = {
+  maxAttempts: 3,
+  initialDelay: 1000, // 初始延迟1秒
+  maxDelay: 5000, // 最大延迟5秒
+  timeout: 10000, // 请求超时10秒
+} as const;
+
+/**
+ * 跨环境的base64解码函数
+ * 在Node环境使用Buffer，在浏览器使用atob
+ * @param base64Data base64编码的数据（可能包含data URI前缀）
+ * @returns Uint8Array
+ */
+function base64ToUint8Array(base64Data: string): Uint8Array {
+  // 移除可能的data URI前缀
+  const cleanBase64 = base64Data.replace(/^data:image\/[a-z]+;base64,/, '');
+  
+  // Node.js环境
+  if (typeof Buffer !== 'undefined') {
+    return new Uint8Array(Buffer.from(cleanBase64, 'base64'));
+  }
+  
+  // 浏览器环境
+  const binaryString = atob(cleanBase64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/**
+ * 检查文件大小是否符合限制
+ * @param bytes 文件字节数组
+ * @param maxSizeMB 最大文件大小（MB）
+ * @returns 是否符合大小限制
+ */
+function checkFileSize(bytes: Uint8Array, maxSizeMB: number): boolean {
+  const sizeMB = bytes.length / (1024 * 1024);
+  if (sizeMB > maxSizeMB) {
+    console.warn(`⚠️ 文件大小 ${sizeMB.toFixed(2)}MB 超过限制 ${maxSizeMB}MB`);
+    return false;
+  }
+  return true;
+}
+
 interface UploadPolicyData {
   readonly policy: string;
   readonly signature: string;
@@ -41,10 +88,12 @@ async function getUploadPolicy(
     model: modelName,
   });
 
-  try {
+  // 使用重试机制获取上传凭证
+  return withRetry(async (signal) => {
     const response = await fetch(`${url}?${params}`, {
       method: "GET",
       headers,
+      signal,
     });
 
     if (!response.ok) {
@@ -54,12 +103,101 @@ async function getUploadPolicy(
 
     const result: BailianUploadResponse = await response.json();
     return result.data;
-  } catch (error) {
-    console.error("❌ 获取上传凭证失败:", error);
-    throw new Error(
-      `Failed to get upload policy: ${error instanceof Error ? error.message : String(error)}`
-    );
+  }, "获取上传凭证");
+}
+
+/**
+ * 判断错误是否可重试
+ * @param error 错误对象
+ * @returns 是否可重试
+ */
+function isRetryableError(error: unknown): boolean {
+  if (error instanceof Error) {
+    // 网络错误、超时错误可重试
+    if (error.message.includes('fetch failed') || 
+        error.message.includes('timeout') ||
+        error.message.includes('ECONNRESET') ||
+        error.message.includes('ETIMEDOUT') ||
+        error.message.includes('ENOTFOUND')) {
+      return true;
+    }
+    
+    // HTTP 5xx 错误可重试
+    if (error.message.includes('500') || 
+        error.message.includes('502') || 
+        error.message.includes('503') || 
+        error.message.includes('504')) {
+      return true;
+    }
+    
+    // HTTP 4xx 错误不可重试（客户端错误）
+    if (error.message.includes('400') || 
+        error.message.includes('401') || 
+        error.message.includes('403') || 
+        error.message.includes('404')) {
+      return false;
+    }
   }
+  
+  // 默认可重试
+  return true;
+}
+
+/**
+ * 执行带重试的异步操作
+ * @param fn 要执行的异步函数，接收AbortSignal参数
+ * @param operationName 操作名称，用于日志
+ * @returns 操作结果
+ */
+async function withRetry<T>(
+  fn: (signal: AbortSignal) => Promise<T>,
+  operationName: string
+): Promise<T> {
+  let lastError: Error | unknown;
+  
+  for (let attempt = 1; attempt <= RETRY_CONFIG.maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), RETRY_CONFIG.timeout);
+    
+    try {
+      console.log(`🔄 ${operationName} - 尝试 ${attempt}/${RETRY_CONFIG.maxAttempts}`);
+      
+      // 执行操作，传递AbortSignal
+      const result = await fn(controller.signal);
+      
+      clearTimeout(timeoutId);
+      console.log(`✅ ${operationName} - 第 ${attempt} 次尝试成功`);
+      return result;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      lastError = error;
+      console.error(`❌ ${operationName} - 第 ${attempt} 次尝试失败:`, error);
+      
+      // 检查是否可重试
+      if (!isRetryableError(error)) {
+        console.log(`🚫 ${operationName} - 错误不可重试，终止`);
+        throw error;
+      }
+      
+      if (attempt < RETRY_CONFIG.maxAttempts) {
+        // 计算延迟时间（指数退避 + 抖动）
+        const baseDelay = Math.min(
+          RETRY_CONFIG.initialDelay * Math.pow(2, attempt - 1),
+          RETRY_CONFIG.maxDelay
+        );
+        // 添加随机抖动（±20%）
+        const jitter = baseDelay * 0.2 * (Math.random() - 0.5);
+        const delay = Math.max(0, baseDelay + jitter);
+        
+        console.log(`⏳ 等待 ${Math.round(delay)}ms 后重试...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw new Error(
+    `${operationName} - 所有重试均失败: ${lastError instanceof Error ? lastError.message : String(lastError)}`
+  );
 }
 
 /**
@@ -74,33 +212,39 @@ async function uploadImageToOSS(
   base64Data: string,
   fileName: string = "screenshot.jpg"
 ): Promise<string> {
-  try {
-    // 将base64转换为Blob（JPEG格式）
-    const binaryString = atob(base64Data);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    const imageBlob = new Blob([bytes], { type: "image/jpeg" });
+  // 将base64转换为Uint8Array（跨环境兼容）
+  const bytes = base64ToUint8Array(base64Data);
+  
+  // 检查文件大小
+  if (!checkFileSize(bytes, policyData.max_file_size_mb)) {
+    throw new Error(
+      `文件大小超过限制 ${policyData.max_file_size_mb}MB，请压缩后重试`
+    );
+  }
+  
+  const imageBlob = new Blob([bytes], { type: "image/jpeg" });
 
-    // 构造上传路径
-    const key = `${policyData.upload_dir}/${fileName}`;
+  // 构造上传路径（规范化，避免双斜杠）
+  const uploadDir = policyData.upload_dir.replace(/\/$/, '');
+  const key = `${uploadDir}/${fileName}`;
 
-    // 构造FormData
-    const formData = new FormData();
-    formData.append("OSSAccessKeyId", policyData.oss_access_key_id);
-    formData.append("policy", policyData.policy);
-    formData.append("Signature", policyData.signature);
-    formData.append("key", key);
-    formData.append("x-oss-object-acl", policyData.x_oss_object_acl);
-    formData.append("x-oss-forbid-overwrite", policyData.x_oss_forbid_overwrite);
-    formData.append("success_action_status", "200");
-    formData.append("file", imageBlob, fileName);
+  // 构造FormData
+  const formData = new FormData();
+  formData.append("OSSAccessKeyId", policyData.oss_access_key_id);
+  formData.append("policy", policyData.policy);
+  formData.append("Signature", policyData.signature);
+  formData.append("key", key);
+  formData.append("x-oss-object-acl", policyData.x_oss_object_acl);
+  formData.append("x-oss-forbid-overwrite", policyData.x_oss_forbid_overwrite);
+  formData.append("success_action_status", "200");
+  formData.append("file", imageBlob, fileName);
 
-    // 上传文件
+  // 使用重试机制上传文件
+  return withRetry(async (signal) => {
     const response = await fetch(policyData.upload_host, {
       method: "POST",
       body: formData,
+      signal,
     });
 
     if (!response.ok) {
@@ -110,22 +254,17 @@ async function uploadImageToOSS(
 
     // 返回OSS URL
     return `oss://${key}`;
-  } catch (error) {
-    console.error("❌ 图片上传失败:", error);
-    throw new Error(
-      `Failed to upload image: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
+  }, "OSS文件上传");
 }
 
 /**
- * 上传截图并获取公网URL的主函数
+ * 上传截图并获取OSS地址的主函数
  * @param base64Data base64编码的截图数据（JPEG格式）
  * @param modelName 模型名称，默认为 'qwen-vl-plus'
  * @param fileName 文件名，默认为 'screenshot.jpg'
- * @returns 公网可访问的OSS URL
+ * @returns OSS临时地址（格式：oss://...）
  */
-export async function uploadScreenshotToBalian(
+export async function uploadScreenshotToBailian(
   base64Data: string,
   modelName: string = "qwen-vl-plus",
   fileName: string = "screenshot.jpg"
@@ -165,3 +304,7 @@ export async function uploadScreenshotToBalian(
 export function isValidOSSUrl(ossUrl: string): boolean {
   return ossUrl.startsWith("oss://") && ossUrl.length > 6;
 }
+
+// 为了保持向后兼容，保留旧名称作为别名
+/** @deprecated 使用 uploadScreenshotToBailian 代替 */
+export const uploadScreenshotToBalian = uploadScreenshotToBailian;

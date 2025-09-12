@@ -9,7 +9,7 @@ import {
   isPuppeteerImageResult,
 } from "@/types/mcp";
 import { compressImageServerV2 } from "@/lib/image-optimized";
-import { uploadScreenshotToBalian } from "@/lib/bailian-upload";
+import { uploadScreenshotToBailian } from "@/lib/bailian-upload";
 
 /**
  * Puppeteer浏览器自动化工具
@@ -224,7 +224,7 @@ export const puppeteerTool = () =>
                 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
                 const fileName = `screenshot-${timestamp}.jpg`;
 
-                const imageUrl = await uploadScreenshotToBalian(
+                const imageUrl = await uploadScreenshotToBailian(
                   compressedData,
                   "qwen-vl-plus",
                   fileName
