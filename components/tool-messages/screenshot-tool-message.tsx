@@ -7,6 +7,7 @@ import {
   Loader2,
   StopCircle,
   AlertCircle,
+  Camera,
   type LucideIcon,
 } from "lucide-react";
 import { ABORTED } from "@/lib/utils";
@@ -44,28 +45,76 @@ export function ScreenshotToolMessage({
   imageFormat = "png",
   maxHeight = "500px",
 }: ScreenshotToolMessageProps) {
-  // 检查 output 是否是图片类型
+  // 检查 output 是否是图片类型（支持 base64 data 或 URL）
   const isImageResult =
     output &&
     typeof output === "object" &&
     "type" in output &&
     output.type === "image" &&
-    "data" in output;
+    ("data" in output || "url" in output);
+
+  // 判断是否是 OSS URL
+  const isOssUrl =
+    isImageResult && "url" in output && output.url && (output.url as string).startsWith("oss://");
+
+  // 获取图片源
+  const getImageSrc = () => {
+    if (!isImageResult) return null;
+
+    // 如果有 base64 data，使用 data URL
+    if ("data" in output && output.data) {
+      return `data:image/${imageFormat};base64,${output.data}`;
+    }
+
+    // 如果有普通 URL（非 OSS），直接返回
+    if ("url" in output && output.url && !isOssUrl) {
+      return output.url as string;
+    }
+
+    return null;
+  };
+
+  const imageSrc = getImageSrc();
 
   const content =
     state === "output-available" && isImageResult ? (
-      <div className="mt-2 relative w-full" style={{ maxHeight }}>
-        <div className="relative w-full" style={{ aspectRatio: "16/9" }}>
-          <Image
-            src={`data:image/${imageFormat};base64,${output.data}`}
-            alt="Screenshot"
-            fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="rounded-sm object-contain"
-            priority
-          />
+      imageSrc ? (
+        // 可以直接显示的图片
+        <div className="mt-2 relative w-full" style={{ maxHeight }}>
+          <div className="relative w-full" style={{ aspectRatio: "16/9" }}>
+            <Image
+              src={imageSrc}
+              alt="Screenshot"
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              className="rounded-sm object-contain"
+              priority
+              unoptimized={imageSrc.startsWith("http")} // 对外部 URL 禁用优化
+            />
+          </div>
         </div>
-      </div>
+      ) : isOssUrl ? (
+        // OSS URL 占位提示
+        <div className="mt-2 relative w-full" style={{ maxHeight }}>
+          <div
+            className="relative w-full bg-gray-100 dark:bg-gray-800 rounded-sm p-8"
+            style={{ aspectRatio: "16/9" }}
+          >
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <Camera className="w-12 h-12 text-gray-400 mb-3" />
+              <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                截图已上传至百炼 OSS
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                图片 URL: {(output.url as string).substring(0, 50)}...
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-600 mt-2">
+                使用分析工具可查看图片内容
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null
     ) : state === "input-available" || state === "input-streaming" ? (
       <div
         className={`w-full aspect-video rounded-sm ${theme.iconBgColor.replace("bg-", "bg-opacity-20 bg-")} animate-pulse mt-2`}

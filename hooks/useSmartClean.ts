@@ -5,6 +5,18 @@ import { toast } from "sonner";
 import { toastConfirm } from "@/lib/ui/toast-confirm";
 import type { UIMessage } from "@ai-sdk/react";
 
+/**
+ * 工具图片输出类型
+ */
+type ToolImageOutput = { type: "image"; data: string };
+
+/**
+ * 类型守卫：检查是否为工具图片输出
+ */
+function isToolImageOutput(x: unknown): x is ToolImageOutput {
+  return !!x && typeof x === "object" && "type" in x && (x as { type: unknown }).type === "image";
+}
+
 interface UseSmartCleanProps {
   messages: UIMessage[];
   setMessages: (messages: UIMessage[]) => void;
@@ -40,10 +52,7 @@ export function useSmartClean({ messages, setMessages, envLimits, envInfo }: Use
             "state" in part &&
             part.state === "output-available" &&
             "output" in part &&
-            typeof part.output === "object" &&
-            part.output !== null &&
-            "type" in part.output &&
-            (part.output as any).type === "image"
+            isToolImageOutput(part.output)
           ) {
             imageCount++;
             if (imageCount > keepImageCount) {

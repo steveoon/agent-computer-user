@@ -160,7 +160,7 @@ export function ChatHeader({
             </PopoverContent>
           </Popover>
           {/* 配置页面入口 */}
-          <Link 
+          <Link
             href="/admin/settings"
             className="flex items-center gap-1.5 hover:bg-white/50 px-2 py-1 rounded-md transition-colors"
           >

@@ -156,15 +156,42 @@ export const zhipinSayHelloSimpleTool = () =>
               }
               
               // 获取所有候选人卡片
-              // Boss直聘是两列布局，需要获取所有的候选人卡片，而不是li.card-item
-              let allCandidateCards = doc.querySelectorAll('.geek-card-small.candidate-card-wrap');
+              // Boss直聘有多种布局，需要按优先级尝试不同的选择器
+              let allCandidateCards = [];
+              
+              // 按优先级尝试不同的选择器
+              const candidateSelectors = [
+                // 新版结构（不带.geek-card-small类）
+                '.candidate-card-wrap',
+                // 旧版结构
+                '.geek-card-small.candidate-card-wrap',
+                // 备用选择器
+                '.card-inner.common-wrap',
+                '.card-inner[data-geek]'
+              ];
+              
+              for (const selector of candidateSelectors) {
+                const found = doc.querySelectorAll(selector);
+                if (found.length > 0) {
+                  // 过滤确保每个元素都是有效的候选人卡片
+                  const validCards = Array.from(found).filter(el => {
+                    // 检查是否有打招呼按钮，这是最可靠的判断方法
+                    const hasGreetBtn = el.querySelector('button.btn.btn-greet') !== null;
+                    // 或者检查是否有候选人信息
+                    const hasCardInner = el.querySelector('.card-inner') !== null || el.classList.contains('card-inner');
+                    return hasGreetBtn || hasCardInner;
+                  });
+                  
+                  if (validCards.length > 0) {
+                    allCandidateCards = validCards;
+                    console.log('使用选择器找到候选人卡片: ' + selector + ', 数量: ' + validCards.length);
+                    break;
+                  }
+                }
+              }
               
               if (allCandidateCards.length === 0) {
-                // 尝试备用选择器
-                allCandidateCards = doc.querySelectorAll('.card-inner.common-wrap');
-                if (allCandidateCards.length === 0) {
-                  return { success: false, error: '未找到候选人卡片列表' };
-                }
+                return { success: false, error: '未找到候选人卡片列表' };
               }
               
               console.log('找到候选人卡片数量: ' + allCandidateCards.length);
@@ -183,7 +210,7 @@ export const zhipinSayHelloSimpleTool = () =>
               if (!cardInner && targetCard.classList.contains('card-inner')) {
                 cardInner = targetCard; // 如果targetCard本身就是card-inner
               }
-              const candidateId = cardInner ? cardInner.getAttribute('data-geek') : null;
+              const candidateId = cardInner ? (cardInner.getAttribute('data-geek') || cardInner.getAttribute('data-geekid')) : null;
               
               // 查找候选人姓名
               let candidateName = '候选人';

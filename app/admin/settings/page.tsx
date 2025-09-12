@@ -79,7 +79,7 @@ export default function AdminSettingsPage() {
         <ArrowLeft className="h-4 w-4" />
         <span className="text-sm">返回首页</span>
       </button>
-      
+
       {/* 页面头部 */}
       <div className="flex items-center justify-between mb-8">
         <div>

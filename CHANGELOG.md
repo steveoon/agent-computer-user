@@ -4,37 +4,32 @@ All notable changes to AI SDK Computer Use will be documented in this file.
 
 # [1.7.0](https://github.com/steveoon/agent-computer-user/compare/v1.6.0...v1.7.0) (2025-09-08)
 
-
 ### Bug Fixes
 
-* 更新订单状态枚举值为完整列表 ([63cc6ea](https://github.com/steveoon/agent-computer-user/commit/63cc6ea3bd842626a7c911eef0cfed6775f1dc09))
-
+- 更新订单状态枚举值为完整列表 ([63cc6ea](https://github.com/steveoon/agent-computer-user/commit/63cc6ea3bd842626a7c911eef0cfed6775f1dc09))
 
 ### Features
 
-* 升级输入组件为多行 Textarea 并增强用户体验 ([7a923b7](https://github.com/steveoon/agent-computer-user/commit/7a923b78db47fbe270aaaa5444775b49b25e66ea))
-* 添加 BOSS直聘聊天详情样本数据和品牌选择历史功能 ([5f3a7f9](https://github.com/steveoon/agent-computer-user/commit/5f3a7f98a48a85f9808c607442474be8a3d04155))
-* 添加微信号配置管理和修复Yupao交换微信功能 ([8e1d972](https://github.com/steveoon/agent-computer-user/commit/8e1d9728854954d3fbf05b6db54de6f570f09be6))
+- 升级输入组件为多行 Textarea 并增强用户体验 ([7a923b7](https://github.com/steveoon/agent-computer-user/commit/7a923b78db47fbe270aaaa5444775b49b25e66ea))
+- 添加 BOSS直聘聊天详情样本数据和品牌选择历史功能 ([5f3a7f9](https://github.com/steveoon/agent-computer-user/commit/5f3a7f98a48a85f9808c607442474be8a3d04155))
+- 添加微信号配置管理和修复Yupao交换微信功能 ([8e1d972](https://github.com/steveoon/agent-computer-user/commit/8e1d9728854954d3fbf05b6db54de6f570f09be6))
 
 # [1.7.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.7.0-develop.1...v1.7.0-develop.2) (2025-09-08)
 
-
 ### Features
 
-* 添加微信号配置管理和修复Yupao交换微信功能 ([8e1d972](https://github.com/steveoon/agent-computer-user/commit/8e1d9728854954d3fbf05b6db54de6f570f09be6))
+- 添加微信号配置管理和修复Yupao交换微信功能 ([8e1d972](https://github.com/steveoon/agent-computer-user/commit/8e1d9728854954d3fbf05b6db54de6f570f09be6))
 
 # [1.7.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.6.0...v1.7.0-develop.1) (2025-09-04)
 
-
 ### Bug Fixes
 
-* 更新订单状态枚举值为完整列表 ([63cc6ea](https://github.com/steveoon/agent-computer-user/commit/63cc6ea3bd842626a7c911eef0cfed6775f1dc09))
-
+- 更新订单状态枚举值为完整列表 ([63cc6ea](https://github.com/steveoon/agent-computer-user/commit/63cc6ea3bd842626a7c911eef0cfed6775f1dc09))
 
 ### Features
 
-* 升级输入组件为多行 Textarea 并增强用户体验 ([7a923b7](https://github.com/steveoon/agent-computer-user/commit/7a923b78db47fbe270aaaa5444775b49b25e66ea))
-* 添加 BOSS直聘聊天详情样本数据和品牌选择历史功能 ([5f3a7f9](https://github.com/steveoon/agent-computer-user/commit/5f3a7f98a48a85f9808c607442474be8a3d04155))
+- 升级输入组件为多行 Textarea 并增强用户体验 ([7a923b7](https://github.com/steveoon/agent-computer-user/commit/7a923b78db47fbe270aaaa5444775b49b25e66ea))
+- 添加 BOSS直聘聊天详情样本数据和品牌选择历史功能 ([5f3a7f9](https://github.com/steveoon/agent-computer-user/commit/5f3a7f98a48a85f9808c607442474be8a3d04155))
 
 # [1.6.0](https://github.com/steveoon/agent-computer-user/compare/v1.5.0...v1.6.0) (2025-09-01)
 

@@ -1,25 +1,25 @@
-"use client"
+"use client";
 
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import { useEffect } from "react"
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
 
 interface ToastConfirmOptions {
-  title: string
-  description?: string
-  confirmLabel?: string
-  cancelLabel?: string
-  onConfirm: () => void | Promise<void>
-  onCancel?: () => void
-  variant?: "default" | "destructive"
-  closeButton?: boolean
-  enableKeyboard?: boolean
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm: () => void | Promise<void>;
+  onCancel?: () => void;
+  variant?: "default" | "destructive";
+  closeButton?: boolean;
+  enableKeyboard?: boolean;
 }
 
 /**
  * 显示一个确认对话框，使用 toast 代替 window.confirm
  * 适用于 Tauri 桌面应用和 Web 环境
- * 
+ *
  * @param title - 对话框标题
  * @param description - 可选的描述文本
  * @param confirmLabel - 确认按钮文本，默认"确定"
@@ -44,39 +44,37 @@ export function toastConfirm({
 }: ToastConfirmOptions) {
   const ToastContent = () => {
     useEffect(() => {
-      if (!enableKeyboard) return
+      if (!enableKeyboard) return;
 
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault()
-          toast.dismiss(toastId)
-          onConfirm()
+          e.preventDefault();
+          toast.dismiss(toastId);
+          onConfirm();
         } else if (e.key === "Escape") {
-          e.preventDefault()
-          toast.dismiss(toastId)
-          onCancel?.()
+          e.preventDefault();
+          toast.dismiss(toastId);
+          onCancel?.();
         }
-      }
+      };
 
-      window.addEventListener("keydown", handleKeyDown)
-      return () => window.removeEventListener("keydown", handleKeyDown)
-    }, [])
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
 
     return (
       <div className="flex flex-col gap-3">
         <div>
           <div className="font-semibold">{title}</div>
-          {description && (
-            <div className="text-sm text-muted-foreground mt-1">{description}</div>
-          )}
+          {description && <div className="text-sm text-muted-foreground mt-1">{description}</div>}
         </div>
         <div className="flex gap-2">
           <Button
             size="sm"
             variant={variant}
             onClick={async () => {
-              toast.dismiss(toastId)
-              await onConfirm()
+              toast.dismiss(toastId);
+              await onConfirm();
             }}
             autoFocus
           >
@@ -86,23 +84,23 @@ export function toastConfirm({
             size="sm"
             variant="outline"
             onClick={() => {
-              toast.dismiss(toastId)
-              onCancel?.()
+              toast.dismiss(toastId);
+              onCancel?.();
             }}
           >
             {cancelLabel}
           </Button>
         </div>
       </div>
-    )
-  }
+    );
+  };
 
   const toastId = toast(<ToastContent />, {
     duration: Infinity,
     position: "top-center",
     closeButton,
     onDismiss: onCancel,
-  })
-  
-  return toastId
+  });
+
+  return toastId;
 }

@@ -409,11 +409,7 @@ export const GeneralConfigManager = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium">微信号列表</h4>
-                <Button
-                  size="sm"
-                  onClick={() => setIsAddingWechat(true)}
-                  disabled={isAddingWechat}
-                >
+                <Button size="sm" onClick={() => setIsAddingWechat(true)} disabled={isAddingWechat}>
                   <Plus className="h-4 w-4 mr-2" />
                   添加微信号
                 </Button>
@@ -421,7 +417,9 @@ export const GeneralConfigManager = () => {
 
               {wechatAccounts.length === 0 && !isAddingWechat ? (
                 <Alert>
-                  <AlertDescription>还没有配置微信号，点击上方按钮添加第一个微信号</AlertDescription>
+                  <AlertDescription>
+                    还没有配置微信号，点击上方按钮添加第一个微信号
+                  </AlertDescription>
                 </Alert>
               ) : (
                 <div className="space-y-3">
@@ -450,7 +448,9 @@ export const GeneralConfigManager = () => {
                               defaultValue={account.wechatId}
                               onBlur={e => {
                                 if (e.target.value.trim()) {
-                                  updateWechatAccount(account.id, { wechatId: e.target.value.trim() });
+                                  updateWechatAccount(account.id, {
+                                    wechatId: e.target.value.trim(),
+                                  });
                                 }
                               }}
                             />
@@ -459,7 +459,9 @@ export const GeneralConfigManager = () => {
                             placeholder="描述（选填）"
                             defaultValue={account.description}
                             onBlur={e => {
-                              updateWechatAccount(account.id, { description: e.target.value.trim() });
+                              updateWechatAccount(account.id, {
+                                description: e.target.value.trim(),
+                              });
                             }}
                           />
                           <div className="flex gap-2">
@@ -539,7 +541,9 @@ export const GeneralConfigManager = () => {
                         <Input
                           placeholder="描述（选填）"
                           value={newWechat.description}
-                          onChange={e => setNewWechat({ ...newWechat, description: e.target.value })}
+                          onChange={e =>
+                            setNewWechat({ ...newWechat, description: e.target.value })
+                          }
                         />
                         <div className="flex gap-2">
                           <Button size="sm" onClick={addWechatAccount}>

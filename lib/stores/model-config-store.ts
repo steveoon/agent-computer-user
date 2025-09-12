@@ -1,7 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ModelId, ProviderConfig } from "@/lib/config/models";
-import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS, MODEL_DICTIONARY } from "@/lib/config/models";
+import {
+  DEFAULT_MODEL_CONFIG,
+  DEFAULT_PROVIDER_CONFIGS,
+  MODEL_DICTIONARY,
+} from "@/lib/config/models";
 
 /**
  * 🤖 模型配置管理Store
@@ -42,12 +46,12 @@ function validateModelId(modelId: ModelId | undefined, defaultModelId: ModelId):
     console.warn(`[MODEL CONFIG] 模型 ID 未定义，使用默认值: ${defaultModelId}`);
     return defaultModelId;
   }
-  
+
   if (!(modelId in MODEL_DICTIONARY)) {
     console.warn(`[MODEL CONFIG] 无效的模型 ID: ${modelId}，已重置为默认值: ${defaultModelId}`);
     return defaultModelId;
   }
-  
+
   return modelId;
 }
 

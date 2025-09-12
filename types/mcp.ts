@@ -94,10 +94,13 @@ export const PuppeteerResultSchema = z.discriminatedUnion("type", [
     type: z.literal("text"),
     text: z.string(),
   }),
-  z.object({
-    type: z.literal("image"),
-    data: z.string().describe("Base64编码的图片数据"),
-  }),
+  z
+    .object({
+      type: z.literal("image"),
+      data: z.string().optional().describe("Base64编码的图片数据（可选）"),
+      url: z.string().optional().describe("图片的公网URL（可选）"),
+    })
+    .refine(data => data.data || data.url, { message: "图片结果必须包含 data 或 url 其中之一" }),
 ]);
 
 export type PuppeteerResult = z.infer<typeof PuppeteerResultSchema>;
@@ -142,12 +145,20 @@ export const MCPManagerStatusSchema = z.object({
 export type MCPManagerStatus = z.infer<typeof MCPManagerStatusSchema>;
 
 /**
+ * AbortSignal 自定义 Schema
+ */
+const AbortSignalSchema = z.custom<AbortSignal>(
+  (v): v is AbortSignal => typeof v === "object" && v !== null && "aborted" in (v as object),
+  "Invalid AbortSignal"
+);
+
+/**
  * MCP工具执行选项（参考AI SDK的ToolExecutionOptions）
  */
 export const MCPToolExecutionOptionsSchema = z.object({
   toolCallId: z.string().optional().describe("工具调用ID"),
   messages: z.array(z.unknown()).optional().describe("消息历史"),
-  abortSignal: z.any().optional().describe("中断信号"),
+  abortSignal: AbortSignalSchema.optional().describe("中断信号"),
 });
 
 export type MCPToolExecutionOptions = z.infer<typeof MCPToolExecutionOptionsSchema>;
@@ -169,8 +180,8 @@ export const MCPToolBaseSchema = z.object({
  */
 export const MCPToolSchema = MCPToolBaseSchema.extend({
   execute: z
-    .any()
-    .refine((val): val is Function => typeof val === "function", {
+    .unknown()
+    .refine((v): v is Function => typeof v === "function", {
       message: "execute必须是一个函数",
     })
     .describe("工具执行函数"),
@@ -379,14 +390,18 @@ export type PuppeteerToolParams = PuppeteerParams;
  * 检查是否为Puppeteer文本结果
  */
 export function isPuppeteerTextResult(result: unknown): result is { type: "text"; text: string } {
-  return PuppeteerResultSchema.safeParse(result).success && (result as any).type === "text";
+  const parsed = PuppeteerResultSchema.safeParse(result);
+  return parsed.success && parsed.data.type === "text";
 }
 
 /**
  * 检查是否为Puppeteer图片结果
  */
-export function isPuppeteerImageResult(result: unknown): result is { type: "image"; data: string } {
-  return PuppeteerResultSchema.safeParse(result).success && (result as any).type === "image";
+export function isPuppeteerImageResult(
+  result: unknown
+): result is { type: "image"; data?: string; url?: string } {
+  const parsed = PuppeteerResultSchema.safeParse(result);
+  return parsed.success && parsed.data.type === "image";
 }
 
 /**

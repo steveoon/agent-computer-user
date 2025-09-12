@@ -34,7 +34,7 @@ export const dulidayInterviewBookingTool = (customToken?: string) =>
         .default(1)
         .describe("是否有健康证：1=有，2=无但接受办理健康证，3=无且不接受办理健康证，默认为1"),
       customerLabelList: z
-        .array(z.any())
+        .array(z.unknown())
         .optional()
         .default([])
         .describe("客户标签列表，默认为空数组"),
