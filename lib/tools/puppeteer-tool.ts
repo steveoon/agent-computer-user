@@ -9,6 +9,7 @@ import {
   isPuppeteerImageResult,
 } from "@/types/mcp";
 import { compressImageServerV2 } from "@/lib/image-optimized";
+import { uploadScreenshotToBailian } from "@/lib/bailian-upload";
 
 /**
  * Puppeteer浏览器自动化工具
@@ -72,7 +73,7 @@ export const puppeteerTool = () =>
       // 截图参数
       name: z.string().optional().describe("截图名称，用于后续引用"),
       selector: z.string().optional().describe("CSS选择器，指定要截图的元素"),
-      width: z.number().optional().describe("视口宽度（像素），默认1920"),
+      width: z.number().optional().describe("视口宽度（像素），默认1440"),
       height: z.number().optional().describe("视口高度（像素），默认1080"),
 
       // 交互参数
@@ -91,7 +92,7 @@ export const puppeteerTool = () =>
         name,
         selector,
         width = 1440,
-        height = 900,
+        height = 1080,
         value,
         script,
       } = params;
@@ -217,11 +218,34 @@ export const puppeteerTool = () =>
                 `✅ 服务端压缩完成，当前大小: ${(compressedData.length / 1024).toFixed(2)}KB`
               );
 
-              const imageResult: PuppeteerResult = {
-                type: "image",
-                data: compressedData,
-              };
-              return PuppeteerResultSchema.parse(imageResult);
+              // 上传到百炼获取公网URL，避免图片字节进入模型上下文
+              try {
+                console.log("📤 正在上传截图到阿里云百炼...");
+                const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+                const fileName = `screenshot-${timestamp}.jpg`;
+
+                const imageUrl = await uploadScreenshotToBailian(
+                  compressedData,
+                  "qwen-vl-plus",
+                  fileName
+                );
+
+                const imageResult: PuppeteerResult = {
+                  type: "image",
+                  url: imageUrl,
+                  // 不设置 data 字段，避免图片字节进入模型上下文
+                };
+                return PuppeteerResultSchema.parse(imageResult);
+              } catch (uploadError) {
+                console.error("❌ 截图上传失败，降级为本地处理:", uploadError);
+
+                // 降级：仍然返回压缩后的图片数据（但会有 prompt too long 风险）
+                const imageResult: PuppeteerResult = {
+                  type: "image",
+                  data: compressedData,
+                };
+                return PuppeteerResultSchema.parse(imageResult);
+              }
             }
           }
 
@@ -296,7 +320,7 @@ export const puppeteerTool = () =>
         return PuppeteerResultSchema.parse(errorResult);
       }
     },
-    toModelOutput(result: unknown) {
+    toModelOutput(result) {
       try {
         // 如果result是字符串，将其包装为text类型的结果
         if (typeof result === "string") {
@@ -319,14 +343,42 @@ export const puppeteerTool = () =>
           };
         }
         if (isPuppeteerImageResult(validatedResult)) {
-          // AI SDK v5 格式
+          // 优先使用 URL 方式，避免图片字节进入模型上下文
+          if (validatedResult.url) {
+            // 返回文本结果，包含图片URL信息，让上层应用处理图片展示
+            // 注意：工具输出不直接支持图片URL，需要在消息层面处理
+            return {
+              type: "content" as const,
+              value: [
+                {
+                  type: "text" as const,
+                  text: `Screenshot captured and uploaded successfully.\n\nImage URL: ${validatedResult.url}\n\nNote: This screenshot is available for analysis. The image has been uploaded to a temporary storage and is accessible via the provided URL.`,
+                },
+              ],
+            };
+          }
+
+          // 降级：如果只有 data 没有 URL，返回文本占位（避免 prompt too long）
+          if (validatedResult.data) {
+            console.warn("⚠️ 截图未上传，仅返回文本占位以避免 prompt 过长");
+            return {
+              type: "content" as const,
+              value: [
+                {
+                  type: "text" as const,
+                  text: "Screenshot captured but not uploaded. Image data available locally but not accessible to avoid context length limits.",
+                },
+              ],
+            };
+          }
+
+          // 异常情况：既没有 URL 也没有 data
           return {
             type: "content" as const,
             value: [
               {
-                type: "media" as const,
-                mediaType: "image/jpeg",
-                data: validatedResult.data,
+                type: "text" as const,
+                text: "Screenshot operation completed but no image data available.",
               },
             ],
           };

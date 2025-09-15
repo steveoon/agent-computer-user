@@ -17,6 +17,8 @@ import {
   ListChecks,
   ClipboardList,
   HandshakeIcon,
+  Eye,
+  FileSearch,
 } from "lucide-react";
 import { ComputerToolMessage } from "./computer-tool";
 import { BashToolMessage } from "./bash-tool";
@@ -30,6 +32,7 @@ import { ZhipinSendMessageTool } from "./zhipin-send-message-tool";
 import { ZhipinChatDetailsTool } from "./zhipin-chat-details-tool";
 import { ZhipinExchangeWechatTool } from "./zhipin-exchange-wechat-tool";
 import { ZhipinGetUsernameTool } from "./zhipin-get-username-tool";
+import { ZhipinLocateResumeToolMessage } from "./zhipin-locate-resume-tool";
 import { YupaoToolMessage } from "./yupao-tool";
 import { YupaoChatDetailsTool } from "./yupao-chat-details-tool";
 import { DulidayJobListToolMessage } from "./duliday-job-list-tool";
@@ -37,6 +40,7 @@ import { DulidayJobDetailsToolMessage } from "./duliday-job-details-tool";
 import { DulidayInterviewBookingToolMessage } from "./duliday-interview-booking-tool";
 import { DulidayBiReportToolMessage } from "./duliday-bi-report-tool";
 import { DulidayBiRefreshTool } from "./duliday-bi-refresh-tool";
+import { AnalyzeScreenshotToolMessage } from "./analyze-screenshot-tool";
 import { themes, type ToolConfig } from "./types";
 
 // 工具注册表
@@ -183,6 +187,17 @@ export const toolRegistry: Record<string, ToolConfig> = {
     icon: HandshakeIcon,
     defaultTheme: themes.purple,
     render: YupaoToolMessage,
+  },
+  // Zhipin Canvas and Analysis tools
+  zhipin_locate_resume_canvas: {
+    icon: FileSearch,
+    defaultTheme: themes.blue,
+    render: ZhipinLocateResumeToolMessage,
+  },
+  analyze_screenshot: {
+    icon: Eye,
+    defaultTheme: themes.purple,
+    render: AnalyzeScreenshotToolMessage,
   },
 };
 

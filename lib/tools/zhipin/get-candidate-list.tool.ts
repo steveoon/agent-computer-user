@@ -130,38 +130,65 @@ export const zhipinGetCandidateListTool = () =>
             }
           }
           
-          // 查找所有候选人卡片
+          // 查找所有候选人卡片 - 兼容新旧两种结构
           let cardItems = [];
           
-          // Boss直聘的布局是每个li.card-item包含一个div.row，
-          // 而div.row里面有两个候选人卡片（左右两列）
-          // 所以我们需要直接查找所有的候选人卡片，而不是li.card-item
-          const selectors = [
-            '.geek-card-small.candidate-card-wrap',  // 直接查找候选人卡片
-            '.card-inner.common-wrap',
-            'li.card-item .geek-card-small',
-            'li.card-item .card-inner'
-          ];
+          // Boss直聘有两种布局结构：
+          // 旧版（两列布局）：li.card-item > div.row > 两个 geek-card-small.candidate-card-wrap > card-inner
+          // 新版（单列布局）：li.card-item > candidate-card-wrap > card-inner
           
-          for (const selector of selectors) {
-            const found = doc.querySelectorAll(selector);
-            if (found.length > 0) {
-              cardItems = Array.from(found);
-              console.log('使用选择器找到候选人卡片: ' + selector + ', 数量: ' + found.length);
-              break;
+          // 策略1：直接查找所有有data-geek属性的card-inner（最可靠）
+          cardItems = Array.from(doc.querySelectorAll('.card-inner[data-geek]'));
+          
+          if (cardItems.length === 0) {
+            // 策略2：尝试各种可能的选择器组合
+            const selectors = [
+              // 新版结构选择器
+              'li.card-item .candidate-card-wrap .card-inner',
+              'li.card-item > .candidate-card-wrap .card-inner',
+              '.candidate-card-wrap .card-inner.common-wrap',
+              // 旧版结构选择器  
+              '.geek-card-small.candidate-card-wrap .card-inner',
+              '.geek-card-small .card-inner.common-wrap',
+              'li.card-item .row .card-inner',
+              // 通用选择器
+              '.card-inner.common-wrap',
+              '.card-inner'
+            ];
+            
+            for (const selector of selectors) {
+              const found = doc.querySelectorAll(selector);
+              if (found.length > 0) {
+                // 过滤确保每个元素都有data-geek或者是有效的候选人卡片
+                const validCards = Array.from(found).filter(el => {
+                  // 检查是否有data-geek属性或者是否在候选人卡片容器内
+                  return el.getAttribute('data-geek') || 
+                         el.closest('.candidate-card-wrap') || 
+                         el.closest('.geek-card-small');
+                });
+                if (validCards.length > 0) {
+                  cardItems = validCards;
+                  console.log('使用选择器找到候选人卡片: ' + selector + ', 数量: ' + validCards.length);
+                  break;
+                }
+              }
             }
+          } else {
+            console.log('直接通过data-geek属性找到候选人卡片, 数量: ' + cardItems.length);
           }
           
           if (cardItems.length === 0) {
             return { 
-              error: '未找到候选人卡片列表，尝试了选择器: ' + selectors.join(', '), 
+              error: '未找到候选人卡片列表', 
               candidates: [],
               pageInfo: {
                 hasIframe: !!iframe,
                 isIframeAccessible: doc !== document,
                 hasLiCardItem: doc.querySelectorAll('li.card-item').length,
+                hasCandidateWrap: doc.querySelectorAll('.candidate-card-wrap').length,
                 hasGeekCard: doc.querySelectorAll('.geek-card-small').length,
-                hasCardInner: doc.querySelectorAll('.card-inner').length
+                hasCardInner: doc.querySelectorAll('.card-inner').length,
+                hasDataGeek: doc.querySelectorAll('[data-geek]').length
               }
             };
           }
@@ -170,18 +197,24 @@ export const zhipinGetCandidateListTool = () =>
             try {
               const candidate = { index };
               
-              // 卡片容器就是当前元素
+              // 根据不同的结构找到正确的容器
               let cardContainer = card;
+              let cardInner = card;
               
-              // 获取候选人ID - 根据实际DOM结构调整
-              let cardInner = cardContainer.querySelector('.card-inner');
-              if (!cardInner && cardContainer.classList.contains('card-inner')) {
-                cardInner = cardContainer; // 如果card本身就是card-inner
+              // 如果当前元素是card-inner，找到外层容器
+              if (card.classList.contains('card-inner')) {
+                // 尝试找到外层的候选人卡片容器
+                const wrapper = card.closest('.candidate-card-wrap') || 
+                               card.closest('.geek-card-small') ||
+                               card.parentElement;
+                if (wrapper) {
+                  cardContainer = wrapper;
+                }
               }
-              if (cardInner) {
-                candidate.candidateId = cardInner.getAttribute('data-geek') || 
-                                       cardInner.getAttribute('data-geekid');
-              }
+              
+              // 获取候选人ID
+              candidate.candidateId = cardInner.getAttribute('data-geek') || 
+                                     cardInner.getAttribute('data-geekid');
               
               // 获取姓名
               const nameEl = cardContainer.querySelector('.name');
@@ -215,11 +248,21 @@ export const zhipinGetCandidateListTool = () =>
                 }
               }
               
-              // 获取工作经历（当前公司和职位）- 适配两种content结构
-              let workExpEl = cardContainer.querySelector('.timeline-wrap.work-exps .content.join-text-wrap');
+              // 获取工作经历（当前公司和职位）- 兼容新旧两种结构
+              // 旧版：.timeline-wrap.work-exps .content
+              // 新版：.timeline-wrap.work-exps .timeline-item:first-child .content
+              let workExpEl = cardContainer.querySelector('.timeline-wrap.work-exps .timeline-item:first-child .content.join-text-wrap');
+              if (!workExpEl) {
+                workExpEl = cardContainer.querySelector('.timeline-wrap.work-exps .timeline-item:first-child .content');
+              }
+              if (!workExpEl) {
+                // 旧版结构
+                workExpEl = cardContainer.querySelector('.timeline-wrap.work-exps .content.join-text-wrap');
+              }
               if (!workExpEl) {
                 workExpEl = cardContainer.querySelector('.timeline-wrap.work-exps .content');
               }
+              
               if (workExpEl) {
                 const workText = workExpEl.textContent?.trim();
                 if (workText) {
@@ -235,11 +278,25 @@ export const zhipinGetCandidateListTool = () =>
                 }
               }
               
-              // 获取期望信息（期望地点和职位）- 适配两种content结构
-              let expectEl = cardContainer.querySelector('.timeline-wrap.expect .content.join-text-wrap');
+              // 获取期望信息（期望地点和职位）- 兼容新旧两种结构
+              // 新版：在row中查找"期望："标签对应的内容
+              let expectEl = null;
+              const expectRow = cardContainer.querySelector('.row-flex');
+              if (expectRow) {
+                const labelEl = expectRow.querySelector('.label');
+                if (labelEl && labelEl.textContent?.includes('期望')) {
+                  expectEl = expectRow.querySelector('.content');
+                }
+              }
+              
+              // 旧版：.timeline-wrap.expect .content
+              if (!expectEl) {
+                expectEl = cardContainer.querySelector('.timeline-wrap.expect .content.join-text-wrap');
+              }
               if (!expectEl) {
                 expectEl = cardContainer.querySelector('.timeline-wrap.expect .content');
               }
+              
               if (expectEl) {
                 const expectText = expectEl.textContent?.trim();
                 if (expectText) {

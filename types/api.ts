@@ -20,15 +20,15 @@ import type { ZhipinData, SystemPromptsConfig, ReplyPromptsConfig } from "./inde
  */
 export const ChatRequestBodySchema = z.object({
   // 必需字段
-  messages: z.array(z.any()), // UIMessage[] - Zod 无法验证复杂的 AI SDK 类型
+  messages: z.array(z.unknown()), // UIMessage[] - Zod 无法验证复杂的 AI SDK 类型
   sandboxId: z.string().nullable(), // null 表示不使用沙盒
 
   // 可选字段
   preferredBrand: z.string().optional(),
-  modelConfig: z.any().optional(), // ModelConfig - 来自 lib/config/models
-  configData: z.any().optional(), // ZhipinData
-  systemPrompts: z.any().optional(), // SystemPromptsConfig
-  replyPrompts: z.any().optional(), // ReplyPromptsConfig
+  modelConfig: z.unknown().optional(), // ModelConfig - 来自 lib/config/models
+  configData: z.unknown().optional(), // ZhipinData
+  systemPrompts: z.unknown().optional(), // SystemPromptsConfig
+  replyPrompts: z.unknown().optional(), // ReplyPromptsConfig
   activeSystemPrompt: z.string().optional(), // keyof SystemPromptsConfig
   dulidayToken: z.string().optional(),
   defaultWechatId: z.string().optional(), // 默认微信号

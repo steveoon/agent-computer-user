@@ -415,7 +415,7 @@ export const yupaoExchangeWechatTool = () =>
               moveSteps: 15,
             });
             confirmClicked = true;
-            
+
             // 清理标识属性
             await puppeteerEvaluate.execute({
               script: wrapAntiDetectionScript(`

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Database, MessageSquare, Cpu, RefreshCw } from "lucide-react";
+import { Settings, Database, MessageSquare, Cpu, RefreshCw, ArrowLeft } from "lucide-react";
 import { BrandDataEditor } from "@/components/admin/brand-data-editor";
 import { PromptsEditor } from "@/components/admin/prompts-editor";
 import { SystemPromptsEditor } from "@/components/admin/system-prompts-editor";
@@ -71,6 +71,15 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
+      {/* 返回按钮 */}
+      <button
+        onClick={() => router.push("/")}
+        className="flex items-center gap-2 mb-6 text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        <span className="text-sm">返回首页</span>
+      </button>
+
       {/* 页面头部 */}
       <div className="flex items-center justify-between mb-8">
         <div>

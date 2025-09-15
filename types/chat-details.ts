@@ -218,7 +218,7 @@ export function parseChatDetailsResult(value: unknown): ChatDetailsResult | null
   // Check if the value has any of the expected properties
   // If it's a completely unrelated object, return null
   if (typeof value === "object" && value !== null) {
-    const obj = value as any;
+    const obj = value as Record<string, unknown>;
     const hasExpectedProps =
       "success" in obj ||
       "message" in obj ||
@@ -237,31 +237,31 @@ export function parseChatDetailsResult(value: unknown): ChatDetailsResult | null
     console.warn("Failed to fully parse chat details result, returning partial:", parsed.error);
 
     // Only return a partial object if at least one property is defined
-    const partialResult: any = {};
+    const partialResult: Partial<ChatDetailsResult> = {};
     let hasDefinedValue = false;
 
-    if (obj.success !== undefined) {
+    if (obj.success !== undefined && typeof obj.success === "boolean") {
       partialResult.success = obj.success;
       hasDefinedValue = true;
     }
-    if (obj.message !== undefined) {
+    if (obj.message !== undefined && typeof obj.message === "string") {
       partialResult.message = obj.message;
       hasDefinedValue = true;
     }
-    if (obj.error !== undefined) {
+    if (obj.error !== undefined && typeof obj.error === "string") {
       partialResult.error = obj.error;
       hasDefinedValue = true;
     }
-    if (obj.data !== undefined) {
-      partialResult.data = obj.data;
+    if (obj.data !== undefined && typeof obj.data === "object" && obj.data !== null) {
+      partialResult.data = obj.data as ChatDetailsResult["data"];
       hasDefinedValue = true;
     }
-    if (obj.summary !== undefined) {
-      partialResult.summary = obj.summary;
+    if (obj.summary !== undefined && typeof obj.summary === "object" && obj.summary !== null) {
+      partialResult.summary = obj.summary as ChatDetailsResult["summary"];
       hasDefinedValue = true;
     }
-    if (obj.formattedHistory !== undefined) {
-      partialResult.formattedHistory = obj.formattedHistory;
+    if (obj.formattedHistory !== undefined && Array.isArray(obj.formattedHistory)) {
+      partialResult.formattedHistory = obj.formattedHistory as string[];
       hasDefinedValue = true;
     }
 
@@ -332,7 +332,7 @@ export function getSenderDisplay(sender: ChatMessageSender): {
  * Migrate from old inline type to new shared type
  * This helper ensures backward compatibility during migration
  */
-export function migrateToUnifiedType(oldResult: any): ChatDetailsResult {
+export function migrateToUnifiedType(oldResult: unknown): ChatDetailsResult {
   // If it already matches the new schema, return as-is
   const parsed = ChatDetailsResultSchema.safeParse(oldResult);
   if (parsed.success) {
@@ -341,13 +341,27 @@ export function migrateToUnifiedType(oldResult: any): ChatDetailsResult {
 
   // Otherwise, attempt to transform the old structure
   // This handles minor differences in field names or structure
-  return {
-    success: oldResult?.success,
-    message: oldResult?.message,
-    error: oldResult?.error,
-    data: oldResult?.data,
-    summary: oldResult?.summary,
-    formattedHistory: oldResult?.formattedHistory,
-    rawResult: oldResult?.rawResult,
-  };
+  if (typeof oldResult === "object" && oldResult !== null) {
+    const obj = oldResult as Record<string, unknown>;
+    return {
+      success: typeof obj.success === "boolean" ? obj.success : undefined,
+      message: typeof obj.message === "string" ? obj.message : undefined,
+      error: typeof obj.error === "string" ? obj.error : undefined,
+      data:
+        typeof obj.data === "object" && obj.data !== null
+          ? (obj.data as ChatDetailsResult["data"])
+          : undefined,
+      summary:
+        typeof obj.summary === "object" && obj.summary !== null
+          ? (obj.summary as ChatDetailsResult["summary"])
+          : undefined,
+      formattedHistory: Array.isArray(obj.formattedHistory)
+        ? (obj.formattedHistory as string[])
+        : undefined,
+      rawResult: obj.rawResult !== undefined ? (obj.rawResult as string) : undefined,
+    };
+  }
+
+  // Return empty result for invalid input
+  return {};
 }

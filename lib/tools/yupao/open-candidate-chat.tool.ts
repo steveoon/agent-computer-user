@@ -43,13 +43,13 @@ export const openCandidateChatTool = tool({
           const listOnly = ${listOnly};
           
           // 动态选择器定义
-          const convItemSelectors = ${JSON.stringify(getAdaptiveSelectors('convItem'))};
-          const nameSelectors = ${JSON.stringify(getAdaptiveSelectors('candidateName'))};
-          const jobTitleSelectors = ${JSON.stringify(getAdaptiveSelectors('jobTitle'))};
-          const unreadNumSelectors = ${JSON.stringify(getAdaptiveSelectors('unreadNum'))};
-          const statusSelectors = ${JSON.stringify(getAdaptiveSelectors('statusUnread'))};
-          const timeSelectors = ${JSON.stringify(getAdaptiveSelectors('messageTime'))};
-          const msgSelectors = ${JSON.stringify(getAdaptiveSelectors('msgText'))};
+          const convItemSelectors = ${JSON.stringify(getAdaptiveSelectors("convItem"))};
+          const nameSelectors = ${JSON.stringify(getAdaptiveSelectors("candidateName"))};
+          const jobTitleSelectors = ${JSON.stringify(getAdaptiveSelectors("jobTitle"))};
+          const unreadNumSelectors = ${JSON.stringify(getAdaptiveSelectors("unreadNum"))};
+          const statusSelectors = ${JSON.stringify(getAdaptiveSelectors("statusUnread"))};
+          const timeSelectors = ${JSON.stringify(getAdaptiveSelectors("messageTime"))};
+          const msgSelectors = ${JSON.stringify(getAdaptiveSelectors("msgText"))};
           
           // 使用第一个成功的选择器获取所有对话项
           let convItems = [];
@@ -320,7 +320,7 @@ export const openCandidateChatTool = tool({
                 const markScript = wrapAntiDetectionScript(`
                   ${generateFindElementScript()}
                   
-                  const nameSelectors = ${JSON.stringify(getAdaptiveSelectors('candidateName'))};
+                  const nameSelectors = ${JSON.stringify(getAdaptiveSelectors("candidateName"))};
                   
                   const items = document.querySelectorAll('${selector}');
                   if (items[${index}]) {

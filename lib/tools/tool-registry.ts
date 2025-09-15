@@ -6,6 +6,7 @@
 import { bashTool, computerTool } from "@/lib/e2b/tool";
 import { feishuBotTool } from "./feishu-bot-tool";
 import { puppeteerTool } from "./puppeteer-tool";
+import { analyzeScreenshotTool } from "./analyze-screenshot.tool";
 import { weChatBotTool } from "./wechat-bot-tool";
 import { jobPostingGeneratorTool } from "./job-posting-generator-tool";
 import { zhipinReplyTool } from "./zhipin-reply-tool";
@@ -116,6 +117,14 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     create: () => puppeteerTool(),
   },
 
+  analyze_screenshot: {
+    name: "analyze_screenshot",
+    description: "截图分析工具，使用AI分析截图内容",
+    category: "automation",
+    requiresSandbox: false,
+    create: () => analyzeScreenshotTool(),
+  },
+
   // ===== Zhipin 自动化工具 =====
   zhipin_get_unread_candidates_improved: {
     name: "zhipin_get_unread_candidates_improved",
@@ -179,6 +188,30 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     category: "automation",
     requiresSandbox: false,
     create: () => zhipinTools.getCandidateList(),
+  },
+
+  zhipin_open_resume: {
+    name: "zhipin_open_resume",
+    description: "打开Boss直聘候选人简历",
+    category: "automation",
+    requiresSandbox: false,
+    create: () => zhipinTools.openResume(),
+  },
+
+  zhipin_locate_resume_canvas: {
+    name: "zhipin_locate_resume_canvas",
+    description: "定位Boss直聘简历Canvas位置",
+    category: "automation",
+    requiresSandbox: false,
+    create: () => zhipinTools.locateResumeCanvas(),
+  },
+
+  zhipin_close_resume_detail: {
+    name: "zhipin_close_resume_detail",
+    description: "关闭Boss直聘简历详情弹窗",
+    category: "automation",
+    requiresSandbox: false,
+    create: () => zhipinTools.closeResumeDetail(),
   },
 
   // ===== Yupao 自动化工具 =====
@@ -320,6 +353,7 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "wechat",
     // 自动化工具
     "puppeteer",
+    "analyze_screenshot",
     // 业务工具
     "job_posting_generator",
     "zhipin_reply_generator",
@@ -337,6 +371,9 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "zhipin_get_username",
     "zhipin_say_hello",
     "zhipin_get_candidate_list",
+    "zhipin_open_resume",
+    "zhipin_locate_resume_canvas",
+    "zhipin_close_resume_detail",
     // Yupao自动化
     "yupao_get_unread_messages",
     "yupao_open_candidate_chat",
@@ -358,6 +395,7 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "computer",
     // 自动化工具
     "puppeteer",
+    "analyze_screenshot",
   ],
 };
 

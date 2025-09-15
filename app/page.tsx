@@ -60,7 +60,7 @@ export default function Chat() {
         <ResizablePanelGroup direction="horizontal" className="h-full">
           {/* Desktop Stream Panel */}
           <ResizablePanel
-            defaultSize={70}
+            defaultSize={60}
             minSize={40}
             className="bg-black relative items-center justify-center"
           >
