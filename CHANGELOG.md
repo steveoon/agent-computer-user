@@ -2,6 +2,22 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.8.0](https://github.com/steveoon/agent-computer-user/compare/v1.7.0...v1.8.0) (2025-09-15)
+
+
+### Bug Fixes
+
+* 优化截图上传功能，增加重试机制和跨环境兼容性 ([1d1889e](https://github.com/steveoon/agent-computer-user/commit/1d1889ef0ea8f3da80c771d94f239372b675b428))
+* 修复zhipin打招呼工具兼容性和类型安全问题 ([3c9f4ae](https://github.com/steveoon/agent-computer-user/commit/3c9f4aebfaea61b4788e362b520940aeae83291f))
+* 替换window.confirm为toast确认组件并修复模型ID验证问题 ([fdbda6a](https://github.com/steveoon/agent-computer-user/commit/fdbda6a52e7ade1688efd417a100dfb254320387))
+* 添加缺失的 msw 测试依赖 ([596a56e](https://github.com/steveoon/agent-computer-user/commit/596a56eb22f711264138b9be65cf0ff901221c55))
+
+
+### Features
+
+* 添加配置页面快速入口和导航优化 ([624f5d4](https://github.com/steveoon/agent-computer-user/commit/624f5d40c503b7de928670743ba7489481dc550c))
+* 添加镜像导出功能到部署脚本 ([791761e](https://github.com/steveoon/agent-computer-user/commit/791761ef00878fffab2f6585a22c6a802ec0f805))
+
 # [1.8.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.7.0...v1.8.0-develop.1) (2025-09-12)
 
 
