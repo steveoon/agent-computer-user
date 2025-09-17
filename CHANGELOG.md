@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.8.1-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.8.0...v1.8.1-develop.1) (2025-09-17)
+
+
+### Bug Fixes
+
+* **bailian-upload:** 修复 Blob 构造器的类型兼容性问题 ([9de3066](https://github.com/steveoon/agent-computer-user/commit/9de30669842cb4955e4969823b73cdfa0e21dbc5))
+
 # [1.8.0](https://github.com/steveoon/agent-computer-user/compare/v1.7.0...v1.8.0) (2025-09-15)
 
 
