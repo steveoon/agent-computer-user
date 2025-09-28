@@ -271,3 +271,23 @@ export const DEFAULT_MODEL_CONFIG = {
   classifyModel: "qwen/qwen-max-latest" as ModelId,
   replyModel: "qwen/qwen-plus-latest" as ModelId,
 } as const;
+
+// ========== Open API 对外开放模型 ==========
+
+/**
+ * 获取对外开放的模型列表
+ * 用于 GET /api/v1/models 接口
+ *
+ * 注意：对外开放所有内部支持的模型，保持内外一致性
+ */
+export function getOpenApiModels(): Array<{
+  id: ModelId;
+  name: string;
+  categories: ModelCategory[];
+}> {
+  return Object.entries(MODEL_DICTIONARY).map(([modelId, modelInfo]) => ({
+    id: modelId as ModelId,
+    name: modelInfo.name,
+    categories: [...modelInfo.categories], // 创建副本避免引用问题
+  }));
+}

@@ -27,5 +27,6 @@
   },
   "[markdown]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
+  },
+  "cSpell.words": ["Duliday", "feishu", "wechat"]
 }
