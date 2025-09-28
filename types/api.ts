@@ -130,8 +130,10 @@ export interface TestLLMReplyResponseBody {
  */
 export interface APIErrorResponse {
   error: string;
+  message?: string;
   details?: unknown;
   statusCode?: number;
+  correlationId?: string;
 }
 
 /**
