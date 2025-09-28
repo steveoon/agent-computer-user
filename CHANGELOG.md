@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.9.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.9.0-develop.1...v1.9.0-develop.2) (2025-09-28)
+
+
+### Features
+
+* 实现 GET /api/v1/models API 端点 ([0f42595](https://github.com/steveoon/agent-computer-user/commit/0f42595b7e01132e395fb1063707435762ab692a))
+
 # [1.9.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.8.1-develop.1...v1.9.0-develop.1) (2025-09-28)
 
 
