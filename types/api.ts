@@ -161,3 +161,22 @@ export function validateChatRequestBody(value: unknown): ChatRequestBody {
   const result = ChatRequestBodySchema.parse(value);
   return result as ChatRequestBody;
 }
+
+// ========== Models API 相关类型 ==========
+
+/**
+ * 模型信息类型
+ * 用于 GET /api/v1/models 接口
+ */
+export interface ModelInfo {
+  id: string;
+  name: string;
+  categories: string[];
+}
+
+/**
+ * Models API 响应体类型
+ */
+export interface ModelsResponseBody {
+  models: ModelInfo[];
+}
