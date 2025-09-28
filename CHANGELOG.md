@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.9.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.8.1-develop.1...v1.9.0-develop.1) (2025-09-28)
+
+
+### Features
+
+* **api:** 实现 Open API v1 接口及鉴权和 CORS 支持 ([836e949](https://github.com/steveoon/agent-computer-user/commit/836e94907e61c842037caa7562d09ba4ea3599fc))
+
 ## [1.8.1-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.8.0...v1.8.1-develop.1) (2025-09-17)
 
 
