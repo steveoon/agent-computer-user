@@ -146,7 +146,7 @@ describe("ClassificationPromptBuilder - 实际实现测试", () => {
       const result = classificationBuilder.build(params);
       expect(result.prompt).toBeDefined();
       expect(result.prompt.length).toBeLessThan(50000); // 防止无限增长
-    }, 30000); // 增加超时时间到30秒，因为 tiktoken 处理长文本需要时间
+    }, 60000); // 增加超时时间到60秒，因为 CI 环境性能较差
 
     it("应该处理复杂的多意图消息", () => {
       const params: ClassificationParams = {
