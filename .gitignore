@@ -57,3 +57,6 @@ test-review-*.ts
 
 # serena files
 .serena/
+
+# VSCode Local History extension
+.history/
