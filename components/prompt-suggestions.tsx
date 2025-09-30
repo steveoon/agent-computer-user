@@ -15,8 +15,7 @@ export interface PromptSuggestion {
 const suggestions: PromptSuggestion[] = [
   {
     text: "查询Duliday BI报表数据",
-    prompt:
-      "获取 Duliday BI 报表数据，查一下订单归属日期从2025-08-08到2025-08-15，上海必胜客的订单，归属大区是浦东新区，数据范围100条",
+    prompt: `获取 Duliday BI 报表数据，按日期范围从 2025-08-08 到 2025-08-15，所属企业是上海必胜客有限公司，大区归属是浦东新区，返回 100 条数据`,
     editable: true,
     editableFields: [
       {
@@ -30,18 +29,18 @@ const suggestions: PromptSuggestion[] = [
         defaultValue: "2025-08-15",
       },
       {
-        key: "品牌门店",
-        pattern: /上海必胜客/g,
-        defaultValue: "上海必胜客",
+        key: "所属企业",
+        pattern: /所属企业是([^，\n]+)/g,
+        defaultValue: "上海必胜客有限公司",
       },
       {
-        key: "归属大区",
-        pattern: /浦东新区/g,
+        key: "大区归属",
+        pattern: /大区归属是([^，\n]+)/g,
         defaultValue: "浦东新区",
       },
       {
         key: "数据范围",
-        pattern: /100/g,
+        pattern: /\d+\s*条/g,
         defaultValue: "100",
       },
     ],
