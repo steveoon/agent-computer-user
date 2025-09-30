@@ -42,10 +42,16 @@ export const MODEL_DICTIONARY = {
     description: "Anthropic Claude 3.7 Sonnet",
     categories: ["chat", "general"] as ModelCategory[],
   },
+  "anthropic/claude-sonnet-4-5-20250929": {
+    provider: "anthropic",
+    name: "Claude Sonnet 4.5",
+    description: "Anthropic Claude Sonnet 4.5 (最新)",
+    categories: ["chat", "general"] as ModelCategory[],
+  },
   "anthropic/claude-sonnet-4-20250514": {
     provider: "anthropic",
     name: "Claude Sonnet 4",
-    description: "Anthropic Claude Sonnet 4 (最新)",
+    description: "Anthropic Claude Sonnet 4",
     categories: ["chat", "general"] as ModelCategory[],
   },
   "anthropic/claude-3-5-haiku-latest": {
@@ -267,7 +273,7 @@ export function getModelCategories(modelId: ModelId): ModelCategory[] {
 
 // 默认配置
 export const DEFAULT_MODEL_CONFIG = {
-  chatModel: "anthropic/claude-sonnet-4-20250514" as ModelId,
+  chatModel: "anthropic/claude-sonnet-4-5-20250929" as ModelId,
   classifyModel: "qwen/qwen-max-latest" as ModelId,
   replyModel: "qwen/qwen-plus-latest" as ModelId,
 } as const;
