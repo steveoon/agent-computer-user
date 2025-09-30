@@ -2,6 +2,19 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.9.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.9.0-develop.2...v1.9.0-develop.3) (2025-09-30)
+
+
+### Bug Fixes
+
+* **duliday:** 修复 BI 报表工具 500 错误并添加企业字段支持 ([7af6761](https://github.com/steveoon/agent-computer-user/commit/7af676183daf563cb04b9d95f10f2e8768bc5f4a))
+
+
+### Features
+
+* **models:** 添加 Claude Sonnet 4.5 模型支持 ([ac86fbb](https://github.com/steveoon/agent-computer-user/commit/ac86fbbc1ffa839b9f013fc6ba81ed26d79de2b3))
+* **ui:** BI 报表工具消息组件添加新字段显示 ([dbde2e3](https://github.com/steveoon/agent-computer-user/commit/dbde2e3bc5f8d7381892dae672e2595b65b88ad6))
+
 # [1.9.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.9.0-develop.1...v1.9.0-develop.2) (2025-09-28)
 
 
