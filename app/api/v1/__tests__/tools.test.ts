@@ -115,10 +115,10 @@ describe("GET /api/v1/tools", () => {
 
       // 模拟返回包含内部工具的完整列表
       vi.mocked(getToolMetadataList).mockReturnValueOnce([
-        { name: "bash", requiresSandbox: false, requiredContext: [] },
-        { name: "computer", requiresSandbox: true, requiredContext: ["sandboxId"] },
-        { name: "internal_debug_tool", requiresSandbox: false, requiredContext: [] },
-        { name: "zhipin_reply_generator", requiresSandbox: false, requiredContext: ["configData", "replyPrompts"] },
+        { name: "bash", description: "Execute bash commands", category: "automation", requiresSandbox: false, requiredContext: [] },
+        { name: "computer", description: "Computer use tool", category: "automation", requiresSandbox: true, requiredContext: ["sandboxId"] },
+        { name: "internal_debug_tool", description: "Internal debug tool", category: "debug", requiresSandbox: false, requiredContext: [] },
+        { name: "zhipin_reply_generator", description: "Generate Zhipin reply", category: "business", requiresSandbox: false, requiredContext: ["configData", "replyPrompts"] },
       ]);
 
       const response = await callGET();
