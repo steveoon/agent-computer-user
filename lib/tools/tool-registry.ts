@@ -538,15 +538,19 @@ export function getToolRegistry(): Readonly<Record<string, ToolDefinition>> {
 
 /**
  * 获取工具元数据列表（用于 /api/v1/tools 接口）
- * 返回工具名称、是否需要沙盒、必需的上下文字段
+ * 返回工具名称、描述、分类、是否需要沙盒、必需的上下文字段
  */
 export function getToolMetadataList(): Array<{
   name: string;
+  description: string;
+  category: string;
   requiresSandbox: boolean;
   requiredContext: string[];
 }> {
   return Object.entries(TOOL_REGISTRY).map(([name, definition]) => ({
     name,
+    description: definition.description,
+    category: definition.category,
     requiresSandbox: definition.requiresSandbox || false,
     requiredContext: definition.requiredContext || [],
   }));

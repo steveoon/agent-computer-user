@@ -4,9 +4,10 @@
  */
 
 import { z } from "zod";
-import { UIMessage } from "ai";
+import type { UIMessage } from "ai";
 import type { ModelConfig } from "@/lib/config/models";
 import type { ZhipinData, SystemPromptsConfig, ReplyPromptsConfig } from "./index";
+import type { OpenApiPromptType } from "@/lib/tools/tool-registry";
 
 // ========== Chat API 相关类型 ==========
 
@@ -179,4 +180,214 @@ export interface ModelInfo {
  */
 export interface ModelsResponseBody {
   models: ModelInfo[];
+}
+
+// ========== Open Chat API 相关类型 ==========
+
+/**
+ * 上下文策略类型
+ * 定义当工具缺少必需上下文时的处理方式
+ */
+export type ContextStrategy = "error" | "skip" | "report";
+
+/**
+ * 消息剪裁选项
+ */
+export interface PruneOptions {
+  maxOutputTokens?: number;
+  targetTokens?: number;
+  preserveRecentMessages?: number;
+}
+
+/**
+ * 工具特定上下文映射
+ * 键为工具名，值为该工具的上下文覆盖
+ */
+export type ToolContextMap = Record<string, Record<string, unknown>>;
+
+/**
+ * Open Chat API 请求体 Schema
+ * 用于 POST /api/v1/chat 接口
+ */
+export const OpenChatRequestSchema = z.object({
+  // 必需字段
+  model: z.string().describe("模型ID，格式：provider/model"),
+  messages: z.array(z.unknown()).describe("消息数组，支持 {role, content} 或 UIMessage 格式"),
+
+  // 流式控制
+  stream: z.boolean().optional().default(true).describe("是否流式输出"),
+
+  // 消息剪裁
+  prune: z.boolean().optional().default(false).describe("是否启用消息剪裁"),
+  pruneOptions: z
+    .object({
+      maxOutputTokens: z.number().optional(),
+      targetTokens: z.number().optional(),
+      preserveRecentMessages: z.number().optional(),
+    })
+    .optional()
+    .describe("消息剪裁选项"),
+
+  // 系统提示词
+  systemPrompt: z.string().optional().describe("直接指定系统提示词，优先级高于 promptType"),
+  promptType: z
+    .enum(["bossZhipinSystemPrompt", "bossZhipinLocalSystemPrompt", "generalComputerSystemPrompt"])
+    .optional()
+    .describe(
+      `系统提示词类型，从 context.systemPrompts 中查找。可选值: bossZhipinSystemPrompt, bossZhipinLocalSystemPrompt, generalComputerSystemPrompt`
+    ),
+
+  // 工具控制
+  allowedTools: z.array(z.string()).optional().describe("允许使用的工具名称列表"),
+  toolContext: z.record(z.string(), z.unknown()).optional().describe("工具特定上下文"),
+  contextStrategy: z
+    .enum(["error", "skip", "report"])
+    .optional()
+    .default("error")
+    .describe("上下文缺失处理策略"),
+
+  // 沙盒
+  sandboxId: z.string().nullable().optional().describe("E2B 沙盒ID"),
+
+  // 通用上下文
+  context: z
+    .object({
+      preferredBrand: z.string().optional(),
+      modelConfig: z.unknown().optional(),
+      configData: z.unknown().optional(),
+      systemPrompts: z.record(z.string(), z.string()).optional().describe("系统提示词映射"),
+      replyPrompts: z.unknown().optional(),
+      dulidayToken: z.string().optional(),
+      defaultWechatId: z.string().optional(),
+    })
+    .optional()
+    .describe("全局上下文"),
+
+  // 验证模式
+  validateOnly: z.boolean().optional().default(false).describe("仅验证，不执行"),
+});
+
+/**
+ * Open Chat API 请求体类型
+ * 遵循 AI SDK 消息格式规范
+ */
+export interface OpenChatRequest {
+  // 必需字段
+  model: string;
+
+  /**
+   * 消息数组
+   * 支持两种格式：
+   * 1. AI SDK 标准格式：UIMessage (推荐)
+   * 2. 简化格式：{role, content} (将在服务端归一化为 UIMessage)
+   */
+  messages: UIMessage[] | Array<{ role: string; content: string }>;
+
+  // 流式控制
+  stream?: boolean;
+
+  // 消息剪裁
+  prune?: boolean;
+  pruneOptions?: PruneOptions;
+
+  // 系统提示词
+  systemPrompt?: string;
+  promptType?: OpenApiPromptType;
+
+  // 工具控制
+  allowedTools?: string[];
+  toolContext?: ToolContextMap;
+  contextStrategy?: ContextStrategy;
+
+  // 沙盒
+  sandboxId?: string | null;
+
+  // 通用上下文
+  context?: {
+    preferredBrand?: string;
+    modelConfig?: ModelConfig;
+    configData?: ZhipinData;
+    systemPrompts?: Record<string, string>;
+    replyPrompts?: ReplyPromptsConfig;
+    dulidayToken?: string;
+    defaultWechatId?: string;
+  };
+
+  // 验证模式
+  validateOnly?: boolean;
+}
+
+/**
+ * Open Chat API 非流式响应体
+ * 遵循 AI SDK 的类型规范
+ */
+export interface OpenChatResponse {
+  /**
+   * 生成的消息数组
+   * 使用 AI SDK 的 UIMessage 类型
+   */
+  messages: UIMessage[];
+
+  /**
+   * Token 使用情况
+   * 严格遵循 AI SDK LanguageModelUsage 的字段命名
+   *
+   * 注意：AI SDK 使用 inputTokens/outputTokens，而非 promptTokens/completionTokens
+   * 所有字段都是可选的（undefined 表示提供商未报告该值）
+   *
+   * @see https://ai-sdk.dev/docs/reference/ai-sdk-core/generate-text
+   */
+  usage: {
+    /** 输入（提示）token 数量 */
+    inputTokens?: number;
+    /** 输出（生成）token 数量 */
+    outputTokens?: number;
+    /** 总 token 数量（可能不等于 input + output，因为可能包含开销） */
+    totalTokens?: number;
+    /** 推理 token 数量（仅某些模型支持） */
+    reasoningTokens?: number;
+    /** 缓存的输入 token 数量（仅某些提供商支持） */
+    cachedInputTokens?: number;
+  };
+
+  /**
+   * 工具使用信息
+   */
+  tools: {
+    used: string[];
+    skipped: string[];
+  };
+}
+
+/**
+ * 验证报告类型
+ * 用于 validateOnly=true 或 contextStrategy=report
+ */
+export interface ValidationReport {
+  valid: boolean;
+  model: {
+    valid: boolean;
+    error?: string;
+  };
+  tools: Array<{
+    name: string;
+    valid: boolean;
+    missingContext?: string[];
+    error?: string;
+  }>;
+}
+
+/**
+ * 检查是否为有效的 OpenChatRequest
+ */
+export function isOpenChatRequest(value: unknown): value is OpenChatRequest {
+  return OpenChatRequestSchema.safeParse(value).success;
+}
+
+/**
+ * 验证并解析 OpenChatRequest
+ */
+export function validateOpenChatRequest(value: unknown): OpenChatRequest {
+  const result = OpenChatRequestSchema.parse(value);
+  return result as OpenChatRequest;
 }
