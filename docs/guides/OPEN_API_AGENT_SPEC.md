@@ -6,7 +6,7 @@
 
 ### 1. 范围与目标
 
-- 实现对外主入口：`POST /api/v1`（当前已存在文件：`app/api/v1/route.ts`）。
+- 实现对外主入口：`POST /api/v1/chat`（当前已存在文件：`app/api/v1/chat/route.ts`）。
 - 提供三类能力：
   - 文本对话（必选）
   - 工具调用（可选，按白名单精确启用）
@@ -14,6 +14,7 @@
 - 提供枚举与发现接口：
   - `GET /api/v1/models`：对外许可模型列表
   - `GET /api/v1/tools`：对外可用工具清单、`requiredContext`、`requiresSandbox`
+  - `GET /api/v1/prompt-types`：对外可用的 promptType 枚举值
   - `GET /api/v1/config-schema`：对外公开的上下文/配置字段说明（不含敏感值）
 
 ### 2. 兼容性与复用策略
@@ -26,7 +27,7 @@
 
 ### 3. 接口契约（API Contracts）
 
-#### 3.1 POST /api/v1
+#### 3.1 POST /api/v1/chat
 
 - 鉴权：`Authorization: Bearer <token>`（若缺失或无效 → `401`）。
 - 请求体（JSON）：
@@ -47,8 +48,11 @@
     "targetTokens": 8000,
     "preserveRecentMessages": 2
   },
+  // 系统提示词配置（二选一）
+  "systemPrompt": "You are a recruitment assistant.",  // 直接指定，优先级最高
+  "promptType": "bossZhipinSystemPrompt",  // 从 context.systemPrompts 查找
+  // 工具配置
   "allowedTools": ["bash", "zhipin_reply_generator"],
-  "promptType": "bossZhipinSystemPrompt",
   "sandboxId": null,
   "context": {
     "preferredBrand": "蜀地源冒菜",
@@ -73,6 +77,10 @@
         }
       },
       "defaultBrand": "蜀地源冒菜"
+    },
+    "systemPrompts": {
+      "bossZhipinSystemPrompt": "你是BOSS直聘招聘助手，负责与候选人沟通岗位信息。",
+      "generalComputerSystemPrompt": "你是一个通用AI助手，可以使用计算机工具。"
     },
     "replyPrompts": {
       "general_chat": "你是连锁餐饮招聘助手，请用简洁礼貌的语气与候选人沟通。",
@@ -100,16 +108,22 @@
 - 语义与校验：
   - `model`：必须在许可列表内（由 `/api/v1/models` 返回）。
   - `messages`：若仅有 `{role, content}`，需在服务端归一化为 AI SDK v5 `UIMessage`（将 `content` 转为 `parts=[{type:"text"}]`）。
+  - `systemPrompt`（可选）：直接指定系统提示词，优先级最高。
+  - `promptType`（可选）：从 `context.systemPrompts` 中查找对应的系统提示词。
+    - **类型验证**：必须是以下枚举值之一（通过 `GET /api/v1/prompt-types` 查询）：
+      - `bossZhipinSystemPrompt`
+      - `bossZhipinLocalSystemPrompt`
+      - `generalComputerSystemPrompt`
+    - 优先级：`systemPrompt` > `promptType` 查找 > 默认值 "You are a helpful AI assistant."
+    - 若 `promptType` 在 `context.systemPrompts` 中不存在，使用默认值。
   - `prune`：`true` 时调用 `prunedMessages(messages, pruneOptions)`，响应头附带 `X-Message-Pruned: true`。
-  - `allowedTools`：精确启用的工具名集合；为空或缺省表示“禁用所有工具”（仅文本对话）。
+  - `allowedTools`：精确启用的工具名集合；为空或缺省表示"禁用所有工具"（仅文本对话）。
   - `toolContext`：按工具名补充特定上下文；与顶层 `context` 合并（后者为默认，前者覆盖冲突字段）。
   - `contextStrategy`：
     - `error`（默认）：如某启用工具缺少其 `requiredContext` → `400`，体内列出缺失字段
     - `skip`：跳过无法实例化的工具，继续（响应头 `X-Tools-Skipped` 列表）
     - `report`：不执行，仅返回缺失上下文清单（等价 `validateOnly=true`）
-  - `validateOnly`：`true` 时不产生内容，仅返回可机读的“缺失上下文/非法参数报告”（`200`）。
-  - `promptType`：仅当命中“对外公共模板”时生效，用其工具集与上下文提示；否则忽略。
-  - `promptType`：仅当命中“对外公共模板”时生效，用其工具集与上下文提示；否则忽略。
+  - `validateOnly`：`true` 时不产生内容，仅返回可机读的"缺失上下文/非法参数报告"（`200`）。
     - 可选值（项目内真实键名）：
       - `bossZhipinSystemPrompt`
       - `bossZhipinLocalSystemPrompt`
@@ -207,7 +221,38 @@
 }
 ```
 
-#### 3.4 GET /api/v1/config-schema
+#### 3.4 GET /api/v1/prompt-types
+
+- 返回所有可用的 `promptType` 枚举值及其描述：
+
+```json
+{
+  "success": true,
+  "data": {
+    "promptTypes": [
+      {
+        "id": "bossZhipinSystemPrompt",
+        "description": "BOSS直聘招聘助手系统提示词"
+      },
+      {
+        "id": "bossZhipinLocalSystemPrompt",
+        "description": "BOSS直聘本地招聘助手系统提示词"
+      },
+      {
+        "id": "generalComputerSystemPrompt",
+        "description": "通用计算机助手系统提示词"
+      }
+    ]
+  }
+}
+```
+
+- 用途：
+  - 第三方调用者在发送请求前可以通过此接口查询所有有效的 `promptType` 值
+  - 避免传入无效的 `promptType` 导致 Zod 验证失败（400 错误）
+  - 当新增 `promptType` 时，调用方可以动态发现新类型
+
+#### 3.5 GET /api/v1/config-schema
 
 - 返回对外公开的上下文/配置字段说明（仅字段与示例，不含私密值）：
 
@@ -232,7 +277,7 @@
 - 背景：鉴权接口已在外部服务托管（例如：`GET https://wolian.cc/api/v1/validate-key`），本项目不实现该接口。所有开放 API 的鉴权在到达业务路由前由 Next.js `middleware` 完成。
 
 - 流程：
-  1. 调用方向本项目任一 OpenAPI（如 `POST /api/v1`）发起请求，携带 `Authorization: Bearer <API_KEY>`。
+  1. 调用方向本项目任一 OpenAPI（如 `POST /api/v1/chat`）发起请求，携带 `Authorization: Bearer <API_KEY>`。
   2. Next.js `middleware` 拦截受保护路径（如 `/api/v1/**`），将请求头中的 `Authorization` 原样转发至外部鉴权服务（如：`GET https://wolian.cc/api/v1/validate-key`）。
   3. 外部服务返回：
      - `200 {"isSuccess":true,...}` → 放行进入实际业务路由；
@@ -294,6 +339,24 @@ export async function middleware(req: Request) {
 
 - 将 `{role, content}` 归一化为 `parts=[{type:"text",text:content}]`。
 - `prune=true` → 调用 `prunedMessages(messages, pruneOptions)`，记录节省比例并设置 `X-Message-Pruned`。
+
+3.5 系统提示词选择
+
+- 优先级规则：
+  1. 若 `systemPrompt` 字段存在 → 直接使用
+  2. 若 `promptType` 存在且 `context.systemPrompts[promptType]` 存在 → 使用查找结果
+  3. 否则使用默认值：`"You are a helpful AI assistant."`
+- 示例代码：
+  ```typescript
+  let systemPrompt: string;
+  if (customSystemPrompt) {
+    systemPrompt = customSystemPrompt;
+  } else if (promptType && context.systemPrompts?.[promptType]) {
+    systemPrompt = context.systemPrompts[promptType];
+  } else {
+    systemPrompt = "You are a helpful AI assistant.";
+  }
+  ```
 
 4. 工具集合构建与上下文合并
 
@@ -364,7 +427,7 @@ export async function middleware(req: Request) {
 
 - 新增 `GET /api/v1/config-schema`：返回可公开的上下文字段说明（静态结构即可）。
 
-5. 主路由 `POST /api/v1`
+5. 主路由 `POST /api/v1/chat`
 
 - 解析与鉴权；校验必填字段。
 - 归一化消息；可选剪裁。
@@ -390,7 +453,7 @@ curl -N -X POST \
   -H "Authorization: Bearer sk_xxx" \
   -H "Content-Type: application/json" \
   -H "Accept: text/event-stream" \
-  https://your.domain/api/v1 \
+  https://your.domain/api/v1/chat \
   -d '{
     "model":"anthropic/claude-3-7-sonnet-20250219",
     "messages":[{"role":"user","content":"你好，帮我总结下本周进展"}],
