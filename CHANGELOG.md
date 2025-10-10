@@ -2,6 +2,18 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.9.0-develop.5](https://github.com/steveoon/agent-computer-user/compare/v1.9.0-develop.4...v1.9.0-develop.5) (2025-10-10)
+
+
+### Bug Fixes
+
+* 修复 TypeScript 类型错误 ([ce92b2b](https://github.com/steveoon/agent-computer-user/commit/ce92b2be9e2af47464be3df42e79ea068d6a4ad6))
+
+
+### Features
+
+* 实现 Open API Agent 系统核心接口 ([a506109](https://github.com/steveoon/agent-computer-user/commit/a506109e8240e283e84c1a926dd695a400657fdd))
+
 # [1.9.0-develop.4](https://github.com/steveoon/agent-computer-user/compare/v1.9.0-develop.3...v1.9.0-develop.4) (2025-10-10)
 
 
