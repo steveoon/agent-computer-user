@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.9.0-develop.4](https://github.com/steveoon/agent-computer-user/compare/v1.9.0-develop.3...v1.9.0-develop.4) (2025-10-10)
+
+
+### Features
+
+* 改进 UX 反馈和导航体验 ([127f584](https://github.com/steveoon/agent-computer-user/commit/127f584a55f4ac1266c78d5d89780692388551b4))
+
 # [1.9.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.9.0-develop.2...v1.9.0-develop.3) (2025-09-30)
 
 
