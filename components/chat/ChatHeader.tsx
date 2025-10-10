@@ -6,7 +6,7 @@ import { BrandSelector } from "@/components/brand-selector";
 import { UserNav } from "@/components/user-nav";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MODEL_DICTIONARY, type ModelId } from "@/lib/config/models";
-import Link from "next/link";
+import { NavLink } from "@/components/ui/nav-link";
 
 interface ChatHeaderProps {
   currentBrand?: string;
@@ -123,12 +123,12 @@ export function ChatHeader({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-sm">当前模型配置</h3>
-                  <a
+                  <NavLink
                     href="/agent-config"
                     className="text-xs text-blue-600 hover:text-blue-800 underline"
                   >
                     修改配置
-                  </a>
+                  </NavLink>
                 </div>
 
                 <div className="space-y-2">
@@ -160,13 +160,13 @@ export function ChatHeader({
             </PopoverContent>
           </Popover>
           {/* 配置页面入口 */}
-          <Link
+          <NavLink
             href="/admin/settings"
             className="flex items-center gap-1.5 hover:bg-white/50 px-2 py-1 rounded-md transition-colors"
           >
             <Settings className="w-3 h-3" />
             <span className="font-medium">配置</span>
-          </Link>
+          </NavLink>
         </div>
         <div className="text-xs text-slate-500">
           {isLoading && (
