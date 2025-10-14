@@ -3,7 +3,7 @@
  * 用于处理消息归一化、工具创建、上下文验证等
  */
 
-import type { UIMessage } from "ai";
+import type { UIMessage, GenerateTextResult, ToolSet as AIToolSet } from "ai";
 import { getOpenApiModels } from "@/lib/config/models";
 import { getToolRegistry, getToolsForPrompt, OPEN_API_PROMPT_TYPES } from "@/lib/tools/tool-registry";
 import { safeCreateTool } from "@/types/tool-common";
@@ -297,4 +297,105 @@ export function buildToolSet(
     toolContextMap,
     contextStrategy
   );
+}
+
+/**
+ * 将 generateText() 的 result 转换为 UIMessage 数组
+ * 保留完整的工具调用历史
+ *
+ * @param result - generateText() 的返回结果
+ * @returns UIMessage 数组,每个 step 对应一个 message
+ *
+ * @remarks
+ * - 如果 result 包含 steps,则遍历每个 step 构建 message
+ * - 每个 step 的 text 转换为 text part
+ * - 每个 step 的 toolCalls + toolResults 转换为 dynamic-tool part
+ * - 如果没有 steps,返回包含最终 text 的单个 message
+ *
+ * @example
+ * ```typescript
+ * const result = await generateText({
+ *   model: languageModel,
+ *   messages: [...],
+ *   tools: { bash: bashTool }
+ * });
+ *
+ * const uiMessages = convertGenerateTextResultToUIMessages(result);
+ * // uiMessages[0] 包含工具调用和结果
+ * // uiMessages[1] 包含最终文本回复
+ * ```
+ */
+export function convertGenerateTextResultToUIMessages<TOOLS extends AIToolSet>(
+  result: Pick<GenerateTextResult<TOOLS, never>, "text" | "steps">
+): UIMessage[] {
+  const responseMessages: UIMessage[] = [];
+
+  if (result.steps && result.steps.length > 0) {
+    // Process each step to build complete conversation history
+    for (const step of result.steps) {
+      const parts: UIMessage["parts"] = [];
+
+      // Add text content if present
+      if (step.text) {
+        parts.push({
+          type: "text",
+          text: step.text,
+          state: "done",
+        });
+      }
+
+      // Add tool calls with their results using DynamicToolUIPart format
+      if (step.toolCalls && step.toolCalls.length > 0) {
+        for (const toolCall of step.toolCalls) {
+          // Find corresponding result
+          const toolResult = step.toolResults?.find(r => r.toolCallId === toolCall.toolCallId);
+
+          if (toolResult) {
+            // Tool with result
+            parts.push({
+              type: "dynamic-tool",
+              toolName: toolCall.toolName,
+              toolCallId: toolCall.toolCallId,
+              state: "output-available",
+              input: toolCall.input,
+              output: toolResult.output,
+            });
+          } else {
+            // Tool call without result (shouldn't happen in generateText)
+            parts.push({
+              type: "dynamic-tool",
+              toolName: toolCall.toolName,
+              toolCallId: toolCall.toolCallId,
+              state: "input-available",
+              input: toolCall.input,
+            });
+          }
+        }
+      }
+
+      // Only create message if there are parts
+      if (parts.length > 0) {
+        responseMessages.push({
+          id: crypto.randomUUID(),
+          role: "assistant",
+          parts,
+        });
+      }
+    }
+  } else {
+    // Fallback: No steps available, create single message with final text
+    responseMessages.push({
+      id: crypto.randomUUID(),
+      role: "assistant",
+      parts: [
+        {
+          type: "text",
+          text: result.text,
+          state: "done",
+        },
+      ],
+    });
+  }
+
+  return responseMessages;
 }

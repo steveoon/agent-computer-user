@@ -18,6 +18,7 @@ import {
   normalizeMessages,
   validateModel,
   buildToolSet,
+  convertGenerateTextResultToUIMessages,
 } from "@/lib/utils/open-chat-utils";
 import { prunedMessages } from "@/lib/utils";
 import { getDynamicRegistry } from "@/lib/model-registry/dynamic-registry";
@@ -245,19 +246,12 @@ export async function POST(req: Request) {
         stopWhen: stepCountIs(30),
       });
 
+      // Convert generateText result to UIMessage array
+      // This preserves complete tool call history from all steps
+      const responseMessages = convertGenerateTextResultToUIMessages(result);
+
       const responseData: OpenChatResponse = {
-        messages: [
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            parts: [
-              {
-                type: "text",
-                text: result.text,
-              },
-            ],
-          },
-        ],
+        messages: responseMessages,
         usage: {
           inputTokens: result.usage.inputTokens,
           outputTokens: result.usage.outputTokens,

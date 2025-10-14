@@ -773,6 +773,88 @@ describe("POST /api/v1/chat", () => {
       expect(message).toHaveProperty("parts");
       expect(Array.isArray(message.parts)).toBe(true);
     });
+
+    it("应该保留完整的工具调用历史（包含 steps）", async () => {
+      // Mock generateText to return steps with tool calls
+      const ai = await import("ai");
+      vi.mocked(ai.generateText).mockResolvedValue({
+        text: "Final response after tool execution",
+        usage: {
+          inputTokens: 100,
+          outputTokens: 50,
+          totalTokens: 150,
+        },
+        steps: [
+          {
+            text: "Let me check that for you.",
+            toolCalls: [
+              {
+                toolCallId: "call_123",
+                toolName: "bash",
+                input: { command: "ls -la" },
+                type: "tool-call",
+              },
+            ],
+            toolResults: [
+              {
+                toolCallId: "call_123",
+                toolName: "bash",
+                input: { command: "ls -la" },
+                output: "file1.txt\nfile2.txt",
+                type: "tool-result",
+              },
+            ],
+            finishReason: "tool-calls",
+            usage: { inputTokens: 50, outputTokens: 20, totalTokens: 70 },
+          },
+          {
+            text: "Final response after tool execution",
+            toolCalls: [],
+            toolResults: [],
+            finishReason: "stop",
+            usage: { inputTokens: 50, outputTokens: 30, totalTokens: 80 },
+          },
+        ],
+      } as never);
+
+      const request = mockRequest({
+        stream: false,
+        allowedTools: ["bash"],
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(data.data.messages).toBeDefined();
+      expect(Array.isArray(data.data.messages)).toBe(true);
+
+      // Should have 2 messages (one per step)
+      expect(data.data.messages.length).toBe(2);
+
+      // First message should contain text and tool invocation
+      const firstMsg = data.data.messages[0];
+      expect(firstMsg.parts.length).toBeGreaterThan(1);
+
+      // Should have text part
+      const textPart = firstMsg.parts.find((p: { type: string }) => p.type === "text");
+      expect(textPart).toBeDefined();
+      expect(textPart.text).toBe("Let me check that for you.");
+
+      // Should have tool invocation part
+      const toolPart = firstMsg.parts.find((p: { type: string }) => p.type === "dynamic-tool");
+      expect(toolPart).toBeDefined();
+      expect(toolPart.toolName).toBe("bash");
+      expect(toolPart.toolCallId).toBe("call_123");
+      expect(toolPart.state).toBe("output-available");
+      expect(toolPart.input).toEqual({ command: "ls -la" });
+      expect(toolPart.output).toBe("file1.txt\nfile2.txt");
+
+      // Second message should contain final text
+      const secondMsg = data.data.messages[1];
+      expect(secondMsg.parts.length).toBe(1);
+      expect(secondMsg.parts[0].type).toBe("text");
+      expect(secondMsg.parts[0].text).toBe("Final response after tool execution");
+    });
   });
 
   describe("负例补充", () => {
