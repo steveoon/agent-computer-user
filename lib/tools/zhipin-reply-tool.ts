@@ -3,6 +3,7 @@ import { z } from "zod";
 import { generateSmartReplyWithLLM } from "@/lib/loaders/zhipin-data.loader";
 import { loadZhipinData } from "@/lib/loaders/zhipin-data.loader";
 import type { ZhipinData } from "@/types/zhipin";
+import { ZhipinDataSchema } from "@/types/zhipin";
 import type { ReplyPromptsConfig } from "@/types/config";
 import type { ModelConfig } from "@/lib/config/models";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
@@ -46,8 +47,21 @@ export const zhipinReplyTool = (
   configData?: ZhipinData,
   replyPrompts?: ReplyPromptsConfig,
   defaultWechatId?: string
-) =>
-  tool({
+) => {
+  // 验证 configData 的完整性
+  if (configData) {
+    const validation = ZhipinDataSchema.safeParse(configData);
+    if (!validation.success) {
+      const errorMessages = validation.error.issues
+        .map(issue => `  - ${issue.path.join(".")}: ${issue.message}`)
+        .join("\n");
+      throw new Error(
+        `智能回复工具初始化失败：configData 数据结构不完整\n${errorMessages}`
+      );
+    }
+  }
+
+  return tool({
     description: `
       Boss直聘智能回复生成工具，根据候选人消息自动生成招聘回复。
       
@@ -193,6 +207,7 @@ export const zhipinReplyTool = (
       };
     },
   });
+};
 
 /**
  * 创建智能回复工具的快捷函数
