@@ -18,6 +18,7 @@ import { dulidayInterviewBookingTool } from "./duliday/duliday-interview-booking
 import { dulidayBiReportTool } from "./duliday/bi-report-tool";
 import { dulidayBiRefreshTool } from "./duliday/bi-refresh-tool";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
+import { ZhipinDataSchema } from "@/types/zhipin";
 
 // Import types from centralized location
 import type {
@@ -99,6 +100,9 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     category: "business",
     requiresSandbox: false,
     requiredContext: ["configData", "replyPrompts"],
+    contextSchemas: {
+      configData: ZhipinDataSchema,
+    },
     create: ctx =>
       zhipinReplyTool(
         ctx.preferredBrand,

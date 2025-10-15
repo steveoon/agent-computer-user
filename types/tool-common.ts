@@ -48,10 +48,29 @@ export interface ToolDefinition {
   requiresSandbox: boolean;
   // AI SDK 的 Tool 类型是通过 tool() 函数推断的，我们不约束具体类型
   create: (context: ToolCreationContext) => Tool | null;
-  // 可选的上下文验证器
+  /**
+   * 可选的上下文验证器
+   * @deprecated 已废弃，验证逻辑已统一到 createToolsWithStrategy 中
+   * 保留此字段仅为向后兼容，不再使用
+   */
   validateContext?: (context: ToolCreationContext) => boolean;
   // 可选的必需字段
   requiredContext?: (keyof ToolCreationContext)[];
+  /**
+   * 可选的上下文 Schema 验证器（Schema-First 设计）
+   *
+   * 键为 requiredContext 中的字段名，值为对应的 Zod Schema
+   * 在 contextStrategy === "error" 时会进行结构验证
+   *
+   * @example
+   * ```typescript
+   * contextSchemas: {
+   *   configData: ZhipinDataSchema,
+   *   replyPrompts: ReplyPromptsSchema,
+   * }
+   * ```
+   */
+  contextSchemas?: Record<string, z.ZodSchema>;
 }
 
 /**
@@ -297,6 +316,8 @@ export function normalizeToolOutput(output: unknown): ToolOutput {
 
 /**
  * 验证工具上下文是否包含必需的字段
+ * @deprecated 已废弃，验证逻辑已统一到 createToolsWithStrategy 中
+ * 保留此函数仅为向后兼容，不再推荐使用
  */
 export function validateToolContext(
   context: ToolCreationContext,
@@ -312,33 +333,32 @@ export function validateToolContext(
 }
 
 /**
- * 创建带验证的工具定义
+ * 创建工具定义
+ *
+ * 注意：validateContext 已废弃，验证统一在 createToolsWithStrategy 中完成
+ * 本函数现在只是简单返回定义，保留以维持 API 兼容性
  */
 export function createToolDefinition(definition: ToolDefinition): ToolDefinition {
-  // 如果定义了必需字段，自动添加验证器
-  if (definition.requiredContext && !definition.validateContext) {
-    definition.validateContext = context =>
-      validateToolContext(context, definition.requiredContext!);
-  }
   return definition;
 }
 
 /**
  * 类型安全的工具创建包装器
+ *
+ * 注意：上下文验证（存在性和Schema）已在 createToolsWithStrategy 中完成
+ * 本函数专注于沙盒检查和工具创建异常处理
  */
 export function safeCreateTool(
   definition: ToolDefinition,
-  context: ToolCreationContext
+  context: ToolCreationContext,
+  shouldThrow = false
 ): Tool | null {
-  // 验证上下文
-  if (definition.validateContext && !definition.validateContext(context)) {
-    console.error(`❌ 工具 ${definition.name} 上下文验证失败`);
-    return null;
-  }
-
   // 检查沙盒需求
   if (definition.requiresSandbox && !context.sandboxId) {
     console.log(`⏭️ 跳过工具 ${definition.name}: 需要sandboxId`);
+    if (shouldThrow) {
+      throw new Error(`工具 ${definition.name} 需要 sandboxId`);
+    }
     return null;
   }
 
@@ -347,6 +367,9 @@ export function safeCreateTool(
     return definition.create(context);
   } catch (error) {
     console.error(`❌ 创建工具 ${definition.name} 失败:`, error);
+    if (shouldThrow) {
+      throw error;
+    }
     return null;
   }
 }

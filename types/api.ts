@@ -373,6 +373,10 @@ export interface ValidationReport {
     name: string;
     valid: boolean;
     missingContext?: string[];
+    structureErrors?: Array<{
+      field: string;
+      issues: string[];
+    }>;
     error?: string;
   }>;
 }

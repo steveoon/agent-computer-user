@@ -3,7 +3,6 @@ import { z } from "zod";
 import { generateSmartReplyWithLLM } from "@/lib/loaders/zhipin-data.loader";
 import { loadZhipinData } from "@/lib/loaders/zhipin-data.loader";
 import type { ZhipinData } from "@/types/zhipin";
-import { ZhipinDataSchema } from "@/types/zhipin";
 import type { ReplyPromptsConfig } from "@/types/config";
 import type { ModelConfig } from "@/lib/config/models";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
@@ -48,18 +47,8 @@ export const zhipinReplyTool = (
   replyPrompts?: ReplyPromptsConfig,
   defaultWechatId?: string
 ) => {
-  // 验证 configData 的完整性
-  if (configData) {
-    const validation = ZhipinDataSchema.safeParse(configData);
-    if (!validation.success) {
-      const errorMessages = validation.error.issues
-        .map(issue => `  - ${issue.path.join(".")}: ${issue.message}`)
-        .join("\n");
-      throw new Error(
-        `智能回复工具初始化失败：configData 数据结构不完整\n${errorMessages}`
-      );
-    }
-  }
+  // 注意：configData 的验证在工具创建时完成（通过 contextSchemas）
+  // 执行时只关注业务逻辑验证
 
   return tool({
     description: `

@@ -111,8 +111,34 @@ vi.mock("@/lib/tools/tool-registry", () => {
 
 // Mock safeCreateTool
 vi.mock("@/types/tool-common", () => ({
-  safeCreateTool: vi.fn(toolDef => {
-    // 简单返回一个mock工具对象
+  safeCreateTool: vi.fn((toolDef, context, shouldThrow = false) => {
+    // 模拟真实的验证逻辑：
+    // zhipin_reply_generator 需要 configData 和 replyPrompts
+    // computer 需要 sandboxId
+
+    if (toolDef.name === "zhipin_reply_generator") {
+      if (!context?.configData || !context?.replyPrompts) {
+        const error = new Error(
+          `工具 ${toolDef.name} 上下文验证失败：缺少 configData 或 replyPrompts`
+        );
+        if (shouldThrow) {
+          throw error;
+        }
+        return null;
+      }
+    }
+
+    if (toolDef.name === "computer") {
+      if (!context?.sandboxId) {
+        const error = new Error(`工具 ${toolDef.name} 需要 sandboxId`);
+        if (shouldThrow) {
+          throw error;
+        }
+        return null;
+      }
+    }
+
+    // 成功创建工具
     return {
       name: toolDef.name,
       description: `Mock ${toolDef.name} tool`,
@@ -181,6 +207,33 @@ describe("POST /api/v1/chat", () => {
         category: "business" as const,
         requiresSandbox: false,
         requiredContext: ["configData", "replyPrompts"],
+        contextSchemas: {
+          // Mock ZhipinDataSchema - 简化版本用于测试
+          configData: {
+            safeParse: vi.fn((data: unknown) => {
+              if (!data || typeof data !== 'object') {
+                return {
+                  success: false,
+                  error: { issues: [{ path: [], message: 'Expected object' }] }
+                };
+              }
+              const issues: Array<{ path: string[]; message: string }> = [];
+              const obj = data as Record<string, unknown>;
+              if (!('stores' in obj)) {
+                issues.push({ path: ['stores'], message: 'Invalid input: expected array, received undefined' });
+              }
+              if (!('brands' in obj)) {
+                issues.push({ path: ['brands'], message: 'Invalid input: expected record, received undefined' });
+              }
+              if (!('city' in obj)) {
+                issues.push({ path: ['city'], message: 'Invalid input: expected string, received undefined' });
+              }
+              return issues.length > 0
+                ? { success: false, error: { issues } }
+                : { success: true, data };
+            })
+          } as never
+        },
         create: vi.fn().mockReturnValue({}),
       },
     };
@@ -375,7 +428,14 @@ describe("POST /api/v1/chat", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
-      // 应该设置 X-Tools-Skipped 响应头
+
+      // 验证响应头
+      const skippedHeader = response.headers.get("X-Tools-Skipped");
+      expect(skippedHeader).toBeTruthy();
+      expect(skippedHeader).toContain("zhipin_reply_generator");
+
+      // bash 不应该被跳过（不需要上下文）
+      expect(skippedHeader).not.toContain("bash");
     });
 
     it("应该在沙盒工具缺少 sandboxId 时返回错误", async () => {
@@ -409,9 +469,28 @@ describe("POST /api/v1/chat", () => {
 
       expect(response.status).toBe(200);
       const data = await response.json();
+
+      // 验证报告结构
       expect(data).toHaveProperty("valid");
       expect(data).toHaveProperty("tools");
       expect(Array.isArray(data.tools)).toBe(true);
+
+      // 验证 bash 工具应该有效（不需要上下文）
+      const bashTool = data.tools.find((t: { name: string }) => t.name === "bash");
+      expect(bashTool).toMatchObject({
+        name: "bash",
+        valid: true,
+      });
+
+      // 验证 zhipin_reply_generator 应该无效（缺少上下文）
+      const zhipinTool = data.tools.find(
+        (t: { name: string }) => t.name === "zhipin_reply_generator"
+      );
+      expect(zhipinTool).toMatchObject({
+        name: "zhipin_reply_generator",
+        valid: false,
+        missingContext: expect.arrayContaining(["configData", "replyPrompts"]),
+      });
     });
 
     it("应该在 contextStrategy=report 时返回验证报告", async () => {

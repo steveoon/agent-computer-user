@@ -111,6 +111,10 @@ interface ToolCreationResult {
     name: string;
     reason: string;
     missingContext?: string[];
+    structureErrors?: Array<{
+      field: string;
+      issues: string[];
+    }>;
   }>;
   validationReport?: ValidationReport;
 }
@@ -162,7 +166,7 @@ export function createToolsWithStrategy(
       toolContextMap[toolName] || {}
     );
 
-    // 验证必需上下文
+    // 验证必需上下文 - 第一阶段：存在性检查
     const missingContext: string[] = [];
     if (toolDef.requiredContext) {
       for (const requiredField of toolDef.requiredContext) {
@@ -173,7 +177,7 @@ export function createToolsWithStrategy(
       }
     }
 
-    // 如果有缺失的上下文
+    // 如果有缺失的上下文，先处理
     if (missingContext.length > 0) {
       const errorMsg = `Missing required context: ${missingContext.join(", ")}`;
 
@@ -203,9 +207,66 @@ export function createToolsWithStrategy(
       }
     }
 
+    // 验证必需上下文 - 第二阶段：Schema 结构验证
+    // 支持所有 contextStrategy（error/skip/report）
+    if (toolDef.contextSchemas) {
+      const structureErrors: Array<{ field: string; issues: string[] }> = [];
+
+      for (const [fieldName, schema] of Object.entries(toolDef.contextSchemas)) {
+        const value = (effectiveContext as Record<string, unknown>)[fieldName];
+
+        // 如果值存在，进行 Schema 验证
+        if (value !== undefined && value !== null) {
+          const validation = schema.safeParse(value);
+
+          if (!validation.success) {
+            // 收集 Zod 验证错误
+            const issues = validation.error.issues.map(
+              issue => `${issue.path.join(".")}: ${issue.message}`
+            );
+            structureErrors.push({ field: fieldName, issues });
+          }
+        }
+      }
+
+      // 如果有 Schema 验证错误，根据策略处理
+      if (structureErrors.length > 0) {
+        if (contextStrategy === "error") {
+          // 格式化错误并抛出
+          const errorMsg = structureErrors
+            .map(e => `  ${e.field}:\n${e.issues.map(i => `    - ${i}`).join("\n")}`)
+            .join("\n");
+          throw new Error(`Tool '${toolName}' Invalid context data structure:\n${errorMsg}`);
+        } else if (contextStrategy === "skip") {
+          // 跳过该工具
+          result.skipped.push({
+            name: toolName,
+            reason: "Invalid context data structure",
+            structureErrors,
+          });
+          continue;
+        } else {
+          // contextStrategy === "report"
+          validationReport.tools.push({
+            name: toolName,
+            valid: false,
+            structureErrors,
+          });
+          validationReport.valid = false;
+          continue;
+        }
+      }
+    }
+
     // 尝试创建工具
     try {
-      const tool = safeCreateTool(toolDef, effectiveContext as unknown as ToolCreationContext);
+      // 当 contextStrategy 为 "error" 时，让 safeCreateTool 抛出异常而不是返回 null
+      const shouldThrow = contextStrategy === "error";
+      const tool = safeCreateTool(
+        toolDef,
+        effectiveContext as unknown as ToolCreationContext,
+        shouldThrow
+      );
 
       if (tool) {
         result.tools[toolName] = tool;
