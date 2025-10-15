@@ -2,6 +2,18 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.9.0-develop.6](https://github.com/steveoon/agent-computer-user/compare/v1.9.0-develop.5...v1.9.0-develop.6) (2025-10-15)
+
+
+### Bug Fixes
+
+* 修复非流式模式丢失工具调用历史的问题 ([0c4beb2](https://github.com/steveoon/agent-computer-user/commit/0c4beb2670eae6e4338dc199e0974a495c6b55fa))
+
+
+### Features
+
+* 增强智能回复工具的 configData 验证 ([29ab232](https://github.com/steveoon/agent-computer-user/commit/29ab23295a74bbafff1449bdb8c8c159d5bcde36))
+
 # [1.9.0-develop.5](https://github.com/steveoon/agent-computer-user/compare/v1.9.0-develop.4...v1.9.0-develop.5) (2025-10-10)
 
 
