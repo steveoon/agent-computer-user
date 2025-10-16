@@ -52,12 +52,12 @@ export const themes = {
     loaderColor: "text-green-500",
   },
   blue: {
-    bgColor: "bg-blue-50 dark:bg-blue-900/20",
-    borderColor: "border-blue-200 dark:border-blue-800",
-    iconBgColor: "bg-blue-100 dark:bg-blue-800",
-    iconColor: "text-blue-600 dark:text-blue-400",
-    textColor: "text-blue-800 dark:text-blue-200",
-    loaderColor: "text-blue-500",
+    bgColor: "bg-brand-light/20 dark:bg-brand-primary/20",
+    borderColor: "border-brand-primary/30 dark:border-brand-primary/50",
+    iconBgColor: "bg-brand-light/30 dark:bg-brand-primary/40",
+    iconColor: "text-brand-primary dark:text-brand-light",
+    textColor: "text-brand-dark dark:text-brand-light",
+    loaderColor: "text-brand-primary",
   },
   purple: {
     bgColor: "bg-purple-50 dark:bg-purple-900/20",

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState, useRef } from "react";
 import { DesktopStream } from "@/components/desktop/DesktopStream";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { MobileChatLayout } from "@/components/chat/MobileChatLayout";
@@ -12,6 +12,7 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { useModelConfig } from "@/lib/stores/model-config-store";
 import { StorageDebug } from "@/components/storage-debug";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import type { ImperativePanelHandle } from "react-resizable-panels";
 
 /**
  * 🏠 主聊天界面组件（内部实现）
@@ -25,6 +26,21 @@ function ChatPageContent() {
 
   // 🤖 模型配置
   const { chatModel, classifyModel, replyModel } = useModelConfig();
+
+  // 🖥️ 沙盒面板折叠状态
+  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(true);
+  const desktopPanelRef = useRef<ImperativePanelHandle>(null);
+
+  // 切换沙盒面板的函数
+  const toggleDesktopPanel = () => {
+    if (isDesktopCollapsed) {
+      // 展开到 60% 宽度
+      desktopPanelRef.current?.resize(60);
+    } else {
+      // 折叠到 0
+      desktopPanelRef.current?.resize(0);
+    }
+  };
 
   // 使用桌面沙盒 Hook
   const desktop = useDesktopSandbox();
@@ -45,6 +61,8 @@ function ChatPageContent() {
     chatModel,
     classifyModel,
     replyModel,
+    isDesktopCollapsed,
+    onToggleDesktop: toggleDesktopPanel,
   };
 
   return (
@@ -65,9 +83,15 @@ function ChatPageContent() {
           <ResizablePanelGroup direction="horizontal" className="h-full">
             {/* Desktop Stream Panel */}
             <ResizablePanel
-              defaultSize={60}
-              minSize={40}
+              ref={desktopPanelRef}
+              defaultSize={0}
+              minSize={0}
+              maxSize={70}
+              collapsible={true}
+              collapsedSize={0}
               className="bg-black relative items-center justify-center"
+              onCollapse={() => setIsDesktopCollapsed(true)}
+              onExpand={() => setIsDesktopCollapsed(false)}
             >
               <DesktopStream
                 streamUrl={desktop.streamUrl}
@@ -87,7 +111,7 @@ function ChatPageContent() {
             <ResizableHandle withHandle />
 
             {/* Chat Interface Panel */}
-            <ResizablePanel defaultSize={30} minSize={25}>
+            <ResizablePanel defaultSize={100} minSize={25}>
               <ChatPanel {...chatPanelProps} />
             </ResizablePanel>
           </ResizablePanelGroup>

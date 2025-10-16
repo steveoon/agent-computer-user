@@ -165,7 +165,7 @@ export const SyncHistory = () => {
                     <TableCell>
                       <div className="flex items-center gap-3 text-sm">
                         <div className="flex items-center gap-1">
-                          <Database className="h-3 w-3 text-blue-600" />
+                          <Database className="h-3 w-3 text-brand-primary" />
                           <span>
                             {record.results.reduce((sum, r) => sum + r.processedRecords, 0)}
                           </span>
@@ -213,7 +213,7 @@ export const SyncHistory = () => {
                   {/* 总体统计 */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="text-center p-3 border rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">
+                      <div className="text-2xl font-bold text-brand-primary">
                         {selectedRecordData.results.length}
                       </div>
                       <div className="text-sm text-muted-foreground">品牌数量</div>

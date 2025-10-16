@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Bot } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 interface DesktopStreamProps {
   streamUrl: string | null;
@@ -35,21 +35,21 @@ export function DesktopStream({
     return (
       <div className="flex flex-col items-center justify-center h-full text-white p-8">
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 mx-auto mb-6 bg-blue-600/20 rounded-full flex items-center justify-center">
-            <Bot className="w-8 h-8 text-blue-400" />
+          <div className="w-16 h-16 mx-auto mb-6 bg-orange-600/20 rounded-full flex items-center justify-center">
+            <Sparkles className="w-8 h-8 text-orange-400" />
           </div>
-          <h2 className="text-xl font-semibold mb-3">AI 助手沙盒环境</h2>
+          <h2 className="text-xl font-semibold mb-3">花卷智能体沙盒环境</h2>
           <p className="text-gray-300 mb-6 leading-relaxed">
-            沙盒环境需要用户登录后才能启动。请先登录您的账户以使用完整的 AI 助手功能。
+            沙盒环境需要用户登录后才能启动。请先登录您的账户以使用完整的花卷智能体功能。
           </p>
           <div className="space-y-3 text-sm text-gray-400">
             <div className="flex items-center justify-center gap-2">
-              <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+              <div className="w-2 h-2 bg-brand-primary rounded-full"></div>
               <span>安全的隔离环境</span>
             </div>
             <div className="flex items-center justify-center gap-2">
               <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              <span>实时屏幕操作</span>
+              <span>实时屏幕操控</span>
             </div>
             <div className="flex items-center justify-center gap-2">
               <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
@@ -114,7 +114,7 @@ export function DesktopStream({
           {sandboxStatus === "paused" && (
             <Button
               onClick={onResume}
-              className="bg-blue-500/80 hover:bg-blue-600/80 text-white px-2 py-1 rounded text-xs"
+              className="bg-brand-primary/80 hover:bg-brand-dark/80 text-white px-2 py-1 rounded text-xs"
               disabled={isInitializing}
             >
               {isInitializing ? "恢复中..." : "恢复桌面"}
@@ -130,16 +130,16 @@ export function DesktopStream({
     return (
       <div className="flex flex-col items-center justify-center h-full text-white p-8">
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 mx-auto mb-6 bg-green-600/20 rounded-full flex items-center justify-center">
-            <Bot className="w-8 h-8 text-green-400" />
+          <div className="w-16 h-16 mx-auto mb-6 bg-orange-600/20 rounded-full flex items-center justify-center">
+            <Sparkles className="w-8 h-8 text-orange-400" />
           </div>
-          <h2 className="text-xl font-semibold mb-3">准备启动沙盒环境</h2>
+          <h2 className="text-xl font-semibold mb-3">准备启动智能体沙盒</h2>
           <p className="text-gray-300 mb-6 leading-relaxed">
             点击下方按钮启动远程沙盒环境。如果您只需要使用本地浏览器工具，可以暂时不启动沙盒。
           </p>
           <Button
             onClick={onInitialize}
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded"
+            className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded"
             disabled={isInitializing}
           >
             {isInitializing ? "正在启动..." : "启动沙盒环境"}

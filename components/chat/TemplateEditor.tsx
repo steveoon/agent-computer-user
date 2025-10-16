@@ -185,7 +185,7 @@ export function TemplateEditor({
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Edit3 className="w-4 h-4 text-blue-600" />
+            <Edit3 className="w-4 h-4 text-brand-primary" />
             <span className="text-sm font-medium text-gray-700">编辑模板</span>
           </div>
           <button onClick={handleClose} className="p-1 hover:bg-gray-100 rounded transition-colors">
@@ -197,7 +197,7 @@ export function TemplateEditor({
         <div className="space-y-3">
           {/* Quick Edit Fields */}
           {fields.length > 0 && (
-            <div className="grid grid-cols-2 gap-2 p-3 bg-blue-50 rounded-md">
+            <div className="grid grid-cols-2 gap-2 p-3 bg-brand-light/20 rounded-md">
               {fields.map(field => (
                 <div key={field.id} className="flex items-center gap-2">
                   <span className="text-sm text-gray-600 whitespace-nowrap">{field.key}：</span>
@@ -216,7 +216,7 @@ export function TemplateEditor({
                         handleSubmit();
                       }
                     }}
-                    className="flex-1 px-2 py-1 text-sm bg-white border border-gray-200 rounded hover:border-blue-300 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+                    className="flex-1 px-2 py-1 text-sm bg-white border border-gray-200 rounded hover:border-brand-primary focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary transition-colors"
                   />
                 </div>
               ))}
@@ -245,7 +245,7 @@ export function TemplateEditor({
               </button>
               <button
                 onClick={handleSubmit}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+                className="flex items-center gap-1.5 px-4 py-1.5 text-sm text-white bg-brand-primary hover:bg-brand-dark rounded transition-colors"
               >
                 <Send className="w-3.5 h-3.5" />
                 发送

@@ -30,7 +30,7 @@ const getStatusStyles = (success: boolean) => ({
 // 工具函数：获取进度状态样式
 const getProgressStatusStyles = (isSyncing: boolean, overallSuccess?: boolean) => {
   if (isSyncing) {
-    return { icon: "text-blue-600", badge: "default" as const };
+    return { icon: "text-brand-primary", badge: "default" as const };
   }
   return overallSuccess
     ? { icon: "text-emerald-600", badge: "default" as const }
@@ -46,7 +46,7 @@ interface StatusIconProps {
 
 function StatusIcon({ isSyncing, success, className = "h-4 w-4" }: StatusIconProps) {
   if (isSyncing) {
-    return <RefreshCw className={`${className} animate-spin text-blue-600`} aria-hidden="true" />;
+    return <RefreshCw className={`${className} animate-spin text-brand-primary`} aria-hidden="true" />;
   }
   return success ? (
     <CheckCircle className={`${className} text-emerald-600`} aria-hidden="true" />
@@ -67,10 +67,10 @@ function SyncStats({ stats, totalDuration, selectedBrandsCount }: SyncStatsProps
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4" role="region" aria-label="同步统计信息">
       <div className="text-center">
         <div className="flex items-center justify-center gap-1 mb-1">
-          <Server className="h-4 w-4 text-blue-600" aria-hidden="true" />
+          <Server className="h-4 w-4 text-brand-primary" aria-hidden="true" />
           <span className="text-sm font-medium">品牌数量</span>
         </div>
-        <div className="text-2xl font-bold text-blue-600">{selectedBrandsCount}</div>
+        <div className="text-2xl font-bold text-brand-primary">{selectedBrandsCount}</div>
       </div>
 
       <div className="text-center">

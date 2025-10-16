@@ -36,6 +36,8 @@ interface ChatPanelProps {
   chatModel: ModelId;
   classifyModel: ModelId;
   replyModel: ModelId;
+  isDesktopCollapsed?: boolean;
+  onToggleDesktop?: () => void;
 }
 
 export function ChatPanel({
@@ -59,6 +61,8 @@ export function ChatPanel({
   chatModel,
   classifyModel,
   replyModel,
+  isDesktopCollapsed,
+  onToggleDesktop,
 }: ChatPanelProps) {
   const [containerRef, endRef] = useScrollToBottom();
 
@@ -120,6 +124,8 @@ export function ChatPanel({
         envInfo={envInfo}
         onSmartClean={smartClean}
         onClear={clearMessages}
+        isDesktopCollapsed={isDesktopCollapsed}
+        onToggleDesktop={onToggleDesktop}
       />
 
       <ChatMessages
@@ -165,7 +171,7 @@ export function ChatPanel({
                     size="sm"
                     variant="outline"
                     onClick={smartClean}
-                    className="text-xs h-7 px-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+                    className="text-xs h-7 px-2 border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10"
                   >
                     智能清理
                   </Button>
