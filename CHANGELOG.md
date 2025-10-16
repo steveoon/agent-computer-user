@@ -2,6 +2,29 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.9.0](https://github.com/steveoon/agent-computer-user/compare/v1.8.0...v1.9.0) (2025-10-16)
+
+
+### Bug Fixes
+
+* **bailian-upload:** 修复 Blob 构造器的类型兼容性问题 ([9de3066](https://github.com/steveoon/agent-computer-user/commit/9de30669842cb4955e4969823b73cdfa0e21dbc5))
+* **duliday:** 修复 BI 报表工具 500 错误并添加企业字段支持 ([7af6761](https://github.com/steveoon/agent-computer-user/commit/7af676183daf563cb04b9d95f10f2e8768bc5f4a))
+* 修复 TypeScript 类型错误 ([ce92b2b](https://github.com/steveoon/agent-computer-user/commit/ce92b2be9e2af47464be3df42e79ea068d6a4ad6))
+* 修复登录后立即访问受保护路由时认证失败的问题 ([bfb9a4d](https://github.com/steveoon/agent-computer-user/commit/bfb9a4db3a7030d72fd3995f598e7d86407ac247))
+* 修复非流式模式丢失工具调用历史的问题 ([0c4beb2](https://github.com/steveoon/agent-computer-user/commit/0c4beb2670eae6e4338dc199e0974a495c6b55fa))
+
+
+### Features
+
+* **api:** 实现 Open API v1 接口及鉴权和 CORS 支持 ([836e949](https://github.com/steveoon/agent-computer-user/commit/836e94907e61c842037caa7562d09ba4ea3599fc))
+* **models:** 添加 Claude Sonnet 4.5 模型支持 ([ac86fbb](https://github.com/steveoon/agent-computer-user/commit/ac86fbbc1ffa839b9f013fc6ba81ed26d79de2b3))
+* **ui:** BI 报表工具消息组件添加新字段显示 ([dbde2e3](https://github.com/steveoon/agent-computer-user/commit/dbde2e3bc5f8d7381892dae672e2595b65b88ad6))
+* 增强智能回复工具的 configData 验证 ([29ab232](https://github.com/steveoon/agent-computer-user/commit/29ab23295a74bbafff1449bdb8c8c159d5bcde36))
+* 实现 GET /api/v1/models API 端点 ([0f42595](https://github.com/steveoon/agent-computer-user/commit/0f42595b7e01132e395fb1063707435762ab692a))
+* 实现 Open API Agent 系统核心接口 ([a506109](https://github.com/steveoon/agent-computer-user/commit/a506109e8240e283e84c1a926dd695a400657fdd))
+* 实现花卷品牌升级和沙盒面板折叠功能 ([8583bba](https://github.com/steveoon/agent-computer-user/commit/8583bba82a0e6bbfb64b7ce3f9e9fa8e0ffd3caf)), closes [#F59E0](https://github.com/steveoon/agent-computer-user/issues/F59E0)
+* 改进 UX 反馈和导航体验 ([127f584](https://github.com/steveoon/agent-computer-user/commit/127f584a55f4ac1266c78d5d89780692388551b4))
+
 # [1.9.0-develop.7](https://github.com/steveoon/agent-computer-user/compare/v1.9.0-develop.6...v1.9.0-develop.7) (2025-10-16)
 
 
