@@ -19,13 +19,13 @@ const RETRY_CONFIG = {
  */
 function base64ToUint8Array(base64Data: string): Uint8Array {
   // 移除可能的data URI前缀
-  const cleanBase64 = base64Data.replace(/^data:image\/[a-z]+;base64,/, '');
-  
+  const cleanBase64 = base64Data.replace(/^data:image\/[a-z]+;base64,/, "");
+
   // Node.js环境
-  if (typeof Buffer !== 'undefined') {
-    return new Uint8Array(Buffer.from(cleanBase64, 'base64'));
+  if (typeof Buffer !== "undefined") {
+    return new Uint8Array(Buffer.from(cleanBase64, "base64"));
   }
-  
+
   // 浏览器环境
   const binaryString = atob(cleanBase64);
   const bytes = new Uint8Array(binaryString.length);
@@ -89,7 +89,7 @@ async function getUploadPolicy(
   });
 
   // 使用重试机制获取上传凭证
-  return withRetry(async (signal) => {
+  return withRetry(async signal => {
     const response = await fetch(`${url}?${params}`, {
       method: "GET",
       headers,
@@ -114,31 +114,37 @@ async function getUploadPolicy(
 function isRetryableError(error: unknown): boolean {
   if (error instanceof Error) {
     // 网络错误、超时错误可重试
-    if (error.message.includes('fetch failed') || 
-        error.message.includes('timeout') ||
-        error.message.includes('ECONNRESET') ||
-        error.message.includes('ETIMEDOUT') ||
-        error.message.includes('ENOTFOUND')) {
+    if (
+      error.message.includes("fetch failed") ||
+      error.message.includes("timeout") ||
+      error.message.includes("ECONNRESET") ||
+      error.message.includes("ETIMEDOUT") ||
+      error.message.includes("ENOTFOUND")
+    ) {
       return true;
     }
-    
+
     // HTTP 5xx 错误可重试
-    if (error.message.includes('500') || 
-        error.message.includes('502') || 
-        error.message.includes('503') || 
-        error.message.includes('504')) {
+    if (
+      error.message.includes("500") ||
+      error.message.includes("502") ||
+      error.message.includes("503") ||
+      error.message.includes("504")
+    ) {
       return true;
     }
-    
+
     // HTTP 4xx 错误不可重试（客户端错误）
-    if (error.message.includes('400') || 
-        error.message.includes('401') || 
-        error.message.includes('403') || 
-        error.message.includes('404')) {
+    if (
+      error.message.includes("400") ||
+      error.message.includes("401") ||
+      error.message.includes("403") ||
+      error.message.includes("404")
+    ) {
       return false;
     }
   }
-  
+
   // 默认可重试
   return true;
 }
@@ -154,17 +160,17 @@ async function withRetry<T>(
   operationName: string
 ): Promise<T> {
   let lastError: Error | unknown;
-  
+
   for (let attempt = 1; attempt <= RETRY_CONFIG.maxAttempts; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), RETRY_CONFIG.timeout);
-    
+
     try {
       console.log(`🔄 ${operationName} - 尝试 ${attempt}/${RETRY_CONFIG.maxAttempts}`);
-      
+
       // 执行操作，传递AbortSignal
       const result = await fn(controller.signal);
-      
+
       clearTimeout(timeoutId);
       console.log(`✅ ${operationName} - 第 ${attempt} 次尝试成功`);
       return result;
@@ -172,13 +178,13 @@ async function withRetry<T>(
       clearTimeout(timeoutId);
       lastError = error;
       console.error(`❌ ${operationName} - 第 ${attempt} 次尝试失败:`, error);
-      
+
       // 检查是否可重试
       if (!isRetryableError(error)) {
         console.log(`🚫 ${operationName} - 错误不可重试，终止`);
         throw error;
       }
-      
+
       if (attempt < RETRY_CONFIG.maxAttempts) {
         // 计算延迟时间（指数退避 + 抖动）
         const baseDelay = Math.min(
@@ -188,13 +194,13 @@ async function withRetry<T>(
         // 添加随机抖动（±20%）
         const jitter = baseDelay * 0.2 * (Math.random() - 0.5);
         const delay = Math.max(0, baseDelay + jitter);
-        
+
         console.log(`⏳ 等待 ${Math.round(delay)}ms 后重试...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
-  
+
   throw new Error(
     `${operationName} - 所有重试均失败: ${lastError instanceof Error ? lastError.message : String(lastError)}`
   );
@@ -214,18 +220,21 @@ async function uploadImageToOSS(
 ): Promise<string> {
   // 将base64转换为Uint8Array（跨环境兼容）
   const bytes = base64ToUint8Array(base64Data);
-  
+
   // 检查文件大小
   if (!checkFileSize(bytes, policyData.max_file_size_mb)) {
-    throw new Error(
-      `文件大小超过限制 ${policyData.max_file_size_mb}MB，请压缩后重试`
-    );
+    throw new Error(`文件大小超过限制 ${policyData.max_file_size_mb}MB，请压缩后重试`);
   }
-  
-  const imageBlob = new Blob([bytes], { type: "image/jpeg" });
+
+  // 适配较新 TS DOM lib 对 BlobPart 的更严格约束：传入 ArrayBuffer 而非视图
+  const arrayBuffer: ArrayBuffer =
+    bytes.buffer instanceof ArrayBuffer
+      ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+      : bytes.slice().buffer;
+  const imageBlob = new Blob([arrayBuffer], { type: "image/jpeg" });
 
   // 构造上传路径（规范化，避免双斜杠）
-  const uploadDir = policyData.upload_dir.replace(/\/$/, '');
+  const uploadDir = policyData.upload_dir.replace(/\/$/, "");
   const key = `${uploadDir}/${fileName}`;
 
   // 构造FormData
@@ -240,7 +249,7 @@ async function uploadImageToOSS(
   formData.append("file", imageBlob, fileName);
 
   // 使用重试机制上传文件
-  return withRetry(async (signal) => {
+  return withRetry(async signal => {
     const response = await fetch(policyData.upload_host, {
       method: "POST",
       body: formData,

@@ -42,7 +42,7 @@ export function BrandSelector({ showHistory = false }: { showHistory?: boolean }
               {brandHistory.slice(0, 3).map(brand => (
                 <SelectItem key={`history-${brand}`} value={brand} className="text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="text-blue-600">📋</span>
+                    <span className="text-brand-primary">📋</span>
                     <span>{brand}</span>
                   </div>
                 </SelectItem>

@@ -18,6 +18,7 @@ import { dulidayInterviewBookingTool } from "./duliday/duliday-interview-booking
 import { dulidayBiReportTool } from "./duliday/bi-report-tool";
 import { dulidayBiRefreshTool } from "./duliday/bi-refresh-tool";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
+import { ZhipinDataSchema } from "@/types/zhipin";
 
 // Import types from centralized location
 import type {
@@ -68,36 +69,40 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
   }),
 
   // ===== 通信工具 =====
-  feishu: {
+  feishu: createToolDefinition({
     name: "feishu",
     description: "飞书机器人消息工具",
     category: "communication",
     requiresSandbox: false,
     create: () => feishuBotTool(),
-  },
+  }),
 
-  wechat: {
+  wechat: createToolDefinition({
     name: "wechat",
     description: "微信机器人消息工具",
     category: "communication",
     requiresSandbox: false,
     create: () => weChatBotTool(),
-  },
+  }),
 
   // ===== 业务工具 =====
-  job_posting_generator: {
+  job_posting_generator: createToolDefinition({
     name: "job_posting_generator",
     description: "职位发布生成器",
     category: "business",
     requiresSandbox: false,
     create: ctx => jobPostingGeneratorTool(ctx.preferredBrand, ctx.configData),
-  },
+  }),
 
-  zhipin_reply_generator: {
+  zhipin_reply_generator: createToolDefinition({
     name: "zhipin_reply_generator",
     description: "智聘智能回复生成器",
     category: "business",
     requiresSandbox: false,
+    requiredContext: ["configData", "replyPrompts"],
+    contextSchemas: {
+      configData: ZhipinDataSchema,
+    },
     create: ctx =>
       zhipinReplyTool(
         ctx.preferredBrand,
@@ -106,222 +111,236 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
         ctx.replyPrompts,
         ctx.defaultWechatId
       ),
-  },
+  }),
 
   // ===== 自动化工具 =====
-  puppeteer: {
+  puppeteer: createToolDefinition({
     name: "puppeteer",
     description: "Puppeteer浏览器自动化工具",
     category: "automation",
     requiresSandbox: false,
     create: () => puppeteerTool(),
-  },
+  }),
 
-  analyze_screenshot: {
+  analyze_screenshot: createToolDefinition({
     name: "analyze_screenshot",
     description: "截图分析工具，使用AI分析截图内容",
     category: "automation",
     requiresSandbox: false,
     create: () => analyzeScreenshotTool(),
-  },
+  }),
 
   // ===== Zhipin 自动化工具 =====
-  zhipin_get_unread_candidates_improved: {
+  zhipin_get_unread_candidates_improved: createToolDefinition({
     name: "zhipin_get_unread_candidates_improved",
     description: "获取智聘未读候选人",
     category: "automation",
     requiresSandbox: false,
     create: () => zhipinTools.getUnreadCandidatesImproved,
-  },
+  }),
 
-  zhipin_open_candidate_chat_improved: {
+  zhipin_open_candidate_chat_improved: createToolDefinition({
     name: "zhipin_open_candidate_chat_improved",
     description: "打开智聘候选人聊天",
     category: "automation",
     requiresSandbox: false,
     create: () => zhipinTools.openCandidateChatImproved,
-  },
+  }),
 
-  zhipin_send_message: {
+  zhipin_send_message: createToolDefinition({
     name: "zhipin_send_message",
     description: "发送智聘消息",
     category: "automation",
     requiresSandbox: false,
     create: () => zhipinTools.sendMessage(),
-  },
+  }),
 
-  zhipin_get_chat_details: {
+  zhipin_get_chat_details: createToolDefinition({
     name: "zhipin_get_chat_details",
     description: "获取智聘聊天详情",
     category: "automation",
     requiresSandbox: false,
     create: () => zhipinTools.getChatDetails(),
-  },
+  }),
 
-  zhipin_exchange_wechat: {
+  zhipin_exchange_wechat: createToolDefinition({
     name: "zhipin_exchange_wechat",
     description: "交换微信",
     category: "automation",
     requiresSandbox: false,
     create: () => zhipinTools.exchangeWechat(),
-  },
+  }),
 
-  zhipin_get_username: {
+  zhipin_get_username: createToolDefinition({
     name: "zhipin_get_username",
     description: "获取智聘用户名",
     category: "automation",
     requiresSandbox: false,
     create: () => zhipinTools.getUsername,
-  },
+  }),
 
-  zhipin_say_hello: {
+  zhipin_say_hello: createToolDefinition({
     name: "zhipin_say_hello",
     description: "Boss直聘批量打招呼",
     category: "automation",
     requiresSandbox: false,
     create: () => zhipinTools.sayHelloSimple(),
-  },
+  }),
 
-  zhipin_get_candidate_list: {
+  zhipin_get_candidate_list: createToolDefinition({
     name: "zhipin_get_candidate_list",
     description: "获取Boss直聘候选人列表",
     category: "automation",
     requiresSandbox: false,
     create: () => zhipinTools.getCandidateList(),
-  },
+  }),
 
-  zhipin_open_resume: {
+  zhipin_open_resume: createToolDefinition({
     name: "zhipin_open_resume",
     description: "打开Boss直聘候选人简历",
     category: "automation",
     requiresSandbox: false,
     create: () => zhipinTools.openResume(),
-  },
+  }),
 
-  zhipin_locate_resume_canvas: {
+  zhipin_locate_resume_canvas: createToolDefinition({
     name: "zhipin_locate_resume_canvas",
     description: "定位Boss直聘简历Canvas位置",
     category: "automation",
     requiresSandbox: false,
     create: () => zhipinTools.locateResumeCanvas(),
-  },
+  }),
 
-  zhipin_close_resume_detail: {
+  zhipin_close_resume_detail: createToolDefinition({
     name: "zhipin_close_resume_detail",
     description: "关闭Boss直聘简历详情弹窗",
     category: "automation",
     requiresSandbox: false,
     create: () => zhipinTools.closeResumeDetail(),
-  },
+  }),
 
   // ===== Yupao 自动化工具 =====
-  yupao_get_unread_messages: {
+  yupao_get_unread_messages: createToolDefinition({
     name: "yupao_get_unread_messages",
     description: "获取约聘未读消息",
     category: "automation",
     requiresSandbox: false,
     create: () => yupaoTools.getUnreadMessages,
-  },
+  }),
 
-  yupao_open_candidate_chat: {
+  yupao_open_candidate_chat: createToolDefinition({
     name: "yupao_open_candidate_chat",
     description: "打开约聘候选人聊天",
     category: "automation",
     requiresSandbox: false,
     create: () => yupaoTools.openCandidateChat,
-  },
+  }),
 
-  yupao_get_chat_details: {
+  yupao_get_chat_details: createToolDefinition({
     name: "yupao_get_chat_details",
     description: "获取约聘聊天详情",
     category: "automation",
     requiresSandbox: false,
     create: () => yupaoTools.getChatDetails,
-  },
+  }),
 
-  yupao_send_message: {
+  yupao_send_message: createToolDefinition({
     name: "yupao_send_message",
     description: "发送约聘消息",
     category: "automation",
     requiresSandbox: false,
     create: () => yupaoTools.sendMessage,
-  },
+  }),
 
-  yupao_exchange_wechat: {
+  yupao_exchange_wechat: createToolDefinition({
     name: "yupao_exchange_wechat",
     description: "约聘交换微信",
     category: "automation",
     requiresSandbox: false,
     create: () => yupaoTools.exchangeWechat,
-  },
+  }),
 
-  yupao_get_username: {
+  yupao_get_username: createToolDefinition({
     name: "yupao_get_username",
     description: "获取约聘用户名",
     category: "automation",
     requiresSandbox: false,
     create: () => yupaoTools.getUsername,
-  },
+  }),
 
-  yupao_get_candidate_list: {
+  yupao_get_candidate_list: createToolDefinition({
     name: "yupao_get_candidate_list",
     description: "获取约聘候选人列表",
     category: "automation",
     requiresSandbox: false,
     create: () => yupaoTools.getCandidateList,
-  },
+  }),
 
-  yupao_say_hello: {
+  yupao_say_hello: createToolDefinition({
     name: "yupao_say_hello",
     description: "约聘批量打招呼",
     category: "automation",
     requiresSandbox: false,
     create: () => yupaoTools.sayHello,
-  },
+  }),
 
   // ===== Duliday 业务工具 =====
-  duliday_job_list: {
+  duliday_job_list: createToolDefinition({
     name: "duliday_job_list",
     description: "Duliday职位列表",
     category: "business",
     requiresSandbox: false,
+    requiredContext: ["dulidayToken"],
     create: ctx => dulidayJobListTool(ctx.dulidayToken, ctx.preferredBrand),
-  },
+  }),
 
-  duliday_job_details: {
+  duliday_job_details: createToolDefinition({
     name: "duliday_job_details",
     description: "Duliday职位详情",
     category: "business",
     requiresSandbox: false,
+    requiredContext: ["dulidayToken"],
     create: ctx => dulidayJobDetailsTool(ctx.dulidayToken),
-  },
+  }),
 
-  duliday_interview_booking: {
+  duliday_interview_booking: createToolDefinition({
     name: "duliday_interview_booking",
     description: "Duliday面试预约",
     category: "business",
     requiresSandbox: false,
+    requiredContext: ["dulidayToken"],
     create: ctx => dulidayInterviewBookingTool(ctx.dulidayToken),
-  },
+  }),
 
-  duliday_bi_report: {
+  duliday_bi_report: createToolDefinition({
     name: "duliday_bi_report",
     description: "Duliday BI报表",
     category: "business",
     requiresSandbox: false,
     create: () => dulidayBiReportTool(),
-  },
+  }),
 
-  duliday_bi_refresh: {
+  duliday_bi_refresh: createToolDefinition({
     name: "duliday_bi_refresh",
     description: "Duliday BI刷新",
     category: "business",
     requiresSandbox: false,
     create: () => dulidayBiRefreshTool(),
-  },
+  }),
 };
 
 // ========== 工具分组配置 ==========
+
+/**
+ * 对外公开的系统提示词（用于 Open API）
+ */
+export const OPEN_API_PROMPT_TYPES = [
+  "bossZhipinSystemPrompt",
+  "bossZhipinLocalSystemPrompt",
+  "generalComputerSystemPrompt",
+] as const;
+
+export type OpenApiPromptType = typeof OPEN_API_PROMPT_TYPES[number];
 
 /**
  * 根据系统提示词定义可用的工具
@@ -509,6 +528,56 @@ export function isToolAllowed(toolName: string, activeSystemPrompt: SystemPrompt
  */
 export function getToolsForPrompt(promptType: SystemPromptType): string[] {
   return PROMPT_TOOL_MAPPING[promptType] || [];
+}
+
+/**
+ * 获取导出工具注册表（只读）
+ * 用于支持直接访问工具定义元数据
+ */
+export function getToolRegistry(): Readonly<Record<string, ToolDefinition>> {
+  return TOOL_REGISTRY;
+}
+
+// ========== 工具元数据访问功能 ==========
+
+/**
+ * 获取工具元数据列表（用于 /api/v1/tools 接口）
+ * 返回工具名称、描述、分类、是否需要沙盒、必需的上下文字段
+ */
+export function getToolMetadataList(): Array<{
+  name: string;
+  description: string;
+  category: string;
+  requiresSandbox: boolean;
+  requiredContext: string[];
+}> {
+  return Object.entries(TOOL_REGISTRY).map(([name, definition]) => ({
+    name,
+    description: definition.description,
+    category: definition.category,
+    requiresSandbox: definition.requiresSandbox || false,
+    requiredContext: definition.requiredContext || [],
+  }));
+}
+
+/**
+ * 获取单个工具的元数据
+ */
+export function getToolMetadata(toolName: string): {
+  name: string;
+  requiresSandbox: boolean;
+  requiredContext: string[];
+  description?: string;
+} | null {
+  const definition = TOOL_REGISTRY[toolName];
+  if (!definition) return null;
+
+  return {
+    name: toolName,
+    requiresSandbox: definition.requiresSandbox || false,
+    requiredContext: definition.requiredContext || [],
+    description: definition.description,
+  };
 }
 
 // ========== 导出其他功能函数 ==========

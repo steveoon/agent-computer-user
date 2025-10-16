@@ -63,7 +63,7 @@ const SCHEDULE_TYPE_CONFIG: Record<
     label: "固定排班",
     description: "固定时间段工作，时间相对稳定",
     icon: Clock,
-    color: "text-blue-600",
+    color: "text-brand-primary",
   },
   flexible: {
     label: "灵活排班",
@@ -405,7 +405,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
             <TooltipTrigger asChild>
               <div className="flex items-center justify-between space-x-2 p-2 rounded-md border">
                 <div className="flex items-center gap-2">
-                  <UserCheck className="h-4 w-4 text-blue-600" />
+                  <UserCheck className="h-4 w-4 text-brand-primary" />
                   <Label className="text-sm font-medium">换班</Label>
                 </div>
                 <Switch
@@ -512,12 +512,12 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
 
   // 渲染批量设置区域
   const renderBatchSettings = () => (
-    <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+    <Card className="bg-gradient-to-r from-brand-light/20 to-brand-light/10 border-brand-primary/30">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Users className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-brand-light/30 rounded-lg">
+              <Users className="h-5 w-5 text-brand-primary" />
             </div>
             批量设置排班规则
           </CardTitle>
@@ -538,7 +538,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
           </Badge>{" "}
           品牌下所有门店统一设置排班规则
           <br />
-          <span className="text-xs text-blue-600">💡 当前显示的是基于现有门店数据的最常见配置</span>
+          <span className="text-xs text-brand-primary">💡 当前显示的是基于现有门店数据的最常见配置</span>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -653,7 +653,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
                       <div
                         className={`p-1.5 rounded-md ${
                           position.scheduleType === "fixed"
-                            ? "bg-blue-100"
+                            ? "bg-brand-light/30"
                             : position.scheduleType === "flexible"
                               ? "bg-green-100"
                               : position.scheduleType === "rotating"
@@ -709,7 +709,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
           <div className="text-sm text-muted-foreground">
             精细化管理 {brandName} 品牌下的排班设置
             {searchKeyword.trim() && (
-              <span className="ml-2 text-blue-600 font-medium">
+              <span className="ml-2 text-brand-primary font-medium">
                 • 找到 {brandStores.length} 家匹配门店
               </span>
             )}
@@ -751,7 +751,7 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
                     variant="link"
                     size="sm"
                     onClick={() => setSearchKeyword("")}
-                    className="text-blue-600 h-auto p-0"
+                    className="text-brand-primary h-auto p-0"
                   >
                     清除搜索条件
                   </Button>
@@ -769,10 +769,10 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
         <>
           <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setEditingStore(null)} />
           <Card className="fixed inset-x-4 top-4 z-50 max-w-3xl mx-auto shadow-xl border-2">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+            <CardHeader className="bg-gradient-to-r from-brand-light/20 to-brand-light/10">
               <CardTitle className="flex items-center gap-2">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Calendar className="h-5 w-5 text-blue-600" />
+                <div className="p-2 bg-brand-light/30 rounded-lg">
+                  <Calendar className="h-5 w-5 text-brand-primary" />
                 </div>
                 编辑排班设置
               </CardTitle>

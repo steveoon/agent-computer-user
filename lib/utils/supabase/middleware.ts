@@ -111,8 +111,11 @@ export const updateSession = async (request: NextRequest) => {
         );
       }
 
-      // 对于页面路由，重定向到首页
-      return NextResponse.redirect(new URL("/", request.url));
+      // 对于页面路由，重定向到首页并添加认证错误参数
+      const redirectUrl = new URL("/", request.url);
+      redirectUrl.searchParams.set("auth_required", "true");
+      redirectUrl.searchParams.set("from", pathname);
+      return NextResponse.redirect(redirectUrl);
     }
 
     return response;

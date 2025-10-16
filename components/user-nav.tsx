@@ -78,7 +78,7 @@ export function UserNav() {
         onClick={() => setAuthDialogOpen(true)}
         variant="outline"
         size="sm"
-        className="h-7 px-3 text-xs font-medium bg-white/80 border-slate-200 hover:bg-blue-50 hover:border-blue-300 text-slate-700 hover:text-blue-700 transition-colors"
+        className="h-7 px-3 text-xs font-medium bg-white/80 border-slate-200 hover:bg-brand-primary/10 hover:border-brand-primary text-slate-700 hover:text-brand-primary transition-colors"
       >
         登录
       </Button>

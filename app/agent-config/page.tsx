@@ -23,8 +23,10 @@ import {
   RefreshCw,
   CheckCircle,
   AlertCircle,
+  ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 import { useModelConfig } from "@/lib/stores/model-config-store";
 import {
@@ -49,6 +51,8 @@ function getModelName(modelId: ModelId): string {
 }
 
 export default function AgentConfigPage() {
+  const router = useRouter();
+
   const {
     chatModel,
     classifyModel,
@@ -118,11 +122,22 @@ export default function AgentConfigPage() {
     <div className="container max-w-6xl mx-auto p-6 space-y-6">
       {/* 页面头部 */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Settings className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">Agent配置</h1>
-            <p className="text-muted-foreground">配置AI模型和服务提供商参数</p>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.back()}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            返回
+          </Button>
+          <div className="flex items-center gap-3">
+            <Settings className="h-8 w-8 text-primary" />
+            <div>
+              <h1 className="text-3xl font-bold">Agent配置</h1>
+              <p className="text-muted-foreground">配置AI模型和服务提供商参数</p>
+            </div>
           </div>
         </div>
         <div className="flex gap-2">

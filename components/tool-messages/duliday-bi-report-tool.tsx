@@ -9,8 +9,10 @@ export function DulidayBiReportToolMessage(props: ToolMessageProps) {
   const startDate = input.startDate as string | undefined;
   const endDate = input.endDate as string | undefined;
   const orderStatus = input.orderStatus as string | undefined;
+  const companyName = input.companyName as string | undefined;
   const storeName = input.storeName as string | undefined;
   const regionName = input.regionName as string | undefined;
+  const orderRegionName = input.orderRegionName as string | undefined;
   const formatType = input.formatType as string | undefined;
   const limit = input.limit as number | undefined;
 
@@ -24,8 +26,10 @@ export function DulidayBiReportToolMessage(props: ToolMessageProps) {
 
   // 其他筛选条件
   if (orderStatus) details.push(orderStatus);
+  if (companyName) details.push(companyName);
   if (storeName) details.push(storeName);
   if (regionName) details.push(regionName);
+  if (orderRegionName) details.push(orderRegionName);
 
   // 数据量和格式
   if (limit) details.push(`${limit}条`);

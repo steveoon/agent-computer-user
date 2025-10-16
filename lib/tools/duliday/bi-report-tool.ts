@@ -23,6 +23,7 @@ const LIMITS = {
 } as const;
 
 const FIELD_NAMES = {
+  COMPANY_NAME: "所属企业",
   ORDER_DATE: "订单归属日期",
   ORDER_STATUS: "订单状态",
   STORE_NAME: "订单所属门店",
@@ -165,6 +166,7 @@ function buildFilters(params: {
   startDate?: string;
   endDate?: string;
   orderStatus?: string;
+  companyName?: string;
   storeName?: string;
   regionName?: string;
   orderRegionName?: string;
@@ -192,6 +194,14 @@ function buildFilters(params: {
       name: FIELD_NAMES.ORDER_STATUS,
       filterType: FILTER_TYPES.EQUAL,
       filterValue: [params.orderStatus],
+    });
+  }
+
+  if (params.companyName) {
+    filters.push({
+      name: FIELD_NAMES.COMPANY_NAME,
+      filterType: FILTER_TYPES.CONTAINS,
+      filterValue: [params.companyName],
     });
   }
 
@@ -532,6 +542,7 @@ export const dulidayBiReportTool = () =>
         .enum(["待接受", "待验收", "进行中", "已拒绝", "已取消", "已验收"])
         .optional()
         .describe("订单状态筛选"),
+      companyName: z.string().optional().describe("所属企业名称关键词，如：上海必胜客、奥乐齐等"),
       storeName: z.string().optional().describe("门店名称关键词，用于筛选特定门店"),
       regionName: z.string().optional().describe("大区归属，如：浦东新区、崇明区、静安区等"),
       orderRegionName: z
@@ -565,6 +576,7 @@ export const dulidayBiReportTool = () =>
         limit = LIMITS.DEFAULT_LIMIT,
         offset = 0,
         orderStatus,
+        companyName,
         storeName,
         regionName,
         orderRegionName,
@@ -585,24 +597,20 @@ export const dulidayBiReportTool = () =>
           startDate,
           endDate,
           orderStatus,
+          companyName,
           storeName,
           regionName,
           orderRegionName,
         });
 
-        // 构建排序参数（API暂不支持，保留接口）
-        let headerSortings: Array<{ name: string; order: string }> | undefined;
-        if (sortBy) {
-          headerSortings = [{ name: sortBy, order: sortOrder }];
-        }
-
+        // 注意：API 不支持 headerSortings 参数（会导致 500 错误）
+        // 排序功能通过本地 sortOrders() 函数实现（见下方第 648-651 行）
         const queryPayload = {
           offset,
           limit: Math.min(limit, LIMITS.MAX_LIMIT),
           view: "GRAPH",
           filters,
           dynamicParams: [],
-          ...(headerSortings && { headerSortings }),
         };
 
         // Step 3: 获取数据（支持分页）
@@ -701,6 +709,7 @@ function formatOutput(
     startDate?: string;
     endDate?: string;
     orderStatus?: string;
+    companyName?: string;
     storeName?: string;
     regionName?: string;
     orderRegionName?: string;
@@ -728,6 +737,7 @@ function formatSummary(
     startDate?: string;
     endDate?: string;
     orderStatus?: string;
+    companyName?: string;
     storeName?: string;
     regionName?: string;
     orderRegionName?: string;
@@ -742,6 +752,7 @@ function formatSummary(
     message += `   日期范围：${params.startDate || "开始"} ~ ${params.endDate || "至今"}\n`;
   }
   if (params.orderStatus) message += `   订单状态：${params.orderStatus}\n`;
+  if (params.companyName) message += `   所属企业：${params.companyName}\n`;
   if (params.storeName) message += `   门店：${params.storeName}\n`;
   if (params.regionName) message += `   大区归属：${params.regionName}\n`;
   if (params.orderRegionName) message += `   所属地区：${params.orderRegionName}\n`;

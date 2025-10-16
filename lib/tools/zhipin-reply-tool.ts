@@ -46,8 +46,11 @@ export const zhipinReplyTool = (
   configData?: ZhipinData,
   replyPrompts?: ReplyPromptsConfig,
   defaultWechatId?: string
-) =>
-  tool({
+) => {
+  // 注意：configData 的验证在工具创建时完成（通过 contextSchemas）
+  // 执行时只关注业务逻辑验证
+
+  return tool({
     description: `
       Boss直聘智能回复生成工具，根据候选人消息自动生成招聘回复。
       
@@ -193,6 +196,7 @@ export const zhipinReplyTool = (
       };
     },
   });
+};
 
 /**
  * 创建智能回复工具的快捷函数
