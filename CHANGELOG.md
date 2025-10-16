@@ -2,6 +2,18 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.9.0-develop.7](https://github.com/steveoon/agent-computer-user/compare/v1.9.0-develop.6...v1.9.0-develop.7) (2025-10-16)
+
+
+### Bug Fixes
+
+* 修复登录后立即访问受保护路由时认证失败的问题 ([bfb9a4d](https://github.com/steveoon/agent-computer-user/commit/bfb9a4db3a7030d72fd3995f598e7d86407ac247))
+
+
+### Features
+
+* 实现花卷品牌升级和沙盒面板折叠功能 ([8583bba](https://github.com/steveoon/agent-computer-user/commit/8583bba82a0e6bbfb64b7ce3f9e9fa8e0ffd3caf)), closes [#F59E0](https://github.com/steveoon/agent-computer-user/issues/F59E0)
+
 # [1.9.0-develop.6](https://github.com/steveoon/agent-computer-user/compare/v1.9.0-develop.5...v1.9.0-develop.6) (2025-10-15)
 
 
