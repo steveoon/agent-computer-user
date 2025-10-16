@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,6 +28,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   const [mode, setMode] = useState<AuthMode>("login");
   const [isPending, startTransition] = useTransition();
   const { setError, clearError } = useAuthStore();
+  const router = useRouter();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -60,7 +62,11 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
           toast.success("登录成功！");
           onOpenChange(false);
+
           // 登录成功后 AuthProvider 会监听 SIGNED_IN 事件并更新 Zustand Store
+          // 刷新路由以确保服务器端中间件能读取到新的 session cookie
+          // 这解决了登录后立即跳转到受保护路由时中间件认证失败的问题
+          router.refresh();
         } else {
           // 使用 Server Action 进行注册（含验证逻辑）
           const result = await signUpAction(formData);
