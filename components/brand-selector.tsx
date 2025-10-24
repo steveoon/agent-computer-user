@@ -35,7 +35,7 @@ export function BrandSelector({ showHistory = false }: { showHistory?: boolean }
         <SelectTrigger className="w-[140px] h-8 text-xs">
           <SelectValue placeholder="选择品牌" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-h-[320px]">
           {showHistory && brandHistory.length > 0 ? (
             <>
               {/* 历史记录部分 - 最近使用的品牌（最多3个） */}
