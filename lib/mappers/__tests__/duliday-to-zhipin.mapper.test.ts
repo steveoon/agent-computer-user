@@ -367,15 +367,271 @@ describe("Duliday to Zhipin Mapper", () => {
       expect(position.minHoursPerWeek).toBe(12); // 6小时 * 2天
     });
 
-    it("验证数据必须满足至少一个字段有值的约束", () => {
-      const invalidData = {
+    it("当 perWeekWorkDays 和 customWorkTimes.minWorkDays 都为 null 但 perWeekNeedWorkDays 有值时，应该使用 perWeekNeedWorkDays", () => {
+      const testData: DulidayRaw.Position = {
+        jobBasicInfoId: 77777,
+        jobStoreId: 77777,
+        storeId: 77777,
+        storeName: "perWeekNeedWorkDays测试门店",
+        storeCityId: 310100,
+        storeRegionId: 310101,
+        jobName: "测试品牌-perWeekNeedWorkDays测试门店-服务员-兼职",
+        jobId: 77777,
+        cityName: ["上海市"],
+        salary: 22,
+        salaryUnitStr: "元/小时",
+        workTimeArrangement: {
+          id: 77777,
+          jobBasicInfoId: 77777,
+          employmentForm: 2,
+          minWorkMonths: 1,
+          temporaryEmploymentStartTime: null,
+          temporaryEmploymentEndTime: null,
+          employmentDescription: null,
+          monthWorkTimeRequirement: 0,
+          perMonthMinWorkTime: null,
+          perMonthMinWorkTimeUnit: null,
+          perMonthMaxRestTime: null,
+          perMonthMaxRestTimeUnit: null,
+          weekWorkTimeRequirement: 3,
+          perWeekNeedWorkDays: 3, // 有值，应该使用这个
+          perWeekWorkDays: null, // 没有值
+          perWeekRestDays: null,
+          evenOddType: null,
+          customWorkTimes: [
+            {
+              jobWorkTimeArrangementId: 77777,
+              weekdays: [1, 2, 3, 4, 5],
+              minWorkDays: null, // 没有值
+              maxWorkDays: null,
+            },
+          ],
+          dayWorkTimeRequirement: 1,
+          perDayMinWorkHours: 5,
+          arrangementType: 2,
+          fixedArrangementTimes: null,
+          combinedArrangementTimes: null,
+          goToWorkStartTime: null,
+          goToWorkEndTime: null,
+          goOffWorkStartTime: null,
+          goOffWorkEndTime: null,
+          maxWorkTakingTime: 30,
+          restTimeDesc: null,
+          workTimeRemark: "使用 perWeekNeedWorkDays",
+        },
+        welfare: {
+          id: 77777,
+          jobBasicInfoId: 77777,
+          haveInsurance: 0,
+          accommodation: 0,
+          accommodationSalary: null,
+          accommodationSalaryUnit: null,
+          probationAccommodationSalaryReceive: null,
+          catering: 0,
+          cateringImage: null,
+          cateringSalary: null,
+          cateringSalaryUnit: null,
+          trafficAllowanceSalary: null,
+          trafficAllowanceSalaryUnit: null,
+          otherWelfare: null,
+          moreWelfares: null,
+          insuranceFund: [],
+          insuranceFundCityId: null,
+          insuranceFundCityStr: null,
+          insuranceFundAmount: null,
+          memo: "",
+          promotionWelfare: null,
+          accommodationNum: null,
+          commuteDistance: null,
+          accommodationEnv: null,
+          imagesDTOList: null,
+        },
+        cooperationMode: 2,
+        requirementNum: 3,
+        thresholdNum: 10,
+        signUpNum: 0,
+        postTime: "2025.08.25 13:00",
+        successDuliriUserId: 7777,
+        successNameStr: "测试人员3",
+        storeAddress: "上海市-徐汇区-测试路",
+      };
+
+      // 验证数据可以通过 Zod schema
+      expect(() => {
+        DulidayRaw.PositionSchema.parse(testData);
+      }).not.toThrow();
+
+      const mockResponse: DulidayRaw.ListResponse = {
+        code: 0,
+        message: "操作成功",
+        data: {
+          result: [testData],
+          total: 1,
+        },
+      };
+
+      const result = convertDulidayListToZhipinData(mockResponse, 100);
+      const position = result.stores![0].positions[0];
+
+      // 验证使用了 perWeekNeedWorkDays 的值
+      expect(position.attendanceRequirement?.minimumDays).toBe(3); // 使用 perWeekNeedWorkDays
+      expect(position.minHoursPerWeek).toBe(15); // 5小时 * 3天
+    });
+
+    it("验证优先级：perWeekWorkDays > customWorkTimes.minWorkDays > perWeekNeedWorkDays", () => {
+      // 测试场景：所有三个字段都有值，应该使用 perWeekWorkDays
+      const testDataPriority1: DulidayRaw.Position = {
+        jobBasicInfoId: 88888,
+        jobStoreId: 88888,
+        storeId: 88888,
+        storeName: "优先级测试门店1",
+        storeCityId: 310100,
+        storeRegionId: 310101,
+        jobName: "测试品牌-优先级测试门店1-服务员-兼职",
+        jobId: 88888,
+        cityName: ["上海市"],
+        salary: 25,
+        salaryUnitStr: "元/小时",
+        workTimeArrangement: {
+          id: 88888,
+          jobBasicInfoId: 88888,
+          employmentForm: 2,
+          minWorkMonths: 1,
+          temporaryEmploymentStartTime: null,
+          temporaryEmploymentEndTime: null,
+          employmentDescription: null,
+          monthWorkTimeRequirement: 0,
+          perMonthMinWorkTime: null,
+          perMonthMinWorkTimeUnit: null,
+          perMonthMaxRestTime: null,
+          perMonthMaxRestTimeUnit: null,
+          weekWorkTimeRequirement: 3,
+          perWeekNeedWorkDays: 2, // 有值
+          perWeekWorkDays: 4, // 有值，应该优先使用这个
+          perWeekRestDays: null,
+          evenOddType: null,
+          customWorkTimes: [
+            {
+              jobWorkTimeArrangementId: 88888,
+              weekdays: [1, 2, 3, 4, 5],
+              minWorkDays: 3, // 有值，但优先级低于 perWeekWorkDays
+              maxWorkDays: 5,
+            },
+          ],
+          dayWorkTimeRequirement: 1,
+          perDayMinWorkHours: 6,
+          arrangementType: 2,
+          fixedArrangementTimes: null,
+          combinedArrangementTimes: null,
+          goToWorkStartTime: null,
+          goToWorkEndTime: null,
+          goOffWorkStartTime: null,
+          goOffWorkEndTime: null,
+          maxWorkTakingTime: 30,
+          restTimeDesc: null,
+          workTimeRemark: "测试优先级1",
+        },
+        welfare: {
+          id: 88888,
+          jobBasicInfoId: 88888,
+          haveInsurance: 0,
+          accommodation: 0,
+          accommodationSalary: null,
+          accommodationSalaryUnit: null,
+          probationAccommodationSalaryReceive: null,
+          catering: 0,
+          cateringImage: null,
+          cateringSalary: null,
+          cateringSalaryUnit: null,
+          trafficAllowanceSalary: null,
+          trafficAllowanceSalaryUnit: null,
+          otherWelfare: null,
+          moreWelfares: null,
+          insuranceFund: [],
+          insuranceFundCityId: null,
+          insuranceFundCityStr: null,
+          insuranceFundAmount: null,
+          memo: "",
+          promotionWelfare: null,
+          accommodationNum: null,
+          commuteDistance: null,
+          accommodationEnv: null,
+          imagesDTOList: null,
+        },
+        cooperationMode: 2,
+        requirementNum: 3,
+        thresholdNum: 10,
+        signUpNum: 0,
+        postTime: "2025.08.25 14:00",
+        successDuliriUserId: 8888,
+        successNameStr: "测试人员4",
+        storeAddress: "上海市-黄浦区-测试路",
+      };
+
+      const mockResponse1: DulidayRaw.ListResponse = {
+        code: 0,
+        message: "操作成功",
+        data: {
+          result: [testDataPriority1],
+          total: 1,
+        },
+      };
+
+      const result1 = convertDulidayListToZhipinData(mockResponse1, 100);
+      const position1 = result1.stores![0].positions[0];
+
+      // 应该使用 perWeekWorkDays = 4
+      expect(position1.attendanceRequirement?.minimumDays).toBe(4);
+      expect(position1.minHoursPerWeek).toBe(24); // 6小时 * 4天
+
+      // 测试场景：只有 customWorkTimes.minWorkDays 和 perWeekNeedWorkDays 有值
+      const testDataPriority2: DulidayRaw.Position = {
+        ...testDataPriority1,
+        jobBasicInfoId: 88889,
+        jobId: 88889,
+        workTimeArrangement: {
+          ...testDataPriority1.workTimeArrangement,
+          id: 88889,
+          jobBasicInfoId: 88889,
+          perWeekNeedWorkDays: 2, // 有值
+          perWeekWorkDays: null, // 没有值
+          customWorkTimes: [
+            {
+              jobWorkTimeArrangementId: 88889,
+              weekdays: [1, 2, 3, 4, 5],
+              minWorkDays: 3, // 有值，应该优先使用这个
+              maxWorkDays: 5,
+            },
+          ],
+        },
+      };
+
+      const mockResponse2: DulidayRaw.ListResponse = {
+        code: 0,
+        message: "操作成功",
+        data: {
+          result: [testDataPriority2],
+          total: 1,
+        },
+      };
+
+      const result2 = convertDulidayListToZhipinData(mockResponse2, 100);
+      const position2 = result2.stores![0].positions[0];
+
+      // 应该使用 customWorkTimes.minWorkDays = 3
+      expect(position2.attendanceRequirement?.minimumDays).toBe(3);
+      expect(position2.minHoursPerWeek).toBe(18); // 6小时 * 3天
+    });
+
+    it("当所有三个字段都为 null 时，应该使用默认值 5", () => {
+      const testData: DulidayRaw.Position = {
         jobBasicInfoId: 99999,
         jobStoreId: 99999,
         storeId: 99999,
-        storeName: "无效数据门店",
+        storeName: "默认值测试门店",
         storeCityId: 310100,
         storeRegionId: 310101,
-        jobName: "测试品牌-无效数据门店-服务员-兼职",
+        jobName: "测试品牌-默认值测试门店-服务员-兼职",
         jobId: 99999,
         cityName: ["上海市"],
         salary: 20,
@@ -394,7 +650,7 @@ describe("Duliday to Zhipin Mapper", () => {
           perMonthMaxRestTime: null,
           perMonthMaxRestTimeUnit: null,
           weekWorkTimeRequirement: 3,
-          perWeekNeedWorkDays: null,
+          perWeekNeedWorkDays: null, // 没有值
           perWeekWorkDays: null, // 没有值
           perWeekRestDays: null,
           evenOddType: null,
@@ -417,7 +673,7 @@ describe("Duliday to Zhipin Mapper", () => {
           goOffWorkEndTime: null,
           maxWorkTakingTime: 30,
           restTimeDesc: null,
-          workTimeRemark: "测试备注",
+          workTimeRemark: "测试默认值",
         },
         welfare: {
           id: 99999,
@@ -456,10 +712,21 @@ describe("Duliday to Zhipin Mapper", () => {
         storeAddress: "上海市-浦东新区-测试",
       };
 
-      // 验证应该失败，因为 perWeekWorkDays 和所有 customWorkTimes.minWorkDays 都是 null
-      expect(() => {
-        DulidayRaw.PositionSchema.parse(invalidData);
-      }).toThrow(/必须提供 perWeekWorkDays 或至少一个 customWorkTimes.minWorkDays/);
+      const mockResponse: DulidayRaw.ListResponse = {
+        code: 0,
+        message: "操作成功",
+        data: {
+          result: [testData],
+          total: 1,
+        },
+      };
+
+      const result = convertDulidayListToZhipinData(mockResponse, 100);
+      const position = result.stores![0].positions[0];
+
+      // 应该使用默认值 5
+      expect(position.attendanceRequirement?.minimumDays).toBe(5);
+      expect(position.minHoursPerWeek).toBe(20); // 4小时 * 5天
     });
   });
 });

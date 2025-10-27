@@ -370,12 +370,19 @@ function hasWeekendInSchedule(workTimeArrangement: DulidayRaw.WorkTimeArrangemen
 function calculateMinHoursPerWeek(workTimeArrangement: DulidayRaw.WorkTimeArrangement): number {
   const dailyHours = workTimeArrangement.perDayMinWorkHours ?? 8;
 
-  // 获取工作天数（添加备用逻辑）
-  let workDays = workTimeArrangement.perWeekWorkDays ?? 5;
+  // 获取工作天数（三层备用逻辑）
+  let workDays: number | null = null;
 
-  // 备用：如果 perWeekWorkDays 为空，从 customWorkTimes 获取 minWorkDays
-  if (!workTimeArrangement.perWeekWorkDays && workTimeArrangement.customWorkTimes?.length) {
-    // 从所有 customWorkTimes 中取最小的非空 minWorkDays（最宽松的要求）
+  // 优先级1：使用 perWeekWorkDays
+  if (
+    workTimeArrangement.perWeekWorkDays !== null &&
+    workTimeArrangement.perWeekWorkDays !== undefined
+  ) {
+    workDays = workTimeArrangement.perWeekWorkDays;
+  }
+
+  // 优先级2：从 customWorkTimes 获取 minWorkDays
+  if (workDays === null && workTimeArrangement.customWorkTimes?.length) {
     const minWorkDaysArray = workTimeArrangement.customWorkTimes
       .map(ct => ct.minWorkDays)
       .filter((days): days is number => days !== null && days !== undefined);
@@ -383,6 +390,20 @@ function calculateMinHoursPerWeek(workTimeArrangement: DulidayRaw.WorkTimeArrang
     if (minWorkDaysArray.length > 0) {
       workDays = Math.min(...minWorkDaysArray);
     }
+  }
+
+  // 优先级3：使用 perWeekNeedWorkDays
+  if (
+    workDays === null &&
+    workTimeArrangement.perWeekNeedWorkDays !== null &&
+    workTimeArrangement.perWeekNeedWorkDays !== undefined
+  ) {
+    workDays = workTimeArrangement.perWeekNeedWorkDays;
+  }
+
+  // 最终默认值
+  if (workDays === null) {
+    workDays = 5;
   }
 
   return dailyHours * workDays;
@@ -421,12 +442,19 @@ function generateAttendanceRequirement(
     requiredDays = Array.from(allDays).sort();
   }
 
-  // 获取最少工作天数（添加备用逻辑）
-  let minimumDays = workTimeArrangement.perWeekWorkDays || 5;
+  // 获取最少工作天数（三层备用逻辑）
+  let minimumDays: number | null = null;
 
-  // 备用：如果 perWeekWorkDays 为空，从 customWorkTimes 获取 minWorkDays
-  if (!workTimeArrangement.perWeekWorkDays && workTimeArrangement.customWorkTimes?.length) {
-    // 从所有 customWorkTimes 中取最小的非空 minWorkDays（最宽松的要求）
+  // 优先级1：使用 perWeekWorkDays
+  if (
+    workTimeArrangement.perWeekWorkDays !== null &&
+    workTimeArrangement.perWeekWorkDays !== undefined
+  ) {
+    minimumDays = workTimeArrangement.perWeekWorkDays;
+  }
+
+  // 优先级2：从 customWorkTimes 获取 minWorkDays
+  if (minimumDays === null && workTimeArrangement.customWorkTimes?.length) {
     const minWorkDaysArray = workTimeArrangement.customWorkTimes
       .map(ct => ct.minWorkDays)
       .filter((days): days is number => days !== null && days !== undefined);
@@ -434,6 +462,20 @@ function generateAttendanceRequirement(
     if (minWorkDaysArray.length > 0) {
       minimumDays = Math.min(...minWorkDaysArray);
     }
+  }
+
+  // 优先级3：使用 perWeekNeedWorkDays
+  if (
+    minimumDays === null &&
+    workTimeArrangement.perWeekNeedWorkDays !== null &&
+    workTimeArrangement.perWeekNeedWorkDays !== undefined
+  ) {
+    minimumDays = workTimeArrangement.perWeekNeedWorkDays;
+  }
+
+  // 最终默认值
+  if (minimumDays === null) {
+    minimumDays = 5;
   }
 
   return {
