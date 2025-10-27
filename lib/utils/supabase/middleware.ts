@@ -51,40 +51,16 @@ export const updateSession = async (request: NextRequest) => {
       },
     });
 
-    // This will refresh session if expired - required for Server Components
+    // IMPORTANT: getClaims() is recommended for middleware as it doesn't make network requests
+    // It only parses the JWT token from cookies, making it much faster and avoiding "Failed to fetch" errors
     // https://supabase.com/docs/guides/auth/server-side/nextjs
-    let user = null;
-    let error = null;
-
-    try {
-      const result = await supabase.auth.getUser();
-      user = result.data?.user;
-      error = result.error;
-    } catch (fetchError) {
-      console.error("[MIDDLEWARE] Fetch error in getUser:", {
-        error: fetchError instanceof Error ? fetchError.message : String(fetchError),
-        stack: fetchError instanceof Error ? fetchError.stack : undefined,
-        supabaseUrl: SUPABASE_URL ? SUPABASE_URL.substring(0, 30) + "..." : "undefined",
-        errorName: fetchError instanceof Error ? fetchError.name : "Unknown",
-        errorCause:
-          fetchError instanceof Error && "cause" in fetchError ? fetchError.cause : undefined,
-      });
-      // 针对 fetch failed 错误的特殊处理建议
-      if (fetchError instanceof Error && fetchError.message.includes("fetch failed")) {
-        console.error("[MIDDLEWARE] Fetch failed troubleshooting tips:");
-        console.error("1. Check if NEXT_PUBLIC_SUPABASE_URL is correctly set in .env");
-        console.error("2. Verify the Supabase URL is accessible from your network");
-        console.error("3. Check for proxy settings that might block the request");
-        console.error("4. Ensure the Supabase project is active and not paused");
-      }
-      error = fetchError;
-    }
+    const { data } = await supabase.auth.getClaims();
+    const user = data?.claims;
 
     // 记录认证状态用于调试
     console.log("[MIDDLEWARE] Auth check:", {
       path: request.nextUrl.pathname,
       hasUser: !!user,
-      error: error instanceof Error ? error.message : error ? String(error) : null,
     });
 
     const pathname = request.nextUrl.pathname;
@@ -96,7 +72,7 @@ export const updateSession = async (request: NextRequest) => {
     }
 
     // 如果是受保护的路由且用户未认证
-    if (isProtectedRoute(pathname) && error) {
+    if (isProtectedRoute(pathname) && !user) {
       console.log("[MIDDLEWARE] 受保护路由，用户未认证，拒绝访问:", pathname);
 
       // 对于API路由，返回401错误而不是重定向
