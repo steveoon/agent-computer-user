@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.10.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.9.0...v1.10.0-develop.1) (2025-10-27)
+
+
+### Features
+
+* 优化 Supabase 中间件性能和工作天数计算逻辑 ([ac96d19](https://github.com/steveoon/agent-computer-user/commit/ac96d19f99aab9c0632ed2173f002e6a257cf633))
+
 # [1.9.0](https://github.com/steveoon/agent-computer-user/compare/v1.8.0...v1.9.0) (2025-10-16)
 
 
