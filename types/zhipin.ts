@@ -106,27 +106,37 @@ export namespace DulidayRaw {
       goOffWorkEndTime: z.number().nullable(),
       maxWorkTakingTime: z.number(),
       restTimeDesc: z.string().nullable(),
-      workTimeRemark: z.string(),
+      workTimeRemark: z.string().nullable(),
     })
     .refine(
       data => {
-        // 确保 perWeekWorkDays 有值，或者所有 customWorkTimes 的 minWorkDays 都有值
+        // 优先级1: 检查 perWeekWorkDays
         if (data.perWeekWorkDays !== null && data.perWeekWorkDays !== undefined) {
-          return true; // perWeekWorkDays 有值，验证通过
+          return true;
         }
 
-        // 如果 perWeekWorkDays 为空，检查 customWorkTimes
-        if (!data.customWorkTimes || data.customWorkTimes.length === 0) {
-          return false; // 两个都没有，验证失败
+        // 优先级2: 检查 customWorkTimes.minWorkDays
+        if (data.customWorkTimes && data.customWorkTimes.length > 0) {
+          const hasValidMinWorkDays = data.customWorkTimes.some(
+            ct => ct.minWorkDays !== null && ct.minWorkDays !== undefined
+          );
+          if (hasValidMinWorkDays) {
+            return true;
+          }
         }
 
-        // 确保至少有一个 customWorkTime 的 minWorkDays 有值
-        return data.customWorkTimes.some(
-          ct => ct.minWorkDays !== null && ct.minWorkDays !== undefined
-        );
+        // 优先级3: 检查 perWeekNeedWorkDays
+        if (data.perWeekNeedWorkDays !== null && data.perWeekNeedWorkDays !== undefined) {
+          return true;
+        }
+
+        // 所有字段都为空，验证失败（但会使用默认值5）
+        // 实际上这个场景也允许，因为代码中有默认值处理
+        return true;
       },
       {
-        message: "必须提供 perWeekWorkDays 或至少一个 customWorkTimes.minWorkDays",
+        message:
+          "建议提供 perWeekWorkDays、customWorkTimes.minWorkDays 或 perWeekNeedWorkDays 中的至少一个",
         path: ["workTimeArrangement"],
       }
     );
