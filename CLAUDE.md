@@ -36,6 +36,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pnpm release` - Run semantic release (CI only)
 - `pnpm release:dry-run` - Preview what would be released without making changes
 
+### Multi-Agent Management Commands
+
+Manage multiple Agent instances running in parallel with isolated browser sessions.
+
+**Prerequisites:** `jq`, `curl`, `pnpm`, `node`, `lsof` (auto-checked on startup)
+
+**Core Features:**
+- Automatic port allocation with conflict detection
+- Independent browser profiles per Agent (session isolation)
+- Configuration validation (ports, paths, Chrome executable)
+- Health checks for Chrome and application startup
+- Process lifecycle management with PID tracking
+
+**Quick Commands:**
+- `pnpm agent:add zhipin` - Add a BOSS直聘 Agent
+- `pnpm agent:add zhipin --count 3` - Add 3 BOSS直聘 Agents
+- `pnpm agent:add yupao --count 2` - Add 2 鱼泡网 Agents
+- `pnpm agent:list` - List all Agents with ports and status
+- `pnpm agent:start` - Start all Agents
+- `pnpm agent:start zhipin-1` - Start a specific Agent
+- `pnpm agent:stop` - Stop all Agents
+- `pnpm agent:logs zhipin-1` - View application logs (default)
+- `pnpm agent:logs zhipin-1 chrome` - View Chrome logs
+- `./scripts/multi-agent.sh help` - See all available commands
+
+**Use Case:** Run multiple automation instances simultaneously, each with its own browser profile and application port. Perfect for managing multiple BOSS直聘 or 鱼泡网 accounts without session conflicts.
+
+**Documentation:** [docs/guides/MULTI_AGENT_GUIDE.md](docs/guides/MULTI_AGENT_GUIDE.md)
+
 ## Architecture Overview
 
 ### Core Application Structure
