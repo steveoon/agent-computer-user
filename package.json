@@ -1,6 +1,6 @@
 {
   "name": "ai-sdk-computer-use",
-  "version": "1.10.0-develop.1",
+  "version": "1.11.0-develop.1",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
@@ -19,7 +19,15 @@
     "format:check": "prettier --check .",
     "semantic-release": "semantic-release",
     "release": "semantic-release",
-    "release:dry-run": "semantic-release --dry-run"
+    "release:dry-run": "semantic-release --dry-run",
+    "agent": "scripts/multi-agent.sh",
+    "agent:add": "scripts/multi-agent.sh add",
+    "agent:list": "scripts/multi-agent.sh list",
+    "agent:start": "scripts/multi-agent.sh start",
+    "agent:stop": "scripts/multi-agent.sh stop",
+    "agent:restart": "scripts/multi-agent.sh restart",
+    "agent:status": "scripts/multi-agent.sh status",
+    "agent:logs": "scripts/multi-agent.sh logs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.30",
