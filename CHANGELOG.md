@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.11.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.11.0-develop.1...v1.11.0-develop.2) (2025-11-03)
+
+
+### Bug Fixes
+
+* 添加自建 Supabase 域名到 CSP 白名单 ([68574d1](https://github.com/steveoon/agent-computer-user/commit/68574d112d967db50fe977783103a2bbe1d2ef97))
+
 # [1.11.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.10.0...v1.11.0-develop.1) (2025-10-28)
 
 
