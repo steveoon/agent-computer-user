@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "frame-src https://*.e2b.dev https://*.e2b.app https://va.vercel-scripts.com",
               "frame-ancestors 'self' https://*.e2b.dev https://*.e2b.app",
-              "connect-src 'self' https://*.e2b.dev https://*.e2b.app https://*.supabase.co",
+              "connect-src 'self' https://*.e2b.dev https://*.e2b.app https://*.supabase.co https://*.duliday.com",
               "img-src 'self' data: https://*.e2b.dev https://*.e2b.app",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.e2b.dev https://*.e2b.app https://va.vercel-scripts.com",
               "style-src 'self' 'unsafe-inline'",
