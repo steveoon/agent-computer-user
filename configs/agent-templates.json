@@ -1,0 +1,28 @@
+{
+  "templates": {
+    "zhipin": {
+      "name": "BOSS直聘代理",
+      "description": "用于操作BOSS直聘平台的自动化Agent",
+      "chromeArgs": [
+        "--remote-debugging-port={{chromePort}}",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-default-apps",
+        "--user-data-dir={{userDataDir}}"
+      ],
+      "env": {}
+    },
+    "yupao": {
+      "name": "鱼泡网代理",
+      "description": "用于操作鱼泡网平台的自动化Agent",
+      "chromeArgs": [
+        "--remote-debugging-port={{chromePort}}",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-default-apps",
+        "--user-data-dir={{userDataDir}}"
+      ],
+      "env": {}
+    }
+  }
+}

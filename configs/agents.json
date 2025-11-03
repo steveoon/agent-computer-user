@@ -1,0 +1,50 @@
+{
+  "agents": [
+    {
+      "id": "zhipin-1",
+      "type": "zhipin",
+      "name": "BOSS直聘代理 1",
+      "description": "用于操作BOSS直聘平台的自动化Agent - 实例 1",
+      "appPort": 3000,
+      "chromePort": 9222,
+      "userDataDir": "/tmp/chrome-agent-profiles/zhipin-1",
+      "chromeArgs": [
+        "--remote-debugging-port={{chromePort}}",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-default-apps",
+        "--user-data-dir={{userDataDir}}"
+      ],
+      "env": {},
+      "createdAt": "2025-10-28T05:48:17Z"
+    },
+    {
+      "id": "yupao-1",
+      "type": "yupao",
+      "name": "鱼泡网代理 1",
+      "description": "用于操作鱼泡网平台的自动化Agent - 实例 1",
+      "appPort": 3001,
+      "chromePort": 9223,
+      "userDataDir": "/tmp/chrome-agent-profiles/yupao-1",
+      "chromeArgs": [
+        "--remote-debugging-port={{chromePort}}",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-default-apps",
+        "--user-data-dir={{userDataDir}}"
+      ],
+      "env": {},
+      "createdAt": "2025-10-28T05:55:25Z"
+    }
+  ],
+  "settings": {
+    "chromeExecutable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "userDataDirBase": "/tmp/chrome-agent-profiles",
+    "logsDir": "./logs/agents",
+    "pidsDir": "./pids/agents",
+    "healthCheckTimeout": 30,
+    "healthCheckInterval": 2,
+    "startPort": 3000,
+    "startChromePort": 9222
+  }
+}
