@@ -19,20 +19,35 @@ import {
 function buildBrandDictionary() {
   // 从实际业务数据获取品牌列表
   const actualBrands = Object.values(ORGANIZATION_MAPPING);
+  const actualBrandsSet = new Set(actualBrands); // 用 Set 优化性能
 
-  // 为每个实际品牌定义别名
+  // 为每个实际品牌定义别名（只包含真正的别名，不包含独立品牌）
   const brandAliases: Record<string, string[]> = {
-    肯德基: ["肯德基", "KFC", "kfc", "天津肯德基"], // 包含天津肯德基
-    必胜客: ["必胜客", "Pizza Hut", "PizzaHut", "上海必胜客"], // 包含上海必胜客
+    // 基础品牌（只保留真别名，不包含区域品牌）
+    肯德基: ["肯德基", "KFC", "kfc"],
+    必胜客: ["必胜客", "Pizza Hut", "PizzaHut"],
     奥乐齐: ["奥乐齐", "ALDI", "Aldi"],
     大米先生: ["大米先生"],
-    成都你六姐: ["成都你六姐", "你六姐"],
+    成都你六姐: ["成都你六姐", "你六姐"], // ✓ 真别名
+    海底捞: ["海底捞", "海捞"],
+
+    // 区域品牌（每个都是独立品牌，有自己的变体）
+    大连肯德基: ["大连肯德基", "大连KFC", "大连kfc"],
+    天津肯德基: ["天津肯德基", "天津KFC", "天津kfc"],
+    北京肯德基: ["北京肯德基", "北京KFC", "北京kfc"],
+    成都肯德基: ["成都肯德基", "成都KFC", "成都kfc"],
+    深圳肯德基: ["深圳肯德基", "深圳KFC", "深圳kfc"],
+    广州肯德基: ["广州肯德基", "广州KFC", "广州kfc"],
+    杭州肯德基: ["杭州肯德基", "杭州KFC", "杭州kfc"],
+    上海必胜客: ["上海必胜客", "上海Pizza Hut", "上海PizzaHut"],
+    北京必胜客: ["北京必胜客", "北京Pizza Hut", "北京PizzaHut"],
+    成都必胜客: ["成都必胜客", "成都Pizza Hut", "成都PizzaHut"],
+    佛山必胜客: ["佛山必胜客", "佛山Pizza Hut", "佛山PizzaHut"],
 
     // 常见品牌别名（即使不在 ORGANIZATION_MAPPING 中，也可能在对话中提到）
     麦当劳: ["麦当劳", "金拱门", "McDonald", "M记"],
     星巴克: ["星巴克", "Starbucks", "星爸爸"],
     汉堡王: ["汉堡王", "Burger King", "BK"],
-    海底捞: ["海底捞"],
     瑞幸: ["瑞幸", "luckin", "Luckin"],
     Manner: ["Manner", "manner"],
     蜜雪冰城: ["蜜雪冰城", "蜜雪"],
@@ -46,9 +61,18 @@ function buildBrandDictionary() {
   // 构建最终字典，优先包含实际业务品牌
   const dictionary: Record<string, string[]> = {};
 
-  // 首先添加实际业务品牌
+  // 首先添加所有实际业务品牌
   actualBrands.forEach(brand => {
-    dictionary[brand] = brandAliases[brand] || [brand];
+    // 获取预定义的别名
+    const predefinedAliases = brandAliases[brand] || [];
+
+    // 过滤掉那些同时也是独立品牌的别名（除了自己）
+    const validAliases = predefinedAliases.filter(
+      alias => !actualBrandsSet.has(alias) || alias === brand
+    );
+
+    // 如果没有别名，至少包含自己
+    dictionary[brand] = validAliases.length > 0 ? validAliases : [brand];
   });
 
   // 然后添加其他常见品牌（用于识别但不在业务范围内）
@@ -62,6 +86,67 @@ function buildBrandDictionary() {
 }
 
 export const BRAND_DICTIONARY = buildBrandDictionary();
+
+/**
+ * 预计算的品牌常量（避免每次调用都重新计算和排序）
+ */
+const ACTUAL_BRANDS = Object.values(ORGANIZATION_MAPPING);
+const SORTED_BRANDS = [...ACTUAL_BRANDS].sort((a, b) => b.length - a.length);
+
+/**
+ * 过滤掉被其他品牌包含的子串品牌
+ * 使用按长度降序 + 线性扫描的方式，避免 O(n²) 双重循环
+ *
+ * @param brands 待过滤的品牌列表
+ * @returns 过滤后的品牌列表（只保留不是其他品牌子串的品牌）
+ */
+function filterShadowedBrands(brands: string[]): string[] {
+  if (brands.length === 0) return [];
+
+  const sorted = [...brands].sort((a, b) => b.length - a.length);
+  const result: string[] = [];
+
+  for (const brand of sorted) {
+    // 只保留不是已有元素子串的品牌
+    if (!result.some(existing => existing.includes(brand))) {
+      result.push(brand);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * 查找文本中精确匹配的品牌
+ * @param text 待匹配的文本
+ * @returns 匹配到的品牌列表
+ */
+function findExactMatches(text: string): string[] {
+  return SORTED_BRANDS.filter(brand => text.includes(brand));
+}
+
+/**
+ * 查找文本中通过别名匹配的品牌
+ * @param text 待匹配的文本
+ * @returns 匹配到的品牌列表
+ */
+function findAliasMatches(text: string): string[] {
+  const matches = new Set<string>();
+
+  for (const [brand, aliases] of Object.entries(BRAND_DICTIONARY)) {
+    for (const alias of aliases) {
+      // 跳过已经是实际品牌名的别名（在第一阶段已处理）
+      if (ACTUAL_BRANDS.includes(alias)) continue;
+
+      if (text.includes(alias)) {
+        matches.add(brand);
+        break; // 找到一个别名就够了
+      }
+    }
+  }
+
+  return Array.from(matches);
+}
 
 /**
  * 上海地区字典
@@ -196,20 +281,17 @@ export const URGENCY_PATTERNS = {
 export class SmartExtractor {
   /**
    * 提取品牌信息
+   * 两阶段匹配策略：
+   * 1. 第一阶段：精确匹配实际业务品牌（按长度降序，避免子串误匹配）
+   * 2. 第二阶段：如果没找到，使用别名匹配（fallback）
    */
   static extractBrands(text: string): string[] {
-    const foundBrands = new Set<string>();
+    // 第一阶段：精确匹配
+    const exactMatches = filterShadowedBrands(findExactMatches(text));
+    if (exactMatches.length > 0) return exactMatches;
 
-    for (const [brand, aliases] of Object.entries(BRAND_DICTIONARY)) {
-      for (const alias of aliases) {
-        if (text.includes(alias)) {
-          foundBrands.add(brand);
-          break; // 找到一个别名就够了
-        }
-      }
-    }
-
-    return Array.from(foundBrands);
+    // 第二阶段：别名匹配（fallback）
+    return filterShadowedBrands(findAliasMatches(text));
   }
 
   /**

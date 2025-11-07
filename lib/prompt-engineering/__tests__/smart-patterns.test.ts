@@ -194,5 +194,184 @@ describe("SmartExtractor - 调试位置提取", () => {
         });
       });
     });
+
+    it("应该优先精确匹配区域品牌（避免子串误匹配）", () => {
+      const testCases = [
+        {
+          text: "大连肯德基有岗位吗",
+          expected: ["大连肯德基"],
+          notExpected: ["肯德基"],
+          reason: "应该匹配 '大连肯德基' 而不是 '肯德基'",
+        },
+        {
+          text: "天津肯德基工资怎么样",
+          expected: ["天津肯德基"],
+          notExpected: ["肯德基"],
+          reason: "应该匹配 '天津肯德基' 而不是 '肯德基'",
+        },
+        {
+          text: "上海必胜客待遇如何",
+          expected: ["上海必胜客"],
+          notExpected: ["必胜客"],
+          reason: "应该匹配 '上海必胜客' 而不是 '必胜客'",
+        },
+        {
+          text: "肯德基有岗位吗",
+          expected: ["肯德基"],
+          notExpected: ["大连肯德基", "天津肯德基"],
+          reason: "只提到 '肯德基' 时应该匹配基础品牌",
+        },
+      ];
+
+      testCases.forEach(({ text, expected, notExpected, reason }) => {
+        console.log(`\n测试: "${text}"`);
+        console.log(`原因: ${reason}`);
+        const extracted = SmartExtractor.extractBrands(text);
+        console.log("提取结果:", extracted);
+
+        // 验证应该包含的品牌
+        expected.forEach(brand => {
+          expect(extracted).toContain(brand);
+        });
+
+        // 验证不应该包含的品牌
+        notExpected.forEach(brand => {
+          expect(extracted).not.toContain(brand);
+        });
+      });
+    });
+
+    it("应该正确处理区域品牌的变体", () => {
+      const testCases = [
+        {
+          text: "大连KFC有岗位吗",
+          expected: ["大连肯德基"],
+          notExpected: ["肯德基"],
+          reason: "别名 '大连KFC' 应该映射到 '大连肯德基'",
+        },
+        {
+          text: "大连kfc工资高吗",
+          expected: ["大连肯德基"],
+          notExpected: ["肯德基"],
+          reason: "小写别名 '大连kfc' 也应该映射到 '大连肯德基'",
+        },
+        {
+          text: "上海Pizza Hut怎么样",
+          expected: ["上海必胜客"],
+          notExpected: ["必胜客"],
+          reason: "英文别名应该映射到中文品牌名",
+        },
+      ];
+
+      testCases.forEach(({ text, expected, notExpected, reason }) => {
+        console.log(`\n测试: "${text}"`);
+        console.log(`原因: ${reason}`);
+        const extracted = SmartExtractor.extractBrands(text);
+        console.log("提取结果:", extracted);
+
+        expected.forEach(brand => {
+          expect(extracted).toContain(brand);
+        });
+
+        notExpected.forEach(brand => {
+          expect(extracted).not.toContain(brand);
+        });
+      });
+    });
+
+    it("应该处理多个独立区域品牌同时提及的情况", () => {
+      const testCases = [
+        {
+          text: "大连肯德基和天津肯德基有什么区别",
+          expected: ["大连肯德基", "天津肯德基"],
+          reason: "应该同时识别两个独立的区域品牌",
+        },
+        {
+          text: "天津肯德基、北京肯德基哪个好",
+          expected: ["天津肯德基", "北京肯德基"],
+          reason: "应该识别所有提到的区域品牌",
+        },
+        {
+          text: "上海必胜客和北京必胜客的待遇对比",
+          expected: ["上海必胜客", "北京必胜客"],
+          reason: "应该识别不同区域的同类品牌",
+        },
+      ];
+
+      testCases.forEach(({ text, expected, reason }) => {
+        console.log(`\n测试: "${text}"`);
+        console.log(`原因: ${reason}`);
+        const extracted = SmartExtractor.extractBrands(text);
+        console.log("提取结果:", extracted);
+
+        expected.forEach(brand => {
+          expect(extracted).toContain(brand);
+        });
+
+        expect(extracted.length).toBe(expected.length);
+      });
+    });
+
+    it("子串品牌匹配行为说明（设计权衡）", () => {
+      // 注意：当文本包含 "大连肯德基" 时，由于 "肯德基" 是 "大连肯德基" 的子串，
+      // 为了避免误匹配，系统会优先匹配更长的品牌名，并过滤掉子串品牌。
+      // 这是一个设计权衡：优先保证常见场景的准确性。
+
+      const testCases = [
+        {
+          text: "大连肯德基和肯德基有什么区别",
+          expected: ["大连肯德基"],
+          notExpected: ["肯德基"],
+          reason: "只识别最长匹配，避免子串误匹配（权衡设计）",
+        },
+      ];
+
+      testCases.forEach(({ text, expected, notExpected, reason }) => {
+        console.log(`\n测试: "${text}"`);
+        console.log(`原因: ${reason}`);
+        const extracted = SmartExtractor.extractBrands(text);
+        console.log("提取结果:", extracted);
+        console.log("设计说明: 这是为了避免 '大连肯德基有岗位吗' 误匹配到 '肯德基'");
+
+        expected.forEach(brand => {
+          expect(extracted).toContain(brand);
+        });
+
+        notExpected.forEach(brand => {
+          expect(extracted).not.toContain(brand);
+        });
+      });
+    });
+
+    it("应该正确处理真别名（不完整/非正式名称）", () => {
+      const testCases = [
+        {
+          text: "你六姐有岗位吗",
+          expected: ["成都你六姐"],
+          reason: "不完整名称 '你六姐' 应该映射到完整名称 '成都你六姐'",
+        },
+        {
+          text: "海捞待遇怎么样",
+          expected: ["海底捞"],
+          reason: "俗称 '海捞' 应该映射到 '海底捞'",
+        },
+        {
+          text: "ALDI有什么岗位",
+          expected: ["奥乐齐"],
+          reason: "英文名 'ALDI' 应该映射到中文品牌名",
+        },
+      ];
+
+      testCases.forEach(({ text, expected, reason }) => {
+        console.log(`\n测试: "${text}"`);
+        console.log(`原因: ${reason}`);
+        const extracted = SmartExtractor.extractBrands(text);
+        console.log("提取结果:", extracted);
+
+        expected.forEach(brand => {
+          expect(extracted).toContain(brand);
+        });
+      });
+    });
   });
 });

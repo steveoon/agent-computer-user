@@ -426,13 +426,17 @@ describe("品牌同步和导入功能测试", () => {
     it("同步时应该验证品牌名称是否在 ORGANIZATION_MAPPING 中", () => {
       const mappedBrands = Object.values(ORGANIZATION_MAPPING);
 
-      // 验证所有映射的品牌
+      // 验证所有映射的品牌（原有品牌）
       expect(mappedBrands).toContain("肯德基");
       expect(mappedBrands).toContain("成都你六姐");
       expect(mappedBrands).toContain("大米先生");
       expect(mappedBrands).toContain("天津肯德基");
       expect(mappedBrands).toContain("上海必胜客");
       expect(mappedBrands).toContain("奥乐齐");
+
+      // 验证新增品牌 (2025-01-24)
+      expect(mappedBrands).toContain("大连肯德基");
+      expect(mappedBrands).toContain("海底捞");
 
       // 非映射品牌
       expect(mappedBrands).not.toContain("测试品牌");
