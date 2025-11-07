@@ -109,7 +109,8 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
         ctx.modelConfig || DEFAULT_MODEL_CONFIG,
         ctx.configData,
         ctx.replyPrompts,
-        ctx.defaultWechatId
+        ctx.defaultWechatId,
+        ctx.brandPriorityStrategy
       ),
   }),
 

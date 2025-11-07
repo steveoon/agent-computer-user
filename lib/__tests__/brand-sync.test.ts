@@ -97,6 +97,7 @@ describe("品牌同步和导入功能测试", () => {
         replyPrompts: {} as any,
         systemPrompts: {} as any,
         activeSystemPrompt: "bossZhipinSystemPrompt",
+        brandPriorityStrategy: "smart",
         metadata: {
           version: "1.0.0",
           lastUpdated: new Date().toISOString(),
@@ -230,6 +231,7 @@ describe("品牌同步和导入功能测试", () => {
         replyPrompts: {} as any,
         systemPrompts: {} as any,
         activeSystemPrompt: "bossZhipinSystemPrompt",
+        brandPriorityStrategy: "smart",
         metadata: {
           version: "1.0.0",
           lastUpdated: new Date().toISOString(),
@@ -469,6 +471,7 @@ describe("品牌同步和导入功能测试", () => {
         replyPrompts: {} as any,
         systemPrompts: {} as any,
         activeSystemPrompt: "bossZhipinSystemPrompt",
+        brandPriorityStrategy: "smart",
         metadata: {
           version: "1.0.0",
           lastUpdated: new Date().toISOString(),
@@ -754,6 +757,7 @@ describe("品牌同步和导入功能测试", () => {
         replyPrompts: {} as any,
         systemPrompts: {} as any,
         activeSystemPrompt: "bossZhipinSystemPrompt",
+        brandPriorityStrategy: "smart",
         metadata: {
           version: "1.0.0",
           lastUpdated: new Date().toISOString(),
@@ -926,6 +930,7 @@ describe("品牌同步和导入功能测试", () => {
         replyPrompts: {} as any,
         systemPrompts: {} as any,
         activeSystemPrompt: "bossZhipinSystemPrompt",
+        brandPriorityStrategy: "smart",
         metadata: {
           version: "1.0.0",
           lastUpdated: new Date().toISOString(),

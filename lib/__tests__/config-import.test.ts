@@ -117,6 +117,7 @@ describe("配置导入数据格式校验", () => {
           generalComputerSystemPrompt: "通用计算机系统提示词",
         },
         activeSystemPrompt: "bossZhipinSystemPrompt",
+        brandPriorityStrategy: "smart",
         metadata: {
           version: "1.0.0",
           lastUpdated: new Date().toISOString(),
@@ -141,6 +142,7 @@ describe("配置导入数据格式校验", () => {
         replyPrompts: {},
         systemPrompts: {},
         activeSystemPrompt: "bossZhipinSystemPrompt",
+        brandPriorityStrategy: "smart",
         metadata: {
           version: "1.0.0",
           lastUpdated: new Date().toISOString(),
@@ -184,6 +186,7 @@ describe("配置导入数据格式校验", () => {
           generalComputerSystemPrompt: "通用计算机系统提示词",
         },
         activeSystemPrompt: "bossZhipinSystemPrompt",
+        brandPriorityStrategy: "smart",
         metadata: {
           version: "1.0.0",
           lastUpdated: new Date().toISOString(),
@@ -271,6 +274,7 @@ describe("配置导入数据格式校验", () => {
           generalComputerSystemPrompt: "通用计算机系统提示词",
         },
         activeSystemPrompt: "bossZhipinSystemPrompt",
+        brandPriorityStrategy: "smart",
         metadata: {
           version: "1.0.0",
           lastUpdated: new Date().toISOString(),
@@ -369,6 +373,7 @@ describe("配置导入数据格式校验", () => {
           generalComputerSystemPrompt: "通用计算机系统提示词",
         },
         activeSystemPrompt: "bossZhipinSystemPrompt",
+        brandPriorityStrategy: "smart",
         metadata: {
           version: "1.0.0",
           lastUpdated: new Date().toISOString(),
@@ -480,9 +485,9 @@ describe("配置导入数据格式校验", () => {
       }
     });
 
-    it("应该修复最新版本配置中缺失的字段而不改变版本号", async () => {
-      // 模拟最新版本但缺少某些模板字段的配置
-      const latestButIncompleteConfig = {
+    it("应该升级 1.2.0 版本配置到 1.2.1（添加 brandPriorityStrategy 字段）", async () => {
+      // 模拟 1.2.0 版本但缺少某些模板字段和 brandPriorityStrategy 的配置
+      const v120Config = {
         brandData: {
           city: "上海市",
           defaultBrand: "肯德基",
@@ -540,29 +545,33 @@ describe("配置导入数据格式校验", () => {
           bossZhipinLocalSystemPrompt: "Boss直聘本地系统提示词",
           generalComputerSystemPrompt: "通用计算机系统提示词",
         },
+        // 故意不包含 brandPriorityStrategy 字段（1.2.0 版本没有这个字段）
         metadata: {
-          version: "1.2.0", // 最新版本号
+          version: "1.2.0",
           lastUpdated: new Date().toISOString(),
         },
       };
 
-      // 初始验证应该失败（因为缺少某些模板字段）
-      const initialResult = AppConfigDataSchema.safeParse(latestButIncompleteConfig);
+      // 初始验证应该失败（因为缺少 brandPriorityStrategy 和某些模板字段）
+      const initialResult = AppConfigDataSchema.safeParse(v120Config);
       expect(initialResult.success).toBe(false);
 
       // 动态导入升级函数
       const { upgradeConfigData } = await import("@/lib/services/config.service");
 
-      // 修复配置（第三个参数 true 表示这是修复，不是升级）
-      const repairedConfig = await upgradeConfigData(latestButIncompleteConfig as any, false, true);
+      // 升级配置（1.2.0 -> 1.2.1）
+      const upgradedConfig = await upgradeConfigData(v120Config as any, false);
 
-      // 验证修复后的配置
-      const finalResult = AppConfigDataSchema.safeParse(repairedConfig);
+      // 验证升级后的配置
+      const finalResult = AppConfigDataSchema.safeParse(upgradedConfig);
       expect(finalResult.success).toBe(true);
 
       if (finalResult.success) {
-        // 验证版本号没有改变
-        expect(finalResult.data.metadata.version).toBe("1.2.0");
+        // 验证版本号已升级到 1.2.1
+        expect(finalResult.data.metadata.version).toBe("1.2.1");
+
+        // 验证 brandPriorityStrategy 字段已添加
+        expect(finalResult.data.brandPriorityStrategy).toBe("smart");
 
         // 验证缺失的模板字段已补全
         const brandTemplates = finalResult.data.brandData.brands["肯德基"].templates;
@@ -572,9 +581,9 @@ describe("配置导入数据格式校验", () => {
         expect(brandTemplates.availability_inquiry).toBeDefined();
         expect(brandTemplates.part_time_support).toBeDefined();
 
-        // 验证元数据中有 repairedAt 而不是 upgradedAt
-        expect(finalResult.data.metadata).toHaveProperty("repairedAt");
-        expect(finalResult.data.metadata).not.toHaveProperty("upgradedAt");
+        // 验证元数据中有 upgradedAt 而不是 repairedAt（这是版本升级，不是修复）
+        expect(finalResult.data.metadata).toHaveProperty("upgradedAt");
+        expect(finalResult.data.metadata).not.toHaveProperty("repairedAt");
       }
     });
   });

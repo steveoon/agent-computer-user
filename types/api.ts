@@ -6,8 +6,9 @@
 import { z } from "zod";
 import type { UIMessage } from "ai";
 import type { ModelConfig } from "@/lib/config/models";
-import type { ZhipinData, SystemPromptsConfig, ReplyPromptsConfig } from "./index";
+import type { ZhipinData, SystemPromptsConfig, ReplyPromptsConfig, BrandPriorityStrategy } from "./index";
 import type { OpenApiPromptType } from "@/lib/tools/tool-registry";
+import { BrandPriorityStrategySchema } from "./config";
 
 // ========== Chat API 相关类型 ==========
 
@@ -26,6 +27,7 @@ export const ChatRequestBodySchema = z.object({
 
   // 可选字段
   preferredBrand: z.string().optional(),
+  brandPriorityStrategy: BrandPriorityStrategySchema.optional(), // 品牌冲突处理策略
   modelConfig: z.unknown().optional(), // ModelConfig - 来自 lib/config/models
   configData: z.unknown().optional(), // ZhipinData
   systemPrompts: z.unknown().optional(), // SystemPromptsConfig
@@ -46,6 +48,7 @@ export interface ChatRequestBody {
 
   // 可选字段
   preferredBrand?: string;
+  brandPriorityStrategy?: BrandPriorityStrategy; // 品牌冲突处理策略
   modelConfig?: ModelConfig;
   configData?: ZhipinData;
   systemPrompts?: SystemPromptsConfig;
@@ -253,6 +256,7 @@ export const OpenChatRequestSchema = z.object({
   context: z
     .object({
       preferredBrand: z.string().optional(),
+      brandPriorityStrategy: BrandPriorityStrategySchema.optional(), // 品牌冲突处理策略
       modelConfig: z.unknown().optional(),
       configData: z.unknown().optional(),
       systemPrompts: z.record(z.string(), z.string()).optional().describe("系统提示词映射"),
@@ -305,6 +309,7 @@ export interface OpenChatRequest {
   // 通用上下文
   context?: {
     preferredBrand?: string;
+    brandPriorityStrategy?: BrandPriorityStrategy; // 品牌冲突处理策略
     modelConfig?: ModelConfig;
     configData?: ZhipinData;
     systemPrompts?: Record<string, string>;

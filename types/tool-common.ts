@@ -7,7 +7,7 @@ import { z } from "zod";
 import type { UIMessagePart, UIDataTypes, UITools, Tool } from "ai";
 import type { ModelConfig } from "@/lib/config/models";
 import type { ZhipinData } from "./zhipin";
-import type { SystemPromptsConfig, ReplyPromptsConfig } from "./config";
+import type { SystemPromptsConfig, ReplyPromptsConfig, BrandPriorityStrategy } from "./config";
 
 // ========== 工具注册表类型定义 ==========
 
@@ -18,6 +18,7 @@ import type { SystemPromptsConfig, ReplyPromptsConfig } from "./config";
 export interface ToolCreationContext {
   sandboxId: string | null;
   preferredBrand?: string;
+  brandPriorityStrategy?: BrandPriorityStrategy; // 品牌冲突处理策略
   modelConfig?: ModelConfig;
   configData?: ZhipinData;
   replyPrompts?: ReplyPromptsConfig;

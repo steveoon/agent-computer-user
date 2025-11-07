@@ -92,6 +92,8 @@ export const BRAND_DICTIONARY = buildBrandDictionary();
  */
 const ACTUAL_BRANDS = Object.values(ORGANIZATION_MAPPING);
 const SORTED_BRANDS = [...ACTUAL_BRANDS].sort((a, b) => b.length - a.length);
+// 🎯 性能优化：使用 Set 替代 Array.includes()，从 O(n) 降到 O(1)
+const ACTUAL_BRAND_SET = new Set(ACTUAL_BRANDS);
 
 /**
  * 过滤掉被其他品牌包含的子串品牌
@@ -135,8 +137,9 @@ function findAliasMatches(text: string): string[] {
 
   for (const [brand, aliases] of Object.entries(BRAND_DICTIONARY)) {
     for (const alias of aliases) {
+      // 🎯 性能优化：使用 Set.has() 替代 Array.includes()，从 O(n) 降到 O(1)
       // 跳过已经是实际品牌名的别名（在第一阶段已处理）
-      if (ACTUAL_BRANDS.includes(alias)) continue;
+      if (ACTUAL_BRAND_SET.has(alias)) continue;
 
       if (text.includes(alias)) {
         matches.add(brand);
@@ -281,17 +284,28 @@ export const URGENCY_PATTERNS = {
 export class SmartExtractor {
   /**
    * 提取品牌信息
-   * 两阶段匹配策略：
-   * 1. 第一阶段：精确匹配实际业务品牌（按长度降序，避免子串误匹配）
-   * 2. 第二阶段：如果没找到，使用别名匹配（fallback）
+   * 两阶段匹配策略（合并结果）：
+   * 1. 第一阶段：精确匹配实际业务品牌（ORGANIZATION_MAPPING中定义的品牌）
+   * 2. 第二阶段：别名匹配（BRAND_DICTIONARY中定义的品牌，包括非业务品牌）
+   * 3. 合并两阶段结果，因为文本可能同时包含业务品牌和常见品牌别名
+   * 4. 去重并过滤子串，确保结果唯一且无冗余
+   *
+   * 示例：
+   * - "我想去肯德基或星巴克" → ["肯德基", "星巴克"]
+   *   （肯德基：业务品牌 + 星巴克：常见品牌别名）
    */
   static extractBrands(text: string): string[] {
-    // 第一阶段：精确匹配
-    const exactMatches = filterShadowedBrands(findExactMatches(text));
-    if (exactMatches.length > 0) return exactMatches;
+    // 第一阶段：精确匹配实际业务品牌
+    const exactMatches = findExactMatches(text);
 
-    // 第二阶段：别名匹配（fallback）
-    return filterShadowedBrands(findAliasMatches(text));
+    // 第二阶段：别名匹配（包括非业务品牌）
+    const aliasMatches = findAliasMatches(text);
+
+    // 合并两个阶段的结果，因为文本可能同时包含业务品牌和常见品牌别名
+    const combined = [...exactMatches, ...aliasMatches];
+
+    // 去重并过滤子串
+    return filterShadowedBrands([...new Set(combined)]);
   }
 
   /**

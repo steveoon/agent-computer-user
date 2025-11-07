@@ -95,6 +95,9 @@ async function migrate() {
       // 智能回复指令
       replyPrompts: replyPromptsConfig,
 
+      // 品牌优先级策略（默认智能判断）
+      brandPriorityStrategy: "smart",
+
       // 配置元信息
       metadata: {
         version: CONFIG_VERSION,
