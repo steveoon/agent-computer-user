@@ -1120,6 +1120,7 @@ export const computerTool = (
               candidate_message || "",
               processedHistory,
               preferredBrand,
+              undefined, // toolBrand - 在此上下文中不可用
               modelConfig,
               configData, // 传递配置数据
               replyPrompts, // 传递回复指令

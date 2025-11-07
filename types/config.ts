@@ -13,6 +13,13 @@ import {
 
 // 🔧 配置相关 Zod Schema 定义
 
+// 品牌优先级策略Schema
+export const BrandPriorityStrategySchema = z.enum([
+  "user-selected",           // UI选择优先
+  "conversation-extracted",  // 职位详情识别优先（工具调用时从岗位信息提取）
+  "smart",                   // 智能判断（推荐）
+]);
+
 // 系统提示词配置Schema
 export const SystemPromptsConfigSchema = z.object({
   bossZhipinSystemPrompt: z.string(),
@@ -31,6 +38,7 @@ export const AppConfigDataSchema = z.object({
   activeSystemPrompt: z
     .enum(["bossZhipinSystemPrompt", "generalComputerSystemPrompt", "bossZhipinLocalSystemPrompt"])
     .optional(),
+  brandPriorityStrategy: BrandPriorityStrategySchema.optional().default("smart"), // 品牌冲突处理策略
   metadata: z.object({
     version: z.string(),
     lastUpdated: z.string(),
@@ -43,6 +51,11 @@ export const AppConfigDataSchema = z.object({
 // 注意：Zod v4 不再支持函数模式验证，ConfigService 接口直接定义在下方
 
 // 🔧 通过 z.infer 生成 TypeScript 类型
+
+/**
+ * 品牌优先级策略类型
+ */
+export type BrandPriorityStrategy = z.infer<typeof BrandPriorityStrategySchema>;
 
 /**
  * 系统提示词配置
@@ -96,6 +109,6 @@ export interface ConfigManagerState {
  * LocalForage 存储键名常量
  */
 export const CONFIG_STORAGE_KEY = "APP_CONFIG_DATA" as const;
-export const CONFIG_VERSION = "1.2.0" as const;
+export const CONFIG_VERSION = "1.2.1" as const;
 
 // 不再重新导出zhipin中的类型，使用时直接从 './zhipin' 导入

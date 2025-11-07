@@ -12,6 +12,7 @@ import type {
   ReplyPromptsConfig,
   ZhipinData,
   CONFIG_STORAGE_KEY,
+  BrandPriorityStrategy,
 } from "@/types";
 
 // 检查是否在客户端环境
@@ -309,6 +310,12 @@ export async function needsDataUpgrade(): Promise<boolean> {
       return true;
     }
 
+    // 检查是否缺少 brandPriorityStrategy 字段
+    if (!config.brandPriorityStrategy) {
+      console.log("🔄 检测到缺少 brandPriorityStrategy 字段，需要数据升级");
+      return true;
+    }
+
     console.log(`✅ 配置数据检查完成，版本: ${currentVersion}，无需升级`);
     return false;
   } catch (error) {
@@ -352,6 +359,14 @@ export async function getReplyPrompts(): Promise<ReplyPromptsConfig | null> {
 export async function getActiveSystemPromptType(): Promise<keyof SystemPromptsConfig> {
   const config = await configService.getConfig();
   return config?.activeSystemPrompt || "bossZhipinSystemPrompt";
+}
+
+/**
+ * 便捷函数：获取品牌优先级策略
+ */
+export async function getBrandPriorityStrategy(): Promise<BrandPriorityStrategy> {
+  const config = await configService.getConfig();
+  return config?.brandPriorityStrategy || "smart";
 }
 
 /**
@@ -435,6 +450,9 @@ export async function migrateFromHardcodedData(): Promise<void> {
 
       // 活动系统提示词（默认使用Boss直聘）
       activeSystemPrompt: "bossZhipinSystemPrompt",
+
+      // 品牌优先级策略（默认智能判断）
+      brandPriorityStrategy: "smart",
 
       // 配置元信息
       metadata: {
@@ -613,12 +631,19 @@ async function upgradeConfigData(
       console.log("✅ 添加了新的系统提示词: bossZhipinLocalSystemPrompt");
     }
 
+    // 🆕 确保 brandPriorityStrategy 字段存在（v1.2.0+）
+    const brandPriorityStrategy = existingConfig.brandPriorityStrategy || "smart";
+    if (!existingConfig.brandPriorityStrategy) {
+      console.log("✅ 添加了品牌优先级策略字段: brandPriorityStrategy = smart");
+    }
+
     // 创建升级后的配置
     const upgradedConfig: AppConfigData = {
       ...existingConfig,
       brandData: upgradedBrandData,
       replyPrompts: upgradedReplyPrompts,
       systemPrompts: upgradedSystemPrompts,
+      brandPriorityStrategy, // 显式设置，确保持久化
       metadata: {
         ...existingConfig.metadata,
         // 只有在真正升级时才更新版本号，修复时保持原版本

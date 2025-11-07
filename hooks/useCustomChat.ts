@@ -39,6 +39,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
     systemPrompts,
     replyPrompts,
     activeSystemPrompt,
+    brandPriorityStrategy,
     isLoading: configLoading,
     error: configError,
   } = useConfigDataForChat();
@@ -159,6 +160,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       };
 
       if (currentBrand) requestBody.preferredBrand = currentBrand;
+      if (brandPriorityStrategy) requestBody.brandPriorityStrategy = brandPriorityStrategy;
       if (modelConfig) requestBody.modelConfig = modelConfig;
       if (configData) requestBody.configData = configData;
       if (systemPrompts) requestBody.systemPrompts = systemPrompts;
@@ -376,6 +378,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
 
       // 只在数据存在时添加
       if (currentBrand) requestBody.preferredBrand = currentBrand;
+      if (brandPriorityStrategy) requestBody.brandPriorityStrategy = brandPriorityStrategy;
       if (modelConfig) requestBody.modelConfig = modelConfig;
       if (configData) requestBody.configData = configData;
       if (systemPrompts) requestBody.systemPrompts = systemPrompts;
@@ -398,6 +401,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       input,
       sandboxId,
       currentBrand,
+      brandPriorityStrategy,
       chatModel,
       classifyModel,
       replyModel,
@@ -429,6 +433,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
         };
 
         if (currentBrand) requestBody.preferredBrand = currentBrand;
+        if (brandPriorityStrategy) requestBody.brandPriorityStrategy = brandPriorityStrategy;
         if (modelConfig) requestBody.modelConfig = modelConfig;
         if (configData) requestBody.configData = configData;
         if (systemPrompts) requestBody.systemPrompts = systemPrompts;
@@ -461,6 +466,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       setMessages,
       sandboxId,
       currentBrand,
+      brandPriorityStrategy,
       chatModel,
       classifyModel,
       replyModel,

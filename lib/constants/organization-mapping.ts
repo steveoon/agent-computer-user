@@ -40,6 +40,8 @@ export const ORGANIZATION_MAPPING: Record<number, string> = {
   1164: "塔可贝尔",
   1165: "左庭右院",
   1170: "可可牛",
+  1167: "大连肯德基",
+  870: "海底捞",
 };
 
 /**

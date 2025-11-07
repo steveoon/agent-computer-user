@@ -1,17 +1,13 @@
 import { useEffect, useState } from "react";
-import {
-  getBrandData,
-  getSystemPrompts,
-  getReplyPrompts,
-  getActiveSystemPromptType,
-} from "@/lib/services/config.service";
-import type { ZhipinData, SystemPromptsConfig, ReplyPromptsConfig } from "@/types";
+import { configService } from "@/lib/services/config.service";
+import type { ZhipinData, SystemPromptsConfig, ReplyPromptsConfig, BrandPriorityStrategy } from "@/types";
 
 interface ConfigDataForChat {
   configData: ZhipinData | null;
   systemPrompts: SystemPromptsConfig | null;
   replyPrompts: ReplyPromptsConfig | null;
   activeSystemPrompt: keyof SystemPromptsConfig;
+  brandPriorityStrategy: BrandPriorityStrategy;
   isLoading: boolean;
   error: string | null;
 }
@@ -26,6 +22,7 @@ export function useConfigDataForChat(): ConfigDataForChat {
     systemPrompts: null,
     replyPrompts: null,
     activeSystemPrompt: "bossZhipinSystemPrompt",
+    brandPriorityStrategy: "smart",
     isLoading: true,
     error: null,
   });
@@ -35,26 +32,27 @@ export function useConfigDataForChat(): ConfigDataForChat {
       try {
         console.log("🔄 开始加载聊天所需的配置数据...");
 
-        // 并行加载所有配置数据
-        const [brandData, systemPromptsData, replyPromptsData, activePrompt] = await Promise.all([
-          getBrandData(),
-          getSystemPrompts(),
-          getReplyPrompts(),
-          getActiveSystemPromptType(),
-        ]);
+        // 🎯 优化：只调用一次 getConfig，避免5次重复的 I/O 和反序列化
+        const config = await configService.getConfig();
+
+        if (!config) {
+          throw new Error("配置数据未找到");
+        }
 
         console.log("✅ 配置数据加载完成", {
-          hasBrandData: !!brandData,
-          hasSystemPrompts: !!systemPromptsData,
-          hasReplyPrompts: !!replyPromptsData,
-          activeSystemPrompt: activePrompt,
+          hasBrandData: !!config.brandData,
+          hasSystemPrompts: !!config.systemPrompts,
+          hasReplyPrompts: !!config.replyPrompts,
+          activeSystemPrompt: config.activeSystemPrompt,
+          brandPriorityStrategy: config.brandPriorityStrategy,
         });
 
         setState({
-          configData: brandData,
-          systemPrompts: systemPromptsData,
-          replyPrompts: replyPromptsData,
-          activeSystemPrompt: activePrompt,
+          configData: config.brandData,
+          systemPrompts: config.systemPrompts,
+          replyPrompts: config.replyPrompts,
+          activeSystemPrompt: config.activeSystemPrompt || "bossZhipinSystemPrompt",
+          brandPriorityStrategy: config.brandPriorityStrategy || "smart",
           isLoading: false,
           error: null,
         });

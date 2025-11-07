@@ -21,6 +21,7 @@ export default function AdminSettingsPage() {
     updateReplyPrompts,
     updateSystemPrompts,
     updateActiveSystemPrompt,
+    updateBrandPriorityStrategy,
     exportConfig,
     importConfig,
     resetConfig,
@@ -293,7 +294,10 @@ export default function AdminSettingsPage() {
 
         {/* 通用配置页面 */}
         <TabsContent value="general">
-          <GeneralConfigManager />
+          <GeneralConfigManager
+            brandPriorityStrategy={config?.brandPriorityStrategy || "smart"}
+            onStrategyChange={updateBrandPriorityStrategy}
+          />
         </TabsContent>
 
         {/* 品牌数据编辑 */}

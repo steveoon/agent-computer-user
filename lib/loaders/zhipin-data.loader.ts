@@ -18,11 +18,12 @@ import {
   migrateFromHardcodedData,
   needsMigration,
 } from "../services/config.service";
-import type { ReplyPromptsConfig } from "../../types/config";
+import type { ReplyPromptsConfig, BrandPriorityStrategy } from "../../types/config";
 import { DEFAULT_PROVIDER_CONFIGS, DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import type { ModelConfig } from "@/lib/config/models";
 import type { CandidateInfo } from "@/lib/tools/zhipin/types";
 import type { SalaryDetails } from "../../types/zhipin";
+import type { BrandResolutionInput, BrandResolutionOutput } from "../../types/brand-resolution";
 // 使用新的模块化 prompt engineering
 import {
   ClassificationPromptBuilder,
@@ -80,38 +81,19 @@ export async function loadZhipinData(
     if (configData) {
       console.log("✅ 使用传入的配置数据");
 
-      // 如果指定了品牌，尝试匹配
-      let effectiveBrand = configData.defaultBrand || Object.keys(configData.brands)[0];
+      // 不再在这里修改 defaultBrand，保持原始配置数据不变
+      // 品牌解析逻辑将在 resolveBrandConflict 中统一处理
 
-      if (preferredBrand) {
-        const matchedBrand = fuzzyMatchBrand(preferredBrand, Object.keys(configData.brands));
-        if (matchedBrand) {
-          effectiveBrand = matchedBrand;
-          if (matchedBrand === preferredBrand) {
-            console.log(`✅ 品牌精确匹配成功: ${preferredBrand}`);
-          } else {
-            console.log(`🔄 品牌模糊匹配成功: ${preferredBrand} → ${matchedBrand}`);
-          }
-        } else {
-          console.warn(`⚠️ 品牌 "${preferredBrand}" 未找到匹配，使用默认品牌: ${effectiveBrand}`);
-        }
-      }
-
-      const effectiveData = {
-        ...configData,
-        defaultBrand: effectiveBrand,
-      };
-
-      const totalPositions = effectiveData.stores.reduce(
+      const totalPositions = configData.stores.reduce(
         (sum, store) => sum + store.positions.length,
         0
       );
       console.log(
-        `📊 数据统计: ${effectiveData.stores.length} 家门店，${totalPositions} 个岗位${
-          preferredBrand ? ` - 当前品牌: ${preferredBrand}` : ""
+        `📊 数据统计: ${configData.stores.length} 家门店，${totalPositions} 个岗位${
+          preferredBrand ? ` - UI选择品牌: ${preferredBrand}` : ""
         }`
       );
-      return effectiveData;
+      return configData;
     }
 
     // 🌐 浏览器环境备用逻辑：从 localforage 加载
@@ -184,7 +166,7 @@ export async function loadZhipinData(
  * @param availableBrands 可用的品牌列表
  * @returns 匹配的品牌名或null
  */
-function fuzzyMatchBrand(inputBrand: string, availableBrands: string[]): string | null {
+export function fuzzyMatchBrand(inputBrand: string, availableBrands: string[]): string | null {
   if (!inputBrand) return null;
 
   const inputLower = inputBrand.toLowerCase();
@@ -532,21 +514,27 @@ export async function classifyUserMessage(
  * 优先使用传入的配置数据，服务端调用时必须提供
  * @param message 候选人消息
  * @param conversationHistory 对话历史（可选）
- * @param preferredBrand 优先使用的品牌（可选）
+ * @param preferredBrand UI选择的品牌（可选）
+ * @param toolBrand 工具调用时从职位详情识别的品牌（可选）
  * @param modelConfig 模型配置（可选）
  * @param configData 预加载的配置数据（服务端调用时必须提供）
  * @param replyPrompts 预加载的回复指令（服务端调用时必须提供）
+ * @param candidateInfo 候选人信息（可选）
+ * @param defaultWechatId 默认微信号（可选）
+ * @param brandPriorityStrategy 品牌冲突处理策略（可选，默认 "smart"）
  * @returns Promise<{replyType: string, text: string, reasoning: string}> 生成的智能回复、分类类型和分类依据
  */
 export async function generateSmartReplyWithLLM(
   message: string = "",
   conversationHistory: string[] = [],
   preferredBrand?: string,
+  toolBrand?: string,
   modelConfig?: ModelConfig,
   configData?: ZhipinData,
   replyPrompts?: ReplyPromptsConfig,
   candidateInfo?: CandidateInfo,
-  defaultWechatId?: string
+  defaultWechatId?: string,
+  brandPriorityStrategy?: BrandPriorityStrategy
 ): Promise<{ replyType: string; text: string; reasoningText: string }> {
   try {
     // 🎯 获取配置的模型和provider设置
@@ -594,16 +582,19 @@ export async function generateSmartReplyWithLLM(
       effectiveReplyPrompts[classification.replyType as keyof typeof effectiveReplyPrompts] ||
       effectiveReplyPrompts.general_chat;
 
-    // 构建上下文信息
-    const contextInfo = buildContextInfo(data, classification);
-
-    // 获取当前品牌
-    const targetBrand = data.defaultBrand || getBrandName(data);
+    // 构建上下文信息并获取解析后的品牌
+    const { contextInfo, resolvedBrand } = buildContextInfo(
+      data,
+      classification,
+      preferredBrand,
+      toolBrand,
+      brandPriorityStrategy
+    );
 
     // 创建回复构建器
     const replyBuilder = new ReplyPromptBuilder();
 
-    // 构建回复参数
+    // 构建回复参数（使用解析后的品牌，确保一致性）
     const replyParams: ReplyBuilderParams = {
       message,
       classification,
@@ -611,7 +602,7 @@ export async function generateSmartReplyWithLLM(
       systemInstruction: systemPromptInstruction,
       conversationHistory,
       candidateInfo,
-      targetBrand,
+      targetBrand: resolvedBrand, // 🎯 使用解析后的品牌，而非用户原始选择
       defaultWechatId,
     };
 
@@ -691,34 +682,277 @@ export async function generateSmartReplyWithLLM(
 }
 
 /**
- * 构建上下文信息，根据提取的信息筛选相关数据
+ * 解析品牌冲突，根据策略返回最终品牌
+ *
+ * 品牌来源优先级说明：
+ * - user-selected: UI选择 → 配置默认 → 第一个可用品牌
+ * - conversation-extracted: 对话提取 → UI选择 → 配置默认 → 第一个可用品牌
+ * - smart: 对话提取 → UI选择 → 配置默认 → 第一个可用品牌（带智能判断）
+ *
+ * @param input 品牌解析输入参数
+ * @returns 解析后的品牌和决策原因
  */
-function buildContextInfo(data: ZhipinData, classification: MessageClassification): string {
-  const extractedInfo = classification.extractedInfo;
-  const { mentionedBrand, city, mentionedLocations, mentionedDistricts } = extractedInfo;
+export function resolveBrandConflict(input: BrandResolutionInput): BrandResolutionOutput {
+  const {
+    uiSelectedBrand,
+    configDefaultBrand,
+    conversationBrand,
+    availableBrands,
+    strategy = "smart"
+  } = input;
 
-  // 根据提到的品牌过滤门店
-  let targetBrand = data.defaultBrand || getBrandName(data);
-  let relevantStores = data.stores;
+  // 记录解析尝试历史
+  const attempts: Array<{ source: string; value: string | undefined; matched: boolean; reason: string }> = [];
 
-  // 如果提到了品牌，使用模糊匹配
-  if (mentionedBrand) {
-    const matchedBrand = fuzzyMatchBrand(mentionedBrand, Object.keys(data.brands));
-    if (matchedBrand) {
-      targetBrand = matchedBrand;
-      console.log(`✅ 品牌匹配成功: ${mentionedBrand} → ${matchedBrand}`);
-    } else {
-      console.warn(`⚠️ 品牌 "${mentionedBrand}" 未找到匹配，使用默认品牌: ${targetBrand}`);
+  // 辅助函数：尝试匹配品牌
+  const tryMatchBrand = (brand: string | undefined, source: string): string | undefined => {
+    if (!brand) {
+      attempts.push({ source, value: undefined, matched: false, reason: "未提供" });
+      return undefined;
+    }
+
+    const matched = fuzzyMatchBrand(brand, availableBrands);
+    if (matched) {
+      const isExact = matched === brand;
+      attempts.push({
+        source,
+        value: brand,
+        matched: true,
+        reason: isExact ? "精确匹配" : `模糊匹配 (${brand} → ${matched})`
+      });
+      return matched;
+    }
+
+    attempts.push({ source, value: brand, matched: false, reason: "无法匹配到可用品牌" });
+    return undefined;
+  };
+
+  // 根据策略执行不同的优先级逻辑
+  switch (strategy) {
+    case "user-selected": {
+      // 优先级：UI选择 → 配置默认 → 第一个可用品牌
+      console.log("📌 品牌解析策略: user-selected (UI选择优先)");
+
+      // 1. 尝试 UI 选择的品牌
+      const uiMatched = tryMatchBrand(uiSelectedBrand, "UI选择");
+      if (uiMatched) {
+        return {
+          resolvedBrand: uiMatched,
+          matchType: uiMatched === uiSelectedBrand ? "exact" : "fuzzy",
+          source: "ui",
+          reason: `用户选择策略: 使用UI选择的品牌 (${uiSelectedBrand}${uiMatched !== uiSelectedBrand ? ` → ${uiMatched}` : ""})`,
+          originalInput: uiSelectedBrand
+        };
+      }
+
+      // 2. 尝试配置默认品牌
+      const configMatched = tryMatchBrand(configDefaultBrand, "配置默认");
+      if (configMatched) {
+        return {
+          resolvedBrand: configMatched,
+          matchType: configMatched === configDefaultBrand ? "exact" : "fuzzy",
+          source: "config",
+          reason: `用户选择策略: UI品牌无法匹配，使用配置默认 (${configDefaultBrand}${configMatched !== configDefaultBrand ? ` → ${configMatched}` : ""})`,
+          originalInput: configDefaultBrand
+        };
+      }
+
+      // 3. 使用第一个可用品牌
+      const fallback = availableBrands[0];
+      return {
+        resolvedBrand: fallback,
+        matchType: "fallback",
+        source: "default",
+        reason: `用户选择策略: 无有效品牌输入，使用系统默认 (${fallback})`
+      };
+    }
+
+    case "conversation-extracted": {
+      // 优先级：对话提取 → UI选择 → 配置默认 → 第一个可用品牌
+      console.log("💬 品牌解析策略: conversation-extracted (对话提取优先)");
+
+      // 1. 尝试对话提取的品牌
+      const conversationMatched = tryMatchBrand(conversationBrand, "对话提取");
+      if (conversationMatched) {
+        return {
+          resolvedBrand: conversationMatched,
+          matchType: conversationMatched === conversationBrand ? "exact" : "fuzzy",
+          source: "conversation",
+          reason: `对话提取策略: 使用对话中提取的品牌 (${conversationBrand}${conversationMatched !== conversationBrand ? ` → ${conversationMatched}` : ""})`,
+          originalInput: conversationBrand
+        };
+      }
+
+      // 2. 尝试 UI 选择的品牌
+      const uiMatched = tryMatchBrand(uiSelectedBrand, "UI选择");
+      if (uiMatched) {
+        return {
+          resolvedBrand: uiMatched,
+          matchType: uiMatched === uiSelectedBrand ? "exact" : "fuzzy",
+          source: "ui",
+          reason: `对话提取策略: 对话品牌无法匹配，使用UI选择 (${uiSelectedBrand}${uiMatched !== uiSelectedBrand ? ` → ${uiMatched}` : ""})`,
+          originalInput: uiSelectedBrand
+        };
+      }
+
+      // 3. 尝试配置默认品牌
+      const configMatched = tryMatchBrand(configDefaultBrand, "配置默认");
+      if (configMatched) {
+        return {
+          resolvedBrand: configMatched,
+          matchType: configMatched === configDefaultBrand ? "exact" : "fuzzy",
+          source: "config",
+          reason: `对话提取策略: 无有效对话/UI品牌，使用配置默认 (${configDefaultBrand}${configMatched !== configDefaultBrand ? ` → ${configMatched}` : ""})`,
+          originalInput: configDefaultBrand
+        };
+      }
+
+      // 4. 使用第一个可用品牌
+      const fallback = availableBrands[0];
+      return {
+        resolvedBrand: fallback,
+        matchType: "fallback",
+        source: "default",
+        reason: `对话提取策略: 无有效品牌输入，使用系统默认 (${fallback})`
+      };
+    }
+
+    case "smart":
+    default: {
+      // 优先级：对话提取 → UI选择 → 配置默认 → 第一个可用品牌
+      // 特殊逻辑：如果对话品牌和UI品牌都存在且不同，进行智能判断
+      console.log("🔍 品牌解析策略: smart (智能判断)");
+
+      const conversationMatched = tryMatchBrand(conversationBrand, "对话提取");
+      const uiMatched = tryMatchBrand(uiSelectedBrand, "UI选择");
+
+      // 如果两者都存在且不同，需要智能判断
+      if (conversationMatched && uiMatched && conversationMatched !== uiMatched) {
+        // 检查是否是同品牌系列
+        const isSameBrandFamily =
+          conversationMatched.includes(uiMatched) ||
+          uiMatched.includes(conversationMatched);
+
+        if (isSameBrandFamily) {
+          // 同系列品牌，使用更具体的（字符串更长的）
+          const moreSpecific = conversationMatched.length > uiMatched.length
+            ? conversationMatched : uiMatched;
+          const source = moreSpecific === conversationMatched ? "conversation" : "ui";
+
+          console.log(
+            `🔍 品牌智能判断 [同系列]: 对话=${conversationMatched}, UI=${uiMatched} → 使用更具体的: ${moreSpecific}`
+          );
+
+          return {
+            resolvedBrand: moreSpecific,
+            matchType: "fuzzy",
+            source: source as "conversation" | "ui",
+            reason: `智能策略: 同系列品牌，使用更具体的 (对话=${conversationMatched}, UI=${uiMatched} → ${moreSpecific})`,
+            originalInput: source === "conversation" ? conversationBrand : uiSelectedBrand
+          };
+        } else {
+          // 不同品牌系列，优先对话提取（因为更符合当前上下文）
+          console.log(
+            `⚡ 品牌智能判断 [不同系列]: 对话=${conversationMatched}, UI=${uiMatched} → 优先对话提取`
+          );
+
+          return {
+            resolvedBrand: conversationMatched,
+            matchType: conversationMatched === conversationBrand ? "exact" : "fuzzy",
+            source: "conversation",
+            reason: `智能策略: 不同品牌系列，优先对话上下文 (对话=${conversationMatched}, UI=${uiMatched})`,
+            originalInput: conversationBrand
+          };
+        }
+      }
+
+      // 如果只有一个存在，或两者相同，按正常优先级处理
+      if (conversationMatched) {
+        return {
+          resolvedBrand: conversationMatched,
+          matchType: conversationMatched === conversationBrand ? "exact" : "fuzzy",
+          source: "conversation",
+          reason: `智能策略: 使用对话中提取的品牌 (${conversationBrand}${conversationMatched !== conversationBrand ? ` → ${conversationMatched}` : ""})`,
+          originalInput: conversationBrand
+        };
+      }
+
+      if (uiMatched) {
+        return {
+          resolvedBrand: uiMatched,
+          matchType: uiMatched === uiSelectedBrand ? "exact" : "fuzzy",
+          source: "ui",
+          reason: `智能策略: 对话无品牌，使用UI选择 (${uiSelectedBrand}${uiMatched !== uiSelectedBrand ? ` → ${uiMatched}` : ""})`,
+          originalInput: uiSelectedBrand
+        };
+      }
+
+      // 尝试配置默认品牌
+      const configMatched = tryMatchBrand(configDefaultBrand, "配置默认");
+      if (configMatched) {
+        return {
+          resolvedBrand: configMatched,
+          matchType: configMatched === configDefaultBrand ? "exact" : "fuzzy",
+          source: "config",
+          reason: `智能策略: 无对话/UI品牌，使用配置默认 (${configDefaultBrand}${configMatched !== configDefaultBrand ? ` → ${configMatched}` : ""})`,
+          originalInput: configDefaultBrand
+        };
+      }
+
+      // 使用第一个可用品牌
+      const fallback = availableBrands[0];
+      return {
+        resolvedBrand: fallback,
+        matchType: "fallback",
+        source: "default",
+        reason: `智能策略: 无有效品牌输入，使用系统默认 (${fallback})`
+      };
     }
   }
+}
+
+/**
+ * 构建上下文信息，根据提取的信息筛选相关数据
+ * @param data 配置数据
+ * @param classification 消息分类结果
+ * @param uiSelectedBrand UI选择的品牌（来自brand-selector组件）
+ * @param toolBrand 工具调用时从职位详情识别的品牌
+ * @param brandPriorityStrategy 品牌优先级策略
+ * @returns 返回上下文信息和解析后的品牌
+ */
+function buildContextInfo(
+  data: ZhipinData,
+  classification: MessageClassification,
+  uiSelectedBrand?: string,
+  toolBrand?: string,
+  brandPriorityStrategy?: BrandPriorityStrategy
+): { contextInfo: string; resolvedBrand: string } {
+  const extractedInfo = classification.extractedInfo;
+  const { city, mentionedLocations, mentionedDistricts } = extractedInfo;
+
+  // 使用新的冲突解析逻辑，传入三个独立的品牌源
+  const brandResolution = resolveBrandConflict({
+    uiSelectedBrand: uiSelectedBrand,           // UI选择的品牌
+    configDefaultBrand: data.defaultBrand,      // 配置中的默认品牌
+    conversationBrand: toolBrand || undefined,  // 工具调用时从职位详情识别的品牌
+    availableBrands: Object.keys(data.brands),
+    strategy: brandPriorityStrategy || "smart"
+  });
+
+  const targetBrand = brandResolution.resolvedBrand;
+  console.log(`🏢 品牌输入: UI选择=${uiSelectedBrand}, 工具识别=${toolBrand}, 配置默认=${data.defaultBrand}`);
+  console.log(`✅ 品牌解析完成: ${targetBrand} (${brandResolution.reason})`);
 
   // 获取目标品牌的所有门店
   const brandStores = data.stores.filter(store => store.brand === targetBrand);
-  relevantStores = brandStores; // 保持品牌过滤，即使为空
+  let relevantStores = brandStores; // 保持品牌过滤，即使为空
 
   // 如果没有门店数据，构建空的上下文
   if (relevantStores.length === 0) {
-    return `品牌：${targetBrand}\n注意：该品牌当前没有门店数据。**门店可能暂时没有在招岗位**。`;
+    return {
+      contextInfo: `品牌：${targetBrand}\n注意：该品牌当前没有门店数据。**门店可能暂时没有在招岗位**。`,
+      resolvedBrand: targetBrand,
+    };
   }
 
   // 优先使用明确提到的工作城市进行过滤
@@ -924,7 +1158,7 @@ function buildContextInfo(data: ZhipinData, classification: MessageClassificatio
     }
   }
 
-  return context;
+  return { contextInfo: context, resolvedBrand: targetBrand };
 }
 
 /**

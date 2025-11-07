@@ -110,6 +110,7 @@ export async function POST(req: Request) {
     const toolCreationContext = {
       sandboxId: sandboxId ?? null,
       preferredBrand: context.preferredBrand,
+      brandPriorityStrategy: context.brandPriorityStrategy,
       modelConfig: effectiveModelConfig,
       configData: context.configData,
       replyPrompts: context.replyPrompts,
