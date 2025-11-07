@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.12.0](https://github.com/steveoon/agent-computer-user/compare/v1.11.0...v1.12.0) (2025-11-07)
+
+
+### Features
+
+* 优化配置管理和类型定义 ([c4dfa5e](https://github.com/steveoon/agent-computer-user/commit/c4dfa5eebb32f5181a429fce972c31209845e076))
+
 # [1.12.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.11.0...v1.12.0-develop.1) (2025-11-07)
 
 
