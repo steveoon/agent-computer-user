@@ -3,7 +3,7 @@ import { z } from "zod";
 import { generateSmartReplyWithLLM } from "@/lib/loaders/zhipin-data.loader";
 import { loadZhipinData } from "@/lib/loaders/zhipin-data.loader";
 import type { ZhipinData } from "@/types/zhipin";
-import type { ReplyPromptsConfig } from "@/types/config";
+import type { ReplyPromptsConfig, BrandPriorityStrategy } from "@/types/config";
 import type { ModelConfig } from "@/lib/config/models";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import { CandidateInfoSchema } from "@/lib/tools/zhipin/types";
@@ -45,7 +45,8 @@ export const zhipinReplyTool = (
   modelConfig?: ModelConfig,
   configData?: ZhipinData,
   replyPrompts?: ReplyPromptsConfig,
-  defaultWechatId?: string
+  defaultWechatId?: string,
+  brandPriorityStrategy?: BrandPriorityStrategy
 ) => {
   // 注意：configData 的验证在工具创建时完成（通过 contextSchemas）
   // 执行时只关注业务逻辑验证
@@ -120,22 +121,23 @@ export const zhipinReplyTool = (
           }
         }
 
-        // 使用传入的品牌或默认品牌
-        const effectiveBrand = brand || preferredBrand;
-
         // 使用传入的模型配置或默认配置
         const effectiveModelConfig = modelConfig || DEFAULT_MODEL_CONFIG;
 
         // 生成智能回复
+        // preferredBrand 是 UI 选择的品牌
+        // brand 是工具调用时从职位详情识别的品牌
         const replyResult = await generateSmartReplyWithLLM(
           candidate_message,
           processedHistory,
-          effectiveBrand,
+          preferredBrand,  // UI选择的品牌
+          brand,           // 工具识别的品牌
           effectiveModelConfig,
           configData,
           replyPrompts,
           candidate_info,
-          defaultWechatId
+          defaultWechatId,
+          brandPriorityStrategy
         );
 
         console.log(`✅ 回复生成成功`);
@@ -154,7 +156,7 @@ export const zhipinReplyTool = (
 
         // 如果需要包含统计信息
         if (include_stats) {
-          const storeDatabase = configData || (await loadZhipinData(effectiveBrand));
+          const storeDatabase = configData || (await loadZhipinData(preferredBrand));
           const totalPositions = storeDatabase.stores.reduce(
             (sum, store) => sum + store.positions.length,
             0
@@ -163,7 +165,7 @@ export const zhipinReplyTool = (
           response.stats = {
             totalStores: storeDatabase.stores.length,
             totalPositions: totalPositions,
-            brand: effectiveBrand || storeDatabase.defaultBrand || "未知品牌",
+            brand: brand || preferredBrand || storeDatabase.defaultBrand || "未知品牌",
           };
         }
 

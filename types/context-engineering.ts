@@ -406,7 +406,7 @@ export const ReplyBuilderParamsSchema = z.object({
   systemInstruction: z.string(),
   conversationHistory: z.array(z.string()),
   candidateInfo: CandidateInfoSchema.optional(),
-  targetBrand: z.string().optional(),
+  targetBrand: z.string().optional(), // 解析后的品牌（经过冲突解析）
   defaultWechatId: z.string().optional(), // 默认微信号
 });
 

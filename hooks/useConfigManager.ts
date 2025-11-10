@@ -4,7 +4,7 @@ import React from "react";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { configService, migrateFromHardcodedData } from "@/lib/services/config.service";
-import type { AppConfigData, ZhipinData, ReplyPromptsConfig, SystemPromptsConfig } from "@/types";
+import type { AppConfigData, ZhipinData, ReplyPromptsConfig, SystemPromptsConfig, BrandPriorityStrategy } from "@/types";
 // 🔧 导入预定义的 Zod Schema，避免重复定义
 import { AppConfigDataSchema } from "@/types/config";
 import { toast } from "sonner";
@@ -29,6 +29,7 @@ interface ConfigState {
   updateReplyPrompts: (replyPrompts: ReplyPromptsConfig) => Promise<void>;
   updateSystemPrompts: (systemPrompts: SystemPromptsConfig) => Promise<void>;
   updateActiveSystemPrompt: (promptType: keyof SystemPromptsConfig) => Promise<void>;
+  updateBrandPriorityStrategy: (strategy: BrandPriorityStrategy) => Promise<void>;
   exportConfig: () => void;
   importConfig: (file: File) => Promise<void>;
   resetConfig: () => Promise<void>;
@@ -259,6 +260,52 @@ const useConfigStore = create<ConfigState>()(
         } catch (error) {
           console.error("❌ 活动系统提示词更新失败:", error);
           set({ error: error instanceof Error ? error.message : "更新失败" });
+        }
+      },
+
+      updateBrandPriorityStrategy: async (strategy: BrandPriorityStrategy) => {
+        const { config } = get();
+        if (!config) {
+          const errorMsg = "配置未加载，无法更新品牌优先级策略";
+          set({ error: errorMsg });
+          toast.error("更新失败", { description: errorMsg });
+          return;
+        }
+
+        try {
+          console.log(`🔄 更新品牌优先级策略到: ${strategy}...`);
+          const updatedConfig: AppConfigData = {
+            ...config,
+            brandPriorityStrategy: strategy,
+            metadata: {
+              ...config.metadata,
+              lastUpdated: new Date().toISOString(),
+            },
+          };
+
+          await configService.saveConfig(updatedConfig);
+          set({ config: updatedConfig, error: null });
+
+          const strategyName =
+            strategy === "user-selected" ? "用户选择优先" :
+            strategy === "conversation-extracted" ? "对话提取优先" :
+            "智能判断";
+
+          console.log(`✅ 品牌优先级策略已更新为: ${strategyName}`);
+
+          // 显示成功 toast 通知
+          toast.success("品牌优先级策略更新成功", {
+            description: `已切换到「${strategyName}」模式`,
+          });
+        } catch (error) {
+          console.error("❌ 品牌优先级策略更新失败:", error);
+          const errorMessage = error instanceof Error ? error.message : "更新失败";
+          set({ error: errorMessage });
+
+          // 显示错误 toast 通知
+          toast.error("品牌优先级策略更新失败", {
+            description: errorMessage,
+          });
         }
       },
 

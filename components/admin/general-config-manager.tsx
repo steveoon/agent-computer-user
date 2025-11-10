@@ -20,8 +20,10 @@ import {
   Trash2,
   Star,
   Edit2,
+  Workflow,
 } from "lucide-react";
 import { toast } from "sonner";
+import type { BrandPriorityStrategy } from "@/types";
 
 interface TokenStatus {
   isValid: boolean;
@@ -39,7 +41,15 @@ interface WechatAccount {
   updatedAt: string;
 }
 
-export const GeneralConfigManager = () => {
+interface GeneralConfigManagerProps {
+  brandPriorityStrategy: BrandPriorityStrategy;
+  onStrategyChange: (strategy: BrandPriorityStrategy) => Promise<void>;
+}
+
+export const GeneralConfigManager = ({
+  brandPriorityStrategy,
+  onStrategyChange,
+}: GeneralConfigManagerProps) => {
   // Token 相关状态
   const [token, setToken] = useState("");
   const [isTokenVisible, setIsTokenVisible] = useState(false);
@@ -271,7 +281,7 @@ export const GeneralConfigManager = () => {
 
       <CardContent>
         <Tabs defaultValue="token" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="token" className="flex items-center gap-2">
               <Key className="h-4 w-4" />
               Token配置
@@ -279,6 +289,10 @@ export const GeneralConfigManager = () => {
             <TabsTrigger value="wechat" className="flex items-center gap-2">
               <MessageCircle className="h-4 w-4" />
               微信号配置
+            </TabsTrigger>
+            <TabsTrigger value="brand-strategy" className="flex items-center gap-2">
+              <Workflow className="h-4 w-4" />
+              品牌策略
             </TabsTrigger>
           </TabsList>
 
@@ -577,6 +591,160 @@ export const GeneralConfigManager = () => {
                 <li>• 请确保微信号信息准确，以便候选人能够正确添加</li>
                 <li>• 点击编辑按钮可以修改已添加的微信号信息</li>
               </ul>
+            </div>
+          </TabsContent>
+
+          {/* 品牌策略配置Tab */}
+          <TabsContent value="brand-strategy" className="space-y-6 mt-6">
+            <div className="space-y-6">
+              <div>
+                <h4 className="font-medium mb-3">品牌冲突处理策略</h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  当UI选择的品牌与职位详情中识别的品牌不一致时的处理方式
+                </p>
+              </div>
+
+              {/* 策略选项 */}
+              <div className="space-y-3">
+                {/* 智能判断（推荐） */}
+                <div
+                  className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                    brandPriorityStrategy === "smart"
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "hover:border-primary/50"
+                  }`}
+                  onClick={() => onStrategyChange("smart")}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                        brandPriorityStrategy === "smart"
+                          ? "border-primary bg-primary"
+                          : "border-gray-300"
+                      }`}
+                    >
+                      {brandPriorityStrategy === "smart" && (
+                        <div className="w-2 h-2 rounded-full bg-white"></div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">智能判断</span>
+                        <Badge variant="default" className="text-xs">
+                          推荐
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">根据品牌关系智能选择</p>
+                      <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
+                        <li>• 优先使用职位详情中识别的品牌</li>
+                        <li>• 同品牌家族（如"肯德基"/"大连肯德基"）→ 使用更具体的</li>
+                        <li>• 不同品牌家族 → 优先职位详情中的品牌</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 用户选择优先 */}
+                <div
+                  className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                    brandPriorityStrategy === "user-selected"
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "hover:border-primary/50"
+                  }`}
+                  onClick={() => onStrategyChange("user-selected")}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                        brandPriorityStrategy === "user-selected"
+                          ? "border-primary bg-primary"
+                          : "border-gray-300"
+                      }`}
+                    >
+                      {brandPriorityStrategy === "user-selected" && (
+                        <div className="w-2 h-2 rounded-full bg-white"></div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <span className="font-medium">用户选择优先</span>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        始终使用用户手动选择的品牌
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 对话提取优先 */}
+                <div
+                  className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                    brandPriorityStrategy === "conversation-extracted"
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "hover:border-primary/50"
+                  }`}
+                  onClick={() => onStrategyChange("conversation-extracted")}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                        brandPriorityStrategy === "conversation-extracted"
+                          ? "border-primary bg-primary"
+                          : "border-gray-300"
+                      }`}
+                    >
+                      {brandPriorityStrategy === "conversation-extracted" && (
+                        <div className="w-2 h-2 rounded-full bg-white"></div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <span className="font-medium">职位识别优先</span>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        始终使用从职位详情中识别的品牌
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 当前生效策略说明 */}
+              <Alert className="bg-blue-50 border-blue-200">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-blue-600 mt-0.5" />
+                  <div className="flex-1">
+                    <AlertDescription className="text-blue-800">
+                      <div className="font-medium mb-1">当前生效策略</div>
+                      <div className="text-sm">
+                        {brandPriorityStrategy === "smart" && (
+                          <>
+                            <strong>智能判断</strong> - 优先使用职位详情识别的品牌，同品牌家族使用更具体的（如"大连肯德基"比"肯德基"更具体），不同品牌家族优先职位识别。
+                          </>
+                        )}
+                        {brandPriorityStrategy === "user-selected" && (
+                          <>
+                            <strong>用户选择优先</strong> - 始终使用UI选择的品牌，忽略职位详情识别。
+                          </>
+                        )}
+                        {brandPriorityStrategy === "conversation-extracted" && (
+                          <>
+                            <strong>职位识别优先</strong> - 始终使用从职位详情识别的品牌，覆盖UI选择。
+                          </>
+                        )}
+                      </div>
+                    </AlertDescription>
+                  </div>
+                </div>
+              </Alert>
+
+              {/* 使用说明 */}
+              <div className="border-t pt-4">
+                <h4 className="font-medium mb-2">使用说明</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• 职位详情中的品牌由AI工具自动识别（如Boss直聘岗位详情页）</li>
+                  <li>• 品牌会经过模糊匹配（精确匹配 → 包含匹配）得到最终匹配结果</li>
+                  <li>• 当UI选择与职位识别不一致时，按所选策略处理</li>
+                  <li>• 品牌家族：一个包含另一个即为同家族（如"肯德基"和"大连肯德基"）</li>
+                  <li>• 策略立即生效，仅保存在当前浏览器中</li>
+                </ul>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

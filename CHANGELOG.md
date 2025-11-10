@@ -2,6 +2,39 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.12.0](https://github.com/steveoon/agent-computer-user/compare/v1.11.0...v1.12.0) (2025-11-07)
+
+
+### Features
+
+* 优化配置管理和类型定义 ([c4dfa5e](https://github.com/steveoon/agent-computer-user/commit/c4dfa5eebb32f5181a429fce972c31209845e076))
+
+# [1.12.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.11.0...v1.12.0-develop.1) (2025-11-07)
+
+
+### Features
+
+* 优化配置管理和类型定义 ([c4dfa5e](https://github.com/steveoon/agent-computer-user/commit/c4dfa5eebb32f5181a429fce972c31209845e076))
+
+# [1.11.0](https://github.com/steveoon/agent-computer-user/compare/v1.10.0...v1.11.0) (2025-11-03)
+
+
+### Bug Fixes
+
+* 添加自建 Supabase 域名到 CSP 白名单 ([68574d1](https://github.com/steveoon/agent-computer-user/commit/68574d112d967db50fe977783103a2bbe1d2ef97))
+
+
+### Features
+
+* 添加多 Agent 并行管理系统 ([be7f12f](https://github.com/steveoon/agent-computer-user/commit/be7f12f31b632a8a989dd3986fe6d837e25e5eda))
+
+# [1.11.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.11.0-develop.1...v1.11.0-develop.2) (2025-11-03)
+
+
+### Bug Fixes
+
+* 添加自建 Supabase 域名到 CSP 白名单 ([68574d1](https://github.com/steveoon/agent-computer-user/commit/68574d112d967db50fe977783103a2bbe1d2ef97))
+
 # [1.11.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.10.0...v1.11.0-develop.1) (2025-10-28)
 
 

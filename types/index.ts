@@ -35,6 +35,7 @@ export type {
   AppConfigData,
   ConfigService,
   ConfigManagerState,
+  BrandPriorityStrategy,
 } from "./config";
 
 export { CONFIG_STORAGE_KEY, CONFIG_VERSION } from "./config";

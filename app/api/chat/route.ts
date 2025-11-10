@@ -35,6 +35,7 @@ export async function POST(req: Request) {
     messages,
     sandboxId,
     preferredBrand,
+    brandPriorityStrategy,
     modelConfig,
     configData,
     systemPrompts,
@@ -121,6 +122,7 @@ export async function POST(req: Request) {
       {
         sandboxId,
         preferredBrand,
+        brandPriorityStrategy,
         modelConfig,
         configData,
         replyPrompts,
