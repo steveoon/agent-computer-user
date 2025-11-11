@@ -60,3 +60,4 @@ test-review-*.ts
 
 # VSCode Local History extension
 .history/
+data/

@@ -160,6 +160,9 @@ export const useSyncStore = create<SyncState>()(
             // 🔄 重新加载配置以确保所有组件获取最新数据
             await configStore.getState().loadConfig();
             console.log("✅ 配置已重新加载，所有组件将看到最新数据");
+
+            // 📤 将配置同步到服务器，供第三方 API 拉取
+            await syncConfigToServer();
           } catch (saveError) {
             console.warn("数据保存失败，但同步已完成:", saveError);
             // 即使保存失败，也不影响同步的成功状态
@@ -403,4 +406,39 @@ export async function mergeAndSaveSyncData(syncResults: SyncResult[]): Promise<v
     `   🔄 替换品牌: ${syncedBrandCount} 个 (${Array.from(syncedBrandNames).join(", ")})`
   );
   console.log(`   🆕 新增门店: ${newStoresCount} 个`);
+}
+
+/**
+ * 将最新配置同步到服务器，使 /api/v1/config/export 可获取
+ */
+async function syncConfigToServer() {
+  try {
+    const latestConfig = await configService.getConfig();
+    if (!latestConfig) {
+      return;
+    }
+
+    const payload = {
+      brandData: latestConfig.brandData,
+      replyPrompts: latestConfig.replyPrompts,
+      metadata: latestConfig.metadata,
+    };
+
+    const response = await fetch("/api/internal/config/sync", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || "配置数据同步到服务器失败");
+    }
+
+    console.log("✅ 配置数据已同步到服务器，第三方可通过 API 获取");
+  } catch (error) {
+    console.warn("⚠️ 配置数据同步到服务器失败（不影响本地同步）:", error);
+  }
 }
