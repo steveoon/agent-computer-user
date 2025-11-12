@@ -339,6 +339,9 @@ EXA_API_KEY=your_exa_search_key
 ### Admin Interfaces
 
 - Visit `/admin/settings` - Configuration management interface
+  - **Brand Management** tab: Create/delete brand mappings with visual interface
+  - Real-time search and filtering with debounced input
+  - Soft delete with confirmation dialog explaining impact
 - Visit `/admin/config` - Legacy configuration interface (redirects to settings)
 
 ### Configuration Data Flow
@@ -431,6 +434,27 @@ EXA_API_KEY=your_exa_search_key
 - **USE** proper HTTP status codes
 - **IMPLEMENT** proper error boundaries and try-catch blocks
 
+### Database Operations
+
+- **USE transactions** for multi-step operations to ensure atomicity (all succeed or all rollback)
+- **ADD type checks** in WHERE clauses (e.g., `dictionaryType = 'brand'`) to prevent cross-type operations
+- **RECORD audit logs** consistently: INSERT operations store only `newData`, UPDATE/DELETE store both `oldData` and `newData`
+- **PREFER soft deletes** with `isActive` flag over physical deletion to preserve history
+- **RETURN detailed errors** with `{ success: boolean; data?: T; error?: string }` pattern
+
+Example transaction pattern:
+```typescript
+await db.transaction(async tx => {
+  const [record] = await tx.select()...;
+  if (!record) return { success: false, error: "Not found" };
+
+  const [updated] = await tx.update()...;
+  await tx.insert(auditLog).values({ oldData: record, newData: updated });
+
+  return { success: true, data: updated };
+});
+```
+
 ### State Management
 
 - Zustand for client-side state (auth, desktop, model config)
@@ -496,15 +520,18 @@ EXA_API_KEY=your_exa_search_key
 5. **Authentication Flow**: Middleware → Supabase Auth → Session Cookie → Protected Routes
 6. **Sync Architecture**: External API → Server-side fetch → Client-side persistence via ConfigService
 7. **Docker Deployment**: Local build → GitHub Container Registry → VPS pull and run
+8. **Brand Management**: Database (`data_dictionary` table) → Server Actions → Zustand Store → Admin UI → Smart Extractor
 
 ## Integration Features
 
 ### Brand and Organization Management
 
-- Organization ID to brand name mapping in `lib/constants/organization-mapping.ts`
-- Supports dynamic brand synchronization from external APIs
-- Brand context available throughout the application via React Context
-- Multi-tenant support using React Context
+- **Database-backed**: Brand mappings stored in PostgreSQL `data_dictionary` table with audit logging
+- **Admin interface**: Visual brand CRUD at `/admin/settings` → Brand Management tab
+- **Server Actions**: `actions/brand-mapping.ts` provides type-safe database operations (create, query, delete)
+- **Soft delete pattern**: Deleted brands set `isActive = false`, preserving history and config data
+- **Smart Extractor integration**: Only active brands (`isActive = true`) are loaded into recognition dictionary
+- **Brand context**: Available throughout application via React Context for multi-tenant support
 
 ### Duliday Integration
 

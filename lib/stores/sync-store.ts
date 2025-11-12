@@ -8,7 +8,6 @@ import {
 } from "@/lib/services/duliday-sync.service";
 import { configService, getBrandData } from "@/lib/services/config.service";
 import { ZhipinData } from "@/types/zhipin";
-import { getAvailableBrands } from "@/lib/constants/organization-mapping";
 import { toast } from "sonner";
 import { configStore } from "@/hooks/useConfigManager";
 
@@ -22,8 +21,8 @@ interface SyncState {
   overallProgress: number;
   currentOrganization: number;
 
-  // 选中的品牌
-  selectedBrands: number[];
+  // 选中的品牌（使用 string 类型的组织ID）
+  selectedBrands: string[];
 
   // 同步历史
   syncHistory: SyncRecord[];
@@ -35,9 +34,9 @@ interface SyncState {
   error: string | null;
 
   // Actions
-  setSelectedBrands: (brands: number[]) => void;
-  toggleBrand: (brandId: number) => void;
-  selectAllBrands: () => void;
+  setSelectedBrands: (brands: string[]) => void;
+  toggleBrand: (brandId: string) => void;
+  selectAllBrands: (allBrandIds: string[]) => void;
   clearSelectedBrands: () => void;
 
   startSync: () => Promise<void>;
@@ -80,9 +79,8 @@ export const useSyncStore = create<SyncState>()(
         set({ selectedBrands: newSelectedBrands });
       },
 
-      selectAllBrands: () => {
-        const allBrands = getAvailableBrands().map(brand => brand.id);
-        set({ selectedBrands: allBrands });
+      selectAllBrands: allBrandIds => {
+        set({ selectedBrands: allBrandIds });
       },
 
       clearSelectedBrands: () => {

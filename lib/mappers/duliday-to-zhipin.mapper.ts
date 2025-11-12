@@ -11,17 +11,18 @@ import {
   TimeSlotAvailability,
   AttendanceRequirement,
 } from "@/types/zhipin";
-import { getBrandNameByOrgId, getDistrictByRegionId } from "@/lib/constants/organization-mapping";
+import { getBrandNameByOrgId } from "@/actions/brand-mapping";
+import { getDistrictByRegionId } from "@/lib/constants/organization-mapping";
 
 /**
  * 将 Duliday API 的列表响应转换为我们的本地数据格式
  */
-export function convertDulidayListToZhipinData(
+export async function convertDulidayListToZhipinData(
   dulidayResponse: DulidayRaw.ListResponse,
   organizationId: number
-): Partial<ZhipinData> {
+): Promise<Partial<ZhipinData>> {
   const stores = new Map<string, Store>();
-  const brandName = getBrandNameByOrgId(organizationId) || "未知品牌";
+  const brandName = (await getBrandNameByOrgId(organizationId)) || "未知品牌";
 
   // 遍历所有岗位数据，聚合成门店
   dulidayResponse.data.result.forEach(item => {

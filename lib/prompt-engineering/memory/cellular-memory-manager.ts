@@ -32,6 +32,7 @@ export class CellularMemoryManager {
   private workingMemory: Map<string, WorkingMemoryValue> = new Map();
   private longTermMemory: Map<string, LongTermFact> = new Map();
   private readonly TOKEN_BUDGET = MEMORY_CONSTANTS.DEFAULT_TOKEN_BUDGET;
+  private pendingExtractions: Promise<void>[] = []; // 追踪异步提取任务
 
   /**
    * 更新内存系统
@@ -56,50 +57,76 @@ export class CellularMemoryManager {
   }
 
   /**
-   * 提取重要信息到长期内存
+   * 提取重要信息到长期内存（异步执行，不阻塞主流程）
    */
   private extractToLongTerm(content: string): void {
     const timestamp = Date.now();
 
-    // 使用智能提取器提取所有信息
-    const extracted = SmartExtractor.extractAll(content);
+    // 使用智能提取器提取所有信息（异步执行，fire-and-forget）
+    const extractionPromise = SmartExtractor.extractAll(content).then(extracted => {
+      // 存储品牌信息
+      extracted.brands.forEach((brand, index) => {
+        this.longTermMemory.set(`brand_${timestamp}_${index}`, brand);
+      });
 
-    // 存储品牌信息
-    extracted.brands.forEach((brand, index) => {
-      this.longTermMemory.set(`brand_${timestamp}_${index}`, brand);
-    });
+      // 存储位置信息
+      extracted.locations.forEach((location, index) => {
+        this.longTermMemory.set(`location_${timestamp}_${index}`, location);
+      });
 
-    // 存储位置信息
-    extracted.locations.forEach((location, index) => {
-      this.longTermMemory.set(`location_${timestamp}_${index}`, location);
-    });
+      // 存储年龄信息
+      if (extracted.age !== null) {
+        this.longTermMemory.set(`age_${timestamp}`, extracted.age);
+      }
 
-    // 存储年龄信息
-    if (extracted.age !== null) {
-      this.longTermMemory.set(`age_${timestamp}`, extracted.age);
-    }
+      // 存储时间偏好
+      extracted.timePreferences.forEach((pref, index) => {
+        this.longTermMemory.set(`schedule_${timestamp}_${index}`, pref);
+      });
 
-    // 存储时间偏好
-    extracted.timePreferences.forEach((pref, index) => {
-      this.longTermMemory.set(`schedule_${timestamp}_${index}`, pref);
-    });
+      // 存储紧急度
+      if (extracted.urgency !== null) {
+        this.longTermMemory.set(`urgency_${timestamp}`, extracted.urgency);
+      }
 
-    // 存储紧急度
-    if (extracted.urgency !== null) {
-      this.longTermMemory.set(`urgency_${timestamp}`, extracted.urgency);
-    }
-
-    // 保留原有的正则提取作为备用（处理特殊格式）
-    const patterns = EXTRACTION_PATTERNS;
-    for (const [key, pattern] of Object.entries(patterns)) {
-      // 只处理智能提取器未覆盖的模式
-      if (!["brand", "location", "age", "schedule"].includes(key)) {
+      // 保留原有的正则提取作为备用（处理特殊格式）
+      const patterns = EXTRACTION_PATTERNS;
+      for (const [key, pattern] of Object.entries(patterns)) {
+        // 只处理智能提取器未覆盖的模式
+        if (!["brand", "location", "age", "schedule"].includes(key)) {
+          const matches = content.matchAll(pattern);
+          for (const match of matches) {
+            this.longTermMemory.set(`${key}_${timestamp}_regex`, match[1]);
+          }
+        }
+      }
+    }).catch(error => {
+      console.warn('提取长期记忆失败（非致命）:', error);
+      // 失败时使用正则表达式fallback
+      const patterns = EXTRACTION_PATTERNS;
+      for (const [key, pattern] of Object.entries(patterns)) {
         const matches = content.matchAll(pattern);
         for (const match of matches) {
           this.longTermMemory.set(`${key}_${timestamp}_regex`, match[1]);
         }
       }
-    }
+    }).finally(() => {
+      // 提取完成后从pending列表移除
+      const index = this.pendingExtractions.indexOf(extractionPromise);
+      if (index > -1) {
+        this.pendingExtractions.splice(index, 1);
+      }
+    });
+
+    // 记录pending promise
+    this.pendingExtractions.push(extractionPromise);
+  }
+
+  /**
+   * 等待所有异步提取完成（主要用于测试）
+   */
+  async waitForExtractions(): Promise<void> {
+    await Promise.all(this.pendingExtractions);
   }
 
   /**

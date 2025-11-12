@@ -60,3 +60,9 @@ test-review-*.ts
 
 # VSCode Local History extension
 .history/
+
+# backup files
+*.bak
+*.backup
+*.swp
+*~

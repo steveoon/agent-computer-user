@@ -3,9 +3,14 @@
  * 调试位置提取逻辑
  */
 
-import { describe, it, expect } from "vitest";
-import { SmartExtractor, LOCATION_DICTIONARY, BRAND_DICTIONARY } from "../memory/smart-patterns";
+import { describe, it, expect, beforeEach } from "vitest";
+import { SmartExtractor, LOCATION_DICTIONARY } from "../memory/smart-patterns";
 import { SHANGHAI_REGION_MAPPING } from "@/lib/constants/organization-mapping";
+import {
+  BrandDictionaryCache,
+  clearBrandDictionaryCache,
+  isCacheValid,
+} from "../memory/brand-dictionary-cache";
 
 describe("SmartExtractor - 调试位置提取", () => {
   describe("LOCATION_DICTIONARY 构建验证", () => {
@@ -157,45 +162,45 @@ describe("SmartExtractor - 调试位置提取", () => {
   });
 
   describe("品牌提取验证", () => {
-    it("应该验证BRAND_DICTIONARY基于ORGANIZATION_MAPPING构建", () => {
-      console.log("\n=== BRAND_DICTIONARY验证 ===");
-      console.log("品牌字典:", Object.keys(BRAND_DICTIONARY));
+    it("应该验证实际业务品牌能被正确识别", async () => {
+      console.log("\n=== 品牌识别验证 ===");
 
-      // 验证实际业务品牌都被包含
-      const actualBrands = [
-        "肯德基",
-        "成都你六姐",
-        "大米先生",
-        "天津肯德基",
-        "上海必胜客",
-        "奥乐齐",
+      // 验证实际业务品牌都能被识别
+      const testCases = [
+        { text: "肯德基有岗位吗", expected: "肯德基" },
+        { text: "成都你六姐招人吗", expected: "成都你六姐" },
+        { text: "大米先生的待遇", expected: "大米先生" },
+        { text: "天津肯德基怎么样", expected: "天津肯德基" },
+        { text: "上海必胜客有空缺", expected: "上海必胜客" },
+        { text: "奥乐齐门店在哪", expected: "奥乐齐" },
       ];
 
-      actualBrands.forEach(brand => {
-        expect(BRAND_DICTIONARY).toHaveProperty(brand);
-        console.log(`✓ 包含品牌: ${brand}, 别名: ${BRAND_DICTIONARY[brand]}`);
-      });
+      for (const { text, expected } of testCases) {
+        const extracted = await SmartExtractor.extractBrands(text);
+        console.log(`✓ 文本: "${text}" -> 识别到: ${extracted.join(", ")}`);
+        expect(extracted).toContain(expected);
+      }
     });
 
-    it("应该正确提取品牌", () => {
+    it("应该正确提取品牌", async () => {
       const testCases = [
         { text: "肯德基有岗位吗", expected: ["肯德基"] },
         { text: "KFC怎么样", expected: ["肯德基"] },
         { text: "我想去麦当劳或星巴克", expected: ["麦当劳", "星巴克"] },
       ];
 
-      testCases.forEach(({ text, expected }) => {
+      for (const { text, expected } of testCases) {
         console.log(`\n测试品牌提取: "${text}"`);
-        const extracted = SmartExtractor.extractBrands(text);
+        const extracted = await SmartExtractor.extractBrands(text);
         console.log("提取结果:", extracted);
 
         expected.forEach(brand => {
           expect(extracted).toContain(brand);
         });
-      });
+      }
     });
 
-    it("应该优先精确匹配区域品牌（避免子串误匹配）", () => {
+    it("应该优先精确匹配区域品牌（避免子串误匹配）", async () => {
       const testCases = [
         {
           text: "大连肯德基有岗位吗",
@@ -223,10 +228,10 @@ describe("SmartExtractor - 调试位置提取", () => {
         },
       ];
 
-      testCases.forEach(({ text, expected, notExpected, reason }) => {
+      for (const { text, expected, notExpected, reason } of testCases) {
         console.log(`\n测试: "${text}"`);
         console.log(`原因: ${reason}`);
-        const extracted = SmartExtractor.extractBrands(text);
+        const extracted = await SmartExtractor.extractBrands(text);
         console.log("提取结果:", extracted);
 
         // 验证应该包含的品牌
@@ -238,10 +243,10 @@ describe("SmartExtractor - 调试位置提取", () => {
         notExpected.forEach(brand => {
           expect(extracted).not.toContain(brand);
         });
-      });
+      }
     });
 
-    it("应该正确处理区域品牌的变体", () => {
+    it("应该正确处理区域品牌的变体", async () => {
       const testCases = [
         {
           text: "大连KFC有岗位吗",
@@ -263,10 +268,10 @@ describe("SmartExtractor - 调试位置提取", () => {
         },
       ];
 
-      testCases.forEach(({ text, expected, notExpected, reason }) => {
+      for (const { text, expected, notExpected, reason } of testCases) {
         console.log(`\n测试: "${text}"`);
         console.log(`原因: ${reason}`);
-        const extracted = SmartExtractor.extractBrands(text);
+        const extracted = await SmartExtractor.extractBrands(text);
         console.log("提取结果:", extracted);
 
         expected.forEach(brand => {
@@ -276,10 +281,10 @@ describe("SmartExtractor - 调试位置提取", () => {
         notExpected.forEach(brand => {
           expect(extracted).not.toContain(brand);
         });
-      });
+      }
     });
 
-    it("应该处理多个独立区域品牌同时提及的情况", () => {
+    it("应该处理多个独立区域品牌同时提及的情况", async () => {
       const testCases = [
         {
           text: "大连肯德基和天津肯德基有什么区别",
@@ -298,10 +303,10 @@ describe("SmartExtractor - 调试位置提取", () => {
         },
       ];
 
-      testCases.forEach(({ text, expected, reason }) => {
+      for (const { text, expected, reason } of testCases) {
         console.log(`\n测试: "${text}"`);
         console.log(`原因: ${reason}`);
-        const extracted = SmartExtractor.extractBrands(text);
+        const extracted = await SmartExtractor.extractBrands(text);
         console.log("提取结果:", extracted);
 
         expected.forEach(brand => {
@@ -309,10 +314,10 @@ describe("SmartExtractor - 调试位置提取", () => {
         });
 
         expect(extracted.length).toBe(expected.length);
-      });
+      }
     });
 
-    it("子串品牌匹配行为说明（设计权衡）", () => {
+    it("子串品牌匹配行为说明（设计权衡）", async () => {
       // 注意：当文本包含 "大连肯德基" 时，由于 "肯德基" 是 "大连肯德基" 的子串，
       // 为了避免误匹配，系统会优先匹配更长的品牌名，并过滤掉子串品牌。
       // 这是一个设计权衡：优先保证常见场景的准确性。
@@ -326,10 +331,10 @@ describe("SmartExtractor - 调试位置提取", () => {
         },
       ];
 
-      testCases.forEach(({ text, expected, notExpected, reason }) => {
+      for (const { text, expected, notExpected, reason } of testCases) {
         console.log(`\n测试: "${text}"`);
         console.log(`原因: ${reason}`);
-        const extracted = SmartExtractor.extractBrands(text);
+        const extracted = await SmartExtractor.extractBrands(text);
         console.log("提取结果:", extracted);
         console.log("设计说明: 这是为了避免 '大连肯德基有岗位吗' 误匹配到 '肯德基'");
 
@@ -340,10 +345,10 @@ describe("SmartExtractor - 调试位置提取", () => {
         notExpected.forEach(brand => {
           expect(extracted).not.toContain(brand);
         });
-      });
+      }
     });
 
-    it("应该正确处理真别名（不完整/非正式名称）", () => {
+    it("应该正确处理真别名（不完整/非正式名称）", async () => {
       const testCases = [
         {
           text: "你六姐有岗位吗",
@@ -362,16 +367,167 @@ describe("SmartExtractor - 调试位置提取", () => {
         },
       ];
 
-      testCases.forEach(({ text, expected, reason }) => {
+      for (const { text, expected, reason } of testCases) {
         console.log(`\n测试: "${text}"`);
         console.log(`原因: ${reason}`);
-        const extracted = SmartExtractor.extractBrands(text);
+        const extracted = await SmartExtractor.extractBrands(text);
         console.log("提取结果:", extracted);
 
         expected.forEach(brand => {
           expect(extracted).toContain(brand);
         });
+      }
+    });
+  });
+
+  describe("品牌字典缓存机制测试", () => {
+    // 每个测试前清空缓存
+    beforeEach(() => {
+      clearBrandDictionaryCache();
+    });
+
+    it("应该在首次调用时构建缓存", async () => {
+      console.log("\n=== 测试首次构建缓存 ===");
+
+      // 验证缓存初始状态为空
+      expect(BrandDictionaryCache.brandDictionary).toBeNull();
+      expect(BrandDictionaryCache.timestamp).toBeNull();
+
+      // 首次调用
+      const brands = await SmartExtractor.extractBrands("肯德基有岗位吗");
+      console.log("首次提取结果:", brands);
+
+      // 验证缓存已构建
+      expect(BrandDictionaryCache.brandDictionary).not.toBeNull();
+      expect(BrandDictionaryCache.timestamp).not.toBeNull();
+      expect(brands).toContain("肯德基");
+    });
+
+    it("应该在后续调用时使用缓存", async () => {
+      console.log("\n=== 测试缓存命中 ===");
+
+      // 首次调用构建缓存
+      await SmartExtractor.extractBrands("肯德基有岗位吗");
+      const firstTimestamp = BrandDictionaryCache.timestamp;
+
+      // 等待 10ms 确保时间戳会不同（如果重新构建）
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // 第二次调用应该使用缓存
+      await SmartExtractor.extractBrands("必胜客招聘吗");
+      const secondTimestamp = BrandDictionaryCache.timestamp;
+
+      // 时间戳应该相同，说明使用了缓存
+      expect(secondTimestamp).toBe(firstTimestamp);
+      console.log("✓ 缓存命中，时间戳未变化");
+    });
+
+    it("应该在手动清空后重新构建缓存", async () => {
+      console.log("\n=== 测试手动清空缓存 ===");
+
+      // 首次调用构建缓存
+      await SmartExtractor.extractBrands("肯德基有岗位吗");
+      const firstTimestamp = BrandDictionaryCache.timestamp;
+      expect(firstTimestamp).not.toBeNull();
+
+      // 手动清空缓存
+      clearBrandDictionaryCache();
+      expect(BrandDictionaryCache.brandDictionary).toBeNull();
+      expect(BrandDictionaryCache.timestamp).toBeNull();
+      console.log("✓ 缓存已清空");
+
+      // 等待 10ms
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // 再次调用应该重新构建
+      await SmartExtractor.extractBrands("必胜客招聘吗");
+      const secondTimestamp = BrandDictionaryCache.timestamp;
+
+      // 时间戳应该不同，说明重新构建了
+      expect(secondTimestamp).not.toBe(firstTimestamp);
+      expect(secondTimestamp).not.toBeNull();
+      console.log("✓ 缓存已重新构建，时间戳更新");
+    });
+
+    it("应该验证 isCacheValid() 函数的正确性", async () => {
+      console.log("\n=== 测试缓存有效性检查 ===");
+
+      // 缓存为空时应该返回 false
+      expect(isCacheValid()).toBe(false);
+      console.log("✓ 空缓存: isCacheValid() = false");
+
+      // 构建缓存
+      await SmartExtractor.extractBrands("肯德基有岗位吗");
+
+      // 刚构建的缓存应该有效
+      expect(isCacheValid()).toBe(true);
+      console.log("✓ 新缓存: isCacheValid() = true");
+
+      // 手动设置过期时间戳（超过 TTL）
+      const expiredTime = Date.now() - (BrandDictionaryCache.ttl + 1000);
+      BrandDictionaryCache.timestamp = expiredTime;
+
+      // 过期的缓存应该无效
+      expect(isCacheValid()).toBe(false);
+      console.log("✓ 过期缓存: isCacheValid() = false");
+    });
+
+    it("应该在缓存过期后重新构建", async () => {
+      console.log("\n=== 测试 TTL 过期机制 ===");
+
+      // 首次调用构建缓存
+      await SmartExtractor.extractBrands("肯德基有岗位吗");
+      const firstDictionary = BrandDictionaryCache.brandDictionary;
+
+      // 手动设置过期时间戳
+      const expiredTime = Date.now() - (BrandDictionaryCache.ttl + 1000);
+      BrandDictionaryCache.timestamp = expiredTime;
+      console.log("✓ 已将缓存时间戳设置为过期");
+
+      // 再次调用应该触发重建
+      await SmartExtractor.extractBrands("必胜客招聘吗");
+      const secondDictionary = BrandDictionaryCache.brandDictionary;
+
+      // 字典对象应该不同（重新构建了）
+      expect(secondDictionary).not.toBe(firstDictionary);
+      expect(BrandDictionaryCache.timestamp).toBeGreaterThan(expiredTime);
+      console.log("✓ 缓存已重新构建");
+    });
+
+    it("应该验证缓存的 TTL 默认值为 5 分钟", () => {
+      console.log("\n=== 验证 TTL 配置 ===");
+
+      const expectedTTL = 5 * 60 * 1000; // 5 分钟
+      expect(BrandDictionaryCache.ttl).toBe(expectedTTL);
+      console.log(`✓ TTL = ${BrandDictionaryCache.ttl}ms (5 分钟)`);
+    });
+
+    it("应该测试缓存在多次调用中的一致性", async () => {
+      console.log("\n=== 测试缓存一致性 ===");
+
+      // 多次调用，验证结果一致
+      const results: string[][] = [];
+      for (let i = 0; i < 5; i++) {
+        const brands = await SmartExtractor.extractBrands("肯德基和必胜客");
+        results.push(brands);
+      }
+
+      // 所有结果应该相同
+      results.forEach((result, index) => {
+        expect(result).toEqual(results[0]);
+        console.log(`✓ 第 ${index + 1} 次调用结果一致`);
       });
+
+      // 验证时间戳没有变化（说明使用了缓存）
+      const timestamps: (number | null)[] = [];
+      for (let i = 0; i < 5; i++) {
+        await SmartExtractor.extractBrands("海底捞招聘");
+        timestamps.push(BrandDictionaryCache.timestamp);
+      }
+
+      const allSame = timestamps.every(ts => ts === timestamps[0]);
+      expect(allSame).toBe(true);
+      console.log("✓ 所有调用使用同一缓存（时间戳相同）");
     });
   });
 });

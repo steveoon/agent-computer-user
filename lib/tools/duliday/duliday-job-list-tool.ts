@@ -1,6 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { getOrgIdByBrandName, getAvailableBrands } from "@/lib/constants/organization-mapping";
+import { getOrgIdByBrandName, getAvailableBrands } from "@/actions/brand-mapping";
 import { jobListResponseSchema, type JobItem } from "./types";
 
 /**
@@ -72,13 +72,22 @@ export const dulidayJobListTool = (customToken?: string, defaultBrand?: string) 
         }
 
         // 根据品牌名称获取组织ID
-        const organizationId = getOrgIdByBrandName(targetBrand);
-        if (!organizationId) {
-          const availableBrands = getAvailableBrands();
+        const organizationIdStr = await getOrgIdByBrandName(targetBrand);
+        if (!organizationIdStr) {
+          const availableBrands = await getAvailableBrands();
           const brandList = availableBrands.map(b => b.name).join("、");
           return {
             type: "text" as const,
             text: `❌ 未找到品牌"${targetBrand}"的组织ID映射\n\n目前支持的品牌有：${brandList}\n\n请使用正确的品牌名称重试。`,
+          };
+        }
+
+        // 转换为数字类型（Duliday API 需要数字类型的 organizationId）
+        const organizationId = parseInt(organizationIdStr, 10);
+        if (isNaN(organizationId)) {
+          return {
+            type: "text" as const,
+            text: `❌ 组织ID格式错误: "${organizationIdStr}"`,
           };
         }
 

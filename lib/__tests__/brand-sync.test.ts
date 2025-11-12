@@ -1,9 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mergeAndSaveSyncData } from "../stores/sync-store";
 import { configService } from "../services/config.service";
-import { ORGANIZATION_MAPPING } from "../constants/organization-mapping";
 import type { ZhipinData, Store } from "@/types";
 import type { SyncResult } from "../services/duliday-sync.service";
+
+// Mock 品牌映射数据（用于测试）
+const MOCK_BRAND_MAPPING = {
+  "肯德基": true,
+  "成都你六姐": true,
+  "大米先生": true,
+  "天津肯德基": true,
+  "上海必胜客": true,
+  "奥乐齐": true,
+  "大连肯德基": true,
+  "海底捞": true,
+  "必胜客": true,
+};
 
 // Mock dependencies
 vi.mock("../services/config.service", () => ({
@@ -425,8 +437,8 @@ describe("品牌同步和导入功能测试", () => {
   });
 
   describe("数据验证", () => {
-    it("同步时应该验证品牌名称是否在 ORGANIZATION_MAPPING 中", () => {
-      const mappedBrands = Object.values(ORGANIZATION_MAPPING);
+    it("同步时应该验证品牌名称是否在品牌映射中", () => {
+      const mappedBrands = Object.keys(MOCK_BRAND_MAPPING);
 
       // 验证所有映射的品牌（原有品牌）
       expect(mappedBrands).toContain("肯德基");
@@ -436,7 +448,7 @@ describe("品牌同步和导入功能测试", () => {
       expect(mappedBrands).toContain("上海必胜客");
       expect(mappedBrands).toContain("奥乐齐");
 
-      // 验证新增品牌 (2025-01-24)
+      // 验证新增品牌
       expect(mappedBrands).toContain("大连肯德基");
       expect(mappedBrands).toContain("海底捞");
 
