@@ -75,6 +75,23 @@ check_dependencies() {
     done
 }
 
+# 初始化配置文件
+init_config() {
+    # 如果 agents.json 不存在，从示例文件复制
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        local example_file="$PROJECT_ROOT/configs/agents.example.json"
+        if [[ -f "$example_file" ]]; then
+            log_info "配置文件不存在，从示例文件创建: $CONFIG_FILE"
+            cp "$example_file" "$CONFIG_FILE"
+            log_success "配置文件已创建，请根据需要修改"
+        else
+            log_error "配置文件和示例文件都不存在"
+            log_info "请创建 $CONFIG_FILE 或 $example_file"
+            exit 1
+        fi
+    fi
+}
+
 # 初始化目录
 init_dirs() {
     mkdir -p "$LOGS_DIR" "$PIDS_DIR"
@@ -588,6 +605,9 @@ EOF
 main() {
     # 检查依赖
     check_dependencies
+
+    # 初始化配置文件
+    init_config
 
     # 初始化目录
     init_dirs

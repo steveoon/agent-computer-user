@@ -66,3 +66,7 @@ test-review-*.ts
 *.backup
 *.swp
 *~
+
+# multi-agent runtime files
+configs/agents.json
+pids/

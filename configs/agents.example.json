@@ -17,24 +17,6 @@
       ],
       "env": {},
       "createdAt": "2025-10-28T05:48:17Z"
-    },
-    {
-      "id": "yupao-1",
-      "type": "yupao",
-      "name": "鱼泡网代理 1",
-      "description": "用于操作鱼泡网平台的自动化Agent - 实例 1",
-      "appPort": 3001,
-      "chromePort": 9223,
-      "userDataDir": "/tmp/chrome-agent-profiles/yupao-1",
-      "chromeArgs": [
-        "--remote-debugging-port={{chromePort}}",
-        "--no-first-run",
-        "--no-default-browser-check",
-        "--disable-default-apps",
-        "--user-data-dir={{userDataDir}}"
-      ],
-      "env": {},
-      "createdAt": "2025-10-28T05:55:25Z"
     }
   ],
   "settings": {
