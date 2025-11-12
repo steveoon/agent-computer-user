@@ -21,47 +21,59 @@ if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 }
 
-// 检查是否在非生产环境（测试、build 等）
-const isTestEnvironment = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
-const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build';
+/**
+ * 数据库实例缓存
+ * 使用懒初始化模式，避免模块加载时的副作用
+ */
+let dbInstance: ReturnType<typeof drizzle> | null = null;
 
-// 创建数据库连接或 mock
-let db: ReturnType<typeof drizzle>;
+/**
+ * 获取数据库实例（懒初始化）
+ *
+ * 优点：
+ * - 避免模块加载期的副作用（不会在 Next.js build 阶段创建连接）
+ * - 清晰的错误信息（缺少 DATABASE_URL 时明确报错）
+ * - 单例模式（多次调用返回同一实例）
+ *
+ * @throws {Error} 如果 DATABASE_URL 未设置
+ * @returns Drizzle ORM 数据库实例
+ */
+export function getDb(): ReturnType<typeof drizzle> {
+  // 如果已有实例，直接返回
+  if (dbInstance) {
+    return dbInstance;
+  }
 
-if (process.env.DATABASE_URL) {
-  // Create PostgreSQL connection
+  // 检查是否在测试环境
+  const isTestEnvironment = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+
+  if (isTestEnvironment) {
+    // 测试环境：返回空对象，实际操作应该被 mock
+    console.warn(
+      "[Database] Running in test environment. Database operations should be mocked."
+    );
+    dbInstance = {} as ReturnType<typeof drizzle>;
+    return dbInstance;
+  }
+
+  // 生产/开发环境：必须提供 DATABASE_URL
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "[Database] DATABASE_URL environment variable is required for database operations. " +
+      "Please set DATABASE_URL in your environment variables (.env.local or production environment)."
+    );
+  }
+
+  // 创建 PostgreSQL 连接
   // Supabase Transaction pooling requires prepare: false
   const client = postgres(process.env.DATABASE_URL, {
     prepare: false, // Required for Supabase transaction pooling
   });
 
-  // Create Drizzle instance with schema
-  db = drizzle({ client, schema });
-} else {
-  // 在以下情况创建 mock 数据库，避免模块加载失败：
-  // 1. 测试环境（Vitest 或 NODE_ENV=test）
-  // 2. Next.js build 阶段（收集页面数据时可能导入 db）
-  // 3. 其他开发场景
-  //
-  // 实际的数据库操作在运行时如果没有真实连接会报错
-  if (isTestEnvironment) {
-    console.warn(
-      "[Database] DATABASE_URL not set in test environment. Database operations will be mocked."
-    );
-  } else if (isBuildTime) {
-    console.warn(
-      "[Database] DATABASE_URL not set during Next.js build. Using mock database for module resolution."
-    );
-  } else {
-    console.warn(
-      "[Database] DATABASE_URL not set. Database operations will fail at runtime."
-    );
-  }
-
-  // 导出一个 mock 的 db 对象，防止导入时报错
-  // 实际的数据库操作在测试中应该被 mock，在生产环境中应该配置 DATABASE_URL
-  db = {} as ReturnType<typeof drizzle>;
+  // 创建 Drizzle 实例并缓存
+  dbInstance = drizzle({ client, schema });
+  return dbInstance;
 }
 
-// Export database and schema
-export { db, schema };
+// Export schema
+export { schema };

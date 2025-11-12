@@ -11,7 +11,7 @@
  * 此文件保留仅用于参考历史迁移逻辑
  */
 
-import { db } from '../db';
+import { getDb } from '../db';
 import { dataDictionary, dictionaryChangeLog } from '../db/schema';
 import { getDictionaryType } from '../db/types';
 import { eq, and } from 'drizzle-orm';
@@ -52,7 +52,7 @@ async function initBrandData(): Promise<MigrationResult> {
 
   try {
     // 使用事务：要么全部成功，要么全部回滚
-    await db.transaction(async (tx) => {
+    await getDb().transaction(async (tx) => {
       console.log('📝 处理中...\n');
 
       for (const entry of entries) {

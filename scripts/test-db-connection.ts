@@ -1,10 +1,10 @@
-import { db } from '../db';
+import { getDb } from '../db';
 import { sql } from 'drizzle-orm';
 
 async function testConnection() {
   try {
     console.log('Testing database connection...');
-    const result = await db.execute(sql`SELECT NOW() as current_time`);
+    const result = await getDb().execute(sql`SELECT NOW() as current_time`);
     console.log('✅ Database connected successfully!');
     if (result && result.length > 0) {
       console.log('Server time:', result[0]);

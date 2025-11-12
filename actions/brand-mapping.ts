@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { dataDictionary, dictionaryChangeLog } from "@/db/schema";
 import { eq, and, or, like, desc, asc, count, inArray } from "drizzle-orm";
 import { getDictionaryType } from "@/db/types";
@@ -19,7 +19,7 @@ import { isUniqueViolation, getFriendlyErrorMessage } from "@/db/errors";
  */
 export async function getAllBrandMappings(): Promise<Record<string, string>> {
   try {
-    const brands = await db
+    const brands = await getDb()
       .select({
         mappingKey: dataDictionary.mappingKey,
         mappingValue: dataDictionary.mappingValue,
@@ -55,7 +55,7 @@ export async function getBrandNameByOrgId(orgId: number | string): Promise<strin
   try {
     const key = typeof orgId === "number" ? String(orgId) : orgId;
 
-    const result = await db
+    const result = await getDb()
       .select({
         mappingValue: dataDictionary.mappingValue,
       })
@@ -83,7 +83,7 @@ export async function getBrandNameByOrgId(orgId: number | string): Promise<strin
  */
 export async function getOrgIdByBrandName(brandName: string): Promise<string | undefined> {
   try {
-    const result = await db
+    const result = await getDb()
       .select({
         mappingKey: dataDictionary.mappingKey,
       })
@@ -110,7 +110,7 @@ export async function getOrgIdByBrandName(brandName: string): Promise<string | u
  */
 export async function getAvailableBrands(): Promise<Array<{ id: string; name: string }>> {
   try {
-    const brands = await db
+    const brands = await getDb()
       .select({
         mappingKey: dataDictionary.mappingKey,
         mappingValue: dataDictionary.mappingValue,
@@ -159,7 +159,7 @@ export async function getBrandNamesByOrgIds(
 
     const keys = orgIds.map(id => (typeof id === "number" ? String(id) : id));
 
-    const brands = await db
+    const brands = await getDb()
       .select({
         mappingKey: dataDictionary.mappingKey,
         mappingValue: dataDictionary.mappingValue,
@@ -197,7 +197,7 @@ export async function createBrand(
 ): Promise<{ success: boolean; data?: unknown; error?: string }> {
   try {
     // 1. 检查组织ID是否已存在（仅检查启用的）
-    const existing = await db
+    const existing = await getDb()
       .select()
       .from(dataDictionary)
       .where(
@@ -217,7 +217,7 @@ export async function createBrand(
     }
 
     // 2. 插入新品牌
-    const [newBrand] = await db
+    const [newBrand] = await getDb()
       .insert(dataDictionary)
       .values({
         dictionaryType: getDictionaryType("BRAND"),
@@ -234,7 +234,7 @@ export async function createBrand(
       .returning();
 
     // 3. 记录变更日志
-    await db.insert(dictionaryChangeLog).values({
+    await getDb().insert(dictionaryChangeLog).values({
       dictionaryId: newBrand.id,
       operation: "INSERT",
       newData: newBrand,
@@ -317,7 +317,7 @@ export async function getBrands(params?: {
     }
 
     // 查询总数
-    const [totalResult] = await db
+    const [totalResult] = await getDb()
       .select({ count: count() })
       .from(dataDictionary)
       .where(and(...conditions));
@@ -333,7 +333,7 @@ export async function getBrands(params?: {
           : dataDictionary.displayOrder;
 
     // 查询数据
-    const rows = await db
+    const rows = await getDb()
       .select()
       .from(dataDictionary)
       .where(and(...conditions))
@@ -373,7 +373,7 @@ export async function deleteBrand(
   operatedBy: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
-    const result = await db.transaction(async tx => {
+    const result = await getDb().transaction(async tx => {
       // 1) 获取并校验为品牌类型的原始数据
       const [oldBrand] = await tx
         .select()
@@ -452,7 +452,7 @@ export async function restoreBrand(
   operatedBy: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
-    const result = await db.transaction(async tx => {
+    const result = await getDb().transaction(async tx => {
       // 1) 获取并校验为品牌类型的原始数据
       const [oldBrand] = await tx
         .select()
