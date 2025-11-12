@@ -31,6 +31,8 @@ const eslintConfig = [
       "playwright-tests/**",
       "docs/**",
       "*.md",
+      // Drizzle 自动生成的迁移文件
+      "drizzle/**",
     ],
   },
   // 然后应用规则到其他文件

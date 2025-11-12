@@ -5,7 +5,7 @@ import {
   formatDulidayError,
   formatHttpError,
 } from "@/lib/utils/duliday-error-formatter";
-import { getBrandNameByOrgId } from "@/lib/constants/organization-mapping";
+import { getBrandNameByOrgId } from "@/actions/brand-mapping";
 import { z } from "zod";
 // 注意：服务器端不使用 configService，数据保存逻辑在客户端处理
 
@@ -236,7 +236,7 @@ export class DulidaySyncService {
           },
         };
 
-        zhipinData = convertDulidayListToZhipinData(validListResponse, organizationId);
+        zhipinData = await convertDulidayListToZhipinData(validListResponse, organizationId);
 
         storeCount = zhipinData.stores?.length || 0;
       }
@@ -244,7 +244,7 @@ export class DulidaySyncService {
       onProgress?.(100, `数据转换完成！`);
 
       const duration = Date.now() - startTime;
-      const brandName = getBrandNameByOrgId(organizationId) || "未知品牌";
+      const brandName = (await getBrandNameByOrgId(organizationId)) || "未知品牌";
 
       // 判断是否成功：有任何有效数据就算部分成功
       const isSuccess = partialResponse.validPositions.length > 0;
@@ -260,7 +260,7 @@ export class DulidaySyncService {
         convertedData: zhipinData, // 返回转换后的数据，但不保存
       };
     } catch (error) {
-      const brandName = getBrandNameByOrgId(organizationId);
+      const brandName = await getBrandNameByOrgId(organizationId);
       const errorMessage = formatDulidayError(error);
       const contextualError = DulidayErrorFormatter.formatWithOrganizationContext(
         organizationId,
@@ -311,7 +311,7 @@ export class DulidaySyncService {
 
         results.push(result);
       } catch (error) {
-        const brandName = getBrandNameByOrgId(orgId);
+        const brandName = await getBrandNameByOrgId(orgId);
         const errorMessage = formatDulidayError(error);
         const contextualError = DulidayErrorFormatter.formatWithOrganizationContext(
           orgId,

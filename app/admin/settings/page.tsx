@@ -9,6 +9,7 @@ import { BrandDataEditor } from "@/components/admin/brand-data-editor";
 import { PromptsEditor } from "@/components/admin/prompts-editor";
 import { SystemPromptsEditor } from "@/components/admin/system-prompts-editor";
 import { GeneralConfigManager } from "@/components/admin/general-config-manager";
+import { BrandTable } from "@/components/admin/brand-management";
 import { useConfigManager } from "@/hooks/useConfigManager";
 import { useRouter } from "next/navigation";
 
@@ -302,7 +303,18 @@ export default function AdminSettingsPage() {
 
         {/* 品牌数据编辑 */}
         <TabsContent value="brands">
-          <BrandDataEditor data={config?.brandData} onSave={updateBrandData} />
+          <Tabs defaultValue="config" className="space-y-6">
+            <TabsList>
+              <TabsTrigger value="config">品牌配置</TabsTrigger>
+              <TabsTrigger value="management">品牌管理</TabsTrigger>
+            </TabsList>
+            <TabsContent value="config">
+              <BrandDataEditor data={config?.brandData} onSave={updateBrandData} />
+            </TabsContent>
+            <TabsContent value="management">
+              <BrandTable />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         {/* 系统提示词编辑 */}

@@ -6,7 +6,7 @@ import { z } from "zod";
  * 同步请求体 Schema
  */
 const SyncRequestSchema = z.object({
-  organizationIds: z.array(z.number()).min(1, "至少需要选择一个组织ID"),
+  organizationIds: z.array(z.union([z.number(), z.string()])).min(1, "至少需要选择一个组织ID"),
   pageSize: z.number().optional().default(100),
   validateOnly: z.boolean().optional().default(false),
   token: z.string().optional(), // 支持从客户端传递token
@@ -75,11 +75,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 将 organizationIds 转换为数字（Duliday API 需要 number[]）
+    const numericOrgIds = organizationIds.map(id => {
+      const parsed = typeof id === 'string' ? parseInt(id, 10) : id;
+      if (isNaN(parsed)) {
+        throw new Error(`无效的组织ID: ${id}`);
+      }
+      return parsed;
+    });
+
     // 执行数据同步
-    console.log(`[SYNC API] 开始同步组织: ${organizationIds.join(", ")}`);
+    console.log(`[SYNC API] 开始同步组织: ${numericOrgIds.join(", ")}`);
 
     const syncRecord = await syncService.syncMultipleOrganizations(
-      organizationIds,
+      numericOrgIds,
       (progress, currentOrg, message) => {
         console.log(`[SYNC API] 进度: ${progress}% - 组织 ${currentOrg}: ${message}`);
       }
