@@ -25,9 +25,15 @@ export function BrandSelector({ showHistory = false }: { showHistory?: boolean }
   // 📊 加载品牌历史记录
   useEffect(() => {
     if (showHistory && isLoaded) {
-      getBrandHistory().then(setBrandHistory).catch(console.warn);
+      getBrandHistory()
+        .then(history => {
+          // ✅ 过滤掉已删除的品牌，只显示当前可用的历史品牌
+          const validHistory = history.filter(brand => availableBrands.includes(brand));
+          setBrandHistory(validHistory);
+        })
+        .catch(console.warn);
     }
-  }, [showHistory, isLoaded]);
+  }, [showHistory, isLoaded, availableBrands]);
 
   return (
     <div className="flex items-center gap-2">

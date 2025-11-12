@@ -4,7 +4,6 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import { useConfigManager } from "@/hooks/useConfigManager";
 import { saveBrandPreference, loadBrandPreference } from "../utils/brand-storage";
 import type { ZhipinData } from "@/types";
-import { getAvailableBrands as getAvailableBrandsFromMapping } from "@/lib/constants/organization-mapping";
 
 // 🔧 品牌上下文类型定义
 interface BrandContextType {
@@ -73,6 +72,9 @@ export function BrandProvider({ children }: BrandProviderProps) {
     loadSavedBrand();
   }, [isConfigLoaded, brandData]);
 
+  // 📋 获取可用品牌列表（仅来自已导入的配置数据）
+  const availableBrands = brandData ? Object.keys(brandData.brands).sort() : [];
+
   // 💾 品牌切换时保存到本地存储
   const handleSetCurrentBrand = async (brand: string) => {
     // 验证品牌是否存在
@@ -83,19 +85,12 @@ export function BrandProvider({ children }: BrandProviderProps) {
 
     setCurrentBrand(brand);
     try {
-      await saveBrandPreference(brand);
+      await saveBrandPreference(brand, availableBrands);
       console.log("✅ 品牌上下文：品牌选择已保存:", brand);
     } catch (error) {
       console.warn("品牌上下文：保存品牌选择失败:", error);
     }
   };
-
-  // 合并两个来源的品牌：ORGANIZATION_MAPPING 中的映射品牌 + 实际数据中的额外品牌
-  const mappedBrands = getAvailableBrandsFromMapping().map(brand => brand.name);
-  const dataBrands = brandData ? Object.keys(brandData.brands) : [];
-
-  // 使用 Set 去重，确保所有品牌都能显示（映射的 + 导入的额外品牌）
-  const availableBrands = Array.from(new Set([...mappedBrands, ...dataBrands])).sort();
 
   const value: BrandContextType = {
     currentBrand,
