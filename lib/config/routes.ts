@@ -14,6 +14,7 @@ export const PROTECTED_ROUTES = [
   "/api/test-llm-reply",
   "/api/desktop-url", // E2B Desktop URL 获取
   "/admin",
+  "/api/internal/config/sync",
 ] as const;
 
 /**

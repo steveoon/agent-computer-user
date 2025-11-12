@@ -6,6 +6,8 @@ const MetadataSchema = z.object({
   version: z.string(),
   lastUpdated: z.string(),
   migratedAt: z.string().optional().nullable().default(""),
+  upgradedAt: z.string().optional().nullable(),
+  repairedAt: z.string().optional().nullable(),
 });
 
 /**

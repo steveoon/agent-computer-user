@@ -8,8 +8,6 @@
  */
 
 import { NextRequest } from "next/server";
-import { writeFileSync, mkdirSync, existsSync, renameSync } from "fs";
-import { join } from "path";
 import {
   createSuccessResponse,
   createErrorResponse,
@@ -19,11 +17,9 @@ import {
 import {
   ConfigSyncPayloadSchema,
   type ConfigSyncPayload,
+  type StoredConfigSync,
 } from "@/lib/utils/config-sync-schema";
-
-// 配置文件存储路径
-const CONFIG_DIR = join(process.cwd(), "data");
-const CONFIG_FILE = join(CONFIG_DIR, "synced-config.json");
+import { saveSyncedConfigSnapshot } from "@/lib/services/config-sync-repository";
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,22 +35,14 @@ export async function POST(request: NextRequest) {
 
     const payload: ConfigSyncPayload = parsedResult.data;
 
-    // 确保目录存在
-    if (!existsSync(CONFIG_DIR)) {
-      mkdirSync(CONFIG_DIR, { recursive: true });
-    }
-
     // 添加服务器端时间戳
-    const configData = {
+    const configData: StoredConfigSync = {
       ...payload,
       synced: true,
       serverSyncedAt: new Date().toISOString(),
     };
 
-    // 写入临时文件后原子替换，避免并发导致写入损坏
-    const tempFile = `${CONFIG_FILE}.${Date.now()}.tmp`;
-    writeFileSync(tempFile, JSON.stringify(configData, null, 2), "utf-8");
-    renameSync(tempFile, CONFIG_FILE);
+    await saveSyncedConfigSnapshot(configData);
 
     console.log("✅ 配置数据已同步到服务器:", {
       brandCount: Object.keys(payload.brandData?.brands || {}).length,

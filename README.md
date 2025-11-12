@@ -341,6 +341,34 @@ curl http://localhost:3000/api/health  # 健康检查
 - MCP延迟连接建立
 - 自动资源清理
 
+## 配置同步存储（Supabase 免费方案）
+
+同步接口 `/api/internal/config/sync` 以及导出接口 `/api/v1/config/export` 现在默认使用 Supabase Postgres 来保存最新的配置快照，而不再依赖不可持久的本地文件系统。若要启用：
+
+1. 在 Supabase 中执行以下 SQL 创建存储表（名称可自定义，但需与 `SUPABASE_CONFIG_SYNC_TABLE` 保持一致）：
+
+   ```sql
+   create table if not exists public.config_sync_snapshots (
+     id text primary key,
+     payload jsonb not null,
+     updated_at timestamptz default now()
+   );
+   ```
+
+2. 在 `.env.local` 中配置：
+
+   ```bash
+   NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=anon-key
+   SUPABASE_SERVICE_ROLE_KEY=service-role-key   # 仅服务端使用，切勿暴露给客户端
+   SUPABASE_CONFIG_SYNC_TABLE=config_sync_snapshots
+   SUPABASE_CONFIG_SYNC_ROW_ID=latest           # 单行模式存储最新快照
+   ```
+
+3. 部署到 Vercel 等环境时，把 `SUPABASE_SERVICE_ROLE_KEY` 设为 Server-only 环境变量，防止泄漏。
+
+> Supabase 免费层提供 500 MB Postgres 容量，足够存储大量 JSON 配置；如需更换为 Upstash/Vercel KV 等其它持久化方案，可仿照 `lib/services/config-sync-repository.ts` 提供新的实现。
+
 ## 安全最佳实践
 
 1. **环境变量安全**

@@ -410,8 +410,9 @@ export async function mergeAndSaveSyncData(syncResults: SyncResult[]): Promise<v
 
 /**
  * 将最新配置同步到服务器，使 /api/v1/config/export 可获取
+ * @internal 导出用于测试
  */
-async function syncConfigToServer() {
+export async function syncConfigToServer() {
   try {
     const latestConfig = await configService.getConfig();
     if (!latestConfig) {
@@ -434,11 +435,13 @@ async function syncConfigToServer() {
 
     if (!response.ok) {
       const message = await response.text();
-      throw new Error(message || "配置数据同步到服务器失败");
+      throw new Error(message);
     }
-
-    console.log("✅ 配置数据已同步到服务器，第三方可通过 API 获取");
   } catch (error) {
     console.warn("⚠️ 配置数据同步到服务器失败（不影响本地同步）:", error);
+    // 非阻塞式提示用户服务器同步失败，但本地数据已安全保存
+    const rawMessage = error instanceof Error ? error.message : "";
+    const errorMessage = rawMessage || "配置数据同步到服务器失败";
+    toast.error(errorMessage);
   }
 }
