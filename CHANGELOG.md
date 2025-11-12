@@ -2,6 +2,19 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.13.0](https://github.com/steveoon/agent-computer-user/compare/v1.12.0...v1.13.0) (2025-11-12)
+
+
+### Bug Fixes
+
+* allow Next.js build without DATABASE_URL ([6880564](https://github.com/steveoon/agent-computer-user/commit/68805644be37c38f4daf45001dfb8f80fc95c289))
+* improve error handling and fix CI test environment ([064b153](https://github.com/steveoon/agent-computer-user/commit/064b153233aa0d4114c73a41e4f585071ebae825))
+
+
+### Features
+
+* 品牌映射迁移到数据库 + 完整 CRUD 功能 ([9ddfa68](https://github.com/steveoon/agent-computer-user/commit/9ddfa68eb8f4bfc44d27d3565bd12a458376aa1f))
+
 # [1.13.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.12.0...v1.13.0-develop.1) (2025-11-12)
 
 
