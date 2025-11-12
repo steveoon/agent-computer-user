@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { syncConfigToServer } from "../stores/sync-store";
 import { configService } from "../services/config.service";
 import { toast } from "sonner";
-import type { AppConfig } from "@/types/config";
+import type { AppConfigData } from "@/types/config";
 import type { ReplyContext } from "@/types/zhipin";
 
 // Mock dependencies
@@ -81,7 +81,7 @@ describe("syncConfigToServer 功能测试", () => {
 
   describe("成功场景", () => {
     it("应该成功将配置同步到服务器", async () => {
-      const mockConfig: AppConfig = {
+      const mockConfig: AppConfigData = {
         brandData: {
           city: "上海市",
           defaultBrand: "肯德基",
@@ -158,7 +158,7 @@ describe("syncConfigToServer 功能测试", () => {
 
   describe("网络错误场景", () => {
     it("当 fetch 抛出网络错误时应该捕获并显示 toast 警告", async () => {
-      const mockConfig: AppConfig = {
+      const mockConfig: AppConfigData = {
         brandData: {
           city: "上海市",
           defaultBrand: "肯德基",
@@ -189,7 +189,7 @@ describe("syncConfigToServer 功能测试", () => {
     });
 
     it("当 fetch 因超时失败时应该正确处理", async () => {
-      const mockConfig: AppConfig = {
+      const mockConfig: AppConfigData = {
         brandData: {
           city: "上海市",
           defaultBrand: "肯德基",
@@ -218,7 +218,7 @@ describe("syncConfigToServer 功能测试", () => {
 
   describe("HTTP 错误响应场景", () => {
     it("当响应状态为 500 时应该抛出错误并显示 toast", async () => {
-      const mockConfig: AppConfig = {
+      const mockConfig: AppConfigData = {
         brandData: {
           city: "上海市",
           defaultBrand: "肯德基",
@@ -248,7 +248,7 @@ describe("syncConfigToServer 功能测试", () => {
     });
 
     it("当响应状态为 422 (Unprocessable Entity) 时应该正确处理", async () => {
-      const mockConfig: AppConfig = {
+      const mockConfig: AppConfigData = {
         brandData: {
           city: "上海市",
           defaultBrand: "肯德基",
@@ -277,7 +277,7 @@ describe("syncConfigToServer 功能测试", () => {
     });
 
     it("当响应无错误消息时应该使用默认错误信息", async () => {
-      const mockConfig: AppConfig = {
+      const mockConfig: AppConfigData = {
         brandData: {
           city: "上海市",
           defaultBrand: "肯德基",
@@ -308,7 +308,7 @@ describe("syncConfigToServer 功能测试", () => {
 
   describe("数据完整性验证", () => {
     it("应该只同步必要的配置字段（brandData, replyPrompts, metadata）", async () => {
-      const mockConfig: AppConfig = {
+      const mockConfig: AppConfigData = {
         brandData: {
           city: "上海市",
           defaultBrand: "肯德基",
@@ -357,7 +357,7 @@ describe("syncConfigToServer 功能测试", () => {
     });
 
     it("应该正确序列化复杂的品牌数据结构", async () => {
-      const mockConfig: AppConfig = {
+      const mockConfig: AppConfigData = {
         brandData: {
           city: "上海市",
           defaultBrand: "肯德基",
@@ -424,7 +424,7 @@ describe("syncConfigToServer 功能测试", () => {
 
   describe("并发安全性", () => {
     it("应该能处理并发调用而不会产生竞态条件", async () => {
-      const mockConfig: AppConfig = {
+      const mockConfig: AppConfigData = {
         brandData: {
           city: "上海市",
           defaultBrand: "肯德基",
@@ -458,7 +458,7 @@ describe("syncConfigToServer 功能测试", () => {
 
   describe("边界条件", () => {
     it("应该能处理空品牌数据", async () => {
-      const mockConfig: AppConfig = {
+      const mockConfig: AppConfigData = {
         brandData: {
           city: "",
           defaultBrand: "",
@@ -517,7 +517,7 @@ describe("syncConfigToServer 功能测试", () => {
         });
       }
 
-      const mockConfig: AppConfig = {
+      const mockConfig: AppConfigData = {
         brandData: {
           city: "上海市",
           defaultBrand: "品牌0",

@@ -8,15 +8,9 @@ import { getSupabaseAdminClient } from "@/lib/utils/supabase/admin";
 const TABLE_NAME = SUPABASE_CONFIG_SYNC_TABLE;
 const ROW_ID = SUPABASE_CONFIG_SYNC_ROW_ID;
 
-interface ConfigSyncRow {
-  id: string;
-  payload: StoredConfigSync;
-  updated_at?: string;
-}
-
 export async function saveSyncedConfigSnapshot(data: StoredConfigSync): Promise<void> {
   const client = getSupabaseAdminClient();
-  const { error } = await client.from<ConfigSyncRow>(TABLE_NAME).upsert(
+  const { error } = await client.from(TABLE_NAME).upsert(
     {
       id: ROW_ID,
       payload: data,
@@ -35,7 +29,7 @@ export async function saveSyncedConfigSnapshot(data: StoredConfigSync): Promise<
 export async function loadSyncedConfigSnapshot(): Promise<StoredConfigSync | null> {
   const client = getSupabaseAdminClient();
   const { data, error } = await client
-    .from<ConfigSyncRow>(TABLE_NAME)
+    .from(TABLE_NAME)
     .select("payload")
     .eq("id", ROW_ID)
     .maybeSingle();
