@@ -6,6 +6,7 @@ import { eq, and, or, like, desc, asc, count, inArray } from "drizzle-orm";
 import { getDictionaryType } from "@/db/types";
 import type { DataDictionary, SourceSystemValue, CreateBrandInput } from "@/db/types";
 import { clearBrandDictionaryCache } from "@/lib/prompt-engineering/memory/brand-dictionary-cache";
+import { isUniqueViolation, getFriendlyErrorMessage } from "@/db/errors";
 
 /**
  * 品牌映射相关的 Server Actions
@@ -134,14 +135,28 @@ export async function getAvailableBrands(): Promise<Array<{ id: string; name: st
 }
 
 /**
+ * 批量查询的最大数量限制
+ * 防止单次查询过大导致性能问题
+ */
+const MAX_BATCH_QUERY_SIZE = 1000;
+
+/**
  * 批量获取品牌名称
- * @param orgIds - 组织ID数组
+ * @param orgIds - 组织ID数组（最多1000个）
  * @returns 品牌映射对象 { organizationId: brandName }
  */
 export async function getBrandNamesByOrgIds(
   orgIds: Array<number | string>
 ): Promise<Record<string, string>> {
   try {
+    // 添加大小限制，防止性能问题
+    if (orgIds.length > MAX_BATCH_QUERY_SIZE) {
+      console.warn(
+        `批量查询数量过大: ${orgIds.length}，限制为前 ${MAX_BATCH_QUERY_SIZE} 个`
+      );
+      orgIds = orgIds.slice(0, MAX_BATCH_QUERY_SIZE);
+    }
+
     const keys = orgIds.map(id => (typeof id === "number" ? String(id) : id));
 
     const brands = await db
@@ -233,13 +248,8 @@ export async function createBrand(
     return { success: true, data: newBrand };
   } catch (error) {
     console.error("创建品牌失败:", error);
-    // 处理唯一约束冲突（PostgreSQL 23505）
-    const isUniqueViolation =
-      typeof error === "object" &&
-      error !== null &&
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (error as any).code === "23505";
-    if (isUniqueViolation) {
+    // 使用标准错误处理
+    if (isUniqueViolation(error)) {
       return {
         success: false,
         error: `组织ID "${data.mappingKey}" 已存在`,
@@ -247,7 +257,7 @@ export async function createBrand(
     }
     return {
       success: false,
-      error: error instanceof Error ? error.message : "未知错误",
+      error: getFriendlyErrorMessage(error),
     };
   }
 }

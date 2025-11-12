@@ -21,18 +21,35 @@ if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 }
 
-if (!process.env.DATABASE_URL) {
+// 检查是否在测试环境
+const isTestEnvironment = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+
+// 检查数据库 URL
+if (!process.env.DATABASE_URL && !isTestEnvironment) {
   throw new Error("DATABASE_URL environment variable is not set");
 }
 
-// Create PostgreSQL connection
-// Supabase Transaction pooling requires prepare: false
-const client = postgres(process.env.DATABASE_URL, {
-  prepare: false, // Required for Supabase transaction pooling
-});
+// 创建数据库连接或 mock
+let db: ReturnType<typeof drizzle>;
 
-// Create Drizzle instance with schema
-export const db = drizzle({ client, schema });
+if (process.env.DATABASE_URL) {
+  // Create PostgreSQL connection
+  // Supabase Transaction pooling requires prepare: false
+  const client = postgres(process.env.DATABASE_URL, {
+    prepare: false, // Required for Supabase transaction pooling
+  });
 
-// Export schema for use in queries
-export { schema };
+  // Create Drizzle instance with schema
+  db = drizzle({ client, schema });
+} else {
+  // 测试环境下的 mock 数据库
+  console.warn(
+    "[Database] DATABASE_URL not set in test environment. Database operations will be mocked."
+  );
+  // 导出一个 mock 的 db 对象，防止测试导入时报错
+  // 实际的数据库操作在测试中应该被 mock
+  db = {} as ReturnType<typeof drizzle>;
+}
+
+// Export database and schema
+export { db, schema };
