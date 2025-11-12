@@ -4,7 +4,7 @@ import { DulidayRaw } from "@/types/zhipin";
 
 describe("Duliday to Zhipin Mapper", () => {
   describe("数据验证和转换", () => {
-    it("当 perWeekWorkDays 有值时，应该成功验证即使 customWorkTimes.minWorkDays 为 null", () => {
+    it("当 perWeekWorkDays 有值时，应该成功验证即使 customWorkTimes.minWorkDays 为 null", async () => {
       // 使用真实失败的数据
       const testData: DulidayRaw.Position = {
         jobBasicInfoId: 34921,
@@ -124,7 +124,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       // 测试转换
-      const result = convertDulidayListToZhipinData(mockResponse, 865); // 奥乐齐的组织ID
+      const result = await convertDulidayListToZhipinData(mockResponse, 865); // 奥乐齐的组织ID
 
       // 验证转换结果
       expect(result.stores).toHaveLength(1);
@@ -138,7 +138,7 @@ describe("Duliday to Zhipin Mapper", () => {
       expect(position.maxHoursPerWeek).toBe(56); // 8小时 * 7天
     });
 
-    it("当 perWeekWorkDays 为 null 但 customWorkTimes.minWorkDays 有值时，应该使用 customWorkTimes", () => {
+    it("当 perWeekWorkDays 为 null 但 customWorkTimes.minWorkDays 有值时，应该使用 customWorkTimes", async () => {
       const testData: DulidayRaw.Position = {
         jobBasicInfoId: 12345,
         jobStoreId: 12345,
@@ -241,7 +241,7 @@ describe("Duliday to Zhipin Mapper", () => {
         },
       };
 
-      const result = convertDulidayListToZhipinData(mockResponse, 100);
+      const result = await convertDulidayListToZhipinData(mockResponse, 100);
       const position = result.stores![0].positions[0];
 
       // 验证使用了 customWorkTimes 的值
@@ -249,7 +249,7 @@ describe("Duliday to Zhipin Mapper", () => {
       expect(position.minHoursPerWeek).toBe(12); // 4小时 * 3天
     });
 
-    it("当 perWeekWorkDays 为 null 且 customWorkTimes 有多个不同的 minWorkDays 时，应该选择最小值", () => {
+    it("当 perWeekWorkDays 为 null 且 customWorkTimes 有多个不同的 minWorkDays 时，应该选择最小值", async () => {
       const testData: DulidayRaw.Position = {
         jobBasicInfoId: 54321,
         jobStoreId: 54321,
@@ -359,7 +359,7 @@ describe("Duliday to Zhipin Mapper", () => {
         },
       };
 
-      const result = convertDulidayListToZhipinData(mockResponse, 100);
+      const result = await convertDulidayListToZhipinData(mockResponse, 100);
       const position = result.stores![0].positions[0];
 
       // 验证选择了最小的非 null minWorkDays
@@ -367,7 +367,7 @@ describe("Duliday to Zhipin Mapper", () => {
       expect(position.minHoursPerWeek).toBe(12); // 6小时 * 2天
     });
 
-    it("当 perWeekWorkDays 和 customWorkTimes.minWorkDays 都为 null 但 perWeekNeedWorkDays 有值时，应该使用 perWeekNeedWorkDays", () => {
+    it("当 perWeekWorkDays 和 customWorkTimes.minWorkDays 都为 null 但 perWeekNeedWorkDays 有值时，应该使用 perWeekNeedWorkDays", async () => {
       const testData: DulidayRaw.Position = {
         jobBasicInfoId: 77777,
         jobStoreId: 77777,
@@ -470,7 +470,7 @@ describe("Duliday to Zhipin Mapper", () => {
         },
       };
 
-      const result = convertDulidayListToZhipinData(mockResponse, 100);
+      const result = await convertDulidayListToZhipinData(mockResponse, 100);
       const position = result.stores![0].positions[0];
 
       // 验证使用了 perWeekNeedWorkDays 的值
@@ -478,7 +478,7 @@ describe("Duliday to Zhipin Mapper", () => {
       expect(position.minHoursPerWeek).toBe(15); // 5小时 * 3天
     });
 
-    it("验证优先级：perWeekWorkDays > customWorkTimes.minWorkDays > perWeekNeedWorkDays", () => {
+    it("验证优先级：perWeekWorkDays > customWorkTimes.minWorkDays > perWeekNeedWorkDays", async () => {
       // 测试场景：所有三个字段都有值，应该使用 perWeekWorkDays
       const testDataPriority1: DulidayRaw.Position = {
         jobBasicInfoId: 88888,
@@ -577,7 +577,7 @@ describe("Duliday to Zhipin Mapper", () => {
         },
       };
 
-      const result1 = convertDulidayListToZhipinData(mockResponse1, 100);
+      const result1 = await convertDulidayListToZhipinData(mockResponse1, 100);
       const position1 = result1.stores![0].positions[0];
 
       // 应该使用 perWeekWorkDays = 4
@@ -615,7 +615,7 @@ describe("Duliday to Zhipin Mapper", () => {
         },
       };
 
-      const result2 = convertDulidayListToZhipinData(mockResponse2, 100);
+      const result2 = await convertDulidayListToZhipinData(mockResponse2, 100);
       const position2 = result2.stores![0].positions[0];
 
       // 应该使用 customWorkTimes.minWorkDays = 3
@@ -623,7 +623,7 @@ describe("Duliday to Zhipin Mapper", () => {
       expect(position2.minHoursPerWeek).toBe(18); // 6小时 * 3天
     });
 
-    it("当所有三个字段都为 null 时，应该使用默认值 5", () => {
+    it("当所有三个字段都为 null 时，应该使用默认值 5", async () => {
       const testData: DulidayRaw.Position = {
         jobBasicInfoId: 99999,
         jobStoreId: 99999,
@@ -721,7 +721,7 @@ describe("Duliday to Zhipin Mapper", () => {
         },
       };
 
-      const result = convertDulidayListToZhipinData(mockResponse, 100);
+      const result = await convertDulidayListToZhipinData(mockResponse, 100);
       const position = result.stores![0].positions[0];
 
       // 应该使用默认值 5

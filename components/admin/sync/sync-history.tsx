@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,13 +30,22 @@ import {
   Users,
 } from "lucide-react";
 import { useSyncStore, formatDuration, getSyncStatusText } from "@/lib/stores/sync-store";
-import { getAvailableBrands } from "@/lib/constants/organization-mapping";
+import { useBrandManagementStore } from "@/lib/stores/brand-management-store";
 
 export const SyncHistory = () => {
   const { syncHistory, loadSyncHistory, clearHistory } = useSyncStore();
   const [selectedRecord, setSelectedRecord] = useState<string | null>(null);
 
-  const availableBrands = getAvailableBrands();
+  // 从 Brand Management Store 获取品牌列表
+  const availableBrands = useBrandManagementStore((state) => state.availableBrands);
+  const loadAvailableBrands = useBrandManagementStore((state) => state.loadAvailableBrands);
+
+  // 初次加载品牌列表
+  useEffect(() => {
+    if (availableBrands.length === 0) {
+      loadAvailableBrands();
+    }
+  }, [availableBrands.length, loadAvailableBrands]);
 
   // 获取品牌名称 (unused for now but may be needed later)
   // const getBrandNames = (organizationIds: number[]) => {
@@ -125,7 +134,7 @@ export const SyncHistory = () => {
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {record.organizationIds.slice(0, 2).map(id => {
-                          const brand = availableBrands.find(b => b.id === id);
+                          const brand = availableBrands.find(b => b.id === String(id));
                           return (
                             <Badge key={id} variant="outline" className="text-xs">
                               {brand?.name || `ID:${id}`}

@@ -1,24 +1,37 @@
 /**
  * 智能模式匹配配置
  * 用于从自然语言对话中提取关键信息
- * 同步、高效、覆盖80%真实场景
+ * 异步加载、高效、覆盖80%真实场景
  *
- * 基于实际业务数据 (organization-mapping.ts) 构建，确保数据一致性
+ * 基于数据库品牌映射构建，确保数据一致性
  */
 
-import {
-  ORGANIZATION_MAPPING,
-  SHANGHAI_REGION_MAPPING,
-} from "@/lib/constants/organization-mapping";
+import { getAllBrandMappings } from "@/actions/brand-mapping";
+import { BrandDictionaryCache, isCacheValid } from "./brand-dictionary-cache";
+import { SHANGHAI_REGION_MAPPING } from "@/lib/constants/organization-mapping";
+
+/**
+ * 品牌字典缓存（延迟初始化）
+ * 改为使用独立缓存模块，便于在 Actions 中清空缓存且避免循环依赖
+ */
 
 /**
  * 餐饮品牌字典
- * 基于 ORGANIZATION_MAPPING 构建，包含常见别名
- * 当 ORGANIZATION_MAPPING 更新时，这里会自动包含新品牌
+ * 基于数据库品牌映射构建，包含常见别名
+ *
+ * 双重保障机制：
+ * 1. 手动清空：写操作后立即失效（0 延迟）
+ * 2. TTL 过期：5 分钟后自动失效（兜底保障）
  */
-function buildBrandDictionary() {
-  // 从实际业务数据获取品牌列表
-  const actualBrands = Object.values(ORGANIZATION_MAPPING);
+async function buildBrandDictionary() {
+  // 如果缓存存在且有效，直接返回
+  if (BrandDictionaryCache.brandDictionary && isCacheValid()) {
+    return BrandDictionaryCache.brandDictionary;
+  }
+
+  // 从数据库获取品牌列表
+  const brandMapping = await getAllBrandMappings();
+  const actualBrands = Object.values(brandMapping);
   const actualBrandsSet = new Set(actualBrands); // 用 Set 优化性能
 
   // 为每个实际品牌定义别名（只包含真正的别名，不包含独立品牌）
@@ -82,18 +95,22 @@ function buildBrandDictionary() {
     }
   });
 
+  // 缓存结果并记录时间戳
+  BrandDictionaryCache.brandDictionary = dictionary;
+  BrandDictionaryCache.sortedBrands = [...actualBrands].sort((a, b) => b.length - a.length);
+  BrandDictionaryCache.actualBrandSet = actualBrandsSet;
+  BrandDictionaryCache.timestamp = Date.now();
+
   return dictionary;
 }
 
-export const BRAND_DICTIONARY = buildBrandDictionary();
-
 /**
- * 预计算的品牌常量（避免每次调用都重新计算和排序）
+ * 获取品牌字典（异步）
+ * @deprecated 直接使用 SmartExtractor.extractBrands() 即可
  */
-const ACTUAL_BRANDS = Object.values(ORGANIZATION_MAPPING);
-const SORTED_BRANDS = [...ACTUAL_BRANDS].sort((a, b) => b.length - a.length);
-// 🎯 性能优化：使用 Set 替代 Array.includes()，从 O(n) 降到 O(1)
-const ACTUAL_BRAND_SET = new Set(ACTUAL_BRANDS);
+export async function getBrandDictionary() {
+  return await buildBrandDictionary();
+}
 
 /**
  * 过滤掉被其他品牌包含的子串品牌
@@ -119,27 +136,29 @@ function filterShadowedBrands(brands: string[]): string[] {
 }
 
 /**
- * 查找文本中精确匹配的品牌
+ * 查找文本中精确匹配的品牌（异步）
  * @param text 待匹配的文本
  * @returns 匹配到的品牌列表
  */
-function findExactMatches(text: string): string[] {
-  return SORTED_BRANDS.filter(brand => text.includes(brand));
+async function findExactMatches(text: string): Promise<string[]> {
+  await buildBrandDictionary(); // 确保缓存已初始化
+  return BrandDictionaryCache.sortedBrands!.filter(brand => text.includes(brand));
 }
 
 /**
- * 查找文本中通过别名匹配的品牌
+ * 查找文本中通过别名匹配的品牌（异步）
  * @param text 待匹配的文本
  * @returns 匹配到的品牌列表
  */
-function findAliasMatches(text: string): string[] {
+async function findAliasMatches(text: string): Promise<string[]> {
+  const dictionary = await buildBrandDictionary(); // 确保缓存已初始化
   const matches = new Set<string>();
 
-  for (const [brand, aliases] of Object.entries(BRAND_DICTIONARY)) {
+  for (const [brand, aliases] of Object.entries(dictionary)) {
     for (const alias of aliases) {
       // 🎯 性能优化：使用 Set.has() 替代 Array.includes()，从 O(n) 降到 O(1)
       // 跳过已经是实际品牌名的别名（在第一阶段已处理）
-      if (ACTUAL_BRAND_SET.has(alias)) continue;
+      if (BrandDictionaryCache.actualBrandSet!.has(alias)) continue;
 
       if (text.includes(alias)) {
         matches.add(brand);
@@ -283,9 +302,9 @@ export const URGENCY_PATTERNS = {
  */
 export class SmartExtractor {
   /**
-   * 提取品牌信息
+   * 提取品牌信息（异步）
    * 两阶段匹配策略（合并结果）：
-   * 1. 第一阶段：精确匹配实际业务品牌（ORGANIZATION_MAPPING中定义的品牌）
+   * 1. 第一阶段：精确匹配实际业务品牌（数据库中定义的品牌）
    * 2. 第二阶段：别名匹配（BRAND_DICTIONARY中定义的品牌，包括非业务品牌）
    * 3. 合并两阶段结果，因为文本可能同时包含业务品牌和常见品牌别名
    * 4. 去重并过滤子串，确保结果唯一且无冗余
@@ -294,12 +313,12 @@ export class SmartExtractor {
    * - "我想去肯德基或星巴克" → ["肯德基", "星巴克"]
    *   （肯德基：业务品牌 + 星巴克：常见品牌别名）
    */
-  static extractBrands(text: string): string[] {
+  static async extractBrands(text: string): Promise<string[]> {
     // 第一阶段：精确匹配实际业务品牌
-    const exactMatches = findExactMatches(text);
+    const exactMatches = await findExactMatches(text);
 
     // 第二阶段：别名匹配（包括非业务品牌）
-    const aliasMatches = findAliasMatches(text);
+    const aliasMatches = await findAliasMatches(text);
 
     // 合并两个阶段的结果，因为文本可能同时包含业务品牌和常见品牌别名
     const combined = [...exactMatches, ...aliasMatches];
@@ -397,17 +416,17 @@ export class SmartExtractor {
   }
 
   /**
-   * 综合提取所有信息
+   * 综合提取所有信息（异步）
    */
-  static extractAll(text: string): {
+  static async extractAll(text: string): Promise<{
     brands: string[];
     locations: string[];
     age: number | null;
     timePreferences: string[];
     urgency: "high" | "medium" | "low" | null;
-  } {
+  }> {
     return {
-      brands: this.extractBrands(text),
+      brands: await this.extractBrands(text),
       locations: this.extractLocations(text),
       age: this.extractAge(text),
       timePreferences: this.extractTimePreferences(text),
@@ -420,7 +439,7 @@ export class SmartExtractor {
  * 使用示例：
  *
  * const text = "我想去肯德基工作，住在浦东张江，今年25岁，急需找个晚班";
- * const extracted = SmartExtractor.extractAll(text);
+ * const extracted = await SmartExtractor.extractAll(text);
  *
  * // 结果：
  * {

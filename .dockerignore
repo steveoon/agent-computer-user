@@ -55,3 +55,8 @@ examples
 e2e
 playwright-tests
 playwright.config.*
+
+# Drizzle 迁移文件 - 不应包含在镜像中
+# 迁移应在部署前手动执行，不应打包到镜像
+drizzle/
+drizzle.config.ts

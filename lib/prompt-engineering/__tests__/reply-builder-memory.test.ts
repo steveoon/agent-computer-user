@@ -111,11 +111,14 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
     });
 
     describe("longTermMemory 长期记忆测试", () => {
-      it("应该正确提取位置信息", () => {
+      it("应该正确提取位置信息", async () => {
         memoryManager.updateMemory({
           user: "我在浦东张江工作",
           assistant: "张江有好几家门店",
         });
+
+        // 等待异步提取完成
+        await memoryManager.waitForExtractions();
 
         const longTermMemory = (memoryManager as any).longTermMemory as Map<string, any>;
         const entries = Array.from(longTermMemory.entries());
@@ -133,11 +136,14 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
         expect(locations).toContain("张江");
       });
 
-      it("应该正确提取年龄信息", () => {
+      it("应该正确提取年龄信息", async () => {
         memoryManager.updateMemory({
           user: "我今年45岁",
           assistant: "45岁可以工作",
         });
+
+        // 等待异步提取完成
+        await memoryManager.waitForExtractions();
 
         const longTermMemory = (memoryManager as any).longTermMemory as Map<string, any>;
         const entries = Array.from(longTermMemory.entries());
@@ -147,12 +153,15 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
         expect(ageEntries[0][1]).toBe(45); // SmartExtractor返回数字，不是字符串
       });
 
-      it("应该智能提取真实对话中的品牌信息", () => {
+      it("应该智能提取真实对话中的品牌信息", async () => {
         // 测试场景1：直接询问品牌
         memoryManager.updateMemory({
           user: "肯德基有岗位吗？",
           assistant: "有的，肯德基多个门店在招",
         });
+
+        // 等待异步提取完成
+        await memoryManager.waitForExtractions();
 
         let longTermMemory = (memoryManager as any).longTermMemory as Map<string, any>;
         let brandEntries = Array.from(longTermMemory.entries()).filter(([key]) =>
@@ -168,6 +177,9 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
           assistant: "有餐饮经验很好",
         });
 
+        // 等待异步提取完成
+        await memoryManager.waitForExtractions();
+
         longTermMemory = (memoryManager as any).longTermMemory as Map<string, any>;
         brandEntries = Array.from(longTermMemory.entries()).filter(([key]) =>
           key.startsWith("brand_")
@@ -181,6 +193,9 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
           assistant: "还有汉堡王和必胜客",
         });
 
+        // 等待异步提取完成
+        await memoryManager.waitForExtractions();
+
         longTermMemory = (memoryManager as any).longTermMemory as Map<string, any>;
         brandEntries = Array.from(longTermMemory.entries()).filter(([key]) =>
           key.startsWith("brand_")
@@ -192,11 +207,14 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
         expect(brandEntries.some(([_, value]) => value === "必胜客")).toBe(true);
       });
 
-      it("应该智能提取复杂对话中的多个品牌", () => {
+      it("应该智能提取复杂对话中的多个品牌", async () => {
         memoryManager.updateMemory({
           user: "星巴克环境比较好，但海底捞太累了，我更想去肯德基或麦当劳",
           assistant: "了解，快餐店确实相对轻松一些",
         });
+
+        // 等待异步提取完成
+        await memoryManager.waitForExtractions();
 
         const longTermMemory = (memoryManager as any).longTermMemory as Map<string, any>;
         const brandEntries = Array.from(longTermMemory.entries())
@@ -210,11 +228,14 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
         expect(brandEntries).toContain("麦当劳");
       });
 
-      it("应该正确提取时间安排信息", () => {
+      it("应该正确提取时间安排信息", async () => {
         memoryManager.updateMemory({
           user: "时间：晚班比较合适",
           assistant: "有晚班岗位",
         });
+
+        // 等待异步提取完成
+        await memoryManager.waitForExtractions();
 
         const longTermMemory = (memoryManager as any).longTermMemory as Map<string, any>;
         const entries = Array.from(longTermMemory.entries());
@@ -232,7 +253,7 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
         }
       });
 
-      it("应该在压缩时按类型聚合并去重", () => {
+      it("应该在压缩时按类型聚合并去重", async () => {
         // 添加多个同类型的事实
         memoryManager.updateMemory({
           user: "我在浦东",
@@ -248,6 +269,9 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
           user: "在浦东工作",
           assistant: "知道了",
         });
+
+        // 等待异步提取完成
+        await memoryManager.waitForExtractions();
 
         const context = memoryManager.getOptimizedContext();
 
@@ -293,11 +317,14 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
       });
     });
 
-    it("应该提取长期记忆事实", () => {
+    it("应该提取长期记忆事实", async () => {
       memoryManager.updateMemory({
         user: "我50岁了，在浦东",
         assistant: "年龄没问题，浦东有门店",
       });
+
+      // 等待异步提取完成
+      await memoryManager.waitForExtractions();
 
       const context = memoryManager.getOptimizedContext();
       expect(context.facts).toBeDefined();
@@ -348,12 +375,15 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
     });
 
     describe("getMemoryStats 内存统计测试", () => {
-      it("应该返回正确的内存统计信息", () => {
+      it("应该返回正确的内存统计信息", async () => {
         // 添加各种类型的内存数据
         memoryManager.updateMemory({
           user: "我25岁，在浦东",
           assistant: "了解你的情况",
         });
+
+        // 等待异步提取完成
+        await memoryManager.waitForExtractions();
 
         memoryManager.setWorkingMemory("brand", "肯德基");
         memoryManager.setWorkingMemory("urgency", "high");
@@ -373,7 +403,7 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
         expect(stats.estimatedTokens).toBeGreaterThan(0); // 应该有token估算
       });
 
-      it("应该在大量数据时返回合理的统计信息", () => {
+      it("应该在大量数据时返回合理的统计信息", async () => {
         // 添加大量数据
         for (let i = 0; i < 10; i++) {
           memoryManager.updateMemory({
@@ -382,6 +412,9 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
           });
           memoryManager.setWorkingMemory(`key${i}`, `value${i}`);
         }
+
+        // 等待异步提取完成
+        await memoryManager.waitForExtractions();
 
         const stats = memoryManager.getMemoryStats();
 
@@ -412,12 +445,15 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
     });
 
     describe("三种内存类型交互关系测试", () => {
-      it("应该正确处理内存间的数据流转", () => {
+      it("应该正确处理内存间的数据流转", async () => {
         // 1. 通过updateMemory添加对话（影响shortTerm和longTerm）
         memoryManager.updateMemory({
           user: "我30岁，在浦东工作，想找肯德基的岗位",
           assistant: "好的，已了解您的需求",
         });
+
+        // 等待异步提取完成
+        await memoryManager.waitForExtractions();
 
         // 2. 设置工作内存
         memoryManager.setWorkingMemory("currentSession", "active");
@@ -440,7 +476,7 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
         expect(context.working.priority).toBe("high");
       });
 
-      it("应该在token预算限制下平衡三种内存", () => {
+      it("应该在token预算限制下平衡三种内存", async () => {
         // 添加大量不同类型的内存
         for (let i = 0; i < 20; i++) {
           memoryManager.updateMemory({
@@ -452,6 +488,9 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
         for (let i = 0; i < 15; i++) {
           memoryManager.setWorkingMemory(`session${i}`, `value${i}`);
         }
+
+        // 等待异步提取完成
+        await memoryManager.waitForExtractions();
 
         // 使用较小的token预算
         const context = memoryManager.getOptimizedContext(1000);
@@ -501,11 +540,14 @@ describe("ReplyPromptBuilder - 内存管理详细测试", () => {
       builder = new ReplyPromptBuilder();
     });
 
-    it("应该在构建提示时使用内存上下文", () => {
+    it("应该在构建提示时使用内存上下文", async () => {
       // 先添加一些历史记忆
       builder.updateMemory("你好", "你好，有什么可以帮助你的？");
       builder.updateMemory("我在浦东", "浦东有多家门店");
       builder.updateMemory("我50岁", "年龄符合要求");
+
+      // 等待异步提取完成
+      await (builder as any).memoryManager.waitForExtractions();
 
       const params: ReplyBuilderParams = {
         message: "有什么岗位？",

@@ -1021,7 +1021,8 @@ function buildContextInfo(
 
   if (relevantStores.length > 0) {
     context += `匹配到的门店信息：\n`;
-    relevantStores.slice(0, 3).forEach(store => {
+    // 显示该品牌下的所有门店（不限制数量）
+    relevantStores.forEach(store => {
       context += `• ${store.name}（${store.district}${store.subarea}）：${store.location}\n`;
       store.positions.forEach(pos => {
         // 🔧 智能薪资信息构建（包含memo解析）

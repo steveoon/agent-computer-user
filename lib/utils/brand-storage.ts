@@ -1,10 +1,13 @@
 /**
  * 🏪 品牌偏好存储工具 - 重构版
- * 不再依赖硬编码的品牌列表，支持动态品牌管理
+ *
+ * 职责：仅负责品牌偏好的持久化存储
+ * - 不获取业务数据（如可用品牌列表）
+ * - 不验证业务逻辑（由调用者负责）
+ * - 专注于存储操作：保存、读取、清理
  */
 
 import localforage from "localforage";
-import { getBrandData } from "../services/config.service";
 
 // 💾 存储键值
 const BRAND_PREFERENCE_KEY = "brand_preference";
@@ -63,11 +66,12 @@ async function cleanLegacyStorage(): Promise<void> {
 /**
  * 💾 保存品牌偏好
  * @param brand 品牌名称
+ * @param availableBrands 可用品牌列表（由调用者提供）
  */
-export async function saveBrandPreference(brand: string): Promise<void> {
+export async function saveBrandPreference(brand: string, availableBrands: string[]): Promise<void> {
   try {
-    // 验证品牌是否有效
-    if (!(await isValidBrand(brand))) {
+    // 验证品牌是否有效（由调用者提供验证列表）
+    if (!availableBrands.includes(brand)) {
       console.warn(`尝试保存无效品牌: ${brand}`);
       return;
     }
@@ -83,17 +87,12 @@ export async function saveBrandPreference(brand: string): Promise<void> {
 
 /**
  * 🔄 读取品牌偏好
- * @returns 保存的品牌名称或null
+ * @returns 保存的品牌名称或null（可能包含已删除的品牌，调用者需验证）
  */
 export async function loadBrandPreference(): Promise<string | null> {
   try {
     const savedBrand = await brandStorage.getItem<string>(BRAND_PREFERENCE_KEY);
-
-    if (savedBrand && (await isValidBrand(savedBrand))) {
-      return savedBrand;
-    }
-
-    return null;
+    return savedBrand || null;
   } catch (error) {
     console.error("读取品牌偏好失败:", error);
     return null;
@@ -122,7 +121,9 @@ async function saveBrandToHistory(brand: string): Promise<void> {
 
 /**
  * 📜 获取品牌使用历史
- * @returns 品牌历史列表
+ * @returns 品牌历史列表（未过滤，包含所有历史记录）
+ *
+ * 注意：返回的历史可能包含已删除的品牌，调用者需要自行过滤
  */
 export async function getBrandHistory(): Promise<string[]> {
   try {
@@ -130,21 +131,7 @@ export async function getBrandHistory(): Promise<string[]> {
     await cleanLegacyStorage();
 
     const history = await brandStorage.getItem<string[]>(BRAND_HISTORY_KEY);
-
-    if (Array.isArray(history)) {
-      // 过滤掉无效的品牌
-      const validHistory: string[] = [];
-
-      for (const brand of history) {
-        if (await isValidBrand(brand)) {
-          validHistory.push(brand);
-        }
-      }
-
-      return validHistory;
-    }
-
-    return [];
+    return Array.isArray(history) ? history : [];
   } catch (error) {
     console.error("读取品牌历史失败:", error);
     return [];
@@ -170,55 +157,23 @@ export async function clearBrandStorage(): Promise<void> {
 export async function getBrandStorageStatus(): Promise<{
   currentBrand: string | null;
   historyCount: number;
-  availableBrands: string[];
 }> {
   try {
-    const [currentBrand, history, availableBrands] = await Promise.all([
+    const [currentBrand, history] = await Promise.all([
       loadBrandPreference(),
       getBrandHistory(),
-      getAvailableBrands(),
     ]);
 
     return {
       currentBrand,
       historyCount: history.length,
-      availableBrands,
     };
   } catch (error) {
     console.error("获取品牌存储状态失败:", error);
     return {
       currentBrand: null,
       historyCount: 0,
-      availableBrands: [],
     };
   }
 }
 
-/**
- * ✅ 验证品牌是否有效
- * @param brand 品牌名称
- * @returns 是否为有效品牌
- */
-async function isValidBrand(brand: string): Promise<boolean> {
-  try {
-    const availableBrands = await getAvailableBrands();
-    return availableBrands.includes(brand);
-  } catch (error) {
-    console.error("验证品牌有效性失败:", error);
-    return false;
-  }
-}
-
-/**
- * 🎯 获取可用品牌列表
- * @returns 可用品牌列表
- */
-async function getAvailableBrands(): Promise<string[]> {
-  try {
-    const brandData = await getBrandData();
-    return brandData ? Object.keys(brandData.brands) : [];
-  } catch (error) {
-    console.error("获取可用品牌列表失败:", error);
-    return [];
-  }
-}

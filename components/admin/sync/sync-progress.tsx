@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { RefreshCw, CheckCircle, XCircle, Clock, Activity, Server, Database } from "lucide-react";
 import { useSyncStore, formatDuration } from "@/lib/stores/sync-store";
-import { getAvailableBrands } from "@/lib/constants/organization-mapping";
+import { useBrandManagementStore } from "@/lib/stores/brand-management-store";
 import { SyncResult } from "@/lib/services/duliday-sync.service";
 
 // 类型定义
@@ -152,7 +152,16 @@ export const SyncProgress = ({ className }: SyncProgressProps = {}) => {
     currentSyncResult,
   } = useSyncStore();
 
-  const availableBrands = getAvailableBrands();
+  // 从 Store 获取品牌列表
+  const availableBrands = useBrandManagementStore((state) => state.availableBrands);
+  const loadAvailableBrands = useBrandManagementStore((state) => state.loadAvailableBrands);
+
+  // 初次加载品牌列表
+  useEffect(() => {
+    if (availableBrands.length === 0) {
+      loadAvailableBrands();
+    }
+  }, [availableBrands.length, loadAvailableBrands]);
 
   // 使用useMemo优化计算性能
   const stats = useMemo((): SyncStatsData | null => {
@@ -172,7 +181,7 @@ export const SyncProgress = ({ className }: SyncProgressProps = {}) => {
   // 获取当前品牌名称
   const currentBrandName = useMemo(() => {
     if (currentOrganization === 0) return "";
-    const brand = availableBrands.find(b => b.id === currentOrganization);
+    const brand = availableBrands.find(b => b.id === String(currentOrganization));
     return brand?.name || `组织 ${currentOrganization}`;
   }, [currentOrganization, availableBrands]);
 

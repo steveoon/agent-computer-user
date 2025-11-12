@@ -1,21 +1,67 @@
 "use client";
 
+import { useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckSquare, Square, Users, Building2 } from "lucide-react";
-import { getAvailableBrands } from "@/lib/constants/organization-mapping";
+import { CheckSquare, Square, Users, Building2, Loader2 } from "lucide-react";
 import { useSyncStore } from "@/lib/stores/sync-store";
+import { useBrandManagementStore } from "@/lib/stores/brand-management-store";
 
 export const BrandSelector = () => {
-  const { selectedBrands, toggleBrand, selectAllBrands, clearSelectedBrands } = useSyncStore();
-  const availableBrands = getAvailableBrands();
+  const { selectedBrands, toggleBrand, selectAllBrands, clearSelectedBrands, setSelectedBrands } = useSyncStore();
+
+  // 从 Brand Management Store 获取品牌列表
+  const availableBrands = useBrandManagementStore((state) => state.availableBrands);
+  const loading = useBrandManagementStore((state) => state.availableBrandsLoading);
+  const loadAvailableBrands = useBrandManagementStore((state) => state.loadAvailableBrands);
+
+  // 初次加载品牌列表
+  useEffect(() => {
+    if (availableBrands.length === 0) {
+      loadAvailableBrands();
+    }
+  }, [availableBrands.length, loadAvailableBrands]);
+
+  // 当品牌列表更新后，清理已删除品牌的选择状态
+  useEffect(() => {
+    if (availableBrands.length > 0 && selectedBrands.length > 0) {
+      const availableBrandIds = new Set(availableBrands.map(b => b.id));
+      const validSelectedBrands = selectedBrands.filter(id => availableBrandIds.has(id));
+
+      // 如果有无效的品牌ID被过滤掉，更新store
+      if (validSelectedBrands.length !== selectedBrands.length) {
+        console.log(`🧹 清理了 ${selectedBrands.length - validSelectedBrands.length} 个已删除的品牌选择`);
+        setSelectedBrands(validSelectedBrands);
+      }
+    }
+  }, [availableBrands, selectedBrands, setSelectedBrands]);
 
   const isAllSelected = selectedBrands.length === availableBrands.length;
   const isPartialSelected =
     selectedBrands.length > 0 && selectedBrands.length < availableBrands.length;
+
+  // 加载状态
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-sm text-muted-foreground">加载品牌列表中...</span>
+      </div>
+    );
+  }
+
+  // 空状态
+  if (availableBrands.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <p>暂无可用品牌</p>
+        <p className="text-xs mt-1">请先在品牌管理中添加品牌</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -33,7 +79,7 @@ export const BrandSelector = () => {
             }}
             onCheckedChange={checked => {
               if (checked) {
-                selectAllBrands();
+                selectAllBrands(availableBrands.map(b => b.id));
               } else {
                 clearSelectedBrands();
               }
@@ -48,7 +94,12 @@ export const BrandSelector = () => {
         </div>
 
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={selectAllBrands} disabled={isAllSelected}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => selectAllBrands(availableBrands.map(b => b.id))}
+            disabled={isAllSelected}
+          >
             <CheckSquare className="h-4 w-4 mr-1" />
             全选
           </Button>

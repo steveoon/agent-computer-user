@@ -1,9 +1,9 @@
-import { getAvailableBrands } from "@/lib/constants/organization-mapping";
+import { getAvailableBrands } from "@/actions/brand-mapping";
 import { configService } from "@/lib/services/config.service";
 
 /**
  * 品牌同步管理器
- * 确保 ORGANIZATION_MAPPING 中的所有品牌都被同步到本地
+ * 确保数据库中的所有品牌都被同步到本地 IndexedDB
  */
 export class BrandSyncManager {
   /**
@@ -29,11 +29,11 @@ export class BrandSyncManager {
       const config = await configService.getConfig();
       const existingBrands = Object.keys(config?.brandData?.brands || {});
 
-      // 获取所有映射的品牌
-      const mappedBrands = getAvailableBrands();
+      // 获取所有映射的品牌（从数据库）
+      const mappedBrands = await getAvailableBrands();
       const mappedBrandNames = mappedBrands.map(b => b.name);
 
-      // 找出缺失的映射品牌（只同步 ORGANIZATION_MAPPING 中定义的品牌）
+      // 找出缺失的映射品牌（只同步数据库中定义的品牌）
       const missingBrands = forceSync
         ? mappedBrands
         : mappedBrands.filter(brand => !existingBrands.includes(brand.name));
@@ -125,7 +125,7 @@ export class BrandSyncManager {
   }> {
     const config = await configService.getConfig();
     const existingBrands = Object.keys(config?.brandData?.brands || {});
-    const mappedBrands = getAvailableBrands();
+    const mappedBrands = await getAvailableBrands();
 
     const missingBrands = mappedBrands
       .filter(brand => !existingBrands.includes(brand.name))

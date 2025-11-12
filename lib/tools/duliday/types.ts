@@ -7,7 +7,7 @@ export const jobItemSchema = z.object({
   jobBasicInfoId: z.number(),
   jobId: z.number(),
   jobName: z.string(),
-  jobNickName: z.string(),
+  jobNickName: z.string().nullable(),
   organizationId: z.number(),
   organizationName: z.string(),
   jobTypePid: z.number(),
@@ -84,8 +84,8 @@ export const interviewTimeSchema = z.object({
       start: z.number(),
       end: z.number(),
       fixedDeadline: z.string().nullable(),
-      cycleDeadlineDay: z.number(),
-      cycleDeadlineEnd: z.number(),
+      cycleDeadlineDay: z.number().nullable(),
+      cycleDeadlineEnd: z.number().nullable(),
     })
   ),
 });
