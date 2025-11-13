@@ -28,6 +28,8 @@
     "agent:restart": "scripts/multi-agent.sh restart",
     "agent:status": "scripts/multi-agent.sh status",
     "agent:logs": "scripts/multi-agent.sh logs",
+    "agent:update": "scripts/multi-agent.sh update",
+    "agent:remove": "scripts/multi-agent.sh remove",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
