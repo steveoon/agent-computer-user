@@ -33,12 +33,13 @@ export async function POST(request: NextRequest) {
 
     // 调用LLM智能回复生成函数（使用客户端传递的配置数据）
     const reply = await generateSmartReplyWithLLM(
-      message.trim(),
-      conversationHistory || [], // 对话历史
-      brand, // 品牌参数
-      modelConfig, // 模型配置参数
-      configData, // 🔧 使用客户端传递的配置数据
-      replyPrompts // 🔧 使用客户端传递的回复指令
+      message.trim(), // 1. message
+      conversationHistory || [], // 2. conversationHistory
+      brand, // 3. preferredBrand
+      undefined, // 4. toolBrand (API调用不需要工具品牌)
+      modelConfig, // 5. modelConfig
+      configData, // 6. configData
+      replyPrompts // 7. replyPrompts
     );
 
     return NextResponse.json({

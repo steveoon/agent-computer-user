@@ -23,6 +23,15 @@ readonly TEMPLATE_FILE="$PROJECT_ROOT/configs/agent-templates.json"
 readonly LOGS_DIR="$PROJECT_ROOT/logs/agents"
 readonly PIDS_DIR="$PROJECT_ROOT/pids/agents"
 
+# 超时与延迟配置
+readonly CHROME_STARTUP_TIMEOUT=10          # Chrome 启动超时 (秒)
+readonly CHROME_PROCESS_CHECK_INTERVAL=1    # Chrome 进程检查间隔 (秒)
+readonly APP_STARTUP_TIMEOUT=30             # 应用启动超时 (秒)
+readonly APP_HEALTH_CHECK_INTERVAL=1        # 应用健康检查间隔 (秒)
+readonly AGENT_STOP_WAIT_TIME=2             # Agent 停止后等待时间 (秒)
+readonly AGENT_RESTART_WAIT_TIME=2          # Agent 重启前等待时间 (秒)
+readonly PORT_RELEASE_WAIT_TIME=2           # 端口释放等待时间 (秒)
+
 # ============================================================================
 # 工具函数
 # ============================================================================
@@ -365,10 +374,10 @@ start_chrome() {
     echo "$chrome_pid" > "$PIDS_DIR/${agent_id}-chrome.pid"
 
     # 等待 Chrome 就绪
-    local timeout=10
+    local timeout=$CHROME_STARTUP_TIMEOUT
     local count=0
     while ! curl -s "http://localhost:$chrome_port/json/version" > /dev/null 2>&1; do
-        sleep 1
+        sleep "$CHROME_PROCESS_CHECK_INTERVAL"
         ((count++))
         if (( count >= timeout )); then
             log_error "Chrome 启动超时"
@@ -398,10 +407,10 @@ start_app() {
     echo "$app_pid" > "$PIDS_DIR/${agent_id}.pid"
 
     # 等待应用就绪
-    local timeout=30
+    local timeout=$APP_STARTUP_TIMEOUT
     local count=0
     while ! curl -s "http://localhost:$app_port/api/health" > /dev/null 2>&1; do
-        sleep 1
+        sleep "$APP_HEALTH_CHECK_INTERVAL"
         ((count++))
         if (( count >= timeout )); then
             log_error "应用启动超时"
@@ -431,7 +440,7 @@ cmd_start() {
     local agent=$(jq -c ".agents[] | select(.id == \"$target_id\")" "$CONFIG_FILE")
     if [[ -z "$agent" ]]; then
         log_error "未找到 Agent: $target_id"
-        exit 1
+        return 1
     fi
 
     # 检查是否已运行
@@ -450,14 +459,14 @@ cmd_start() {
     if ! start_chrome "$target_id" "$agent"; then
         log_error "Chrome 启动失败"
         cmd_stop "$target_id"
-        exit 1
+        return 1
     fi
 
     # 启动应用
     if ! start_app "$target_id" "$agent"; then
         log_error "应用启动失败"
         cmd_stop "$target_id"
-        exit 1
+        return 1
     fi
 
     local app_port=$(echo "$agent" | jq -r '.appPort')
@@ -493,7 +502,7 @@ cmd_stop() {
         if ps -p "$pid" > /dev/null 2>&1; then
             log_step "停止应用 (PID: $pid)..."
             kill "$pid" 2>/dev/null || true
-            sleep 2
+            sleep "$AGENT_STOP_WAIT_TIME"
             # 强制杀死
             if ps -p "$pid" > /dev/null 2>&1; then
                 kill -9 "$pid" 2>/dev/null || true
@@ -508,7 +517,7 @@ cmd_stop() {
         if ps -p "$chrome_pid" > /dev/null 2>&1; then
             log_step "停止 Chrome (PID: $chrome_pid)..."
             kill "$chrome_pid" 2>/dev/null || true
-            sleep 2
+            sleep "$AGENT_STOP_WAIT_TIME"
             # 强制杀死
             if ps -p "$chrome_pid" > /dev/null 2>&1; then
                 kill -9 "$chrome_pid" 2>/dev/null || true
@@ -567,6 +576,357 @@ cmd_logs() {
     tail -f "$log_file"
 }
 
+# 全局状态变量（用于 trap，避免局部变量被清理）
+declare -a _UPDATE_RUNNING_AGENTS=()
+_UPDATE_DID_STASH=false
+_UPDATE_STASH_MESSAGE=""
+_UPDATE_FAILED=false
+
+# 🛡️ 错误处理函数 - 失败时恢复服务（全局函数，可访问全局状态）
+_cleanup_update_on_error() {
+    local exit_code=$?
+
+    if [[ $exit_code -ne 0 ]] || [[ "$_UPDATE_FAILED" == "true" ]]; then
+        log_error "更新流程失败 (退出码: $exit_code)"
+
+        # 恢复 stash (如果有)
+        if [[ "$_UPDATE_DID_STASH" == "true" ]]; then
+            log_step "恢复暂存的更改..."
+            cd "$PROJECT_ROOT"
+            if git stash pop > /dev/null 2>&1; then
+                log_success "已恢复暂存的更改"
+            else
+                log_warn "无法自动恢复暂存，请手动执行: git stash pop"
+                log_info "暂存消息: $_UPDATE_STASH_MESSAGE"
+            fi
+        fi
+
+        # 尝试重启之前运行的 Agent
+        if (( ${#_UPDATE_RUNNING_AGENTS[@]} > 0 )); then
+            log_warn "尝试重启之前运行的 ${#_UPDATE_RUNNING_AGENTS[@]} 个 Agent..."
+            sleep "$PORT_RELEASE_WAIT_TIME"
+            local restart_success=0
+            for agent_id in "${_UPDATE_RUNNING_AGENTS[@]}"; do
+                if cmd_start "$agent_id" 2>/dev/null; then
+                    ((restart_success++))
+                else
+                    log_error "重启 $agent_id 失败"
+                fi
+            done
+
+            if (( restart_success == ${#_UPDATE_RUNNING_AGENTS[@]} )); then
+                log_success "所有 Agent 已恢复运行"
+            else
+                log_error "部分 Agent 恢复失败 ($restart_success/${#_UPDATE_RUNNING_AGENTS[@]})"
+                log_info "请手动检查并重启失败的 Agent"
+            fi
+        fi
+
+        log_error "更新流程已中止，服务已尝试恢复"
+
+        # 清理全局状态
+        _UPDATE_RUNNING_AGENTS=()
+        _UPDATE_DID_STASH=false
+        _UPDATE_STASH_MESSAGE=""
+        _UPDATE_FAILED=false
+
+        exit 1
+    fi
+}
+
+# ============================================================================
+# Update 流程私有函数
+# ============================================================================
+
+# 收集当前运行的 Agent
+_collect_running_agents() {
+    log_step "检测运行中的 Agent..."
+    _UPDATE_RUNNING_AGENTS=()
+
+    while IFS= read -r agent; do
+        local id=$(echo "$agent" | jq -r '.id')
+        if [[ -f "$PIDS_DIR/${id}.pid" ]]; then
+            local pid=$(cat "$PIDS_DIR/${id}.pid")
+            if ps -p "$pid" > /dev/null 2>&1; then
+                _UPDATE_RUNNING_AGENTS+=("$id")
+                log_info "  ✓ $id (运行中, PID: $pid)"
+            fi
+        fi
+    done < <(get_agents)
+
+    if (( ${#_UPDATE_RUNNING_AGENTS[@]} == 0 )); then
+        log_warn "没有运行中的 Agent"
+        read -p "是否继续更新？[y/N] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            log_info "更新已取消"
+            return 1
+        fi
+    else
+        log_success "检测到 ${#_UPDATE_RUNNING_AGENTS[@]} 个运行中的 Agent"
+    fi
+    return 0
+}
+
+# 停止所有运行的 Agent
+_stop_running_agents() {
+    if (( ${#_UPDATE_RUNNING_AGENTS[@]} > 0 )); then
+        log_step "停止所有运行中的 Agent..."
+        for agent_id in "${_UPDATE_RUNNING_AGENTS[@]}"; do
+            cmd_stop "$agent_id"
+        done
+        log_success "所有 Agent 已停止"
+    fi
+}
+
+# 拉取代码并处理 stash
+_pull_code_with_stash() {
+    local skip_pull=$1
+
+    if [[ "$skip_pull" == "true" ]]; then
+        log_info "跳过代码拉取 (--skip-pull)"
+        return 0
+    fi
+
+    log_step "拉取最新代码..."
+    cd "$PROJECT_ROOT"
+
+    # 保存当前分支
+    local current_branch=$(git rev-parse --abbrev-ref HEAD)
+    log_info "当前分支: $current_branch"
+
+    # 检查是否有未提交的更改
+    if ! git diff-index --quiet HEAD --; then
+        log_warn "检测到未提交的更改"
+        git status --short
+        echo ""
+        log_warn "选项："
+        log_info "  [y] 暂存更改并继续 (自动 git stash)"
+        log_info "  [n] 取消更新并恢复 Agent"
+        echo ""
+        read -p "是否暂存并继续？[y/N] " -n 1 -r
+        echo
+
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            _UPDATE_STASH_MESSAGE="auto-stash before update $(date +%Y%m%d_%H%M%S)"
+            if git stash push -m "$_UPDATE_STASH_MESSAGE"; then
+                _UPDATE_DID_STASH=true
+                local stash_id=$(git stash list | head -1 | cut -d: -f1)
+                log_success "更改已暂存 (ID: $stash_id, 消息: $_UPDATE_STASH_MESSAGE)"
+            else
+                log_error "暂存失败"
+                return 1
+            fi
+        else
+            log_error "更新已取消"
+            _UPDATE_FAILED=false  # 用户主动取消，不触发错误处理
+            trap - EXIT  # 清除 trap
+            # 重启之前运行的 Agent
+            if (( ${#_UPDATE_RUNNING_AGENTS[@]} > 0 )); then
+                log_info "重启之前运行的 Agent..."
+                for agent_id in "${_UPDATE_RUNNING_AGENTS[@]}"; do
+                    cmd_start "$agent_id"
+                done
+            fi
+            return 2  # 用户取消，返回特殊码
+        fi
+    fi
+
+    # 拉取最新代码
+    if ! git pull origin "$current_branch"; then
+        log_error "代码拉取失败"
+        return 1
+    fi
+    log_success "代码更新成功"
+    return 0
+}
+
+# 安装依赖 (如果需要)
+_install_dependencies_if_needed() {
+    local skip_install=$1
+
+    if [[ "$skip_install" == "true" ]]; then
+        log_info "跳过依赖安装 (--skip-install)"
+        return 0
+    fi
+
+    log_step "检查依赖更新..."
+    cd "$PROJECT_ROOT"
+
+    # 检测 package.json 是否有变化
+    local need_install=false
+    if git diff HEAD@{1} HEAD --name-only 2>/dev/null | grep -q "package.json\|pnpm-lock.yaml"; then
+        need_install=true
+        log_warn "检测到依赖变化，需要重新安装"
+    else
+        log_info "依赖无变化，跳过安装"
+    fi
+
+    if [[ "$need_install" == "true" ]]; then
+        log_step "安装依赖..."
+        if ! pnpm install; then
+            log_error "依赖安装失败"
+            return 1
+        fi
+        log_success "依赖安装成功"
+    fi
+    return 0
+}
+
+# 构建项目
+_build_project() {
+    log_step "构建项目..."
+    cd "$PROJECT_ROOT"
+
+    if ! pnpm build; then
+        log_error "项目构建失败"
+        log_warn "构建失败，服务将尝试恢复"
+        return 1
+    fi
+    log_success "项目构建成功"
+    return 0
+}
+
+# 恢复 stash (如果有)
+_restore_stash() {
+    if [[ "$_UPDATE_DID_STASH" != "true" ]]; then
+        return 0
+    fi
+
+    log_step "恢复暂存的更改..."
+    cd "$PROJECT_ROOT"
+    if git stash pop > /dev/null 2>&1; then
+        log_success "已恢复暂存的更改"
+        _UPDATE_DID_STASH=false  # 标记已恢复，防止 trap 重复恢复
+    else
+        log_warn "无法自动恢复暂存 (可能有冲突)"
+        log_info "请手动解决冲突后执行: git stash pop"
+        log_info "暂存消息: $_UPDATE_STASH_MESSAGE"
+    fi
+    return 0
+}
+
+# 重启 Agent 并显示统计
+_restart_agents_with_stats() {
+    if (( ${#_UPDATE_RUNNING_AGENTS[@]} == 0 )); then
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        log_success "更新完成！没有需要重启的 Agent"
+        log_info "使用 './scripts/multi-agent.sh start' 启动 Agent"
+        return 0
+    fi
+
+    log_step "重启之前运行的 Agent..."
+    sleep "$PORT_RELEASE_WAIT_TIME"  # 等待端口释放
+
+    local restart_success=0
+    local restart_failed=()
+    for agent_id in "${_UPDATE_RUNNING_AGENTS[@]}"; do
+        log_info "重启 $agent_id..."
+        if cmd_start "$agent_id" 2>/dev/null; then
+            ((restart_success++))
+        else
+            restart_failed+=("$agent_id")
+            log_error "重启 $agent_id 失败"
+        fi
+    done
+
+    # 显示统计
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    if (( restart_success == ${#_UPDATE_RUNNING_AGENTS[@]} )); then
+        log_success "更新完成！已成功重启 ${#_UPDATE_RUNNING_AGENTS[@]} 个 Agent"
+    else
+        log_warn "更新完成，但部分 Agent 重启失败 ($restart_success/${#_UPDATE_RUNNING_AGENTS[@]})"
+        if (( ${#restart_failed[@]} > 0 )); then
+            log_error "重启失败的 Agent: ${restart_failed[*]}"
+            log_info "请手动检查日志并重启失败的 Agent"
+        fi
+    fi
+
+    # 显示重启的 Agent 列表
+    echo -e "\n${CYAN}已重启的 Agent:${NC}"
+    for agent_id in "${_UPDATE_RUNNING_AGENTS[@]}"; do
+        local agent=$(jq -c ".agents[] | select(.id == \"$agent_id\")" "$CONFIG_FILE")
+        local app_port=$(echo "$agent" | jq -r '.appPort')
+
+        # 检查是否重启失败
+        local status="${GREEN}✓${NC}"
+        for failed in "${restart_failed[@]}"; do
+            if [[ "$failed" == "$agent_id" ]]; then
+                status="${RED}✗${NC}"
+                break
+            fi
+        done
+
+        echo -e "  $status ${CYAN}$agent_id${NC} - http://localhost:$app_port"
+    done
+    return 0
+}
+
+# 更新代码并重启 - 主流程编排
+cmd_update() {
+    local skip_pull=${1:-false}
+    local skip_install=${2:-false}
+
+    log_info "开始更新流程..."
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    # 重置全局状态
+    _UPDATE_RUNNING_AGENTS=()
+    _UPDATE_DID_STASH=false
+    _UPDATE_STASH_MESSAGE=""
+    _UPDATE_FAILED=false
+
+    # 设置 trap 捕获错误并自动清理
+    trap _cleanup_update_on_error EXIT
+
+    # Step 1: 收集运行中的 Agent
+    if ! _collect_running_agents; then
+        trap - EXIT
+        return 0
+    fi
+
+    # Step 2: 停止所有运行的 Agent
+    _stop_running_agents
+
+    # Step 3: 拉取代码并处理 stash
+    # 使用 || 捕获返回值，防止 set -e 立即退出，同时保持函数内部的 set -e 语义
+    local pull_result=0
+    _pull_code_with_stash "$skip_pull" || pull_result=$?
+
+    if (( pull_result == 2 )); then
+        # 用户取消，已在函数内恢复 Agent
+        return 0
+    elif (( pull_result != 0 )); then
+        _UPDATE_FAILED=true
+        return 1
+    fi
+
+    # Step 4: 安装依赖 (如果需要)
+    if ! _install_dependencies_if_needed "$skip_install"; then
+        _UPDATE_FAILED=true
+        return 1
+    fi
+
+    # Step 5: 构建项目
+    if ! _build_project; then
+        _UPDATE_FAILED=true
+        return 1
+    fi
+
+    # Step 6: 恢复 stash (如果有)
+    _restore_stash
+
+    # Step 7: 重启 Agent 并显示统计
+    _restart_agents_with_stats
+
+    # 清除 trap 和全局状态 (成功完成)
+    trap - EXIT
+    _UPDATE_RUNNING_AGENTS=()
+    _UPDATE_DID_STASH=false
+    _UPDATE_STASH_MESSAGE=""
+    _UPDATE_FAILED=false
+}
+
 # ============================================================================
 # 主函数
 # ============================================================================
@@ -587,8 +947,13 @@ ${YELLOW}命令:${NC}
   ${GREEN}remove${NC} <agent-id>          删除 Agent
   ${GREEN}status${NC}                     查看状态
   ${GREEN}logs${NC} <agent-id> [type]     查看日志 (type: app|chrome)
+  ${GREEN}update${NC} [options]           更新代码并重启 Agent
+    ${YELLOW}选项:${NC}
+      --skip-pull              跳过 git pull (仅 build + 重启)
+      --skip-install           跳过 pnpm install
 
 ${YELLOW}示例:${NC}
+  ${CYAN}基础操作:${NC}
   $0 add zhipin              # 添加 1 个 BOSS直聘 Agent
   $0 add zhipin --count 3    # 添加 3 个 BOSS直聘 Agent
   $0 add yupao --count 2     # 添加 2 个鱼泡网 Agent
@@ -598,6 +963,11 @@ ${YELLOW}示例:${NC}
   $0 stop                    # 停止所有 Agent
   $0 logs zhipin-1 app       # 查看应用日志
   $0 remove zhipin-1         # 删除 Agent
+
+  ${CYAN}代码更新 (推荐):${NC}
+  $0 update                  # 自动: pull + install + build + 重启运行的 Agent
+  $0 update --skip-pull      # 仅: build + 重启 (代码已手动更新)
+  $0 update --skip-install   # 跳过依赖安装 (加快速度)
 
 EOF
 }
@@ -639,7 +1009,7 @@ main() {
         restart)
             local target=${1:-}
             cmd_stop "$target"
-            sleep 2
+            sleep "$AGENT_RESTART_WAIT_TIME"
             cmd_start "$target"
             ;;
         remove)
@@ -650,6 +1020,28 @@ main() {
             ;;
         logs)
             cmd_logs "${1:-}" "${2:-app}"
+            ;;
+        update)
+            local skip_pull=false
+            local skip_install=false
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --skip-pull)
+                        skip_pull=true
+                        shift
+                        ;;
+                    --skip-install)
+                        skip_install=true
+                        shift
+                        ;;
+                    *)
+                        log_error "未知选项: $1"
+                        show_help
+                        exit 1
+                        ;;
+                esac
+            done
+            cmd_update "$skip_pull" "$skip_install"
             ;;
         help|--help|-h)
             show_help

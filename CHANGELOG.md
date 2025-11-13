@@ -2,6 +2,20 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.14.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.13.1-develop.1...v1.14.0-develop.1) (2025-11-13)
+
+
+### Features
+
+* refactor multi-agent script with config constants and modular update workflow ([649dbeb](https://github.com/steveoon/agent-computer-user/commit/649dbeb922578d089dee4d81749e6665e283d8d8))
+
+## [1.13.1-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.13.0...v1.13.1-develop.1) (2025-11-13)
+
+
+### Bug Fixes
+
+* 修复 test-llm-reply API 参数顺序并添加字段过滤设计文档 ([60692e1](https://github.com/steveoon/agent-computer-user/commit/60692e136601b9fa3b552469742ab114b2869d1d))
+
 # [1.13.0](https://github.com/steveoon/agent-computer-user/compare/v1.12.0...v1.13.0) (2025-11-12)
 
 

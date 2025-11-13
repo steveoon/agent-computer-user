@@ -59,7 +59,25 @@ Manage multiple Agent instances running in parallel with isolated browser sessio
 - `pnpm agent:stop` - Stop all Agents
 - `pnpm agent:logs zhipin-1` - View application logs (default)
 - `pnpm agent:logs zhipin-1 chrome` - View Chrome logs
+- `pnpm agent:update` - 🔄 **Auto-update: pull + build + restart running Agents**
+- `pnpm agent:update -- --skip-pull` - Build + restart (skip git pull)
+- `pnpm agent:update -- --skip-install` - Skip dependency installation
 - `./scripts/multi-agent.sh help` - See all available commands
+
+**Code Update Workflow (Recommended):**
+After pushing code updates to the repository, run on each deployment machine:
+```bash
+pnpm agent:update
+```
+This command automatically:
+1. Detects which Agents are currently running
+2. Stops all running Agents gracefully
+3. Pulls latest code from the current git branch
+4. Installs dependencies (if package.json changed)
+5. Builds the project with `pnpm build`
+6. Restarts previously running Agents
+
+**Note:** `pnpm start` runs production build (`.next/`), so updates **require** rebuild + restart.
 
 **Use Case:** Run multiple automation instances simultaneously, each with its own browser profile and application port. Perfect for managing multiple BOSS直聘 or 鱼泡网 accounts without session conflicts.
 
