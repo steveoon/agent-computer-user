@@ -698,11 +698,16 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
     configDefaultBrand,
     conversationBrand,
     availableBrands,
-    strategy = "smart"
+    strategy = "smart",
   } = input;
 
   // 记录解析尝试历史
-  const attempts: Array<{ source: string; value: string | undefined; matched: boolean; reason: string }> = [];
+  const attempts: Array<{
+    source: string;
+    value: string | undefined;
+    matched: boolean;
+    reason: string;
+  }> = [];
 
   // 辅助函数：尝试匹配品牌
   const tryMatchBrand = (brand: string | undefined, source: string): string | undefined => {
@@ -718,7 +723,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
         source,
         value: brand,
         matched: true,
-        reason: isExact ? "精确匹配" : `模糊匹配 (${brand} → ${matched})`
+        reason: isExact ? "精确匹配" : `模糊匹配 (${brand} → ${matched})`,
       });
       return matched;
     }
@@ -741,7 +746,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
           matchType: uiMatched === uiSelectedBrand ? "exact" : "fuzzy",
           source: "ui",
           reason: `用户选择策略: 使用UI选择的品牌 (${uiSelectedBrand}${uiMatched !== uiSelectedBrand ? ` → ${uiMatched}` : ""})`,
-          originalInput: uiSelectedBrand
+          originalInput: uiSelectedBrand,
         };
       }
 
@@ -753,7 +758,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
           matchType: configMatched === configDefaultBrand ? "exact" : "fuzzy",
           source: "config",
           reason: `用户选择策略: UI品牌无法匹配，使用配置默认 (${configDefaultBrand}${configMatched !== configDefaultBrand ? ` → ${configMatched}` : ""})`,
-          originalInput: configDefaultBrand
+          originalInput: configDefaultBrand,
         };
       }
 
@@ -763,7 +768,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
         resolvedBrand: fallback,
         matchType: "fallback",
         source: "default",
-        reason: `用户选择策略: 无有效品牌输入，使用系统默认 (${fallback})`
+        reason: `用户选择策略: 无有效品牌输入，使用系统默认 (${fallback})`,
       };
     }
 
@@ -779,7 +784,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
           matchType: conversationMatched === conversationBrand ? "exact" : "fuzzy",
           source: "conversation",
           reason: `对话提取策略: 使用对话中提取的品牌 (${conversationBrand}${conversationMatched !== conversationBrand ? ` → ${conversationMatched}` : ""})`,
-          originalInput: conversationBrand
+          originalInput: conversationBrand,
         };
       }
 
@@ -791,7 +796,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
           matchType: uiMatched === uiSelectedBrand ? "exact" : "fuzzy",
           source: "ui",
           reason: `对话提取策略: 对话品牌无法匹配，使用UI选择 (${uiSelectedBrand}${uiMatched !== uiSelectedBrand ? ` → ${uiMatched}` : ""})`,
-          originalInput: uiSelectedBrand
+          originalInput: uiSelectedBrand,
         };
       }
 
@@ -803,7 +808,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
           matchType: configMatched === configDefaultBrand ? "exact" : "fuzzy",
           source: "config",
           reason: `对话提取策略: 无有效对话/UI品牌，使用配置默认 (${configDefaultBrand}${configMatched !== configDefaultBrand ? ` → ${configMatched}` : ""})`,
-          originalInput: configDefaultBrand
+          originalInput: configDefaultBrand,
         };
       }
 
@@ -813,7 +818,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
         resolvedBrand: fallback,
         matchType: "fallback",
         source: "default",
-        reason: `对话提取策略: 无有效品牌输入，使用系统默认 (${fallback})`
+        reason: `对话提取策略: 无有效品牌输入，使用系统默认 (${fallback})`,
       };
     }
 
@@ -830,13 +835,12 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
       if (conversationMatched && uiMatched && conversationMatched !== uiMatched) {
         // 检查是否是同品牌系列
         const isSameBrandFamily =
-          conversationMatched.includes(uiMatched) ||
-          uiMatched.includes(conversationMatched);
+          conversationMatched.includes(uiMatched) || uiMatched.includes(conversationMatched);
 
         if (isSameBrandFamily) {
           // 同系列品牌，使用更具体的（字符串更长的）
-          const moreSpecific = conversationMatched.length > uiMatched.length
-            ? conversationMatched : uiMatched;
+          const moreSpecific =
+            conversationMatched.length > uiMatched.length ? conversationMatched : uiMatched;
           const source = moreSpecific === conversationMatched ? "conversation" : "ui";
 
           console.log(
@@ -848,7 +852,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
             matchType: "fuzzy",
             source: source as "conversation" | "ui",
             reason: `智能策略: 同系列品牌，使用更具体的 (对话=${conversationMatched}, UI=${uiMatched} → ${moreSpecific})`,
-            originalInput: source === "conversation" ? conversationBrand : uiSelectedBrand
+            originalInput: source === "conversation" ? conversationBrand : uiSelectedBrand,
           };
         } else {
           // 不同品牌系列，优先对话提取（因为更符合当前上下文）
@@ -861,7 +865,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
             matchType: conversationMatched === conversationBrand ? "exact" : "fuzzy",
             source: "conversation",
             reason: `智能策略: 不同品牌系列，优先对话上下文 (对话=${conversationMatched}, UI=${uiMatched})`,
-            originalInput: conversationBrand
+            originalInput: conversationBrand,
           };
         }
       }
@@ -873,7 +877,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
           matchType: conversationMatched === conversationBrand ? "exact" : "fuzzy",
           source: "conversation",
           reason: `智能策略: 使用对话中提取的品牌 (${conversationBrand}${conversationMatched !== conversationBrand ? ` → ${conversationMatched}` : ""})`,
-          originalInput: conversationBrand
+          originalInput: conversationBrand,
         };
       }
 
@@ -883,7 +887,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
           matchType: uiMatched === uiSelectedBrand ? "exact" : "fuzzy",
           source: "ui",
           reason: `智能策略: 对话无品牌，使用UI选择 (${uiSelectedBrand}${uiMatched !== uiSelectedBrand ? ` → ${uiMatched}` : ""})`,
-          originalInput: uiSelectedBrand
+          originalInput: uiSelectedBrand,
         };
       }
 
@@ -895,7 +899,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
           matchType: configMatched === configDefaultBrand ? "exact" : "fuzzy",
           source: "config",
           reason: `智能策略: 无对话/UI品牌，使用配置默认 (${configDefaultBrand}${configMatched !== configDefaultBrand ? ` → ${configMatched}` : ""})`,
-          originalInput: configDefaultBrand
+          originalInput: configDefaultBrand,
         };
       }
 
@@ -905,7 +909,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
         resolvedBrand: fallback,
         matchType: "fallback",
         source: "default",
-        reason: `智能策略: 无有效品牌输入，使用系统默认 (${fallback})`
+        reason: `智能策略: 无有效品牌输入，使用系统默认 (${fallback})`,
       };
     }
   }
@@ -932,15 +936,17 @@ function buildContextInfo(
 
   // 使用新的冲突解析逻辑，传入三个独立的品牌源
   const brandResolution = resolveBrandConflict({
-    uiSelectedBrand: uiSelectedBrand,           // UI选择的品牌
-    configDefaultBrand: data.defaultBrand,      // 配置中的默认品牌
-    conversationBrand: toolBrand || undefined,  // 工具调用时从职位详情识别的品牌
+    uiSelectedBrand: uiSelectedBrand, // UI选择的品牌
+    configDefaultBrand: data.defaultBrand, // 配置中的默认品牌
+    conversationBrand: toolBrand || undefined, // 工具调用时从职位详情识别的品牌
     availableBrands: Object.keys(data.brands),
-    strategy: brandPriorityStrategy || "smart"
+    strategy: brandPriorityStrategy || "smart",
   });
 
   const targetBrand = brandResolution.resolvedBrand;
-  console.log(`🏢 品牌输入: UI选择=${uiSelectedBrand}, 工具识别=${toolBrand}, 配置默认=${data.defaultBrand}`);
+  console.log(
+    `🏢 品牌输入: UI选择=${uiSelectedBrand}, 工具识别=${toolBrand}, 配置默认=${data.defaultBrand}`
+  );
   console.log(`✅ 品牌解析完成: ${targetBrand} (${brandResolution.reason})`);
 
   // 获取目标品牌的所有门店
@@ -1022,7 +1028,7 @@ function buildContextInfo(
   if (relevantStores.length > 0) {
     context += `匹配到的门店信息：\n`;
     // 显示该品牌下的所有门店（不限制数量）
-    relevantStores.forEach(store => {
+    relevantStores.slice(0, 3).forEach(store => {
       context += `• ${store.name}（${store.district}${store.subarea}）：${store.location}\n`;
       store.positions.forEach(pos => {
         // 🔧 智能薪资信息构建（包含memo解析）
