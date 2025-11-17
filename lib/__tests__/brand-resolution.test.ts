@@ -186,7 +186,7 @@ describe("Brand Resolution Logic", () => {
       expect(result.reason).toContain("智能策略");
     });
 
-    it("should choose more specific brand for same brand family", () => {
+    it("should prioritize conversation brand for same brand family", () => {
       const input: BrandResolutionInput = {
         uiSelectedBrand: "肯德基",
         configDefaultBrand: "必胜客",
@@ -197,14 +197,14 @@ describe("Brand Resolution Logic", () => {
 
       const result = resolveBrandConflict(input);
 
-      // 天津肯德基 is more specific than 肯德基
+      // 同系列品牌，优先使用对话提取的品牌（更符合当前上下文）
       expect(result.resolvedBrand).toBe("天津肯德基");
       expect(result.source).toBe("conversation");
       expect(result.reason).toContain("同系列品牌");
-      expect(result.reason).toContain("更具体");
+      expect(result.reason).toContain("对话上下文");
     });
 
-    it("should handle reverse case: UI more specific than conversation", () => {
+    it("should prioritize conversation brand even when UI is more specific", () => {
       const input: BrandResolutionInput = {
         uiSelectedBrand: "大连肯德基",
         configDefaultBrand: "必胜客",
@@ -215,11 +215,11 @@ describe("Brand Resolution Logic", () => {
 
       const result = resolveBrandConflict(input);
 
-      // 大连肯德基 is more specific than 肯德基
-      expect(result.resolvedBrand).toBe("大连肯德基");
-      expect(result.source).toBe("ui");
+      // 同系列品牌，仍然优先对话提取（即使 UI 更具体）
+      expect(result.resolvedBrand).toBe("肯德基");
+      expect(result.source).toBe("conversation");
       expect(result.reason).toContain("同系列品牌");
-      expect(result.reason).toContain("更具体");
+      expect(result.reason).toContain("对话上下文");
     });
 
     it("should use conversation brand for different brand families", () => {
