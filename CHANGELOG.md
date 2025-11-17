@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.14.1-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.14.0...v1.14.1-develop.1) (2025-11-17)
+
+
+### Bug Fixes
+
+* 修复同系列品牌匹配逻辑，优先使用LLM提取的品牌 ([fba0970](https://github.com/steveoon/agent-computer-user/commit/fba09703d89003620bc95a35eb0aee9e3c3f4032))
+
 # [1.14.0](https://github.com/steveoon/agent-computer-user/compare/v1.13.0...v1.14.0) (2025-11-13)
 
 

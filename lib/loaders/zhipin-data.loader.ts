@@ -838,21 +838,17 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
           conversationMatched.includes(uiMatched) || uiMatched.includes(conversationMatched);
 
         if (isSameBrandFamily) {
-          // 同系列品牌，使用更具体的（字符串更长的）
-          const moreSpecific =
-            conversationMatched.length > uiMatched.length ? conversationMatched : uiMatched;
-          const source = moreSpecific === conversationMatched ? "conversation" : "ui";
-
+          // 同系列品牌，优先使用对话提取的品牌（更符合当前上下文意图）
           console.log(
-            `🔍 品牌智能判断 [同系列]: 对话=${conversationMatched}, UI=${uiMatched} → 使用更具体的: ${moreSpecific}`
+            `🔍 品牌智能判断 [同系列]: 对话=${conversationMatched}, UI=${uiMatched} → 优先使用对话提取`
           );
 
           return {
-            resolvedBrand: moreSpecific,
-            matchType: "fuzzy",
-            source: source as "conversation" | "ui",
-            reason: `智能策略: 同系列品牌，使用更具体的 (对话=${conversationMatched}, UI=${uiMatched} → ${moreSpecific})`,
-            originalInput: source === "conversation" ? conversationBrand : uiSelectedBrand,
+            resolvedBrand: conversationMatched,
+            matchType: conversationMatched === conversationBrand ? "exact" : "fuzzy",
+            source: "conversation",
+            reason: `智能策略: 同系列品牌，优先对话上下文 (对话=${conversationMatched}, UI=${uiMatched})`,
+            originalInput: conversationBrand,
           };
         } else {
           // 不同品牌系列，优先对话提取（因为更符合当前上下文）
