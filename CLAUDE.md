@@ -438,6 +438,74 @@ EXA_API_KEY=your_exa_search_key
 - **PREFER** `readonly` arrays and object properties for immutability
 - **USE** explicit return types for all functions
 
+### TypeScript Patterns (Eliminate if-else)
+
+**1. Handler/Strategy Pattern** - Replace conditional branches with object mapping:
+```typescript
+// ❌ Avoid
+if (type === "a") { doA(); } else if (type === "b") { doB(); }
+
+// ✅ Prefer
+interface Handler { execute: () => void; config: Config; }
+const HANDLERS: Record<TypeKey, Handler> = {
+  a: { execute: doA, config: configA },
+  b: { execute: doB, config: configB },
+};
+HANDLERS[type].execute();
+```
+
+**2. Literal Union Types** - Restrict valid values at compile time:
+```typescript
+// ❌ Avoid
+brand: string;  // Any string accepted
+
+// ✅ Prefer
+type BrandKey = "boss-zhipin" | "yupao";
+brand: BrandKey;  // Only valid values
+```
+
+**3. Type Predicates** - Safe type narrowing without assertions:
+```typescript
+// ❌ Avoid
+const items = arr.filter(x => isValid(x)) as ValidType[];
+
+// ✅ Prefer
+const items = arr.filter((x): x is ValidType => isValid(x));
+```
+
+**4. Constants Extraction** - Eliminate magic values:
+```typescript
+// ❌ Avoid
+await page.setViewport({ width: 1920, height: 1080 });
+
+// ✅ Prefer
+const VIEWPORT = { width: 1920, height: 1080 } as const;
+await page.setViewport(VIEWPORT);
+```
+
+**5. Configuration Merging** - Reduce duplication:
+```typescript
+// ❌ Avoid: Repeating same overrides in multiple branches
+if (cond) { config = { ...defaults, a: parseA(), b: parseB() }; }
+else { config = { ...defaults, a: parseA(), b: parseB() }; }
+
+// ✅ Prefer: Extract common overrides
+const overrides = { a: parseA(), b: parseB() };
+config = cond
+  ? { ...defaults, ...specific, ...overrides }
+  : { ...defaults, ...overrides };
+```
+
+**6. Record Mapping** - Replace switch statements:
+```typescript
+// ❌ Avoid
+switch (key) { case "a": return "A"; case "b": return "B"; }
+
+// ✅ Prefer
+const MAP: Record<Key, string> = { a: "A", b: "B" };
+return MAP[key];
+```
+
 ### Component Development
 
 - **USE** the established component patterns in `components/ui/`

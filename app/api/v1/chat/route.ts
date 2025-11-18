@@ -252,6 +252,7 @@ export async function POST(req: Request) {
       const responseMessages = convertGenerateTextResultToUIMessages(result);
 
       const responseData: OpenChatResponse = {
+        correlationId, // 添加请求追踪ID到响应体
         messages: responseMessages,
         usage: {
           inputTokens: result.usage.inputTokens,
@@ -264,6 +265,8 @@ export async function POST(req: Request) {
           used,
           skipped: skipped.map(s => s.name),
         },
+        // actions 字段暂不实现，留待后续添加工具调用逻辑
+        // actions: extractActionsFromMessages(responseMessages),
       };
 
       const headers: Record<string, string> = {
