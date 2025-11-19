@@ -7,7 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   Key,
   CheckCircle,
@@ -21,9 +26,11 @@ import {
   Star,
   Edit2,
   Workflow,
+  Bot,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { BrandPriorityStrategy } from "@/types";
+import { useModelConfigStore } from "@/lib/stores/model-config-store";
 
 interface TokenStatus {
   isValid: boolean;
@@ -50,6 +57,9 @@ export const GeneralConfigManager = ({
   brandPriorityStrategy,
   onStrategyChange,
 }: GeneralConfigManagerProps) => {
+  // Agent 配置
+  const { maxSteps, setMaxSteps } = useModelConfigStore();
+
   // Token 相关状态
   const [token, setToken] = useState("");
   const [isTokenVisible, setIsTokenVisible] = useState(false);
@@ -280,24 +290,21 @@ export const GeneralConfigManager = ({
       </CardHeader>
 
       <CardContent>
-        <Tabs defaultValue="token" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="token" className="flex items-center gap-2">
-              <Key className="h-4 w-4" />
-              Token配置
-            </TabsTrigger>
-            <TabsTrigger value="wechat" className="flex items-center gap-2">
-              <MessageCircle className="h-4 w-4" />
-              微信号配置
-            </TabsTrigger>
-            <TabsTrigger value="brand-strategy" className="flex items-center gap-2">
-              <Workflow className="h-4 w-4" />
-              品牌策略
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Token配置Tab */}
-          <TabsContent value="token" className="space-y-6 mt-6">
+        <Accordion type="multiple" defaultValue={["token"]} className="w-full">
+          {/* Token配置 */}
+          <AccordionItem value="token" className="border rounded-lg px-4 mb-2 data-[state=open]:bg-muted/30 data-[state=open]:shadow-sm transition-all">
+            <AccordionTrigger className="hover:no-underline py-4 [&>svg]:text-muted-foreground hover:bg-muted/50 -mx-4 px-4 rounded-lg transition-colors">
+              <div className="flex items-center gap-2">
+                <Key className="h-4 w-4 text-muted-foreground" />
+                <span>Token配置</span>
+                {token && (
+                  <Badge variant={tokenStatus?.isValid ? "default" : "secondary"} className="ml-2">
+                    {tokenStatus?.isValid ? "已验证" : "未验证"}
+                  </Badge>
+                )}
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
             {/* Token状态显示 */}
             {tokenStatus && (
               <Alert
@@ -405,20 +412,33 @@ export const GeneralConfigManager = ({
             </div>
 
             {/* 使用说明 */}
-            <div className="border-t pt-4">
-              <h4 className="font-medium mb-2">使用说明</h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                使用说明
+              </summary>
+              <ul className="text-muted-foreground space-y-1 mt-2 ml-4">
                 <li>• Token保存在浏览器本地存储中，仅在当前设备有效</li>
                 <li>• 请定期验证Token状态，确保数据同步功能正常</li>
-                <li>• 如果Token过期，请联系相关人员获取新的Token</li>
                 <li>• Token仅用于数据读取，不会修改Duliday平台的数据</li>
-                <li>• 为确保安全，请不要在公共设备上保存Token</li>
               </ul>
-            </div>
-          </TabsContent>
+            </details>
+            </AccordionContent>
+          </AccordionItem>
 
-          {/* 微信号配置Tab */}
-          <TabsContent value="wechat" className="space-y-6 mt-6">
+          {/* 微信号配置 */}
+          <AccordionItem value="wechat" className="border rounded-lg px-4 mb-2 data-[state=open]:bg-muted/30 data-[state=open]:shadow-sm transition-all">
+            <AccordionTrigger className="hover:no-underline py-4 [&>svg]:text-muted-foreground hover:bg-muted/50 -mx-4 px-4 rounded-lg transition-colors">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                <span>微信号配置</span>
+                {wechatAccounts.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {wechatAccounts.length} 个
+                  </Badge>
+                )}
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
             {/* 微信号列表 */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -582,20 +602,123 @@ export const GeneralConfigManager = ({
             </div>
 
             {/* 使用说明 */}
-            <div className="border-t pt-4">
-              <h4 className="font-medium mb-2">使用说明</h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• 可以配置多个微信号，用于不同场景的自动回复</li>
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                使用说明
+              </summary>
+              <ul className="text-muted-foreground space-y-1 mt-2 ml-4">
                 <li>• 默认微信号将在与候选人交换联系方式时自动使用</li>
-                <li>• 微信号信息仅保存在本地浏览器中，不会上传到服务器</li>
-                <li>• 请确保微信号信息准确，以便候选人能够正确添加</li>
-                <li>• 点击编辑按钮可以修改已添加的微信号信息</li>
+                <li>• 微信号信息仅保存在本地浏览器中</li>
               </ul>
-            </div>
-          </TabsContent>
+            </details>
+            </AccordionContent>
+          </AccordionItem>
 
-          {/* 品牌策略配置Tab */}
-          <TabsContent value="brand-strategy" className="space-y-6 mt-6">
+          {/* Agent配置 */}
+          <AccordionItem value="agent" className="border rounded-lg px-4 mb-2 data-[state=open]:bg-muted/30 data-[state=open]:shadow-sm transition-all">
+            <AccordionTrigger className="hover:no-underline py-4 [&>svg]:text-muted-foreground hover:bg-muted/50 -mx-4 px-4 rounded-lg transition-colors">
+              <div className="flex items-center gap-2">
+                <Bot className="h-4 w-4 text-muted-foreground" />
+                <span>Agent配置</span>
+                <Badge variant="outline" className="ml-2">
+                  {maxSteps} 轮
+                </Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  设置 Agent 在一次对话中的最大工具调用轮数
+                </p>
+              </div>
+
+              {/* maxSteps 配置 */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-4">
+                  <Label htmlFor="max-steps">最大轮数</Label>
+                  <Input
+                    id="max-steps"
+                    type="number"
+                    min={1}
+                    max={500}
+                    value={maxSteps}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (!isNaN(value)) {
+                        setMaxSteps(value);
+                      }
+                    }}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">(1-500)</span>
+                </div>
+
+                {/* 预设快捷选项 */}
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant={maxSteps === 10 ? "default" : "outline"}
+                    onClick={() => setMaxSteps(10)}
+                  >
+                    10 轮
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={maxSteps === 30 ? "default" : "outline"}
+                    onClick={() => setMaxSteps(30)}
+                  >
+                    30 轮
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={maxSteps === 150 ? "default" : "outline"}
+                    onClick={() => setMaxSteps(150)}
+                  >
+                    150 轮
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={maxSteps === 300 ? "default" : "outline"}
+                    onClick={() => setMaxSteps(300)}
+                  >
+                    300 轮
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={maxSteps === 500 ? "default" : "outline"}
+                    onClick={() => setMaxSteps(500)}
+                  >
+                    500 轮
+                  </Button>
+                </div>
+              </div>
+
+              {/* 使用说明 */}
+              <details className="text-sm">
+                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                  使用说明
+                </summary>
+                <ul className="text-muted-foreground space-y-1 mt-2 ml-4">
+                  <li>• 每次工具调用计为一轮，达到限制时可点击"继续"按钮</li>
+                  <li>• 处理多个候选人时，建议设置 50-100 轮</li>
+                </ul>
+              </details>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* 品牌策略配置 */}
+          <AccordionItem value="brand-strategy" className="border rounded-lg px-4 data-[state=open]:bg-muted/30 data-[state=open]:shadow-sm transition-all">
+            <AccordionTrigger className="hover:no-underline py-4 [&>svg]:text-muted-foreground hover:bg-muted/50 -mx-4 px-4 rounded-lg transition-colors">
+              <div className="flex items-center gap-2">
+                <Workflow className="h-4 w-4 text-muted-foreground" />
+                <span>品牌策略</span>
+                <Badge variant="outline" className="ml-2">
+                  {brandPriorityStrategy === "smart" ? "智能" :
+                   brandPriorityStrategy === "user-selected" ? "用户优先" : "职位优先"}
+                </Badge>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 pb-4">
             <div className="space-y-6">
               <div>
                 <h4 className="font-medium mb-3">品牌冲突处理策略</h4>
@@ -735,19 +858,19 @@ export const GeneralConfigManager = ({
               </Alert>
 
               {/* 使用说明 */}
-              <div className="border-t pt-4">
-                <h4 className="font-medium mb-2">使用说明</h4>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• 职位详情中的品牌由AI工具自动识别（如Boss直聘岗位详情页）</li>
-                  <li>• 品牌会经过模糊匹配（精确匹配 → 包含匹配）得到最终匹配结果</li>
-                  <li>• 当UI选择与职位识别不一致时，按所选策略处理</li>
-                  <li>• 品牌家族：一个包含另一个即为同家族（如"肯德基"和"大连肯德基"）</li>
-                  <li>• 策略立即生效，仅保存在当前浏览器中</li>
+              <details className="text-sm">
+                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                  使用说明
+                </summary>
+                <ul className="text-muted-foreground space-y-1 mt-2 ml-4">
+                  <li>• 职位详情中的品牌由AI工具自动识别</li>
+                  <li>• 品牌家族：一个包含另一个即为同家族</li>
                 </ul>
-              </div>
+              </details>
             </div>
-          </TabsContent>
-        </Tabs>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </CardContent>
     </Card>
   );

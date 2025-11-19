@@ -44,6 +44,17 @@ export { CONFIG_STORAGE_KEY, CONFIG_VERSION } from "./config";
 export * from "./image-optimize-type";
 export * from "./feishu";
 
+// AI SDK 相关类型
+export type FinishReason =
+  | "stop"
+  | "length"
+  | "content-filter"
+  | "tool-calls"
+  | "error"
+  | "other"
+  | "unknown"
+  | null;
+
 // 从tool-common.ts导出工具相关类型
 export type {
   // 工具注册表类型

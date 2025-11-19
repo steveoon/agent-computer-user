@@ -6,6 +6,7 @@ import { PromptSuggestions, type PromptSuggestion } from "@/components/prompt-su
 import { TemplateEditor } from "./TemplateEditor";
 import { toast } from "sonner";
 import { useInputHistoryStore } from "@/lib/stores/input-history-store";
+import type { FinishReason } from "@/types";
 
 interface ChatInputFormProps {
   input: string;
@@ -18,6 +19,7 @@ interface ChatInputFormProps {
   error: Error | undefined;
   isAuthenticated: boolean;
   append: (message: { role: "user"; content: string }) => void;
+  lastFinishReason?: FinishReason;
 }
 
 interface TemplateState {
@@ -36,9 +38,17 @@ export function ChatInputForm({
   error,
   isAuthenticated,
   append,
+  lastFinishReason,
 }: ChatInputFormProps) {
   const { addToHistory } = useInputHistoryStore();
   const [templateState, setTemplateState] = useState<TemplateState | null>(null);
+
+  // 继续处理的回调
+  const handleContinue = () => {
+    const continuePrompt = "继续";
+    addToHistory(continuePrompt);
+    append({ role: "user", content: continuePrompt });
+  };
 
   const handlePromptClick = (suggestion: PromptSuggestion) => {
     if (!isAuthenticated) {
@@ -108,6 +118,8 @@ export function ChatInputForm({
             stop={stop}
             error={error}
             isAuthenticated={isAuthenticated}
+            lastFinishReason={lastFinishReason}
+            onContinue={handleContinue}
           />
         </form>
       </div>

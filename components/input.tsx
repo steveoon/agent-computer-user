@@ -1,7 +1,8 @@
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Play } from "lucide-react";
 import { Textarea } from "./ui/textarea";
 import { useInputHistoryStore } from "@/lib/stores/input-history-store";
 import { useEffect, useRef, useState } from "react";
+import type { FinishReason } from "@/types";
 
 // Constants for textarea dimensions
 const MIN_HEIGHT = 52;
@@ -16,6 +17,8 @@ interface InputProps {
   stop: () => void;
   error?: Error | null;
   isAuthenticated?: boolean;
+  lastFinishReason?: FinishReason;
+  onContinue?: () => void;
 }
 
 export const Input = ({
@@ -27,6 +30,8 @@ export const Input = ({
   stop,
   error,
   isAuthenticated = true,
+  lastFinishReason,
+  onContinue,
 }: InputProps) => {
   const { navigateHistory, resetIndex, setTempInput, history } = useInputHistoryStore();
   const hasNavigated = useRef(false);
@@ -35,6 +40,10 @@ export const Input = ({
 
   // 更智能的禁用逻辑：只有在真正加载中且没有错误时才禁用，或者用户未认证
   const shouldDisable = (isLoading && !error) || isInitializing || !isAuthenticated;
+
+  // 判断是否应该显示"继续"按钮
+  // 条件：状态为 ready，且 lastFinishReason 为 "tool-calls"（被步数限制中断）
+  const shouldShowContinue = status === "ready" && lastFinishReason === "tool-calls" && onContinue;
 
   // Unified function to adjust textarea height
   const adjustTextareaHeight = (element: HTMLTextAreaElement | null, scrollToBottom = false) => {
@@ -192,6 +201,15 @@ export const Input = ({
               />
             </svg>
           </div>
+        </button>
+      ) : shouldShowContinue ? (
+        <button
+          type="button"
+          onClick={onContinue}
+          aria-label="继续处理"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-2 bg-green-600 hover:bg-green-700 transition-colors"
+        >
+          <Play className="h-4 w-4 text-white" />
         </button>
       ) : (
         <button

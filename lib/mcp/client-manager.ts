@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter } from "events";
-import { experimental_createMCPClient } from "ai";
-import { Experimental_StdioMCPTransport } from "ai/mcp-stdio";
+import { experimental_createMCPClient } from "@ai-sdk/mcp";
+import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
 import {
   MCPClientConfig,
   MCPManagerStatus,

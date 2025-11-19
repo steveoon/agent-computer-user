@@ -19,6 +19,9 @@ interface ModelConfigState {
 
   // Provider配置
   providerConfigs: Record<string, ProviderConfig>;
+
+  // Agent配置
+  maxSteps: number; // Agent最大处理轮数 (1-500)
 }
 
 interface ModelConfigActions {
@@ -31,6 +34,9 @@ interface ModelConfigActions {
   updateProviderConfig: (provider: string, config: ProviderConfig) => void;
   resetProviderConfig: (provider: string) => void;
   resetAllProviderConfigs: () => void;
+
+  // Agent配置方法
+  setMaxSteps: (steps: number) => void;
 
   // 重置方法
   resetToDefaults: () => void;
@@ -92,6 +98,7 @@ export const useModelConfigStore = create<ModelConfigStore>()(
       classifyModel: DEFAULT_MODEL_CONFIG.classifyModel,
       replyModel: DEFAULT_MODEL_CONFIG.replyModel,
       providerConfigs: { ...DEFAULT_PROVIDER_CONFIGS },
+      maxSteps: 30, // 默认30轮
 
       // 模型配置方法
       setChatModel: (model: ModelId) => {
@@ -138,6 +145,14 @@ export const useModelConfigStore = create<ModelConfigStore>()(
         console.log(`[MODEL CONFIG] 所有Provider配置已重置为默认值`);
       },
 
+      // Agent配置方法
+      setMaxSteps: (steps: number) => {
+        // 限制范围 1-500
+        const validSteps = Math.max(1, Math.min(500, steps));
+        set({ maxSteps: validSteps });
+        console.log(`[MODEL CONFIG] Agent最大轮数已更新为: ${validSteps}`);
+      },
+
       // 重置所有配置
       resetToDefaults: () => {
         set({
@@ -145,6 +160,7 @@ export const useModelConfigStore = create<ModelConfigStore>()(
           classifyModel: DEFAULT_MODEL_CONFIG.classifyModel,
           replyModel: DEFAULT_MODEL_CONFIG.replyModel,
           providerConfigs: { ...DEFAULT_PROVIDER_CONFIGS },
+          maxSteps: 30,
         });
         console.log(`[MODEL CONFIG] 所有配置已重置为默认值`);
       },
@@ -156,6 +172,7 @@ export const useModelConfigStore = create<ModelConfigStore>()(
         classifyModel: state.classifyModel,
         replyModel: state.replyModel,
         providerConfigs: state.providerConfigs,
+        maxSteps: state.maxSteps,
       }),
       // 自定义合并逻辑：解决新增Provider被覆盖的问题和无效模型ID问题
       merge: (persistedState, currentState) => {
@@ -185,6 +202,10 @@ export const useModelConfigStore = create<ModelConfigStore>()(
             persisted.providerConfigs,
             DEFAULT_PROVIDER_CONFIGS
           ),
+          // 验证 maxSteps 范围
+          maxSteps: persisted.maxSteps
+            ? Math.max(1, Math.min(500, persisted.maxSteps))
+            : 30,
         };
       },
     }
@@ -196,6 +217,7 @@ export const useChatModel = () => useModelConfigStore(state => state.chatModel);
 export const useClassifyModel = () => useModelConfigStore(state => state.classifyModel);
 export const useReplyModel = () => useModelConfigStore(state => state.replyModel);
 export const useProviderConfigs = () => useModelConfigStore(state => state.providerConfigs);
+export const useMaxSteps = () => useModelConfigStore(state => state.maxSteps);
 
 // 获取特定provider的配置
 export const useProviderConfig = (provider: string) =>

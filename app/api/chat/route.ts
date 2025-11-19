@@ -43,6 +43,7 @@ export async function POST(req: Request) {
     activeSystemPrompt,
     dulidayToken,
     defaultWechatId,
+    maxSteps,
   }: ChatRequestBody = await req.json();
 
   try {
@@ -140,12 +141,24 @@ export async function POST(req: Request) {
       providerOptions: {
         anthropic: { cacheControl: { type: "ephemeral" } },
       },
-      stopWhen: stepCountIs(30),
-      onFinish: async ({ usage, toolResults }) => {
-        console.log("📊 usage", usage);
-        // Note: toolResults is typically empty in streaming mode as results are sent immediately
-        if (toolResults && toolResults.length > 0) {
-          console.log("🛠️ toolResults", toolResults);
+      stopWhen: stepCountIs(maxSteps || 30),
+      onStepFinish: async ({ finishReason, usage, toolCalls }) => {
+        const toolInfo = toolCalls?.length
+          ? ` | tools: [${toolCalls.map(t => t.toolName).join(", ")}]`
+          : "";
+        console.log(`📊 Step finish=${finishReason}${toolInfo} | tokens: ${usage?.totalTokens || 0}`);
+      },
+      onFinish: async ({ usage, finishReason, steps }) => {
+        console.log(
+          `\n🏁 Stream完成 | 原因: ${finishReason} | 总步数: ${steps.length} | 总tokens: ${usage?.totalTokens || 0}`
+        );
+        // 打印每步摘要
+        if (steps.length > 0) {
+          console.log("📋 步骤摘要:");
+          steps.forEach((step, i) => {
+            const tools = step.toolCalls?.map(t => t.toolName).join(", ") || "无";
+            console.log(`   ${i + 1}. ${step.finishReason} | tools: ${tools}`);
+          });
         }
       },
       onError: async error => {

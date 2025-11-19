@@ -35,6 +35,7 @@ export const ChatRequestBodySchema = z.object({
   activeSystemPrompt: z.string().optional(), // keyof SystemPromptsConfig
   dulidayToken: z.string().optional(),
   defaultWechatId: z.string().optional(), // 默认微信号
+  maxSteps: z.number().min(1).max(500).optional(), // Agent最大处理轮数
 });
 
 /**
@@ -56,6 +57,7 @@ export interface ChatRequestBody {
   activeSystemPrompt?: keyof SystemPromptsConfig;
   dulidayToken?: string;
   defaultWechatId?: string; // 默认微信号
+  maxSteps?: number; // Agent最大处理轮数 (1-500)
 }
 
 /**
