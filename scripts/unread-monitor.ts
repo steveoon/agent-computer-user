@@ -111,7 +111,7 @@ const DEFAULT_CONFIG: MonitorConfig = {
   fallbackPrompt: "检查对话列表，找出对方发送了消息但我们还没有回复的候选人，并逐个回复",
 };
 
-const BROWSER_VIEWPORT = { width: 1920, height: 1080 } as const;
+const BROWSER_VIEWPORT = { width: 1440, height: 1080 } as const;
 const LOGIN_WAIT_DURATION_MS = 30000; // 间隔30秒后开始监听
 const AGENT_PROCESS_WAIT_MS = 60000; // 等待1分钟让Agent处理完成
 
@@ -459,7 +459,7 @@ const BRAND_HANDLERS: Record<BrandKey, BrandHandler> = {
   yupao: {
     key: "yupao",
     displayName: "鱼泡",
-    startUrl: "https://www.yupao.com/message",
+    startUrl: "https://www.yupao.com/web/im",
     loginMessage: "已打开鱼泡消息页面，请手动登录",
     checkUnread: checkYupaoUnread,
   },
@@ -813,36 +813,78 @@ class UnreadMonitor {
       throw error;
     }
 
-    // 打开 Huajune 聊天页面
-    this.chatPage = await this.browser.newPage();
-    await this.chatPage.setViewport(BROWSER_VIEWPORT); // 设置视口大小
-    await this.chatPage.goto(this.config.chatPageUrl, WAIT_UNTIL_OPTIONS);
-    logger.success(`已打开聊天页面: ${this.config.chatPageUrl}`);
+    // 获取浏览器中已有的所有页面
+    const existingPages = await this.browser.pages();
+    logger.info(`检测到浏览器中已有 ${existingPages.length} 个页面`);
 
-    // 为每个品牌创建标签页（需要用户手动登录）
+    // 查找或创建 Huajune 聊天页面
+    let chatPageFound = false;
+    for (const page of existingPages) {
+      const url = page.url();
+      if (url.includes(new URL(this.config.chatPageUrl).host)) {
+        this.chatPage = page;
+        await this.chatPage.setViewport(BROWSER_VIEWPORT); // 确保 viewport 正确
+        chatPageFound = true;
+        logger.success(`复用已有聊天页面: ${url}`);
+        break;
+      }
+    }
+
+    if (!chatPageFound) {
+      this.chatPage = await this.browser.newPage();
+      await this.chatPage.setViewport(BROWSER_VIEWPORT);
+      await this.chatPage.goto(this.config.chatPageUrl, WAIT_UNTIL_OPTIONS);
+      logger.success(`已打开聊天页面: ${this.config.chatPageUrl}`);
+    }
+
+    // 为每个品牌查找或创建标签页
+    let needLogin = false;
     for (const brand of this.config.enabledBrands) {
       const handler = BRAND_HANDLERS[brand];
       if (!handler) continue;
-      const brandPage = await this.browser.newPage();
-      await brandPage.setViewport(BROWSER_VIEWPORT); // 设置视口大小
-      this.brandPages.set(brand, brandPage);
 
-      await brandPage.goto(handler.startUrl, WAIT_UNTIL_OPTIONS);
-      logger.info(handler.loginMessage);
+      // 尝试查找已存在的品牌页面
+      let brandPageFound = false;
+      const targetHost = new URL(handler.startUrl).host;
+
+      for (const page of existingPages) {
+        const url = page.url();
+        if (url.includes(targetHost)) {
+          await page.setViewport(BROWSER_VIEWPORT); // 确保 viewport 正确
+          this.brandPages.set(brand, page);
+          brandPageFound = true;
+          logger.success(`复用已有 ${handler.displayName} 页面: ${url}`);
+          break;
+        }
+      }
+
+      // 如果没有找到，创建新页面
+      if (!brandPageFound) {
+        const brandPage = await this.browser.newPage();
+        await brandPage.setViewport(BROWSER_VIEWPORT);
+        this.brandPages.set(brand, brandPage);
+        await brandPage.goto(handler.startUrl, WAIT_UNTIL_OPTIONS);
+        logger.info(handler.loginMessage);
+        needLogin = true;
+      }
     }
 
-    // 等待用户登录
-    logger.warn("⏳ 请在浏览器中完成登录，30 秒后开始监听...");
-    logger.info("");
-    logger.info("📋 重要提示：请勿关闭以下标签页");
-    logger.info(`  - ${this.config.chatPageUrl}（Agent 聊天页面）`);
-    for (const brand of this.config.enabledBrands) {
-      const handler = BRAND_HANDLERS[brand];
-      if (!handler) continue;
-      logger.info(`  - ${handler.startUrl}（${handler.displayName}）`);
+    // 只有在创建了新页面时才等待登录
+    if (needLogin) {
+      logger.warn("⏳ 请在浏览器中完成登录，30 秒后开始监听...");
+      logger.info("");
+      logger.info("📋 重要提示：请勿关闭以下标签页");
+      logger.info(`  - ${this.config.chatPageUrl}（Agent 聊天页面）`);
+      for (const brand of this.config.enabledBrands) {
+        const handler = BRAND_HANDLERS[brand];
+        if (!handler) continue;
+        logger.info(`  - ${handler.startUrl}（${handler.displayName}）`);
+      }
+      logger.info("");
+      await new Promise(resolve => setTimeout(resolve, LOGIN_WAIT_DURATION_MS));
+    } else {
+      logger.success("所有页面已复用，跳过登录等待");
     }
-    logger.info("");
-    await new Promise(resolve => setTimeout(resolve, LOGIN_WAIT_DURATION_MS));
 
     // 设置键盘快捷键
     this.setupKeyboardControls();
