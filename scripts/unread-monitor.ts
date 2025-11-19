@@ -359,14 +359,19 @@ async function checkBossZhipinUnread(page: Page): Promise<UnreadMessage | null> 
 /**
  * 检测鱼泡未读消息
  * 使用动态选择器处理 CSS 模块哈希变化（与 get-unread-messages.tool.ts 一致）
+ * 注意：使用字符串脚本而非函数传递，避免 tsx/esbuild 的 __name 序列化问题
  */
 async function checkYupaoUnread(page: Page): Promise<UnreadMessage | null> {
   try {
-    // 使用动态选择器在浏览器端查找未读消息
-    const result = await page.evaluate(
-      selectors => {
+    // 预先计算选择器数组（在 Node.js 端）
+    const convItemSelectors = getYupaoAdaptiveSelectors("convItem");
+    const unreadNumSelectors = getYupaoAdaptiveSelectors("unreadNum");
+
+    // 使用字符串脚本在浏览器端执行，避免函数序列化问题
+    const script = `
+      (function() {
         // 定义查找元素的函数
-        function findElement(element: Element, patterns: string[]): Element | null {
+        function findElement(element, patterns) {
           for (const pattern of patterns) {
             try {
               const found = element.querySelector(pattern);
@@ -378,10 +383,12 @@ async function checkYupaoUnread(page: Page): Promise<UnreadMessage | null> {
           return null;
         }
 
-        // 查找所有对话项
-        const convItemSelectors = selectors.convItem;
-        let convItems: Element[] = [];
+        // 选择器配置
+        const convItemSelectors = ${JSON.stringify(convItemSelectors)};
+        const unreadNumSelectors = ${JSON.stringify(unreadNumSelectors)};
 
+        // 查找所有对话项
+        let convItems = [];
         for (const selector of convItemSelectors) {
           try {
             const items = document.querySelectorAll(selector);
@@ -403,23 +410,21 @@ async function checkYupaoUnread(page: Page): Promise<UnreadMessage | null> {
         let candidateCount = 0;
 
         for (const item of convItems) {
-          const unreadElement = findElement(item, selectors.unreadNum);
+          const unreadElement = findElement(item, unreadNumSelectors);
           if (unreadElement) {
-            const countText = unreadElement.textContent?.trim();
-            if (countText && /^\d+$/.test(countText)) {
+            const countText = unreadElement.textContent ? unreadElement.textContent.trim() : '';
+            if (countText && /^\\d+$/.test(countText)) {
               totalUnread += parseInt(countText, 10);
               candidateCount++;
             }
           }
         }
 
-        return { totalUnread, candidateCount };
-      },
-      {
-        convItem: getYupaoAdaptiveSelectors("convItem"),
-        unreadNum: getYupaoAdaptiveSelectors("unreadNum"),
-      }
-    );
+        return { totalUnread: totalUnread, candidateCount: candidateCount };
+      })()
+    `;
+
+    const result = await page.evaluate(script) as { totalUnread: number; candidateCount: number };
 
     if (result.totalUnread > 0) {
       logger.info(`鱼泡发现 ${result.totalUnread} 条未读消息（${result.candidateCount} 个候选人）`);
