@@ -2,6 +2,20 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.16.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.15.1-develop.1...v1.16.0-develop.1) (2025-11-19)
+
+
+### Features
+
+* **monitor:** 复用已有浏览器标签页并修复 viewport 问题 ([6f65607](https://github.com/steveoon/agent-computer-user/commit/6f6560767acf75a2202e815c3628caf701953ed4))
+
+## [1.15.1-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.15.0...v1.15.1-develop.1) (2025-11-19)
+
+
+### Bug Fixes
+
+* **monitor:** 修复鱼泡未读消息检测的 __name 序列化错误 ([86a669e](https://github.com/steveoon/agent-computer-user/commit/86a669e32eaea52393c22b2a07fea3711e821faf))
+
 # [1.15.0](https://github.com/steveoon/agent-computer-user/compare/v1.14.1...v1.15.0) (2025-11-19)
 
 
