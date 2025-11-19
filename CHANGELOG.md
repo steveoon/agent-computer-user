@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.15.0](https://github.com/steveoon/agent-computer-user/compare/v1.14.1...v1.15.0) (2025-11-19)
+
+
+### Features
+
+* 添加Agent步数限制后的"继续"按钮及可配置maxSteps ([8d708b1](https://github.com/steveoon/agent-computer-user/commit/8d708b18bf58da84ec6f61fd749894c004877453))
+
 # [1.15.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.14.1...v1.15.0-develop.1) (2025-11-19)
 
 
