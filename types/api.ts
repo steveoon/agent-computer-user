@@ -35,6 +35,7 @@ export const ChatRequestBodySchema = z.object({
   activeSystemPrompt: z.string().optional(), // keyof SystemPromptsConfig
   dulidayToken: z.string().optional(),
   defaultWechatId: z.string().optional(), // 默认微信号
+  maxSteps: z.number().min(1).max(500).optional(), // Agent最大处理轮数
 });
 
 /**
@@ -56,6 +57,7 @@ export interface ChatRequestBody {
   activeSystemPrompt?: keyof SystemPromptsConfig;
   dulidayToken?: string;
   defaultWechatId?: string; // 默认微信号
+  maxSteps?: number; // Agent最大处理轮数 (1-500)
 }
 
 /**
@@ -194,6 +196,55 @@ export interface ModelsResponseBody {
 export type ContextStrategy = "error" | "skip" | "report";
 
 /**
+ * 动作类型枚举
+ * 定义聊天响应中可能需要执行的附加操作
+ */
+export type ActionType = "sendMiniProgram" | "inviteToGroup";
+
+/**
+ * 动作指令基础接口
+ */
+export interface ActionBase {
+  readonly type: ActionType;
+}
+
+/**
+ * 发送小程序动作
+ * 小程序配置由调用方维护，服务端只负责告知是否需要发送
+ *
+ * @example
+ * { type: "sendMiniProgram" }
+ */
+export interface SendMiniProgramAction extends ActionBase {
+  readonly type: "sendMiniProgram";
+  // 无需额外参数，调用方自行决定发送哪个小程序
+}
+
+/**
+ * 拉群动作
+ *
+ * @example
+ * {
+ *   type: "inviteToGroup",
+ *   groupId: "group_a",
+ *   groupName: "技术交流群",
+ *   wechatIds: ["user1", "user2"]
+ * }
+ */
+export interface InviteToGroupAction extends ActionBase {
+  readonly type: "inviteToGroup";
+  readonly groupId: string; // 群ID（必需）
+  readonly groupName?: string; // 群名称（可选，便于调试和日志）
+  readonly wechatIds?: readonly string[]; // 要邀请的微信ID列表（可选）
+}
+
+/**
+ * 联合动作类型
+ * 支持的所有动作类型的联合
+ */
+export type Action = SendMiniProgramAction | InviteToGroupAction;
+
+/**
  * 消息剪裁选项
  */
 export interface PruneOptions {
@@ -328,6 +379,14 @@ export interface OpenChatRequest {
  */
 export interface OpenChatResponse {
   /**
+   * 请求追踪ID
+   * 用于日志追踪、问题排查和队列处理场景
+   *
+   * @example "req-1734567890-abc123"
+   */
+  correlationId: string;
+
+  /**
    * 生成的消息数组
    * 使用 AI SDK 的 UIMessage 类型
    */
@@ -362,6 +421,34 @@ export interface OpenChatResponse {
     used: string[];
     skipped: string[];
   };
+
+  /**
+   * 附加动作指令数组
+   * 告知调用方在发送文本消息后需要执行的额外操作
+   *
+   * 使用场景：
+   * - 发送小程序卡片（小程序配置由调用方维护）
+   * - 邀请用户加入微信群（可同时邀请加入多个群）
+   *
+   * @example
+   * // 仅发送小程序
+   * [{ type: "sendMiniProgram" }]
+   *
+   * @example
+   * // 拉两个群
+   * [
+   *   { type: "inviteToGroup", groupId: "group_a", groupName: "技术群" },
+   *   { type: "inviteToGroup", groupId: "group_b", groupName: "产品群" }
+   * ]
+   *
+   * @example
+   * // 发送小程序 + 拉群
+   * [
+   *   { type: "sendMiniProgram" },
+   *   { type: "inviteToGroup", groupId: "group_a" }
+   * ]
+   */
+  actions?: readonly Action[];
 }
 
 /**

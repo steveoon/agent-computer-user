@@ -12,7 +12,7 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { useModelConfig } from "@/lib/stores/model-config-store";
 import { useConfigDataForChat } from "./useConfigDataForChat";
 import { getEnvironmentLimits, detectEnvironment } from "@/lib/utils/environment";
-import type { ChatRequestOptions } from "@/types";
+import type { ChatRequestOptions, FinishReason } from "@/types";
 import type { ToolPart } from "@/types/tool-common";
 
 // 同构 useLayoutEffect，避免 SSR 问题
@@ -31,7 +31,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
   const { currentBrand } = useBrand();
 
   // 🤖 模型配置
-  const { chatModel, classifyModel, replyModel, providerConfigs } = useModelConfig();
+  const { chatModel, classifyModel, replyModel, providerConfigs, maxSteps } = useModelConfig();
 
   // 🔧 配置数据 - 从 localforage 加载
   const {
@@ -115,6 +115,9 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
   // 🎯 AI SDK v5: 手动管理 input 状态
   const [input, setInput] = useState("");
 
+  // 🎯 存储最后的 finishReason，用于判断是否需要显示"继续"按钮
+  const [lastFinishReason, setLastFinishReason] = useState<FinishReason>(null);
+
   // 🎯 生成稳定的聊天 ID（如果没有 sandboxId）
   const [stableChatId] = useState(() => `chat-${crypto.randomUUID()}`);
   const chatId = sandboxId || stableChatId;
@@ -134,6 +137,13 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       credentials: "include",
     }),
     id: chatId,
+    onFinish: ({finishReason}) => {
+      // 保存最后的 finishReason
+      if (finishReason) {
+        setLastFinishReason(finishReason);
+        console.log(`🏁 Chat完成 | finishReason: ${finishReason}`);
+      }
+    },
   });
 
   // 使用智能清理 Hook
@@ -168,6 +178,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       if (activeSystemPrompt) requestBody.activeSystemPrompt = activeSystemPrompt;
       if (dulidayToken) requestBody.dulidayToken = dulidayToken;
       if (defaultWechatId) requestBody.defaultWechatId = defaultWechatId;
+      if (maxSteps) requestBody.maxSteps = maxSteps;
 
       await sendMessage({ text: message.content }, { body: requestBody });
     },
@@ -386,6 +397,10 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       if (activeSystemPrompt) requestBody.activeSystemPrompt = activeSystemPrompt;
       if (dulidayToken) requestBody.dulidayToken = dulidayToken;
       if (defaultWechatId) requestBody.defaultWechatId = defaultWechatId;
+      if (maxSteps) requestBody.maxSteps = maxSteps;
+
+      // 重置 finishReason
+      setLastFinishReason(null);
 
       sendMessage({ text: input }, { body: requestBody });
 
@@ -412,6 +427,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       activeSystemPrompt,
       dulidayToken,
       defaultWechatId,
+      maxSteps,
       chatId,
     ]
   );
@@ -440,6 +456,10 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
         if (replyPrompts) requestBody.replyPrompts = replyPrompts;
         if (activeSystemPrompt) requestBody.activeSystemPrompt = activeSystemPrompt;
         if (dulidayToken) requestBody.dulidayToken = dulidayToken;
+        if (maxSteps) requestBody.maxSteps = maxSteps;
+
+        // 重置 finishReason
+        setLastFinishReason(null);
 
         await sendMessage({ text: message.content }, { body: requestBody });
       } else {
@@ -477,6 +497,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       activeSystemPrompt,
       dulidayToken,
       defaultWechatId,
+      maxSteps,
     ]
   );
 
@@ -513,6 +534,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
     status,
     error,
     isLoading,
+    lastFinishReason, // 最后的完成原因
 
     // 🔧 配置状态
     configLoading,

@@ -8,6 +8,7 @@ import { useScrollToBottom } from "@/lib/use-scroll-to-bottom";
 import { Button } from "@/components/ui/button";
 import type { UIMessage } from "@ai-sdk/react";
 import type { ModelId } from "@/lib/config/models";
+import type { FinishReason } from "@/types";
 
 interface ChatPanelProps {
   // 来自 useCustomChat
@@ -27,6 +28,7 @@ interface ChatPanelProps {
     environment: string;
     description: string;
   };
+  lastFinishReason?: FinishReason;
 
   // 来自其他地方
   currentBrand?: string;
@@ -54,6 +56,7 @@ export function ChatPanel({
   clearMessages,
   smartClean,
   envInfo,
+  lastFinishReason,
   currentBrand,
   sandboxStatus,
   isInitializing,
@@ -214,6 +217,7 @@ export function ChatPanel({
         error={error}
         isAuthenticated={isAuthenticated}
         append={append}
+        lastFinishReason={lastFinishReason}
       />
 
       {/* 状态栏 - 移动端显示 */}
