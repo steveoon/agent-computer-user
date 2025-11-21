@@ -103,6 +103,47 @@ export const yupaoExchangeWechatTool = () =>
         // 添加初始延迟
         await randomDelay(100, 300);
 
+        // 优先策略：检查是否有待处理的"同意"按钮（对方发起的交换请求）
+        const handlePendingRequestScript = wrapAntiDetectionScript(`
+          // 查找所有交换请求气泡
+          const boxes = document.querySelectorAll('.exchange-phone-box');
+          for (const box of boxes) {
+            // 检查是否是微信交换请求 (包含微信图标)
+            const hasWechatIcon = box.querySelector('.yp-weixinlogo');
+            if (!hasWechatIcon) continue;
+            
+            // 检查是否有"同意"按钮
+            const agreeBtn = box.querySelector('.agree.ep-btn');
+            if (agreeBtn) {
+              // 检查按钮是否可见且未被禁用
+              const style = window.getComputedStyle(agreeBtn);
+              if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+                agreeBtn.click();
+                return { 
+                  handled: true, 
+                  message: '已自动同意对方的交换微信请求',
+                  text: agreeBtn.textContent?.trim()
+                };
+              }
+            }
+          }
+          return { handled: false };
+        `);
+
+        const pendingResult = await puppeteerEvaluate.execute({ script: handlePendingRequestScript });
+        const pendingData = parseEvaluateResult(pendingResult) as { handled: boolean; message?: string } | null;
+
+        if (pendingData?.handled) {
+          return {
+            success: true,
+            message: pendingData.message || "成功同意交换微信请求",
+            details: {
+              method: "accepted_request",
+              info: "检测到对方已发起请求，自动点击同意"
+            }
+          };
+        }
+
         // 第一步：查找交换微信按钮 - 使用动态选择器
         const exchangeBtnSelector = createDynamicClassSelector("_exchange-tel-btn");
 
