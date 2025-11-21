@@ -218,10 +218,67 @@ export const yupaoSayHelloSimpleTool = () =>
               `),
             });
 
+            // 检查并处理可能出现的"同事已联系"弹窗
+            await randomDelay(800, 1200);
+            
+            const dialogHandlerScript = wrapAntiDetectionScript(`
+              function isVisible(elem) {
+                if (!elem) return false;
+                const style = window.getComputedStyle(elem);
+                if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+                const rect = elem.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0;
+              }
+
+              const modals = Array.from(document.querySelectorAll('.ant-modal-content'));
+              const conflictModal = modals.find(m => {
+                // 1. 检查文本内容
+                if (!m.textContent || !m.textContent.includes('您的同事近期联系过该牛人')) return false;
+                
+                // 2. 检查可见性
+                // Antd Modal 通常通过父级 .ant-modal-wrap 控制显示
+                const wrap = m.closest('.ant-modal-wrap');
+                if (wrap && !isVisible(wrap)) return false;
+                
+                return isVisible(m);
+              });
+              
+              if (conflictModal) {
+                const buttons = Array.from(conflictModal.querySelectorAll('button'));
+                const continueBtn = buttons.find(btn => btn.textContent && btn.textContent.includes('继续联系'));
+                
+                if (continueBtn && isVisible(continueBtn)) {
+                  continueBtn.click();
+                  return { handled: true, message: '检测到冲突弹窗，已自动点击继续联系' };
+                }
+                return { handled: true, error: '检测到冲突弹窗，但未找到有效继续联系按钮' };
+              }
+              return { handled: false };
+            `);
+
+            const dialogResultRaw = await puppeteerEvaluate.execute({ script: dialogHandlerScript });
+            const dialogResult = parseEvaluateResult(dialogResultRaw) as { 
+              handled: boolean; 
+              message?: string; 
+              error?: string 
+            } | null;
+
+            let resultMessage = `成功点击${marked.buttonText || "聊天按钮"}`;
+            if (dialogResult?.handled) {
+              if (dialogResult.message) {
+                resultMessage += ` (${dialogResult.message})`;
+              }
+              if (dialogResult.error) {
+                resultMessage += ` (警告: ${dialogResult.error})`;
+              }
+              // 如果处理了弹窗，额外等待一会儿让消息发送
+              await new Promise(r => setTimeout(r, 500));
+            }
+
             results.push({
               candidateName: marked.candidateName || `候选人${candidateIndex}`,
               success: true,
-              message: `成功点击${marked.buttonText || "聊天按钮"}`,
+              message: resultMessage,
               timestamp: new Date().toISOString(),
             });
 

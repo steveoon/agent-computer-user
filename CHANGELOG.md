@@ -2,6 +2,21 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.17.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.17.0-develop.1...v1.17.0-develop.2) (2025-11-21)
+
+
+### Features
+
+* **yupao:** 优化微信交换流程和聊天详情解析 ([00a6c85](https://github.com/steveoon/agent-computer-user/commit/00a6c85c7f99418ccc2a1a78af09670e22931f72))
+
+# [1.17.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.16.0...v1.17.0-develop.1) (2025-11-21)
+
+
+### Features
+
+* **ui:** 优化 Puppeteer 工具消息组件显示参数 ([4fad072](https://github.com/steveoon/agent-computer-user/commit/4fad07200ca998f786c1144db7d9f2f0df2f1869))
+* **yupao:** 优化候选人匹配和弹窗处理逻辑 ([db39cc6](https://github.com/steveoon/agent-computer-user/commit/db39cc6912c03dd12dce8cd039930cc314d16c3b))
+
 # [1.16.0](https://github.com/steveoon/agent-computer-user/compare/v1.15.0...v1.16.0) (2025-11-19)
 
 

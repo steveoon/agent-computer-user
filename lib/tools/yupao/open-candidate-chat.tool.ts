@@ -143,12 +143,17 @@ export const openCandidateChatTool = tool({
           let targetCandidate = null;
           
           if (candidateName) {
-            // 按名字查找
-            targetCandidate = candidates.find(c => 
-              c.name.includes(candidateName) || candidateName.includes(c.name)
-            );
+            // 1. 优先尝试完全匹配
+            targetCandidate = candidates.find(c => c.name === candidateName);
+
+            // 2. 如果没找到，尝试包含匹配
+            if (!targetCandidate) {
+              targetCandidate = candidates.find(c => 
+                c.name.includes(candidateName) || candidateName.includes(c.name)
+              );
+            }
             
-            // 如果没找到完全匹配，尝试模糊匹配
+            // 3. 如果没找到完全匹配，尝试模糊匹配 (字符匹配)
             if (!targetCandidate) {
               targetCandidate = candidates.find(c => {
                 const nameChars = candidateName.split('');

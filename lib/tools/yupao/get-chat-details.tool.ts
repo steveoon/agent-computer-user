@@ -155,10 +155,12 @@ export const yupaoChatDetailsTool = () =>
             ],
             contactNumber: [
               '.view-phone-box .text',
+              'div[class*="view-phone-box"] p[class*="text"]',
               'div[class*="view-phone-box"] span[class*="text"]'
             ],
             contactTitle: [
               '.view-phone-box .title',
+              'div[class*="view-phone-box"] p[class*="title"]',
               'div[class*="view-phone-box"] div[class*="title"]'
             ],
             phoneIcon: [
@@ -452,19 +454,28 @@ export const yupaoChatDetailsTool = () =>
                 return;
               }
               
-              // 检查是否是交换电话请求消息
+              // 检查是否是交换电话/微信请求消息
               const exchangePhoneBox = findElement(msgInner, selectors.exchangePhoneBox);
               if (exchangePhoneBox) {
                 const requestText = exchangePhoneBox.querySelector('.tip-ss');
                 const content = requestText ? requestText.textContent.trim() : '请求交换联系方式';
-                const isAccepted = exchangePhoneBox.querySelector('.disabled') !== null;
+                
+                // 判断是电话还是微信
+                const hasWechatIcon = exchangePhoneBox.querySelector('.yp-weixinlogo') !== null;
+                const type = hasWechatIcon ? 'wechat-exchange-request' : 'phone-exchange-request';
+                
+                // 检查状态
+                const agreeBtn = exchangePhoneBox.querySelector('.agree.ep-btn');
+                const isHandled = !agreeBtn || window.getComputedStyle(agreeBtn).display === 'none';
+                const isAccepted = exchangePhoneBox.querySelector('.disabled') !== null; // 旧的判断方式保留作为参考
                 
                 chatMessages.push({
                   index: i,
                   sender: sender,
-                  messageType: 'phone-exchange-request',
-                  content: content,
-                  accepted: isAccepted,
+                  messageType: type,
+                  content: content + (agreeBtn ? ' [待处理: 可点击同意]' : ''),
+                  accepted: isAccepted || isHandled,
+                  hasAgreeButton: !!agreeBtn,
                   time: time,
                   hasTime: !!time,
                   isRead: isRead,

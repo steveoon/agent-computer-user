@@ -90,12 +90,7 @@ const MonitorConfigSchema = z.object({
   browserWSEndpoint: z.string().optional(),
   /** 浏览器 CDP URL（连接到已有浏览器，优先级低于 browserWSEndpoint） */
   browserURL: z.string().optional().default("http://localhost:9222"),
-  /** 兜底检查间隔（毫秒），用于检查未回复的消息 */
-  fallbackCheckInterval: z.number().min(60000).default(600000), // 默认 10 分钟
-  /** 兜底检查指令 */
-  fallbackPrompt: z
-    .string()
-    .default("检查对话列表，找出对方发送了消息但我们还没有回复的候选人，并逐个回复"),
+
 });
 
 type MonitorConfig = z.infer<typeof MonitorConfigSchema>;
@@ -107,13 +102,13 @@ const DEFAULT_CONFIG: MonitorConfig = {
   enabledBrands: ["boss-zhipin"],
   autoSubmit: false, // 默认只填充，不自动提交
   browserURL: "http://localhost:9222", // 默认连接到 multi-agent.sh 启动的 Chrome
-  fallbackCheckInterval: 600000, // 默认 10 分钟
-  fallbackPrompt: "检查对话列表，找出对方发送了消息但我们还没有回复的候选人，并逐个回复",
+
 };
 
 const BROWSER_VIEWPORT = { width: 1440, height: 1080 } as const;
-const LOGIN_WAIT_DURATION_MS = 30000; // 间隔30秒后开始监听
+const LOGIN_WAIT_DURATION_MS = 60000; // 间隔60秒后开始监听
 const AGENT_PROCESS_WAIT_MS = 60000; // 等待1分钟让Agent处理完成
+const INITIAL_CONNECT_WAIT_MS = 30000; // 等待30秒让Agent完成初始化连接
 
 const WAIT_UNTIL_OPTIONS = { waitUntil: "networkidle2" as const };
 
@@ -171,20 +166,7 @@ const parsePollInterval = (input: string | undefined): number => {
   return parsed;
 };
 
-const parseFallbackInterval = (input: string | undefined): number => {
-  if (!input) return DEFAULT_CONFIG.fallbackCheckInterval;
 
-  const parsed = parseInt(input, 10);
-  if (!Number.isFinite(parsed) || parsed < 60000) {
-    logger.warn(
-      `⚠️  FALLBACK_CHECK_INTERVAL 配置无效: "${input}"（需要 >= 60000 的数字，如 "600000" 表示 10 分钟）`
-    );
-    logger.warn(`⚠️  使用默认值: ${DEFAULT_CONFIG.fallbackCheckInterval}ms`);
-    return DEFAULT_CONFIG.fallbackCheckInterval;
-  }
-
-  return parsed;
-};
 
 const parseEnabledBrands = (input: string | undefined): BrandKey[] => {
   if (!input) return DEFAULT_CONFIG.enabledBrands;
@@ -553,8 +535,7 @@ class UnreadMonitor {
   private nextPollTime: number = 0;
   /** 是否有待处理的立即检测请求 */
   private immediateCheckRequested = false;
-  /** 上次兜底检查的时间戳 */
-  private lastFallbackCheckTime: number = 0;
+
 
   constructor(config: MonitorConfig) {
     this.config = MonitorConfigSchema.parse(config);
@@ -641,15 +622,7 @@ class UnreadMonitor {
       logger.info(`  - 下次检测：${secondsLeft} 秒后`);
     }
 
-    // 显示下次兜底检查时间
-    if (!this.isPaused && this.lastFallbackCheckTime > 0) {
-      const nextFallbackTime = this.lastFallbackCheckTime + this.config.fallbackCheckInterval;
-      const secondsToFallback = Math.max(0, Math.round((nextFallbackTime - Date.now()) / 1000));
-      const minutesToFallback = Math.round(secondsToFallback / 60);
-      logger.info(`  - 下次兜底检查：${minutesToFallback} 分钟后`);
-    } else if (!this.isPaused) {
-      logger.info(`  - 下次兜底检查：即将执行`);
-    }
+
 
     logger.info("");
   }
@@ -817,26 +790,6 @@ class UnreadMonitor {
     const existingPages = await this.browser.pages();
     logger.info(`检测到浏览器中已有 ${existingPages.length} 个页面`);
 
-    // 查找或创建 Huajune 聊天页面
-    let chatPageFound = false;
-    for (const page of existingPages) {
-      const url = page.url();
-      if (url.includes(new URL(this.config.chatPageUrl).host)) {
-        this.chatPage = page;
-        await this.chatPage.setViewport(BROWSER_VIEWPORT); // 确保 viewport 正确
-        chatPageFound = true;
-        logger.success(`复用已有聊天页面: ${url}`);
-        break;
-      }
-    }
-
-    if (!chatPageFound) {
-      this.chatPage = await this.browser.newPage();
-      await this.chatPage.setViewport(BROWSER_VIEWPORT);
-      await this.chatPage.goto(this.config.chatPageUrl, WAIT_UNTIL_OPTIONS);
-      logger.success(`已打开聊天页面: ${this.config.chatPageUrl}`);
-    }
-
     // 为每个品牌查找或创建标签页
     let needLogin = false;
     for (const brand of this.config.enabledBrands) {
@@ -869,9 +822,29 @@ class UnreadMonitor {
       }
     }
 
+    // 查找或创建 Huajune 聊天页面
+    let chatPageFound = false;
+    for (const page of existingPages) {
+      const url = page.url();
+      if (url.includes(new URL(this.config.chatPageUrl).host)) {
+        this.chatPage = page;
+        await this.chatPage.setViewport(BROWSER_VIEWPORT); // 确保 viewport 正确
+        chatPageFound = true;
+        logger.success(`复用已有聊天页面: ${url}`);
+        break;
+      }
+    }
+
+    if (!chatPageFound) {
+      this.chatPage = await this.browser.newPage();
+      await this.chatPage.setViewport(BROWSER_VIEWPORT);
+      await this.chatPage.goto(this.config.chatPageUrl, WAIT_UNTIL_OPTIONS);
+      logger.success(`已打开聊天页面: ${this.config.chatPageUrl}`);
+    }
+
     // 只有在创建了新页面时才等待登录
     if (needLogin) {
-      logger.warn("⏳ 请在浏览器中完成登录，30 秒后开始监听...");
+      logger.warn("⏳ 请在浏览器中完成登录，60 秒后开始监听...");
       logger.info("");
       logger.info("📋 重要提示：请勿关闭以下标签页");
       logger.info(`  - ${this.config.chatPageUrl}（Agent 聊天页面）`);
@@ -884,6 +857,38 @@ class UnreadMonitor {
       await new Promise(resolve => setTimeout(resolve, LOGIN_WAIT_DURATION_MS));
     } else {
       logger.success("所有页面已复用，跳过登录等待");
+    }
+
+    // 自动填入连接提示词
+    if (this.chatPage) {
+      try {
+        const port = new URL(this.config.browserURL).port || "9222";
+        
+        // 确定目标 URL 关键词
+        let targetUrlKeyword = "";
+        if (this.config.enabledBrands.includes("yupao")) {
+          targetUrlKeyword = "yupao.com";
+        } else if (this.config.enabledBrands.includes("boss-zhipin")) {
+          targetUrlKeyword = "zhipin.com";
+        }
+
+        // 构建更明确的提示词
+        const connectPrompt = targetUrlKeyword 
+          ? `连接到浏览器端口 ${port}，并切换到包含 "${targetUrlKeyword}" 的标签页`
+          : `连接到浏览器,端口 ${port}`;
+
+        logger.info(`正在填入初始化指令: "${connectPrompt}"`);
+        
+        await this.chatPage.bringToFront();
+        await fillChatInput(this.chatPage, null, this.config.autoSubmit, connectPrompt);
+
+        if (this.config.autoSubmit) {
+          logger.info(`等待 ${INITIAL_CONNECT_WAIT_MS / 1000} 秒，让 Agent 完成初始化连接...`);
+          await new Promise(resolve => setTimeout(resolve, INITIAL_CONNECT_WAIT_MS));
+        }
+      } catch (error) {
+        logger.warn(`填入初始化指令失败: ${error}`);
+      }
     }
 
     // 设置键盘快捷键
@@ -970,36 +975,7 @@ class UnreadMonitor {
 
       logger.info("本轮检测完成");
 
-      // 如果有触发处理，重置兜底检查计时器
-      if (hasTriggered) {
-        this.lastFallbackCheckTime = Date.now();
-      } else {
-        // 没有检测到未读，检查是否需要执行兜底检查
-        const now = Date.now();
-        const timeSinceLastFallback = now - this.lastFallbackCheckTime;
 
-        if (timeSinceLastFallback >= this.config.fallbackCheckInterval) {
-          logger.info("⏰ 执行兜底检查（检查未回复的消息）...");
-
-          if (await this.ensureChatPageAvailable()) {
-            await this.chatPage!.bringToFront();
-            const success = await fillChatInput(
-              this.chatPage!,
-              null,
-              this.config.autoSubmit,
-              this.config.fallbackPrompt
-            );
-
-            if (success) {
-              this.lastFallbackCheckTime = now;
-              logger.success("兜底检查指令已发送");
-              hasTriggered = true; // 标记为已触发，后面会等待 Agent 处理
-            } else {
-              logger.warn("兜底检查指令发送失败");
-            }
-          }
-        }
-      }
 
       // 如果有触发处理且启用了自动提交，等待 Agent 处理完成
       // 但如果是立即检测请求，跳过等待
@@ -1057,8 +1033,7 @@ async function main() {
   const baseOverrides: Partial<MonitorConfig> = {
     pollingInterval: parsePollInterval(process.env.POLL_INTERVAL),
     autoSubmit: process.env.AUTO_SUBMIT === "true",
-    fallbackCheckInterval: parseFallbackInterval(process.env.FALLBACK_CHECK_INTERVAL),
-    fallbackPrompt: process.env.FALLBACK_PROMPT || DEFAULT_CONFIG.fallbackPrompt,
+
   };
 
   // 优先从 AGENT_ID 读取配置，否则使用环境变量
@@ -1089,7 +1064,7 @@ async function main() {
     logger.info(`  - 浏览器端口: ${agentConfig.chromePort}`);
     logger.info(`  - Agent 端口: ${agentConfig.appPort}`);
     logger.info(`  - 监听品牌: ${config.enabledBrands.join(", ")}`);
-    logger.info(`  - 兜底检查间隔: ${Math.round(config.fallbackCheckInterval / 60000)} 分钟`);
+
   } else {
     logger.info("🔧 使用环境变量配置");
     config = {
