@@ -34,6 +34,12 @@ export const MODEL_DICTIONARY = {
     description: "Google Gemini 2.5 Pro 预览版",
     categories: ["general"] as ModelCategory[],
   },
+  "google/gemini-3-pro-preview": {
+    provider: "google",
+    name: "Gemini 3 Pro Preview",
+    description: "Google Gemini 3 Pro 预览版",
+    categories: ["chat", "general"] as ModelCategory[],
+  },
 
   // Anthropic 模型 - 既可以做Chat也可以做General任务
   "anthropic/claude-3-7-sonnet-20250219": {
@@ -54,18 +60,18 @@ export const MODEL_DICTIONARY = {
     description: "Anthropic Claude Sonnet 4",
     categories: ["chat", "general"] as ModelCategory[],
   },
-  "anthropic/claude-3-5-haiku-latest": {
+  "anthropic/claude-haiku-4-5": {
     provider: "anthropic",
-    name: "Claude 3.5 Haiku (最新)",
-    description: "Anthropic Claude 3.5 Haiku (最新)",
+    name: "Claude Haiku 4.5",
+    description: "Anthropic Claude Haiku 4.5 (最新)",
     categories: ["chat", "general"] as ModelCategory[],
   },
 
   // OpenAI 模型
-  "openai/gpt-5": {
+  "openai/gpt-5.1": {
     provider: "openai",
-    name: "GPT-5",
-    description: "OpenAI GPT-5",
+    name: "GPT-5.1",
+    description: "OpenAI GPT-5.1",
     categories: ["chat", "general"] as ModelCategory[],
   },
   "openai/gpt-5-chat-latest": {
@@ -74,22 +80,16 @@ export const MODEL_DICTIONARY = {
     description: "OpenAI GPT-5 Chat (最新)",
     categories: ["general"] as ModelCategory[],
   },
-  "openai/gpt-4.1": {
+  "openai/gpt-5-mini": {
     provider: "openai",
-    name: "GPT-4.1",
-    description: "OpenAI GPT-4.1",
-    categories: ["general"] as ModelCategory[],
+    name: "GPT-5 Mini",
+    description: "OpenAI GPT-5 Mini",
+    categories: ["chat","general"] as ModelCategory[],
   },
   "openai/gpt-4o": {
     provider: "openai",
     name: "GPT-4o",
     description: "OpenAI GPT-4o",
-    categories: ["general"] as ModelCategory[],
-  },
-  "openai/gpt-4o-mini": {
-    provider: "openai",
-    name: "GPT-4o Mini",
-    description: "OpenAI GPT-4o Mini (轻量版)",
     categories: ["general"] as ModelCategory[],
   },
 
@@ -170,6 +170,12 @@ export const MODEL_DICTIONARY = {
     description: "通过MoonshotAI访问的Kimi K2 0905 Preview",
     categories: ["chat", "general"] as ModelCategory[],
   },
+  "moonshotai/kimi-k2-thinking-turbo": {
+    provider: "moonshotai",
+    name: "Kimi K2 Thinking Turbo",
+    description: "通过MoonshotAI访问的Kimi K2 Thinking Turbo",
+    categories: ["chat", "general"] as ModelCategory[],
+  }
 } as const;
 
 // 模型ID类型
@@ -273,9 +279,9 @@ export function getModelCategories(modelId: ModelId): ModelCategory[] {
 
 // 默认配置
 export const DEFAULT_MODEL_CONFIG = {
-  chatModel: "anthropic/claude-sonnet-4-5-20250929" as ModelId,
-  classifyModel: "qwen/qwen-max-latest" as ModelId,
-  replyModel: "qwen/qwen-plus-latest" as ModelId,
+  chatModel: "anthropic/claude-haiku-4-5" as ModelId,
+  classifyModel: "openai/gpt-5-mini" as ModelId,
+  replyModel: "openai/gpt-5-chat-latest" as ModelId,
 } as const;
 
 // ========== Open API 对外开放模型 ==========

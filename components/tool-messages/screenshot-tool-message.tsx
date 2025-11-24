@@ -80,8 +80,11 @@ export function ScreenshotToolMessage({
     state === "output-available" && isImageResult ? (
       imageSrc ? (
         // 可以直接显示的图片
-        <div className="mt-2 relative w-full" style={{ maxHeight }}>
-          <div className="relative w-full" style={{ aspectRatio: "16/9" }}>
+        <div className="mt-2 relative w-full flex justify-center" style={{ maxHeight }}>
+          <div
+            className="relative w-full"
+            style={{ aspectRatio: "16/9", maxWidth: `calc(${maxHeight} * 16 / 9)` }}
+          >
             <Image
               src={imageSrc}
               alt="Screenshot"
@@ -95,10 +98,10 @@ export function ScreenshotToolMessage({
         </div>
       ) : isOssUrl ? (
         // OSS URL 占位提示
-        <div className="mt-2 relative w-full" style={{ maxHeight }}>
+        <div className="mt-2 relative w-full flex justify-center" style={{ maxHeight }}>
           <div
             className="relative w-full bg-gray-100 dark:bg-gray-800 rounded-sm p-8"
-            style={{ aspectRatio: "16/9" }}
+            style={{ aspectRatio: "16/9", maxWidth: `calc(${maxHeight} * 16 / 9)` }}
           >
             <div className="flex flex-col items-center justify-center h-full text-center">
               <Camera className="w-12 h-12 text-gray-400 mb-3" />
