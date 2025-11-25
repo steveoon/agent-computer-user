@@ -1216,71 +1216,74 @@ export const computerTool = (
     },
   });
 
-// Universal bash tool compatible with all providers
-// Universal bash tool - supports both E2B sandbox and local execution
-export const bashTool = (sandboxId?: string) =>
+// ============================================================================
+// BASH TOOL - Human-in-the-Loop (HITL) Implementation
+// ============================================================================
+
+/**
+ * Bash tool for E2B sandbox mode - Auto-executes commands
+ * Has execute function, so commands run automatically without confirmation
+ */
+export const bashToolSandbox = (sandboxId: string) =>
   tool({
-    description: sandboxId
-      ? "Execute bash commands in the E2B sandbox"
-      : "Execute bash commands on the local system (requires confirmation in development)",
+    description: "Execute bash commands in the E2B sandbox",
     inputSchema: z.object({
       command: z.string().describe("The bash command to execute"),
+      description: z
+        .string()
+        .max(50)
+        .describe("Brief description of what this command does (max 50 chars, e.g. '启动Chrome远程调试')"),
     }),
     execute: async ({ command }) => {
-      // E2B 沙箱模式
-      if (sandboxId) {
-        const desktop = await getDesktop(sandboxId);
-        try {
-          const result = await desktop.commands.run(command);
-          return result.stdout || "(Command executed successfully with no output)";
-        } catch (error) {
-          console.error("Bash command failed in sandbox:", error);
-          if (error instanceof Error) {
-            return `Error executing command: ${error.message}`;
-          } else {
-            return `Error executing command: ${String(error)}`;
-          }
-        }
-      }
-
-      // 本地执行模式
+      const desktop = await getDesktop(sandboxId);
       try {
-        // 安全检查：禁止危险命令
-        const dangerousCommands = ["rm -rf /", "dd if=", "mkfs", "format", ":(){ :|:& };:"];
-        const isDangerous = dangerousCommands.some(cmd => command.toLowerCase().includes(cmd));
-
-        if (isDangerous) {
-          return `❌ 拒绝执行：检测到潜在危险命令\n\n命令: ${command}\n\n请使用更安全的命令或在 E2B 沙箱环境中执行。`;
-        }
-
-        // 在生产环境自动拒绝本地执行
-        if (process.env.NODE_ENV === "production") {
-          return `❌ 本地 bash 命令在生产环境中被禁用\n\n命令: ${command}\n\n请使用 E2B 沙箱模式以安全执行命令。`;
-        }
-
-        // 开发环境：返回命令预览和手动执行指南
-        return `📋 本地 Bash 命令预览
-
-⚠️ 安全提示：此命令需要在您的本地系统上执行。
-
-命令:
-\`\`\`bash
-${command}
-\`\`\`
-
-如需执行此命令，请：
-1. 复制上面的命令
-2. 打开您的终端应用
-3. 粘贴并执行命令
-4. 确保您了解命令的作用
-
-⚡ 提示：在 E2B 沙箱模式下可以自动执行命令，更加安全便捷。`;
+        const result = await desktop.commands.run(command);
+        return result.stdout || "(Command executed successfully with no output)";
       } catch (error) {
-        console.error("Local bash command processing failed:", error);
-        return `❌ 处理命令时出错: ${error instanceof Error ? error.message : String(error)}`;
+        console.error("Bash command failed in sandbox:", error);
+        if (error instanceof Error) {
+          return `Error executing command: ${error.message}`;
+        } else {
+          return `Error executing command: ${String(error)}`;
+        }
       }
     },
   });
+
+/**
+ * Bash tool for local mode - Requires human confirmation (HITL)
+ * No execute function, triggers frontend confirmation UI
+ * Actual execution happens in API route after user confirms
+ */
+export const bashToolLocal = () =>
+  tool({
+    description:
+      "Execute bash commands on the local system. Requires user confirmation before execution.",
+    inputSchema: z.object({
+      command: z.string().describe("The bash command to execute"),
+      description: z
+        .string()
+        .max(50)
+        .describe("Brief description of what this command does (max 50 chars, e.g. '启动Chrome远程调试')"),
+    }),
+    // outputSchema is required for tools without execute function
+    outputSchema: z.string().describe("The command output or error message"),
+    // No execute function - triggers HITL flow
+    // Frontend will show confirmation UI
+    // Backend will execute after user confirms
+  });
+
+/**
+ * Universal bash tool factory - Returns appropriate version based on context
+ * @param sandboxId - If provided, returns sandbox version (auto-execute)
+ *                   If not provided, returns local version (HITL)
+ */
+export const bashTool = (sandboxId?: string) => {
+  if (sandboxId) {
+    return bashToolSandbox(sandboxId);
+  }
+  return bashToolLocal();
+};
 
 // Backward compatibility aliases
 export const anthropicComputerTool35 = computerTool35;

@@ -14,6 +14,14 @@ export interface ToolMessageProps {
   status?: string;
   messageId: string;
   partIndex: number;
+  // HITL: 工具确认相关
+  toolCallId?: string;
+  addToolOutput?: (params: {
+    toolCallId: string;
+    tool: string;
+    output: string;
+  }) => Promise<void>;
+  sendMessage?: () => void;
 }
 
 export interface ToolTheme {

@@ -29,6 +29,13 @@ interface ChatPanelProps {
     description: string;
   };
   lastFinishReason?: FinishReason;
+  // HITL: 工具确认相关
+  addToolOutput?: (params: {
+    toolCallId: string;
+    tool: string;
+    output: string;
+  }) => Promise<void>;
+  sendMessage?: () => void;
 
   // 来自其他地方
   currentBrand?: string;
@@ -57,6 +64,8 @@ export function ChatPanel({
   smartClean,
   envInfo,
   lastFinishReason,
+  addToolOutput,
+  sendMessage,
   currentBrand,
   sandboxStatus,
   isInitializing,
@@ -137,6 +146,8 @@ export function ChatPanel({
         status={status}
         containerRef={containerRef}
         endRef={endRef}
+        addToolOutput={addToolOutput}
+        sendMessage={sendMessage}
       />
 
       {/* 错误状态显示 */}

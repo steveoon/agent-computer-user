@@ -131,6 +131,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
     setMessages,
     error,
     regenerate,
+    addToolOutput, // HITL: 用于发送工具确认决策
   } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
@@ -556,5 +557,9 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
 
     // 环境信息
     envInfo,
+
+    // HITL: 工具确认相关
+    addToolOutput, // 发送工具确认决策
+    sendMessage, // 继续对话
   };
 }
