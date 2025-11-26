@@ -9,6 +9,8 @@ import {
   MessageClassification,
   ReplyContextSchema,
   ReplyContext,
+  Store,
+  Position,
 } from "../../types/zhipin";
 import { generateText, generateObject } from "ai";
 import { z } from "zod";
@@ -535,7 +537,18 @@ export async function generateSmartReplyWithLLM(
   candidateInfo?: CandidateInfo,
   defaultWechatId?: string,
   brandPriorityStrategy?: BrandPriorityStrategy
-): Promise<{ replyType: string; text: string; reasoningText: string }> {
+): Promise<{
+  replyType: string;
+  text: string;
+  reasoningText: string;
+  debugInfo?: {
+    relevantStores: Store[];
+    storeCount: number;
+    detailLevel: string;
+    classification: MessageClassification;
+  };
+  contextInfo?: string;
+}> {
   try {
     // 🎯 获取配置的模型和provider设置
     const replyModel = modelConfig?.replyModel || DEFAULT_MODEL_CONFIG.replyModel;
@@ -583,7 +596,7 @@ export async function generateSmartReplyWithLLM(
       effectiveReplyPrompts.general_chat;
 
     // 构建上下文信息并获取解析后的品牌
-    const { contextInfo, resolvedBrand } = buildContextInfo(
+    const { contextInfo, resolvedBrand, debugInfo } = buildContextInfo(
       data,
       classification,
       preferredBrand,
@@ -628,6 +641,8 @@ export async function generateSmartReplyWithLLM(
       replyType: classification.replyType,
       text: finalReply.text,
       reasoningText: classification.reasoningText,
+      debugInfo,
+      contextInfo,
     };
   } catch (error) {
     console.error("LLM智能回复生成失败:", error);
@@ -912,6 +927,349 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
 }
 
 /**
+ * 🎯 信息详细级别类型
+ */
+type DetailLevel = "minimal" | "standard" | "detailed";
+
+/**
+ * 🎯 门店评分结构
+ */
+interface StoreScore {
+  store: Store;
+  score: number;
+  breakdown: {
+    locationMatch: number; // 位置匹配得分 (0-40)
+    districtMatch: number; // 区域匹配得分 (0-30)
+    positionDiversity: number; // 岗位多样性得分 (0-20)
+    availability: number; // 可用性得分 (0-10)
+  };
+}
+
+/**
+ * 🔍 智能门店排序函数
+ * 根据多个因素对门店进行相关性评分和排序
+ *
+ * @param stores 待排序的门店列表
+ * @param classification 消息分类结果（包含位置、区域等提取信息）
+ * @returns 按相关性降序排列的门店列表
+ */
+function rankStoresByRelevance(stores: Store[], classification: MessageClassification): Store[] {
+  const { mentionedLocations, mentionedDistricts } = classification.extractedInfo;
+
+  // 计算每个门店的相关性得分
+  const scoredStores: StoreScore[] = stores.map(store => {
+    let locationMatch = 0;
+    let districtMatch = 0;
+    let positionDiversity = 0;
+    let availability = 0;
+
+    // 1. 位置匹配（40%权重）- 最高优先级
+    if (mentionedLocations && mentionedLocations.length > 0) {
+      const matchingLocation = mentionedLocations.find(
+        loc =>
+          store.name.includes(loc.location) ||
+          store.location.includes(loc.location) ||
+          store.subarea.includes(loc.location)
+      );
+      if (matchingLocation) {
+        locationMatch = matchingLocation.confidence * 40;
+      }
+    }
+
+    // 2. 区域匹配（30%权重）
+    if (mentionedDistricts && mentionedDistricts.length > 0) {
+      const matchingDistrict = mentionedDistricts.find(
+        dist => store.district.includes(dist.district) || store.subarea.includes(dist.district)
+      );
+      if (matchingDistrict) {
+        districtMatch = matchingDistrict.confidence * 30;
+      }
+    }
+
+    // 3. 岗位多样性（20%权重）- 不同岗位类型越多越好
+    const uniquePositionTypes = new Set(store.positions.map(p => p.name));
+    positionDiversity = Math.min(uniquePositionTypes.size * 5, 20);
+
+    // 4. 岗位可用性（10%权重）- 有空余时段的岗位数
+    const availablePositions = store.positions.filter(p =>
+      p.availableSlots?.some(slot => slot.isAvailable)
+    );
+    availability = Math.min(availablePositions.length * 2, 10);
+
+    const totalScore = locationMatch + districtMatch + positionDiversity + availability;
+
+    return {
+      store,
+      score: totalScore,
+      breakdown: {
+        locationMatch,
+        districtMatch,
+        positionDiversity,
+        availability,
+      },
+    };
+  });
+
+  // 按得分降序排序（稳定排序，分数相同时保持原顺序）
+  const ranked = scoredStores.sort((a, b) => {
+    if (b.score !== a.score) {
+      return b.score - a.score;
+    }
+    // 分数相同，保持原顺序
+    return 0;
+  });
+
+  // 记录排序结果（便于调试）
+  if (ranked.length > 0 && ranked[0].score > 0) {
+    console.log(
+      `📊 门店排序完成: 前3名得分 = ${ranked
+        .slice(0, 3)
+        .map(s => `${s.store.name}(${s.score.toFixed(1)})`)
+        .join(", ")}`
+    );
+  }
+
+  return ranked.map(item => item.store);
+}
+
+/**
+ * 🔢 确定展示门店数量
+ * 根据对话类型动态决定展示多少个门店
+ *
+ * @param rankedStores 已排序的门店列表
+ * @param replyType 回复类型
+ * @returns 应展示的门店数量
+ */
+function determineStoreCount(rankedStores: Store[], replyType: ReplyContext): number {
+  // 早期探索阶段 → 5个门店（提供更多选择）
+  const earlyStages: ReplyContext[] = ["initial_inquiry", "location_inquiry", "no_location_match"];
+
+  // 具体咨询阶段 → 3个门店（聚焦相关信息）
+  const specificStages: ReplyContext[] = [
+    "salary_inquiry",
+    "schedule_inquiry",
+    "attendance_inquiry",
+    "flexibility_inquiry",
+    "work_hours_inquiry",
+    "availability_inquiry",
+  ];
+
+  if (earlyStages.includes(replyType)) {
+    return Math.min(5, rankedStores.length);
+  }
+
+  if (specificStages.includes(replyType)) {
+    return Math.min(3, rankedStores.length);
+  }
+
+  // 默认3个
+  return Math.min(3, rankedStores.length);
+}
+
+/**
+ * 🎨 回复类型到信息详细级别的映射
+ */
+const REPLY_TYPE_DETAIL_MAP: Record<ReplyContext, DetailLevel> = {
+  // Minimal：初次探索，仅展示关键信息
+  initial_inquiry: "minimal",
+  location_inquiry: "minimal",
+  no_location_match: "minimal",
+  age_concern: "minimal",
+  insurance_inquiry: "minimal",
+
+  // Standard：常规咨询，展示核心信息
+  salary_inquiry: "standard",
+  schedule_inquiry: "standard",
+  interview_request: "standard",
+  general_chat: "standard",
+  followup_chat: "standard",
+
+  // Detailed：深度咨询，展示完整信息
+  attendance_inquiry: "detailed",
+  flexibility_inquiry: "detailed",
+  attendance_policy_inquiry: "detailed",
+  work_hours_inquiry: "detailed",
+  availability_inquiry: "detailed",
+  part_time_support: "detailed",
+};
+
+/**
+ * 🎯 确定信息详细级别
+ * 根据回复类型返回对应的信息详细程度
+ *
+ * @param replyType 回复类型
+ * @returns 信息详细级别 (minimal | standard | detailed)
+ */
+function determineDetailLevel(replyType: ReplyContext): DetailLevel {
+  return REPLY_TYPE_DETAIL_MAP[replyType] || "standard";
+}
+
+/**
+ * 📝 构建岗位信息
+ * 根据详细级别和回复类型动态生成岗位信息
+ *
+ * @param position 岗位对象
+ * @param detailLevel 信息详细级别
+ * @param replyType 回复类型
+ * @returns 格式化的岗位信息字符串
+ */
+function buildPositionInfo(
+  position: Position,
+  detailLevel: DetailLevel,
+  replyType: ReplyContext
+): string {
+  let info = "";
+
+  // ========== 所有级别都包含的基础信息 ==========
+  info += `  职位：${position.name}\n`;
+
+  // 时间段（最多显示2个）
+  const timeSlots = position.timeSlots.slice(0, 2).join("、");
+  info += `  时间：${timeSlots}${position.timeSlots.length > 2 ? "等" : ""}\n`;
+
+  // 薪资信息（使用现有的智能构建函数）
+  const salaryInfo = buildSalaryDescription(position.salary);
+  info += `  薪资：${salaryInfo}\n`;
+
+  // ⭐ 重要：年龄要求必须在所有级别展示（用户要求）
+  if (position.requirements && position.requirements.length > 0) {
+    const requirements = position.requirements.filter(req => req !== "无");
+    if (requirements.length > 0) {
+      info += `  要求：${requirements.join("、")}\n`;
+    }
+  }
+
+  // ========== Minimal 级别：添加基础排班信息 ==========
+  if (detailLevel === "minimal") {
+    const scheduleTypeText = getScheduleTypeText(position.scheduleType);
+    const flexText = position.schedulingFlexibility.canSwapShifts ? "（可换班）" : "";
+    info += `  排班：${scheduleTypeText}${flexText}\n`;
+    return info;
+  }
+
+  // ========== Standard 级别：根据 replyType 添加聚焦信息 ==========
+  if (detailLevel === "standard") {
+    if (replyType === "salary_inquiry") {
+      // 薪资咨询：重点展示奖金和福利
+      if (position.salary.bonus) {
+        info += `  奖金：${position.salary.bonus}\n`;
+      }
+      if (position.benefits?.items?.length) {
+        const benefits = position.benefits.items.filter(item => item !== "无");
+        if (benefits.length > 0) {
+          info += `  福利：${benefits.slice(0, 3).join("、")}\n`;
+        }
+      }
+    } else if (replyType === "schedule_inquiry" || replyType === "flexibility_inquiry") {
+      // 排班咨询：重点展示灵活性和工时
+      const flexibility = position.schedulingFlexibility;
+      const features = [];
+      if (flexibility.canSwapShifts) features.push("可换班");
+      if (flexibility.partTimeAllowed) features.push("支持兼职");
+      if (flexibility.weekendRequired) features.push("需周末");
+      if (features.length > 0) {
+        info += `  排班特点：${features.join("、")}\n`;
+      }
+
+      if (position.minHoursPerWeek || position.maxHoursPerWeek) {
+        info += `  每周工时：${position.minHoursPerWeek || 0}-${position.maxHoursPerWeek || "不限"}小时\n`;
+      }
+    } else {
+      // 其他场景：展示基础排班和部分福利
+      const scheduleTypeText = getScheduleTypeText(position.scheduleType);
+      const flexText = position.schedulingFlexibility.canSwapShifts ? "（可换班）" : "";
+      info += `  排班：${scheduleTypeText}${flexText}\n`;
+
+      // 展示前2个福利
+      if (position.benefits?.items?.length) {
+        const benefits = position.benefits.items.filter(item => item !== "无");
+        if (benefits.length > 0) {
+          info += `  福利：${benefits.slice(0, 2).join("、")}\n`;
+        }
+      }
+    }
+    return info;
+  }
+
+  // ========== Detailed 级别：展示完整信息 ==========
+  if (detailLevel === "detailed") {
+    // 1. 完整薪资和福利
+    if (position.salary.bonus) {
+      info += `  奖金：${position.salary.bonus}\n`;
+    }
+    if (position.benefits && position.benefits.items && position.benefits.items.length > 0) {
+      const benefitsList = position.benefits.items.filter(item => item !== "无");
+      if (benefitsList.length > 0) {
+        info += `  福利：${benefitsList.join("、")}\n`;
+      }
+    }
+    if (position.benefits && position.benefits.promotion) {
+      info += `  晋升福利：${position.benefits.promotion}\n`;
+    }
+
+    // 2. 完整排班信息
+    const scheduleTypeText = getScheduleTypeText(position.scheduleType);
+    const canSwapText = position.schedulingFlexibility.canSwapShifts
+      ? "（可换班）"
+      : "（不可换班）";
+    info += `  排班类型：${scheduleTypeText}${canSwapText}\n`;
+
+    // 3. 可用时段（如果与 replyType 相关）
+    if (replyType === "availability_inquiry" || replyType === "schedule_inquiry") {
+      const availableSlots = position.availableSlots?.filter(slot => slot.isAvailable);
+      if (availableSlots && availableSlots.length > 0) {
+        info += `  可预约时段：${availableSlots
+          .slice(0, 3)
+          .map(slot => `${slot.slot}(${slot.currentBooked}/${slot.maxCapacity}人)`)
+          .join("、")}\n`;
+      }
+    }
+
+    // 4. 考勤政策
+    if (position.attendancePolicy.punctualityRequired) {
+      info += `  考勤要求：准时到岗，最多迟到${position.attendancePolicy.lateToleranceMinutes}分钟\n`;
+    }
+
+    // 5. 排班灵活性特点
+    const flexibility = position.schedulingFlexibility;
+    const flexibilityFeatures = [];
+    if (flexibility.canSwapShifts) flexibilityFeatures.push("可换班");
+    if (flexibility.partTimeAllowed) flexibilityFeatures.push("兼职");
+    if (flexibility.weekendRequired) flexibilityFeatures.push("需周末");
+    if (flexibility.holidayRequired) flexibilityFeatures.push("需节假日");
+    if (flexibilityFeatures.length > 0) {
+      info += `  排班特点：${flexibilityFeatures.join("、")}\n`;
+    }
+
+    // 6. 工时要求
+    if (position.minHoursPerWeek || position.maxHoursPerWeek) {
+      info += `  每周工时：${position.minHoursPerWeek || 0}-${position.maxHoursPerWeek || "不限"}小时\n`;
+    }
+
+    // 7. 工作日偏好
+    if (position.preferredDays && position.preferredDays.length > 0) {
+      info += `  工作日偏好：${position.preferredDays.map(day => getDayText(day)).join("、")}\n`;
+    }
+
+    // 8. 出勤要求
+    if (position.attendanceRequirement) {
+      const req = position.attendanceRequirement;
+      let reqText = `出勤要求：${req.description}`;
+      if (req.requiredDays && req.requiredDays.length > 0) {
+        const dayNames = req.requiredDays.map(dayNum => getDayNumberText(dayNum));
+        reqText += `（需要：${dayNames.join("、")}）`;
+      }
+      if (req.minimumDays) {
+        reqText += `，最少${req.minimumDays}天/周`;
+      }
+      info += `  ${reqText}\n`;
+    }
+  }
+
+  return info;
+}
+
+/**
  * 构建上下文信息，根据提取的信息筛选相关数据
  * @param data 配置数据
  * @param classification 消息分类结果
@@ -926,7 +1284,16 @@ function buildContextInfo(
   uiSelectedBrand?: string,
   toolBrand?: string,
   brandPriorityStrategy?: BrandPriorityStrategy
-): { contextInfo: string; resolvedBrand: string } {
+): {
+  contextInfo: string;
+  resolvedBrand: string;
+  debugInfo: {
+    relevantStores: Store[];
+    storeCount: number;
+    detailLevel: string;
+    classification: MessageClassification;
+  };
+} {
   const extractedInfo = classification.extractedInfo;
   const { city, mentionedLocations, mentionedDistricts } = extractedInfo;
 
@@ -954,6 +1321,12 @@ function buildContextInfo(
     return {
       contextInfo: `品牌：${targetBrand}\n注意：该品牌当前没有门店数据。**门店可能暂时没有在招岗位**。`,
       resolvedBrand: targetBrand,
+      debugInfo: {
+        relevantStores: [],
+        storeCount: 0,
+        detailLevel: "minimal",
+        classification,
+      },
     };
   }
 
@@ -1020,96 +1393,30 @@ function buildContextInfo(
 
   // 构建上下文信息
   let context = `默认推荐品牌：${targetBrand}\n`;
+  let rankedStores: Store[] = [];
 
   if (relevantStores.length > 0) {
+    // 🎯 智能门店排序
+    rankedStores = rankStoresByRelevance(relevantStores, classification);
+
+    // 🔢 确定展示门店数量
+    const storeCount = determineStoreCount(rankedStores, classification.replyType);
+
+    // 📊 确定信息详细级别
+    const detailLevel = determineDetailLevel(classification.replyType);
+
+    console.log(
+      `📊 上下文构建: 展示${storeCount}个门店，详细级别=${detailLevel}，回复类型=${classification.replyType}`
+    );
+
     context += `匹配到的门店信息：\n`;
-    // 显示该品牌下的所有门店（不限制数量）
-    relevantStores.slice(0, 3).forEach(store => {
+
+    // 🏢 构建优化后的门店信息
+    rankedStores.slice(0, storeCount).forEach(store => {
       context += `• ${store.name}（${store.district}${store.subarea}）：${store.location}\n`;
+
       store.positions.forEach(pos => {
-        // 🔧 智能薪资信息构建（包含memo解析）
-        const salaryInfo = buildSalaryDescription(pos.salary);
-        context += `  职位：${pos.name}，时间：${pos.timeSlots.join("、")}，薪资：${salaryInfo}\n`;
-
-        if (pos.salary.bonus) {
-          context += `  奖金：${pos.salary.bonus}\n`;
-        }
-
-        // 处理结构化福利对象
-        if (pos.benefits && pos.benefits.items && pos.benefits.items.length > 0) {
-          const benefitsList = pos.benefits.items.filter(item => item !== "无");
-          if (benefitsList.length > 0) {
-            context += `  福利：${benefitsList.join("、")}\n`;
-          }
-        }
-        if (pos.benefits && pos.benefits.promotion) {
-          context += `  晚升福利：${pos.benefits.promotion}\n`;
-        }
-
-        // 新增：考勤和排班信息
-        const scheduleTypeText = getScheduleTypeText(pos.scheduleType);
-        const canSwapText = pos.schedulingFlexibility.canSwapShifts ? "（可换班）" : "（不可换班）";
-        context += `  排班类型：${scheduleTypeText}${canSwapText}\n`;
-
-        // 可用时间段信息
-        const availableSlots = pos.availableSlots.filter(slot => slot.isAvailable);
-        if (availableSlots.length > 0) {
-          context += `  可预约时段：${availableSlots
-            .map(
-              slot =>
-                `${slot.slot}(${slot.currentBooked}/${
-                  slot.maxCapacity
-                }人，${getPriorityText(slot.priority)}优先级)`
-            )
-            .join("、")}\n`;
-        }
-
-        // 考勤要求
-        const attendance = pos.attendancePolicy;
-        if (attendance.punctualityRequired) {
-          context += `  考勤要求：准时到岗，最多迟到${attendance.lateToleranceMinutes}分钟\n`;
-        }
-
-        // 排班灵活性
-        const flexibility = pos.schedulingFlexibility;
-        const flexibilityFeatures = [];
-        if (flexibility.canSwapShifts) flexibilityFeatures.push("可换班");
-        if (flexibility.partTimeAllowed) flexibilityFeatures.push("兼职");
-        if (flexibility.weekendRequired) flexibilityFeatures.push("需周末");
-        if (flexibility.holidayRequired) flexibilityFeatures.push("需节假日");
-
-        if (flexibilityFeatures.length > 0) {
-          context += `  排班特点：${flexibilityFeatures.join("、")}\n`;
-        }
-
-        // 每周工时要求
-        if (pos.minHoursPerWeek || pos.maxHoursPerWeek) {
-          context += `  每周工时：${pos.minHoursPerWeek || 0}-${
-            pos.maxHoursPerWeek || "不限"
-          }小时\n`;
-        }
-
-        // 偏好工作日
-        if (pos.preferredDays && pos.preferredDays.length > 0) {
-          context += `  工作日偏好：${pos.preferredDays.map(day => getDayText(day)).join("、")}\n`;
-        }
-
-        // 新增：出勤要求
-        if (pos.attendanceRequirement) {
-          const req = pos.attendanceRequirement;
-          let reqText = `出勤要求：${req.description}`;
-
-          if (req.requiredDays && req.requiredDays.length > 0) {
-            const dayNames = req.requiredDays.map(dayNum => getDayNumberText(dayNum));
-            reqText += `（需要：${dayNames.join("、")}）`;
-          }
-
-          if (req.minimumDays) {
-            reqText += `，最少${req.minimumDays}天/周`;
-          }
-
-          context += `  ${reqText}\n`;
-        }
+        context += buildPositionInfo(pos, detailLevel, classification.replyType);
       });
     });
   } else {
@@ -1161,7 +1468,17 @@ function buildContextInfo(
     }
   }
 
-  return { contextInfo: context, resolvedBrand: targetBrand };
+  return {
+    contextInfo: context,
+    resolvedBrand: targetBrand,
+    debugInfo: {
+      relevantStores: rankedStores.length > 0 ? rankedStores : relevantStores,
+      storeCount:
+        rankedStores.length > 0 ? determineStoreCount(rankedStores, classification.replyType) : 0,
+      detailLevel: determineDetailLevel(classification.replyType),
+      classification,
+    },
+  };
 }
 
 /**
@@ -1179,20 +1496,6 @@ function getScheduleTypeText(
     on_call: "随叫随到",
   };
   return typeMap[scheduleType] || "灵活排班";
-}
-
-/**
- * 获取优先级的中文描述
- */
-function getPriorityText(priority: "high" | "medium" | "low" | string): string {
-  if (!priority) return "中"; // 默认值
-
-  const priorityMap: Record<string, string> = {
-    high: "高",
-    medium: "中",
-    low: "低",
-  };
-  return priorityMap[priority] || "中";
 }
 
 /**

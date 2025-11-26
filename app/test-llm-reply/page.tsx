@@ -6,9 +6,14 @@ import { useBrand } from "@/lib/contexts/brand-context";
 import { clearBrandStorage, getBrandStorageStatus } from "@/lib/utils/brand-storage";
 import { useModelConfig } from "@/lib/stores/model-config-store";
 import { useConfigDataForChat } from "@/hooks/useConfigDataForChat";
-import { Settings, MessageSquare, X, Plus, ChevronUp, ChevronDown } from "lucide-react";
+import { Settings, MessageSquare, X, Plus, ChevronUp, ChevronDown, Bug } from "lucide-react";
 import Link from "next/link";
-import { REPLY_TYPE_NAMES, type ReplyContext } from "@/types/zhipin";
+import {
+  REPLY_TYPE_NAMES,
+  type ReplyContext,
+  type Store,
+  type MessageClassification,
+} from "@/types/zhipin";
 
 export default function TestLLMReplyPage() {
   const { currentBrand } = useBrand();
@@ -20,9 +25,17 @@ export default function TestLLMReplyPage() {
     error: configError,
   } = useConfigDataForChat();
   const [message, setMessage] = useState("");
+  const [toolBrand, setToolBrand] = useState(""); // 🆕 模拟工具识别的品牌
   const [reply, setReply] = useState("");
   const [replyType, setReplyType] = useState("");
   const [reasoning, setReasoning] = useState("");
+  const [debugInfo, setDebugInfo] = useState<{
+    relevantStores: Store[];
+    storeCount: number;
+    detailLevel: string;
+    classification: MessageClassification;
+  } | null>(null); // 🆕 调试信息
+  const [contextInfo, setContextInfo] = useState<string>(""); // 🆕 上下文信息
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [currentTestMessage, setCurrentTestMessage] = useState("");
@@ -114,6 +127,8 @@ export default function TestLLMReplyPage() {
     setReply("");
     setReplyType("");
     setReasoning("");
+    setDebugInfo(null); // 重置调试信息
+    setContextInfo(""); // 重置上下文信息
     setCurrentTestMessage(messageToTest);
 
     try {
@@ -125,6 +140,7 @@ export default function TestLLMReplyPage() {
         body: JSON.stringify({
           message: messageToTest,
           brand: currentBrand,
+          toolBrand, // 🆕 传递工具识别品牌
           modelConfig: {
             classifyModel,
             replyModel,
@@ -146,6 +162,12 @@ export default function TestLLMReplyPage() {
       setReply(replyText);
       setReplyType(data.replyType || "");
       setReasoning(data.reasoningText || "");
+      if (data.debugInfo) {
+        setDebugInfo(data.debugInfo);
+      }
+      if (data.contextInfo) {
+        setContextInfo(data.contextInfo);
+      }
     } catch (error) {
       console.error("测试失败:", error);
       setError(error instanceof Error ? error.message : "未知错误");
@@ -396,6 +418,31 @@ export default function TestLLMReplyPage() {
         )}
       </div>
 
+      {/* 模拟设置 */}
+      <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded">
+        <h2 className="text-lg font-semibold text-purple-800 mb-3 flex items-center gap-2">
+          <Settings className="w-5 h-5" />
+          模拟环境设置
+        </h2>
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-purple-700 mb-1">
+              模拟工具识别品牌 (Tool Brand)
+            </label>
+            <input
+              type="text"
+              value={toolBrand}
+              onChange={e => setToolBrand(e.target.value)}
+              placeholder="例如: 海底捞 (留空表示未识别)"
+              className="w-full p-2 border border-purple-300 rounded text-sm focus:ring-purple-500 focus:border-purple-500"
+            />
+            <p className="text-xs text-purple-600 mt-1">
+              用于模拟从职位详情页获取到的品牌信息，测试品牌冲突解析逻辑
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* 预设测试消息 */}
       <div className="mb-6">
         <h2 className="text-lg font-semibold mb-3">快速测试</h2>
@@ -503,6 +550,86 @@ export default function TestLLMReplyPage() {
                   <span className="text-blue-600 ml-1">{reasoning}</span>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* 调试信息展示 */}
+          {debugInfo && (
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded text-sm">
+              <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                <Bug className="w-4 h-4" />
+                上下文构建调试信息
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="bg-white p-3 rounded border">
+                  <div className="text-gray-500 text-xs mb-1">最终展示门店数</div>
+                  <div className="font-bold text-lg">{debugInfo.storeCount}</div>
+                </div>
+                <div className="bg-white p-3 rounded border">
+                  <div className="text-gray-500 text-xs mb-1">详细级别</div>
+                  <div className="font-bold text-lg uppercase">{debugInfo.detailLevel}</div>
+                </div>
+                <div className="bg-white p-3 rounded border">
+                  <div className="text-gray-500 text-xs mb-1">相关门店总数</div>
+                  <div className="font-bold text-lg">{debugInfo.relevantStores.length}</div>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <h4 className="font-medium text-gray-700 mb-2">提取的关键信息：</h4>
+                <pre className="bg-gray-800 text-green-400 p-3 rounded overflow-x-auto text-xs">
+                  {JSON.stringify(debugInfo.classification.extractedInfo, null, 2)}
+                </pre>
+              </div>
+
+              {contextInfo && (
+                <div className="mb-4">
+                  <h4 className="font-medium text-gray-700 mb-2">最终构建的 Context Info：</h4>
+                  <pre className="bg-gray-100 text-gray-700 p-3 rounded border border-gray-300 overflow-x-auto text-xs whitespace-pre-wrap h-40 resize-y">
+                    {contextInfo}
+                  </pre>
+                </div>
+              )}
+
+              <div>
+                <h4 className="font-medium text-gray-700 mb-2">
+                  匹配到的门店列表 (Top {debugInfo.storeCount}):
+                </h4>
+                {debugInfo.relevantStores.length > 0 ? (
+                  <div className="space-y-2">
+                    {debugInfo.relevantStores.slice(0, 5).map((store, idx) => (
+                      <div
+                        key={store.id}
+                        className={`p-2 rounded border ${
+                          idx < debugInfo.storeCount
+                            ? "bg-green-50 border-green-200"
+                            : "bg-white border-gray-200 opacity-60"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className="font-medium">
+                            {idx + 1}. {store.name}
+                          </span>
+                          <span className="text-xs bg-gray-200 px-2 py-1 rounded">
+                            {store.brand}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1">
+                          {store.district} - {store.location}
+                        </div>
+                      </div>
+                    ))}
+                    {debugInfo.relevantStores.length > 5 && (
+                      <div className="text-center text-gray-500 text-xs py-1">
+                        ... 还有 {debugInfo.relevantStores.length - 5} 家门店未显示
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-gray-500 italic">无匹配门店</div>
+                )}
+              </div>
             </div>
           )}
         </div>

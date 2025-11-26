@@ -105,7 +105,7 @@ const DEFAULT_CONFIG: MonitorConfig = {
 
 };
 
-const BROWSER_VIEWPORT = { width: 1440, height: 1080 } as const;
+const BROWSER_VIEWPORT = { width: 1440, height: 900 } as const;
 const LOGIN_WAIT_DURATION_MS = 60000; // 间隔60秒后开始监听
 const AGENT_PROCESS_WAIT_MS = 60000; // 等待1分钟让Agent处理完成
 const INITIAL_CONNECT_WAIT_MS = 30000; // 等待30秒让Agent完成初始化连接
