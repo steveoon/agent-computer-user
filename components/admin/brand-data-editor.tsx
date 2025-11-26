@@ -104,7 +104,20 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
 
     const brandCount = Object.keys(localData.brands).length;
     const storeCount = localData.stores.length;
-    const cityInfo = localData.city;
+
+    // 🏙️ 从门店推断覆盖城市（优先使用门店级别的 city 字段）
+    const storeCities = localData.stores
+      .map(store => store.city)
+      .filter((city): city is string => Boolean(city));
+    const uniqueCities = Array.from(new Set(storeCities));
+    // 如果没有门店级别的城市，降级使用全局 city
+    const cityInfo =
+      uniqueCities.length > 0
+        ? uniqueCities.length === 1
+          ? uniqueCities[0]
+          : `${uniqueCities.length}个城市`
+        : localData.city || "未设置";
+    const cityTooltip = uniqueCities.length > 1 ? uniqueCities.join("、") : undefined;
 
     return (
       <div className="space-y-6">
@@ -138,8 +151,14 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
               <Database className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{cityInfo}</div>
-              <p className="text-xs text-muted-foreground">主要城市</p>
+              <div className="text-2xl font-bold" title={cityTooltip}>
+                {cityInfo}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {uniqueCities.length > 1
+                  ? `${uniqueCities.slice(0, 3).join("、")}${uniqueCities.length > 3 ? "等" : ""}`
+                  : "主要城市"}
+              </p>
             </CardContent>
           </Card>
         </div>

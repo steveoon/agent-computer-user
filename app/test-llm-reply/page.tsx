@@ -8,12 +8,9 @@ import { useModelConfig } from "@/lib/stores/model-config-store";
 import { useConfigDataForChat } from "@/hooks/useConfigDataForChat";
 import { Settings, MessageSquare, X, Plus, ChevronUp, ChevronDown, Bug } from "lucide-react";
 import Link from "next/link";
-import {
-  REPLY_TYPE_NAMES,
-  type ReplyContext,
-  type Store,
-  type MessageClassification,
-} from "@/types/zhipin";
+import { REPLY_TYPE_NAMES, type ReplyContext, type MessageClassification } from "@/types/zhipin";
+import type { StoreWithDistance } from "@/types/geocoding";
+import { MatchedStoresCard } from "@/components/tool-messages/matched-stores-card";
 
 export default function TestLLMReplyPage() {
   const { currentBrand } = useBrand();
@@ -30,7 +27,7 @@ export default function TestLLMReplyPage() {
   const [replyType, setReplyType] = useState("");
   const [reasoning, setReasoning] = useState("");
   const [debugInfo, setDebugInfo] = useState<{
-    relevantStores: Store[];
+    relevantStores: StoreWithDistance[];
     storeCount: number;
     detailLevel: string;
     classification: MessageClassification;
@@ -592,44 +589,17 @@ export default function TestLLMReplyPage() {
                 </div>
               )}
 
-              <div>
-                <h4 className="font-medium text-gray-700 mb-2">
-                  匹配到的门店列表 (Top {debugInfo.storeCount}):
-                </h4>
-                {debugInfo.relevantStores.length > 0 ? (
-                  <div className="space-y-2">
-                    {debugInfo.relevantStores.slice(0, 5).map((store, idx) => (
-                      <div
-                        key={store.id}
-                        className={`p-2 rounded border ${
-                          idx < debugInfo.storeCount
-                            ? "bg-green-50 border-green-200"
-                            : "bg-white border-gray-200 opacity-60"
-                        }`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <span className="font-medium">
-                            {idx + 1}. {store.name}
-                          </span>
-                          <span className="text-xs bg-gray-200 px-2 py-1 rounded">
-                            {store.brand}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-600 mt-1">
-                          {store.district} - {store.location}
-                        </div>
-                      </div>
-                    ))}
-                    {debugInfo.relevantStores.length > 5 && (
-                      <div className="text-center text-gray-500 text-xs py-1">
-                        ... 还有 {debugInfo.relevantStores.length - 5} 家门店未显示
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-gray-500 italic">无匹配门店</div>
-                )}
-              </div>
+              {debugInfo.relevantStores.length > 0 ? (
+                <MatchedStoresCard
+                  stores={debugInfo.relevantStores}
+                  displayCount={debugInfo.storeCount}
+                  defaultExpanded
+                  compact={false}
+                  className="mt-4"
+                />
+              ) : (
+                <div className="text-gray-500 italic ml-8">无匹配门店</div>
+              )}
             </div>
           )}
         </div>

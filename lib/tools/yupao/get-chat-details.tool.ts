@@ -331,6 +331,8 @@ export const yupaoChatDetailsTool = () =>
             education: '', // Yupao通常不在这里显示学历
             expectedSalary: expectedSalary,
             expectedLocation: expectedLocation,
+            // 🆕 添加岗位地址信息（从岗位信息卡片中提取）
+            jobAddress: jobInfo.jobAddress || '',
             height: height,
             weight: weight,
             healthCertificate: hasHealthCertificate,
@@ -607,6 +609,8 @@ export const yupaoChatDetailsTool = () =>
                     candidateAge: parsedResult.candidateInfo?.age || "",
                     candidateExpectedSalary: parsedResult.candidateInfo?.expectedSalary || "",
                     candidateExpectedLocation: parsedResult.candidateInfo?.expectedLocation || "",
+                    // 🆕 岗位地址（从岗位信息卡片提取，如"上海 徐汇区 龙华"）
+                    jobAddress: parsedResult.candidateInfo?.jobAddress || "",
                     totalMessages: parsedResult.stats?.totalMessages || 0,
                     lastMessageTime:
                       parsedResult.chatMessages?.[parsedResult.chatMessages.length - 1]?.time ||

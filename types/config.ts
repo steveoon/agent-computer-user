@@ -109,6 +109,6 @@ export interface ConfigManagerState {
  * LocalForage 存储键名常量
  */
 export const CONFIG_STORAGE_KEY = "APP_CONFIG_DATA" as const;
-export const CONFIG_VERSION = "1.2.1" as const;
+export const CONFIG_VERSION = "1.2.2" as const;
 
 // 不再重新导出zhipin中的类型，使用时直接从 './zhipin' 导入

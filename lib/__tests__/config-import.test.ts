@@ -559,7 +559,7 @@ describe("配置导入数据格式校验", () => {
       // 动态导入升级函数
       const { upgradeConfigData } = await import("@/lib/services/config.service");
 
-      // 升级配置（1.2.0 -> 1.2.1）
+      // 升级配置（1.2.0 -> 1.2.2）
       const upgradedConfig = await upgradeConfigData(v120Config as any, false);
 
       // 验证升级后的配置
@@ -567,8 +567,8 @@ describe("配置导入数据格式校验", () => {
       expect(finalResult.success).toBe(true);
 
       if (finalResult.success) {
-        // 验证版本号已升级到 1.2.1
-        expect(finalResult.data.metadata.version).toBe("1.2.1");
+        // 验证版本号已升级到 1.2.2
+        expect(finalResult.data.metadata.version).toBe("1.2.2");
 
         // 验证 brandPriorityStrategy 字段已添加
         expect(finalResult.data.brandPriorityStrategy).toBe("smart");

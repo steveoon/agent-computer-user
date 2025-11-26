@@ -4,8 +4,8 @@ import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, AlertTriangle, Eye, EyeOff, Database } from "lucide-react";
-import { SyncResult } from "@/lib/services/duliday-sync.service";
+import { CheckCircle, XCircle, Clock, AlertTriangle, Eye, EyeOff, Database, MapPin, ChevronDown, ChevronUp } from "lucide-react";
+import { SyncResult, GeocodingStats } from "@/lib/services/duliday-sync.service";
 import { formatDuration } from "@/lib/stores/sync-store";
 import { SyncErrorList } from "@/components/sync/sync-error-display";
 
@@ -115,6 +115,93 @@ function ErrorDetailsSection({ errors }: ErrorDetailsSectionProps) {
   );
 }
 
+// 地理编码统计组件
+interface GeocodingStatsSectionProps {
+  stats: GeocodingStats;
+}
+
+function GeocodingStatsSection({ stats }: GeocodingStatsSectionProps) {
+  const [showFailedStores, setShowFailedStores] = useState(false);
+  const hasFailedStores = stats.failedStores && stats.failedStores.length > 0;
+  const successRate = stats.total > 0 ? Math.round((stats.success / stats.total) * 100) : 100;
+
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+      <div className="flex items-center gap-2 mb-2">
+        <MapPin className="h-4 w-4 text-blue-500" />
+        <span className="text-sm font-medium">地理编码</span>
+        {stats.total === 0 && stats.skipped > 0 && (
+          <Badge variant="secondary" className="text-xs">已有坐标</Badge>
+        )}
+      </div>
+
+      <div className="grid grid-cols-4 gap-2 text-sm">
+        <div className="text-center p-2 bg-slate-50 dark:bg-slate-900/30 rounded">
+          <div className="font-semibold">{stats.total + stats.skipped}</div>
+          <div className="text-xs text-muted-foreground">总门店</div>
+        </div>
+        <div className="text-center p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded">
+          <div className="font-semibold text-emerald-600 dark:text-emerald-400">{stats.success}</div>
+          <div className="text-xs text-muted-foreground">编码成功</div>
+        </div>
+        <div className="text-center p-2 bg-amber-50 dark:bg-amber-900/20 rounded">
+          <div className="font-semibold text-amber-600 dark:text-amber-400">{stats.skipped}</div>
+          <div className="text-xs text-muted-foreground">已有坐标</div>
+        </div>
+        <div className="text-center p-2 bg-rose-50 dark:bg-rose-900/20 rounded">
+          <div className="font-semibold text-rose-600 dark:text-rose-400">{stats.failed}</div>
+          <div className="text-xs text-muted-foreground">编码失败</div>
+        </div>
+      </div>
+
+      {/* 编码成功率进度条 */}
+      {stats.total > 0 && (
+        <div className="mt-2 space-y-1">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-muted-foreground">编码成功率</span>
+            <span className="font-medium">{successRate}%</span>
+          </div>
+          <Progress
+            value={successRate}
+            className={`h-1.5 ${successRate >= 80 ? "[&>div]:bg-blue-500" : successRate >= 50 ? "[&>div]:bg-amber-500" : "[&>div]:bg-rose-500"}`}
+          />
+        </div>
+      )}
+
+      {/* 失败门店列表 */}
+      {hasFailedStores && (
+        <div className="mt-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowFailedStores(!showFailedStores)}
+            className="w-full justify-between text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 h-7"
+          >
+            <span className="flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              查看 {stats.failedStores.length} 个编码失败的门店
+            </span>
+            {showFailedStores ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </Button>
+
+          {showFailedStores && (
+            <div className="mt-2 p-2 bg-rose-50/50 dark:bg-rose-900/10 rounded text-xs max-h-[150px] overflow-y-auto">
+              <ul className="space-y-1">
+                {stats.failedStores.map((storeName, index) => (
+                  <li key={index} className="flex items-start gap-1 text-rose-700 dark:text-rose-300">
+                    <XCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                    <span>{storeName}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function BrandSyncResultCard({ result, forceShowErrors = false }: BrandSyncResultCardProps) {
   const [showErrors, setShowErrors] = useState(false);
 
@@ -192,6 +279,11 @@ export function BrandSyncResultCard({ result, forceShowErrors = false }: BrandSy
 
               {/* 进度条 */}
               <ProgressSection totalRecords={stats.totalRecords} successRate={stats.successRate} />
+
+              {/* 地理编码统计 - 如果有统计数据 */}
+              {result.geocodingStats && (
+                <GeocodingStatsSection stats={result.geocodingStats} />
+              )}
 
               {/* 错误信息按钮 - 如果有错误 */}
               {hasErrors && (

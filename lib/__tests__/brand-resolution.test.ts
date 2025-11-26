@@ -183,7 +183,8 @@ describe("Brand Resolution Logic", () => {
 
       expect(result.resolvedBrand).toBe("麦当劳");
       expect(result.source).toBe("conversation");
-      expect(result.reason).toContain("智能策略");
+      expect(result.reason).toContain("不同品牌冲突");
+      expect(result.reason).toContain("优先对话");
     });
 
     it("should prioritize conversation brand for same brand family", () => {
@@ -200,8 +201,8 @@ describe("Brand Resolution Logic", () => {
       // 同系列品牌，优先使用对话提取的品牌（更符合当前上下文）
       expect(result.resolvedBrand).toBe("天津肯德基");
       expect(result.source).toBe("conversation");
-      expect(result.reason).toContain("同系列品牌");
-      expect(result.reason).toContain("对话上下文");
+      expect(result.reason).toContain("同系列品牌冲突");
+      expect(result.reason).toContain("优先对话");
     });
 
     it("should prioritize conversation brand even when UI is more specific", () => {
@@ -218,8 +219,8 @@ describe("Brand Resolution Logic", () => {
       // 同系列品牌，仍然优先对话提取（即使 UI 更具体）
       expect(result.resolvedBrand).toBe("肯德基");
       expect(result.source).toBe("conversation");
-      expect(result.reason).toContain("同系列品牌");
-      expect(result.reason).toContain("对话上下文");
+      expect(result.reason).toContain("同系列品牌冲突");
+      expect(result.reason).toContain("优先对话");
     });
 
     it("should use conversation brand for different brand families", () => {
@@ -236,8 +237,8 @@ describe("Brand Resolution Logic", () => {
       // Different families, prioritize conversation
       expect(result.resolvedBrand).toBe("肯德基");
       expect(result.source).toBe("conversation");
-      expect(result.reason).toContain("不同品牌系列");
-      expect(result.reason).toContain("对话上下文");
+      expect(result.reason).toContain("不同品牌冲突");
+      expect(result.reason).toContain("优先对话");
     });
 
     it("should handle missing conversation brand gracefully", () => {
@@ -374,7 +375,12 @@ describe("Brand Resolution Logic", () => {
         } else if (input.strategy === "conversation-extracted") {
           expect(result.reason).toContain("对话提取策略");
         } else if (input.strategy === "smart") {
-          expect(result.reason).toContain("智能策略");
+          // smart 策略根据品牌冲突情况返回不同的 reason
+          expect(
+            result.reason.includes("智能策略") ||
+              result.reason.includes("品牌冲突") ||
+              result.reason.includes("优先对话")
+          ).toBe(true);
         }
       });
     });

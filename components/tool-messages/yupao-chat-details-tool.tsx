@@ -1,7 +1,7 @@
 "use client";
 
 import { BaseToolMessage } from "./base-tool-message";
-import { FileText, User, MessageSquare, Clock, Phone, MessageCircle } from "lucide-react";
+import { FileText, User, MessageSquare, Clock, Phone, MessageCircle, MapPin } from "lucide-react";
 import { ToolMessageProps } from "./types";
 import {
   getSenderDisplay,
@@ -128,6 +128,17 @@ export function YupaoChatDetailsTool(props: ToolMessageProps) {
                         </span>
                         <span className="text-gray-700 dark:text-gray-300">
                           {candidateInfo.education}
+                        </span>
+                      </div>
+                    )}
+                    {candidateInfo.jobAddress && (
+                      <div className="flex gap-2">
+                        <span className="text-gray-500 dark:text-gray-400 min-w-[60px] flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          地址：
+                        </span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          {candidateInfo.jobAddress}
                         </span>
                       </div>
                     )}

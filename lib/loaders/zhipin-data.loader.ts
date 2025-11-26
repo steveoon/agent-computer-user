@@ -26,6 +26,13 @@ import type { ModelConfig } from "@/lib/config/models";
 import type { CandidateInfo } from "@/lib/tools/zhipin/types";
 import type { SalaryDetails } from "../../types/zhipin";
 import type { BrandResolutionInput, BrandResolutionOutput } from "../../types/brand-resolution";
+import {
+  geocodingService,
+  extractCityFromAddress,
+  mostFrequent,
+  isValidCoordinates,
+} from "../services/geocoding.service";
+import type { StoreWithDistance } from "@/types/geocoding";
 // 使用新的模块化 prompt engineering
 import {
   ClassificationPromptBuilder,
@@ -256,7 +263,9 @@ export function generateSmartReply(
 
     // 使用实际选中门店的品牌名，而不是目标品牌名
     const actualBrand = randomStore.brand;
-    let reply = `你好，${data.city}各区有${actualBrand}门店岗位空缺，兼职排班 ${randomPosition.workHours} 小时。基本薪资：${randomPosition.salary.base} 元/小时。`;
+    // 使用门店级别的城市，优先级：门店 city > 全局 data.city
+    const storeCity = getStoreCity(randomStore, data.city);
+    let reply = `你好，${storeCity}各区有${actualBrand}门店岗位空缺，兼职排班 ${randomPosition.workHours} 小时。基本薪资：${randomPosition.salary.base} 元/小时。`;
     if (randomPosition.salary.range) {
       reply += `薪资范围：${randomPosition.salary.range}。`;
     }
@@ -315,7 +324,9 @@ export function generateSmartReply(
     }
 
     // 否则询问用户位置
-    return `你好，${data.city}目前各区有门店岗位空缺，你在什么位置？我可以查下你附近`;
+    // 🔧 优先级: 门店 store.city → 门店地址提取 → data.city (fallback)
+    const inferredCity = inferCityFromStores(data.stores, data.city);
+    return `你好，${inferredCity}目前各区有门店岗位空缺，你在什么位置？我可以查下你附近`;
   }
 
   // 3. 时间安排咨询
@@ -418,7 +429,9 @@ export function generateSmartReply(
   }
 
   // 9. 默认回复
-  return `你好，${data.city}目前各区有门店岗位空缺，你在什么位置？我可以查下你附近`;
+  // 🔧 优先级: 门店 store.city → 门店地址提取 → data.city (fallback)
+  const defaultCity = inferCityFromStores(data.stores, data.city);
+  return `你好，${defaultCity}目前各区有门店岗位空缺，你在什么位置？我可以查下你附近`;
 }
 
 /**
@@ -448,13 +461,14 @@ export async function classifyUserMessage(
   // 创建分类构建器
   const classificationBuilder = new ClassificationPromptBuilder();
 
-  // 构建分类参数
+  // 构建分类参数（城市从门店推断，优先级：门店 city > 全局 data.city）
+  const inferredCity = inferCityFromStores(data.stores, data.city);
   const classificationParams: ClassificationParams = {
     message,
     conversationHistory,
     candidateInfo,
     brandData: {
-      city: data.city,
+      city: inferredCity,
       defaultBrand: data.defaultBrand || getBrandName(data),
       availableBrands: Object.keys(data.brands),
       storeCount: data.stores.length,
@@ -542,7 +556,7 @@ export async function generateSmartReplyWithLLM(
   text: string;
   reasoningText: string;
   debugInfo?: {
-    relevantStores: Store[];
+    relevantStores: StoreWithDistance[];
     storeCount: number;
     detailLevel: string;
     classification: MessageClassification;
@@ -595,13 +609,14 @@ export async function generateSmartReplyWithLLM(
       effectiveReplyPrompts[classification.replyType as keyof typeof effectiveReplyPrompts] ||
       effectiveReplyPrompts.general_chat;
 
-    // 构建上下文信息并获取解析后的品牌
-    const { contextInfo, resolvedBrand, debugInfo } = buildContextInfo(
+    // 构建上下文信息并获取解析后的品牌（异步：支持真实距离计算）
+    const { contextInfo, resolvedBrand, debugInfo } = await buildContextInfo(
       data,
       classification,
       preferredBrand,
       toolBrand,
-      brandPriorityStrategy
+      brandPriorityStrategy,
+      candidateInfo // 传递候选人信息，用于获取 jobAddress
     );
 
     // 创建回复构建器
@@ -751,8 +766,6 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
   switch (strategy) {
     case "user-selected": {
       // 优先级：UI选择 → 配置默认 → 第一个可用品牌
-      console.log("📌 品牌解析策略: user-selected (UI选择优先)");
-
       // 1. 尝试 UI 选择的品牌
       const uiMatched = tryMatchBrand(uiSelectedBrand, "UI选择");
       if (uiMatched) {
@@ -789,8 +802,6 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
 
     case "conversation-extracted": {
       // 优先级：对话提取 → UI选择 → 配置默认 → 第一个可用品牌
-      console.log("💬 品牌解析策略: conversation-extracted (对话提取优先)");
-
       // 1. 尝试对话提取的品牌
       const conversationMatched = tryMatchBrand(conversationBrand, "对话提取");
       if (conversationMatched) {
@@ -841,8 +852,6 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
     default: {
       // 优先级：对话提取 → UI选择 → 配置默认 → 第一个可用品牌
       // 特殊逻辑：如果对话品牌和UI品牌都存在且不同，进行智能判断
-      console.log("🔍 品牌解析策略: smart (智能判断)");
-
       const conversationMatched = tryMatchBrand(conversationBrand, "对话提取");
       const uiMatched = tryMatchBrand(uiSelectedBrand, "UI选择");
 
@@ -854,28 +863,20 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
 
         if (isSameBrandFamily) {
           // 同系列品牌，优先使用对话提取的品牌（更符合当前上下文意图）
-          console.log(
-            `🔍 品牌智能判断 [同系列]: 对话=${conversationMatched}, UI=${uiMatched} → 优先使用对话提取`
-          );
-
           return {
             resolvedBrand: conversationMatched,
             matchType: conversationMatched === conversationBrand ? "exact" : "fuzzy",
             source: "conversation",
-            reason: `智能策略: 同系列品牌，优先对话上下文 (对话=${conversationMatched}, UI=${uiMatched})`,
+            reason: `同系列品牌冲突，优先对话`,
             originalInput: conversationBrand,
           };
         } else {
           // 不同品牌系列，优先对话提取（因为更符合当前上下文）
-          console.log(
-            `⚡ 品牌智能判断 [不同系列]: 对话=${conversationMatched}, UI=${uiMatched} → 优先对话提取`
-          );
-
           return {
             resolvedBrand: conversationMatched,
             matchType: conversationMatched === conversationBrand ? "exact" : "fuzzy",
             source: "conversation",
-            reason: `智能策略: 不同品牌系列，优先对话上下文 (对话=${conversationMatched}, UI=${uiMatched})`,
+            reason: `不同品牌冲突，优先对话`,
             originalInput: conversationBrand,
           };
         }
@@ -945,25 +946,71 @@ interface StoreScore {
   };
 }
 
+// 🗺️ StoreWithDistance 类型从 @/types/geocoding 导入
+// 重新导出供其他模块使用
+export type { StoreWithDistance } from "@/types/geocoding";
+
 /**
- * 🔍 智能门店排序函数
- * 根据多个因素对门店进行相关性评分和排序
- *
- * @param stores 待排序的门店列表
- * @param classification 消息分类结果（包含位置、区域等提取信息）
- * @returns 按相关性降序排列的门店列表
+ * 🌐 推断城市
+ * 从分类结果或门店数据中推断用户所在城市
  */
-function rankStoresByRelevance(stores: Store[], classification: MessageClassification): Store[] {
+function inferCity(classification: MessageClassification, stores: Store[]): string {
+  // 1. 优先使用分类结果的 city
+  if (classification.extractedInfo.city) {
+    return classification.extractedInfo.city;
+  }
+
+  // 2. 从门店数据推断城市
+  return inferCityFromStores(stores);
+}
+
+/**
+ * 🏙️ 从门店列表推断城市
+ * 优先使用门店级别的 city 字段，其次从地址提取
+ * @param stores 门店列表
+ * @param fallback 备用值（可选）
+ * @returns 最常见的城市名称
+ */
+function inferCityFromStores(stores: Store[], fallback?: string): string {
+  // 1. 优先收集门店级别的 city 字段
+  const storeCities = stores.map(s => s.city).filter((c): c is string => Boolean(c));
+
+  if (storeCities.length > 0) {
+    return mostFrequent(storeCities) || fallback || "当地";
+  }
+
+  // 2. 降级：从门店地址提取城市
+  const addressCities = stores.map(s => extractCityFromAddress(s.location)).filter(Boolean);
+  return mostFrequent(addressCities) || fallback || "当地";
+}
+
+/**
+ * 🏪 获取门店所在城市
+ * @param store 门店对象
+ * @param fallback 备用值
+ * @returns 门店城市
+ */
+function getStoreCity(store: Store, fallback?: string): string {
+  return store.city || fallback || "当地";
+}
+
+/**
+ * 🔍 基于文本匹配的门店排序（降级方案）
+ * @returns 带距离信息的门店列表（文本匹配时 distance 为 undefined）
+ */
+function rankStoresByTextMatch(
+  stores: Store[],
+  classification: MessageClassification
+): StoreWithDistance[] {
   const { mentionedLocations, mentionedDistricts } = classification.extractedInfo;
 
-  // 计算每个门店的相关性得分
   const scoredStores: StoreScore[] = stores.map(store => {
     let locationMatch = 0;
     let districtMatch = 0;
     let positionDiversity = 0;
     let availability = 0;
 
-    // 1. 位置匹配（40%权重）- 最高优先级
+    // 1. 位置匹配（40%权重）
     if (mentionedLocations && mentionedLocations.length > 0) {
       const matchingLocation = mentionedLocations.find(
         loc =>
@@ -986,11 +1033,11 @@ function rankStoresByRelevance(stores: Store[], classification: MessageClassific
       }
     }
 
-    // 3. 岗位多样性（20%权重）- 不同岗位类型越多越好
+    // 3. 岗位多样性（20%权重）
     const uniquePositionTypes = new Set(store.positions.map(p => p.name));
     positionDiversity = Math.min(uniquePositionTypes.size * 5, 20);
 
-    // 4. 岗位可用性（10%权重）- 有空余时段的岗位数
+    // 4. 岗位可用性（10%权重）
     const availablePositions = store.positions.filter(p =>
       p.availableSlots?.some(slot => slot.isAvailable)
     );
@@ -1001,35 +1048,90 @@ function rankStoresByRelevance(stores: Store[], classification: MessageClassific
     return {
       store,
       score: totalScore,
-      breakdown: {
-        locationMatch,
-        districtMatch,
-        positionDiversity,
-        availability,
-      },
+      breakdown: { locationMatch, districtMatch, positionDiversity, availability },
     };
   });
 
-  // 按得分降序排序（稳定排序，分数相同时保持原顺序）
-  const ranked = scoredStores.sort((a, b) => {
-    if (b.score !== a.score) {
-      return b.score - a.score;
-    }
-    // 分数相同，保持原顺序
-    return 0;
-  });
+  const ranked = scoredStores.sort((a, b) => b.score - a.score);
 
-  // 记录排序结果（便于调试）
   if (ranked.length > 0 && ranked[0].score > 0) {
     console.log(
-      `📊 门店排序完成: 前3名得分 = ${ranked
+      `📊 文本匹配排序: 前3名得分 = ${ranked
         .slice(0, 3)
         .map(s => `${s.store.name}(${s.score.toFixed(1)})`)
         .join(", ")}`
     );
   }
 
-  return ranked.map(item => item.store);
+  // 返回带距离信息的结构（文本匹配时无距离）
+  return ranked.map(item => ({ store: item.store, distance: undefined }));
+}
+
+/**
+ * 🔍 智能门店排序函数（异步版本）
+ * 优先使用真实地理距离排序，失败时降级到文本匹配
+ *
+ * @param stores 待排序的门店列表
+ * @param classification 消息分类结果（包含位置、区域等提取信息）
+ * @returns 带距离信息的门店列表（按距离/相关性排序）
+ */
+async function rankStoresByRelevance(
+  stores: Store[],
+  classification: MessageClassification
+): Promise<StoreWithDistance[]> {
+  const { mentionedLocations } = classification.extractedInfo;
+
+  // 🗺️ 如果有位置信息，尝试使用真实距离排序
+  if (mentionedLocations && mentionedLocations.length > 0) {
+    const primaryLocation = mentionedLocations[0];
+
+    // 检查是否有门店有有效坐标
+    const storesWithCoords = stores.filter(s => isValidCoordinates(s.coordinates));
+
+    if (storesWithCoords.length > 0) {
+      try {
+        // 推断城市
+        const city = inferCity(classification, stores);
+
+        // 获取用户位置坐标（使用智能编码：优先 POI 搜索，适合小区/楼盘名）
+        console.log(`\n━━━ 🗺️ 坐标获取 ━━━\n   目标: ${primaryLocation.location} (城市: ${city || "未知"})`);
+        const userCoords = await geocodingService.smartGeocode(primaryLocation.location, city);
+
+        if (userCoords) {
+          // 计算各门店到用户的距离
+          const storesWithDistance = geocodingService.calculateDistancesToTarget(
+            storesWithCoords,
+            userCoords
+          );
+
+          // 合并无坐标的门店（排在最后，距离为 undefined）
+          const storesWithoutCoords = stores.filter(s => !isValidCoordinates(s.coordinates));
+
+          console.log(
+            `   排序结果: ${storesWithDistance
+              .slice(0, 3)
+              .map(s => `${s.store.name}(${geocodingService.formatDistance(s.distance)})`)
+              .join(" → ")}`
+          );
+
+          // 返回带距离信息的结构
+          return [
+            ...storesWithDistance.map(s => ({ store: s.store, distance: s.distance })),
+            ...storesWithoutCoords.map(s => ({ store: s, distance: undefined })),
+          ];
+        } else {
+          console.warn(`⚠️ 无法获取用户位置坐标: ${primaryLocation.location}，降级到文本匹配`);
+        }
+      } catch (error) {
+        console.error("❌ 距离排序失败，降级到文本匹配:", error);
+      }
+    } else {
+      console.warn("⚠️ 没有门店有有效坐标，使用文本匹配排序");
+    }
+  }
+
+  // 降级：使用原有的文本匹配排序
+  return rankStoresByTextMatch(stores, classification);
 }
 
 /**
@@ -1276,26 +1378,32 @@ function buildPositionInfo(
  * @param uiSelectedBrand UI选择的品牌（来自brand-selector组件）
  * @param toolBrand 工具调用时从职位详情识别的品牌
  * @param brandPriorityStrategy 品牌优先级策略
+ * @param candidateInfo 候选人信息（包含 jobAddress 等）
  * @returns 返回上下文信息和解析后的品牌
  */
-function buildContextInfo(
+async function buildContextInfo(
   data: ZhipinData,
   classification: MessageClassification,
   uiSelectedBrand?: string,
   toolBrand?: string,
-  brandPriorityStrategy?: BrandPriorityStrategy
-): {
+  brandPriorityStrategy?: BrandPriorityStrategy,
+  candidateInfo?: CandidateInfo
+): Promise<{
   contextInfo: string;
   resolvedBrand: string;
   debugInfo: {
-    relevantStores: Store[];
+    relevantStores: StoreWithDistance[];
     storeCount: number;
     detailLevel: string;
     classification: MessageClassification;
   };
-} {
+}> {
   const extractedInfo = classification.extractedInfo;
   const { city, mentionedLocations, mentionedDistricts } = extractedInfo;
+
+  // 📍 jobAddress 是岗位发布地址，单独用于门店过滤（不用于距离计算）
+  // mentionedLocations 是候选人提到的位置，用于门店过滤 + 距离排序
+  const jobAddressForFilter = candidateInfo?.jobAddress;
 
   // 使用新的冲突解析逻辑，传入三个独立的品牌源
   const brandResolution = resolveBrandConflict({
@@ -1308,9 +1416,10 @@ function buildContextInfo(
 
   const targetBrand = brandResolution.resolvedBrand;
   console.log(
-    `🏢 品牌输入: UI选择=${uiSelectedBrand}, 工具识别=${toolBrand}, 配置默认=${data.defaultBrand}`
+    `\n━━━ 🏢 品牌解析 ━━━\n` +
+      `   输入: UI=${uiSelectedBrand || "无"} | 工具=${toolBrand || "无"} | 默认=${data.defaultBrand}\n` +
+      `   结果: ${targetBrand} (${brandResolution.reason})`
   );
-  console.log(`✅ 品牌解析完成: ${targetBrand} (${brandResolution.reason})`);
 
   // 获取目标品牌的所有门店
   const brandStores = data.stores.filter(store => store.brand === targetBrand);
@@ -1331,9 +1440,13 @@ function buildContextInfo(
   }
 
   // 优先使用明确提到的工作城市进行过滤
-  if (city && city !== data.city) {
-    // 如果提到的城市与数据城市不匹配，记录但不过滤（避免误判）
-    console.warn(`候选人提到的城市 "${city}" 与数据城市 "${data.city}" 不匹配`);
+  // 🔧 优先级: 门店 store.city → 门店地址提取 → data.city (fallback)
+  const brandCity = inferCityFromStores(relevantStores, data.city);
+
+  // 位置过滤日志收集
+  const locationLogs: string[] = [];
+  if (city && city !== brandCity) {
+    locationLogs.push(`⚠️ 城市不匹配: 候选人="${city}" vs 门店="${brandCity}"`);
   }
 
   // 根据提到的位置进一步过滤（按置信度排序）
@@ -1353,10 +1466,10 @@ function buildContextInfo(
 
       if (filteredStores.length > 0) {
         relevantStores = filteredStores;
-        console.log(`✅ 位置匹配成功: ${location} (置信度: ${confidence})`);
+        locationLogs.push(`✅ 位置匹配: ${location} → ${filteredStores.length}家门店`);
         break;
       } else {
-        console.log(`❌ 位置匹配失败: ${location} (置信度: ${confidence})`);
+        locationLogs.push(`   尝试: ${location} (${confidence}) → 无匹配`);
       }
     }
   }
@@ -1378,42 +1491,72 @@ function buildContextInfo(
 
       if (districtFiltered.length > 0) {
         relevantStores = districtFiltered;
-        console.log(
-          `✅ 区域匹配成功: ${sortedDistricts
-            .map(d => `${d.district}(置信度:${d.confidence})`)
-            .join(", ")}`
+        locationLogs.push(
+          `✅ 区域匹配: ${sortedDistricts.map(d => d.district).join("/")} → ${districtFiltered.length}家门店`
         );
       } else {
-        console.log(`❌ 区域匹配失败: 没有找到匹配的区域`);
+        locationLogs.push(`   区域尝试: ${sortedDistricts.map(d => d.district).join("/")} → 无匹配`);
       }
     } else {
-      console.log(`⚠️ 所有区域置信度过低 (≤0.6)，跳过区域过滤`);
+      locationLogs.push(`   区域置信度过低，跳过`);
     }
+  }
+
+  // 📍 如果候选人没有提到位置（门店未被过滤），使用岗位地址过滤
+  if (relevantStores.length === brandStores.length && jobAddressForFilter) {
+    locationLogs.push(`📍 使用岗位地址: ${jobAddressForFilter}`);
+    const jobAddressFiltered = relevantStores.filter(
+      store =>
+        store.name.includes(jobAddressForFilter) ||
+        store.location.includes(jobAddressForFilter) ||
+        store.district.includes(jobAddressForFilter) ||
+        store.subarea.includes(jobAddressForFilter)
+    );
+
+    if (jobAddressFiltered.length > 0) {
+      relevantStores = jobAddressFiltered;
+      locationLogs.push(`✅ 岗位地址匹配 → ${jobAddressFiltered.length}家门店`);
+    } else {
+      locationLogs.push(`   岗位地址无匹配`);
+    }
+  }
+
+  // 输出位置过滤日志
+  if (locationLogs.length > 0) {
+    console.log(`\n━━━ 📍 位置过滤 ━━━\n` + locationLogs.map(l => `   ${l}`).join("\n"));
   }
 
   // 构建上下文信息
   let context = `默认推荐品牌：${targetBrand}\n`;
-  let rankedStores: Store[] = [];
+  let rankedStoresWithDistance: StoreWithDistance[] = [];
 
   if (relevantStores.length > 0) {
-    // 🎯 智能门店排序
-    rankedStores = rankStoresByRelevance(relevantStores, classification);
+    // 🎯 智能门店排序（异步：支持真实距离计算）
+    rankedStoresWithDistance = await rankStoresByRelevance(relevantStores, classification);
 
-    // 🔢 确定展示门店数量
-    const storeCount = determineStoreCount(rankedStores, classification.replyType);
+    // 🔢 确定展示门店数量（使用门店数组）
+    const storeCount = determineStoreCount(
+      rankedStoresWithDistance.map(s => s.store),
+      classification.replyType
+    );
 
     // 📊 确定信息详细级别
     const detailLevel = determineDetailLevel(classification.replyType);
 
     console.log(
-      `📊 上下文构建: 展示${storeCount}个门店，详细级别=${detailLevel}，回复类型=${classification.replyType}`
+      `\n━━━ 📊 上下文构建 ━━━\n` +
+        `   回复类型: ${classification.replyType}\n` +
+        `   展示门店: ${storeCount}家 | 详细级别: ${detailLevel}`
     );
 
     context += `匹配到的门店信息：\n`;
 
-    // 🏢 构建优化后的门店信息
-    rankedStores.slice(0, storeCount).forEach(store => {
-      context += `• ${store.name}（${store.district}${store.subarea}）：${store.location}\n`;
+    // 🏢 构建优化后的门店信息（包含距离）
+    rankedStoresWithDistance.slice(0, storeCount).forEach(({ store, distance }) => {
+      // 🗺️ 如果有距离信息，显示在门店名称后
+      const distanceText =
+        distance !== undefined ? `【距离约${geocodingService.formatDistance(distance)}】` : "";
+      context += `• ${store.name}${distanceText}（${store.district}${store.subarea}）：${store.location}\n`;
 
       store.positions.forEach(pos => {
         context += buildPositionInfo(pos, detailLevel, classification.replyType);
@@ -1468,13 +1611,24 @@ function buildContextInfo(
     }
   }
 
+  // 如果没有排序结果，将原始门店转换为带距离的结构
+  const finalStoresWithDistance: StoreWithDistance[] =
+    rankedStoresWithDistance.length > 0
+      ? rankedStoresWithDistance
+      : relevantStores.map(store => ({ store, distance: undefined }));
+
   return {
     contextInfo: context,
     resolvedBrand: targetBrand,
     debugInfo: {
-      relevantStores: rankedStores.length > 0 ? rankedStores : relevantStores,
+      relevantStores: finalStoresWithDistance,
       storeCount:
-        rankedStores.length > 0 ? determineStoreCount(rankedStores, classification.replyType) : 0,
+        rankedStoresWithDistance.length > 0
+          ? determineStoreCount(
+              rankedStoresWithDistance.map(s => s.store),
+              classification.replyType
+            )
+          : 0,
       detailLevel: determineDetailLevel(classification.replyType),
       classification,
     },

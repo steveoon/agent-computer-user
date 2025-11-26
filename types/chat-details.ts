@@ -83,6 +83,7 @@ export const UnifiedCandidateInfoSchema = z
     age: z.string().optional().describe("年龄"),
     experience: z.string().optional().describe("工作经验"),
     education: z.string().optional().describe("学历"),
+    jobAddress: z.string().optional().describe("岗位地址（从DOM解析）"),
     info: z.array(z.string()).optional().describe("其他信息标签"),
     fullText: z.string().optional().describe("完整文本信息"),
   })
@@ -94,6 +95,7 @@ export const UnifiedCandidateInfoSchema = z
 export const ChatDetailsSummarySchema = z.object({
   candidateName: z.string().describe("候选人姓名"),
   candidatePosition: z.string().describe("候选人职位"),
+  jobAddress: z.string().optional().describe("岗位地址"),
   totalMessages: z.number().describe("总消息数"),
   lastMessageTime: z.string().describe("最后消息时间"),
 });

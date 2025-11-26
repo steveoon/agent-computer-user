@@ -28,6 +28,17 @@ const DULIDAY_API_BASE = "https://k8s.duliday.com/persistence/a";
 const DULIDAY_LIST_ENDPOINT = `${DULIDAY_API_BASE}/job-requirement/hiring/list`;
 
 /**
+ * 地理编码统计结果
+ */
+export interface GeocodingStats {
+  total: number; // 需要编码的总数
+  success: number; // 成功数
+  failed: number; // 失败数
+  skipped: number; // 跳过数（已有坐标）
+  failedStores: string[]; // 失败的门店名称列表
+}
+
+/**
  * 同步结果接口
  */
 export interface SyncResult {
@@ -39,6 +50,7 @@ export interface SyncResult {
   errors: string[];
   duration: number;
   convertedData?: Partial<ZhipinData>; // 可选：转换后的数据
+  geocodingStats?: GeocodingStats; // 地理编码统计
 }
 
 /**
@@ -395,8 +407,18 @@ export function createSyncService(token?: string): DulidaySyncService {
  */
 export function saveSyncRecord(record: SyncRecord): void {
   try {
+    // 🔧 移除 convertedData 以避免 localStorage 配额超限
+    // convertedData 包含所有门店数据，只用于当前同步操作，不需要保存到历史记录
+    const cleanedRecord: SyncRecord = {
+      ...record,
+      results: record.results.map(result => ({
+        ...result,
+        convertedData: undefined, // 移除大数据
+      })),
+    };
+
     const existingRecords = getSyncHistory();
-    const updatedRecords = [record, ...existingRecords].slice(0, 50); // 只保留最近50条记录
+    const updatedRecords = [cleanedRecord, ...existingRecords].slice(0, 50); // 只保留最近50条记录
     localStorage.setItem("sync_history", JSON.stringify(updatedRecords));
   } catch (error) {
     console.error("Failed to save sync record:", error);

@@ -46,6 +46,9 @@ services:
       # Duliday Integration
       - DULIDAY_TOKEN=${DULIDAY_TOKEN}
 
+      # Database
+      - DATABASE_URL=${DATABASE_URL}
+
       # Puppeteer Configuration
       # Puppeteer MCP Server 会通过 npx 自动管理 Chromium
 
