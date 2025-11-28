@@ -127,7 +127,7 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
 
   if (!data) {
     return (
-      <Card>
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle>系统提示词编辑器</CardTitle>
           <CardDescription>配置AI助手的系统级行为指令</CardDescription>
@@ -147,7 +147,7 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
   return (
     <div className="space-y-6">
       {/* 头部操作栏 */}
-      <Card>
+      <Card className="glass-card">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -176,7 +176,7 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
       </Card>
 
       {/* 活动提示词选择器 */}
-      <Card>
+      <Card className="glass-card">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
@@ -246,7 +246,7 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
       )}
 
       {/* Boss直聘系统提示词 */}
-      <Card>
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle className="text-lg">Boss直聘招聘助手</CardTitle>
           <CardDescription>
@@ -268,7 +268,7 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
       </Card>
 
       {/* Boss直聘本地版系统提示词 */}
-      <Card>
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle className="text-lg">Boss直聘招聘助手(本地版)</CardTitle>
           <CardDescription>
@@ -290,7 +290,7 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
       </Card>
 
       {/* 通用计算机操作提示词 */}
-      <Card>
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle className="text-lg">通用计算机助手</CardTitle>
           <CardDescription>
@@ -312,7 +312,7 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
       </Card>
 
       {/* 使用说明 */}
-      <Card>
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle>编辑说明</CardTitle>
           <CardDescription>系统提示词的作用和编辑注意事项</CardDescription>

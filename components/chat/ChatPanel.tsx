@@ -30,11 +30,7 @@ interface ChatPanelProps {
   };
   lastFinishReason?: FinishReason;
   // HITL: 工具确认相关
-  addToolOutput?: (params: {
-    toolCallId: string;
-    tool: string;
-    output: string;
-  }) => Promise<void>;
+  addToolOutput?: (params: { toolCallId: string; tool: string; output: string }) => Promise<void>;
   sendMessage?: () => void;
 
   // 来自其他地方
@@ -124,7 +120,7 @@ export function ChatPanel({
   };
 
   return (
-    <div className="flex flex-col border-l border-zinc-200 h-full">
+    <div className="flex flex-col border-l border-white/20 h-full glass bg-white/40">
       <ChatHeader
         currentBrand={currentBrand}
         messagesCount={messages.length}

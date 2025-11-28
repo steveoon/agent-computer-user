@@ -77,18 +77,23 @@ export function NavLink({ href, children, className, onClick }: NavLinkProps) {
       aria-busy={isNavigating}
       aria-disabled={isNavigating}
       className={cn(
-        "inline-flex items-center gap-1.5 transition-colors",
-        isNavigating && "pointer-events-none opacity-70",
+        "inline-flex items-center gap-1.5 transition-colors relative",
+        isNavigating && "pointer-events-none",
         className
       )}
     >
-      {isNavigating ? (
-        <>
-          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-          <span>加载中...</span>
-        </>
-      ) : (
-        children
+      <span
+        className={cn(
+          "flex items-center gap-1.5 transition-opacity duration-200",
+          isNavigating ? "opacity-0" : "opacity-100"
+        )}
+      >
+        {children}
+      </span>
+      {isNavigating && (
+        <span className="absolute inset-0 flex items-center justify-center">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        </span>
       )}
     </a>
   );
