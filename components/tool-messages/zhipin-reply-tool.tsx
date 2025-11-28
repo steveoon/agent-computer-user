@@ -5,6 +5,8 @@ import { BaseToolMessage } from "./base-tool-message";
 import { themes, type ToolMessageProps } from "./types";
 import { useMemo } from "react";
 import { REPLY_TYPE_NAMES, type ReplyContext } from "@/types/zhipin";
+import { MatchedStoresCard } from "./matched-stores-card";
+import type { StoreWithDistance } from "@/types/geocoding";
 
 export function ZhipinReplyToolMessage(props: ToolMessageProps) {
   const { input, state, output, isLatestMessage, status, messageId, partIndex } = props;
@@ -12,16 +14,24 @@ export function ZhipinReplyToolMessage(props: ToolMessageProps) {
   const brand = input.brand as string | undefined;
   const includeStats = input.include_stats as boolean | undefined;
 
-  // 从结果中提取分类信息
-  const { replyType, reasoningText } = useMemo(() => {
+  // 从结果中提取分类信息和调试信息
+  const { replyType, reasoningText, matchedStores } = useMemo(() => {
     if (output && typeof output === "object" && "replyType" in output) {
-      const typedResult = output as { replyType?: string; reasoningText?: string };
+      const typedResult = output as {
+        replyType?: string;
+        reasoningText?: string;
+        debugInfo?: {
+          relevantStores: StoreWithDistance[];
+          storeCount: number;
+        };
+      };
       return {
         replyType: typedResult.replyType,
         reasoningText: typedResult.reasoningText,
+        matchedStores: typedResult.debugInfo?.relevantStores,
       };
     }
-    return { replyType: undefined, reasoningText: undefined };
+    return { replyType: undefined, reasoningText: undefined, matchedStores: undefined };
   }, [output]);
 
   const details: string[] = [];
@@ -67,6 +77,9 @@ export function ZhipinReplyToolMessage(props: ToolMessageProps) {
             <span className="text-gray-700 dark:text-gray-300 flex-1">{reasoningText}</span>
           </div>
         </div>
+      )}
+      {matchedStores && matchedStores.length > 0 && state === "output-available" && (
+        <MatchedStoresCard stores={matchedStores} displayCount={3} compact className="ml-8" />
       )}
     </>
   );

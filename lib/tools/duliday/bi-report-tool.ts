@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { fetchWithRetry } from "@/lib/utils/fetch-retry";
 
 // ==================== 常量配置 ====================
 const API_CONFIG = {
@@ -233,65 +234,22 @@ function buildFilters(params: {
 }
 
 /**
- * 带超时和重试的fetch请求
- */
-async function fetchWithRetry(
-  input: RequestInfo | URL,
-  init: RequestInit = {},
-  options: { timeout?: number; retries?: number; retryDelay?: number } = {}
-): Promise<Response> {
-  const { timeout = 10000, retries = 3, retryDelay = 1000 } = options;
-
-  for (let attempt = 0; attempt < retries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-      const response = await fetch(input, {
-        ...init,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      // 如果是5xx错误，重试
-      if (response.status >= 500 && attempt < retries - 1) {
-        console.log(`⚠️ 服务器错误 ${response.status}，${retryDelay}ms 后重试...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        continue;
-      }
-
-      return response;
-    } catch (error) {
-      if (attempt === retries - 1) throw error;
-
-      console.log(`⚠️ 请求失败，${retryDelay}ms 后重试 (${attempt + 1}/${retries})...`);
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
-    }
-  }
-
-  throw new Error("请求失败，已达最大重试次数");
-}
-
-/**
  * 登录获取Token
  */
 async function login(): Promise<string> {
   console.log("🔐 正在登录获取Token...");
 
-  const response = await fetchWithRetry(
-    `${API_CONFIG.BASE_URL}${API_CONFIG.LOGIN_ENDPOINT}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        domain: API_CONFIG.DOMAIN,
-        loginId: CREDENTIALS.LOGIN_ID,
-        password: CREDENTIALS.PASSWORD,
-      }),
-    },
-    { timeout: 15000, retries: 3 }
-  );
+  const response = await fetchWithRetry(`${API_CONFIG.BASE_URL}${API_CONFIG.LOGIN_ENDPOINT}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      domain: API_CONFIG.DOMAIN,
+      loginId: CREDENTIALS.LOGIN_ID,
+      password: CREDENTIALS.PASSWORD,
+    }),
+    timeout: 15000,
+    retries: 3,
+  });
 
   if (!response.ok) {
     throw new Error(`登录失败: ${response.status} ${response.statusText}`);
@@ -325,8 +283,9 @@ async function fetchBIData(
         "Content-Type": "application/json",
       },
       body: JSON.stringify(queryPayload),
-    },
-    { timeout: 20000, retries: 3 }
+      timeout: 20000,
+      retries: 3,
+    }
   );
 
   if (!response.ok) {

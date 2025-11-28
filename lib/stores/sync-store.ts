@@ -130,27 +130,110 @@ export const useSyncStore = create<SyncState>()(
 
           set({ currentStep: "正在同步数据...", overallProgress: 10 });
 
-          // 调用 API 端点进行同步
-          const syncResponse = await fetch("/api/sync", {
+          // 获取现有数据以提取已知坐标
+          const existingData = await getBrandData();
+          const existingCoordinates: Record<string, { lat: number; lng: number }> = {};
+
+          if (existingData?.stores) {
+            existingData.stores.forEach(store => {
+              if (store.coordinates && store.coordinates.lat !== 0 && store.coordinates.lng !== 0) {
+                // 使用地址作为键
+                existingCoordinates[store.location] = store.coordinates;
+              }
+            });
+          }
+
+          // 调用 API 端点进行同步 (流式响应)
+          const response = await fetch("/api/sync", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
               organizationIds: selectedBrands,
-              token: localToken, // 传递本地存储的token
+              token: localToken,
+              existingCoordinates, // 发送已知坐标
             }),
           });
 
-          if (!syncResponse.ok) {
-            const errorData = await syncResponse.json();
+          if (!response.ok) {
+            const errorData = await response.json();
             throw new Error(errorData.error || "同步请求失败");
           }
 
-          const { data: result } = await syncResponse.json();
+          if (!response.body) {
+            throw new Error("未收到服务器响应流");
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let result: SyncRecord | null = null;
+          let buffer = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+
+            // Keep the last line in the buffer as it might be incomplete
+            // unless the stream is done (which is handled by the loop exit)
+            buffer = lines.pop() || "";
+
+            for (const line of lines) {
+              if (line.trim() === "") continue;
+
+              try {
+                const data = JSON.parse(line);
+
+                if (data.type === "progress") {
+                  set({
+                    overallProgress: data.progress,
+                    currentStep: data.message,
+                    currentOrganization: data.currentOrg || 0,
+                  });
+                } else if (data.type === "geocoding_progress") {
+                  // 地理编码阶段进度 (50% - 90%)
+                  const baseProgress = 50;
+                  set(state => ({
+                    currentStep: `正在地理编码 [${data.brandName}]: ${data.processed}/${data.total}`,
+                    overallProgress: Math.min(
+                      90,
+                      Math.max(baseProgress, state.overallProgress + 0.5)
+                    ),
+                  }));
+                } else if (data.type === "result") {
+                  result = data.data;
+                } else if (data.type === "error") {
+                  throw new Error(data.error);
+                }
+              } catch (e) {
+                console.error("解析流数据失败:", e);
+              }
+            }
+          }
+
+          // Process any remaining buffer
+          if (buffer.trim()) {
+            try {
+              const data = JSON.parse(buffer);
+              if (data.type === "result") {
+                result = data.data;
+              } else if (data.type === "error") {
+                throw new Error(data.error);
+              }
+            } catch (e) {
+              console.error("解析剩余缓冲数据失败:", e);
+            }
+          }
+
+          if (!result) {
+            throw new Error("未收到同步结果数据");
+          }
 
           // 处理转换后的数据并保存到本地配置
-          set({ currentStep: "正在保存数据到本地...", overallProgress: 90 });
+          set({ currentStep: "正在保存数据到本地...", overallProgress: 95 });
 
           try {
             await mergeAndSaveSyncData(result.results);

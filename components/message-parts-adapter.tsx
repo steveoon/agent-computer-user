@@ -16,12 +16,21 @@ interface MessagePartsAdapterProps {
   message: UIMessage;
   isLatestMessage?: boolean;
   status?: string;
+  // HITL: 工具确认相关
+  addToolOutput?: (params: {
+    toolCallId: string;
+    tool: string;
+    output: string;
+  }) => Promise<void>;
+  sendMessage?: () => void;
 }
 
 export function MessagePartsAdapter({
   message,
   isLatestMessage,
   status,
+  addToolOutput,
+  sendMessage,
 }: MessagePartsAdapterProps) {
   // 优先检查 parts 数组（新的消息格式）
   const parts = message.parts;
@@ -87,6 +96,9 @@ export function MessagePartsAdapter({
                   status={status}
                   messageId={message.id}
                   partIndex={i}
+                  toolCallId={toolCallId}
+                  addToolOutput={addToolOutput}
+                  sendMessage={sendMessage}
                 />
               </div>
             );

@@ -88,7 +88,7 @@ export function ChatInputForm({
         submitPrompt={handlePromptClick}
       />
 
-      <div className="bg-white relative">
+      <div className="bg-white/40 backdrop-blur-md relative">
         {/* Template Editor */}
         {templateState && (
           <TemplateEditor

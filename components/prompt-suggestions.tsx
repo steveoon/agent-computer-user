@@ -105,7 +105,7 @@ export const PromptSuggestions = ({
   disabled: boolean;
 }) => {
   return (
-    <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-white border-t border-zinc-200">
+    <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-white/30 backdrop-blur-md border-t border-white/20">
       {suggestions.map((suggestion, index) => (
         <Button
           key={index}

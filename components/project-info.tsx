@@ -4,7 +4,7 @@ import Image from "next/image";
 export const ProjectInfo = () => {
   return (
     <motion.div className="w-full px-4">
-      <div className="rounded-lg border-border border p-6 flex flex-col gap-4 text-center text-base dark:text-zinc-400">
+      <div className="rounded-lg bg-white/40 backdrop-blur-md p-6 flex flex-col gap-4 text-center text-base dark:text-zinc-400 shadow-sm">
         <div className="flex flex-row justify-center items-center">
           <div className="relative h-12 w-60">
             <Image

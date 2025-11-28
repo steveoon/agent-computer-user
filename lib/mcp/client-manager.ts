@@ -91,6 +91,19 @@ class MCPClientManager {
       enabled: true,
     });
     this.clientConfigs.set("puppeteer", puppeteerConfig);
+
+    // 高德地图 MCP 配置 - 用于地理编码和距离计算
+    const amapConfig = validateMCPClientConfig({
+      name: "amap",
+      command: "npx",
+      args: ["-y", "@amap/amap-maps-mcp-server"],
+      env: {
+        AMAP_MAPS_API_KEY: process.env.AMAP_MAPS_API_KEY || "",
+      },
+      description: "高德地图 MCP 服务",
+      enabled: true,
+    });
+    this.clientConfigs.set("amap", amapConfig);
   }
 
   /**
@@ -198,6 +211,20 @@ class MCPClientManager {
   }
 
   /**
+   * 高德地图 MCP 客户端
+   */
+  public async getAmapMCPClient(): Promise<MCPClient> {
+    return this.getMCPClient("amap") as Promise<MCPClient>;
+  }
+
+  /**
+   * 高德地图 MCP 工具
+   */
+  public async getAmapMCPTools(): Promise<MCPTools> {
+    return this.getMCPTools("amap");
+  }
+
+  /**
    * 关闭指定的MCP客户端
    * @param clientName 客户端名称
    */
@@ -302,6 +329,9 @@ export const getPuppeteerMCPTools = () => mcpClientManager.getPuppeteerMCPTools(
 
 export const getPlaywrightMCPClient = () => mcpClientManager.getPlaywrightMCPClient();
 export const getPlaywrightMCPTools = () => mcpClientManager.getPlaywrightMCPTools();
+
+export const getAmapMCPClient = () => mcpClientManager.getAmapMCPClient();
+export const getAmapMCPTools = () => mcpClientManager.getAmapMCPTools();
 
 // 客户端管理函数
 export const closeMCPClient = (clientName: string) => mcpClientManager.closeMCPClient(clientName);

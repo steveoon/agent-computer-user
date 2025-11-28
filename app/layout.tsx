@@ -42,6 +42,8 @@ export const metadata: Metadata = {
   manifest: "/site.webmanifest",
 };
 
+import { ErrorBoundary } from "@/components/ui/error-boundary";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -53,14 +55,16 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AuthProvider>
-          <BrandProvider>
-            <ConfigInitializer />
-            {children}
-            <Toaster />
-            <Analytics />
-          </BrandProvider>
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <BrandProvider>
+              <ConfigInitializer />
+              {children}
+              <Toaster />
+              <Analytics />
+            </BrandProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

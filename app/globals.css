@@ -53,32 +53,39 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
+  /* 基础背景色 - 调整为柔和的暖色调以配合品牌色 */
+  --background: oklch(0.99 0.01 85);
   --foreground: oklch(0.141 0.005 285.823);
+
+  /* Glassmorphism 变量 */
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.8);
+  --glass-shadow: 0 8px 32px 0 rgba(245, 158, 11, 0.1); /* 使用品牌色阴影 */
+
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.141 0.005 285.823);
 
   /* 花卷品牌色 - 浅色模式 */
-  --brand-primary: oklch(0.74 0.15 70);    /* #F59E0B - 琥珀橙 */
-  --brand-light: oklch(0.85 0.15 85);      /* #FCD34D - 浅黄 */
-  --brand-dark: oklch(0.60 0.18 60);       /* #D97706 - 深橙 */
+  --brand-primary: oklch(0.74 0.15 70); /* #F59E0B - 琥珀橙 */
+  --brand-light: oklch(0.85 0.15 85); /* #FCD34D - 浅黄 */
+  --brand-dark: oklch(0.6 0.18 60); /* #D97706 - 深橙 */
 
-  --primary: oklch(0.74 0.15 70);          /* 使用品牌主色 */
-  --primary-foreground: oklch(1 0 0);      /* 白色文字 */
+  --primary: oklch(0.74 0.15 70); /* 使用品牌主色 */
+  --primary-foreground: oklch(1 0 0); /* 白色文字 */
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.967 0.001 286.375);
   --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.85 0.15 85);           /* 使用品牌浅色作为强调色 */
+  --accent: oklch(0.85 0.15 85); /* 使用品牌浅色作为强调色 */
   --accent-foreground: oklch(0.21 0.006 285.885);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.74 0.15 70);             /* 使用品牌主色作为焦点环 */
-  --chart-1: oklch(0.74 0.15 70);          /* 图表使用品牌色 */
+  --ring: oklch(0.74 0.15 70); /* 使用品牌主色作为焦点环 */
+  --chart-1: oklch(0.74 0.15 70); /* 图表使用品牌色 */
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
@@ -86,7 +93,7 @@
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.74 0.15 70);  /* 侧边栏使用品牌色 */
+  --sidebar-primary: oklch(0.74 0.15 70); /* 侧边栏使用品牌色 */
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.967 0.001 286.375);
   --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
@@ -97,37 +104,43 @@
 .dark {
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
+
+  /* Glassmorphism 变量 - 深色模式 */
+  --glass-bg: rgba(30, 30, 30, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+
   --card: oklch(0.141 0.005 285.823);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.141 0.005 285.823);
   --popover-foreground: oklch(0.985 0 0);
 
   /* 花卷品牌色 - 深色模式 */
-  --brand-primary: oklch(0.74 0.15 70);    /* #F59E0B - 琥珀橙 */
-  --brand-light: oklch(0.85 0.15 85);      /* #FCD34D - 浅黄 */
-  --brand-dark: oklch(0.60 0.18 60);       /* #D97706 - 深橙 */
+  --brand-primary: oklch(0.74 0.15 70); /* #F59E0B - 琥珀橙 */
+  --brand-light: oklch(0.85 0.15 85); /* #FCD34D - 浅黄 */
+  --brand-dark: oklch(0.6 0.18 60); /* #D97706 - 深橙 */
 
-  --primary: oklch(0.74 0.15 70);          /* 使用品牌主色 */
-  --primary-foreground: oklch(0.1 0 0);    /* 深色文字 */
+  --primary: oklch(0.74 0.15 70); /* 使用品牌主色 */
+  --primary-foreground: oklch(0.1 0 0); /* 深色文字 */
   --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.274 0.006 286.033);
   --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.85 0.15 85);           /* 使用品牌浅色作为强调色 */
+  --accent: oklch(0.85 0.15 85); /* 使用品牌浅色作为强调色 */
   --accent-foreground: oklch(0.1 0 0);
   --destructive: oklch(0.396 0.141 25.723);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.274 0.006 286.033);
   --input: oklch(0.274 0.006 286.033);
-  --ring: oklch(0.74 0.15 70);             /* 使用品牌主色作为焦点环 */
-  --chart-1: oklch(0.74 0.15 70);          /* 图表使用品牌色 */
+  --ring: oklch(0.74 0.15 70); /* 使用品牌主色作为焦点环 */
+  --chart-1: oklch(0.74 0.15 70); /* 图表使用品牌色 */
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.21 0.006 285.885);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.74 0.15 70);  /* 侧边栏使用品牌色 */
+  --sidebar-primary: oklch(0.74 0.15 70); /* 侧边栏使用品牌色 */
   --sidebar-primary-foreground: oklch(0.1 0 0);
   --sidebar-accent: oklch(0.274 0.006 286.033);
   --sidebar-accent-foreground: oklch(0.985 0 0);
@@ -141,16 +154,94 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* 添加柔和的背景渐变 */
+    background: radial-gradient(circle at 50% 0%, oklch(0.95 0.05 85) 0%, var(--background) 100%);
+    overflow-x: hidden; /* 仅防止水平方向出现滚动条 */
+    min-height: 100vh;
   }
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera */
-/* ::-webkit-scrollbar {
-  display: none;
-} */
+@layer components {
+  .glass-card {
+    @apply !bg-white/40 backdrop-blur-md border-white/20 shadow-sm;
+  }
 
-/* Hide scrollbar for IE, Edge and Firefox */
-/* * {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-} */
+  .glass-tabs {
+    @apply !bg-white/40 backdrop-blur-md border border-white/20 shadow-sm;
+  }
+
+  .glass-tab-active {
+    @apply data-[state=active]:!bg-white/60 data-[state=active]:shadow-sm;
+  }
+
+  .glass-button {
+    @apply !bg-white/40 hover:!bg-white/60 backdrop-blur-sm shadow-sm hover:text-primary transition-colors border-white/40;
+  }
+}
+
+/* Glassmorphism Utilities */
+@layer utilities {
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-right: 1px solid rgba(255, 255, 255, 0.5);
+  }
+
+  /* 背景光斑动画 */
+  .bg-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.4; /* 降低整体不透明度从 0.6 到 0.4 */
+    z-index: -1;
+    animation: blob-bounce 10s infinite ease-in-out alternate;
+  }
+
+  .bg-blob-1 {
+    top: -10%;
+    left: -10%;
+    width: 500px;
+    height: 500px;
+    background: var(--brand-light);
+    opacity: 0.3; /* 单独降低 blob-1 不透明度 */
+    animation-delay: 0s;
+  }
+
+  .bg-blob-2 {
+    bottom: -10%;
+    right: -10%;
+    width: 600px;
+    height: 600px;
+    background: var(--brand-primary);
+    opacity: 0.25; /* 降低 blob-2 不透明度从 0.4 到 0.25 */
+    animation-delay: 2s;
+  }
+
+  .bg-blob-3 {
+    top: 40%;
+    left: 40%;
+    width: 400px;
+    height: 400px;
+    background: #e0e7ff; /* 淡淡的蓝紫色作为对比，增加层次感 */
+    opacity: 0.4;
+    animation-delay: 4s;
+  }
+
+  @keyframes blob-bounce {
+    0% {
+      transform: translate(0, 0) scale(1);
+    }
+    100% {
+      transform: translate(20px, -20px) scale(1.1);
+    }
+  }
+}

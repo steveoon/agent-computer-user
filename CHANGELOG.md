@@ -2,6 +2,23 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.18.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.18.0-develop.1...v1.18.0-develop.2) (2025-11-28)
+
+
+### Features
+
+* Add ErrorBoundary component to enhance error handling in RootLayout and ChatPanel ([78eca3d](https://github.com/steveoon/agent-computer-user/commit/78eca3d8b0867c2e15a1b255c8c1ec59a0d97769))
+
+# [1.18.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.17.0...v1.18.0-develop.1) (2025-11-28)
+
+
+### Features
+
+* Enhance UI with glassmorphism effects and improve layout for chat and admin settings pages ([7d9b825](https://github.com/steveoon/agent-computer-user/commit/7d9b825dc478d3d0940eab46460407a378594c3e))
+* Implement Human-in-the-Loop (HITL) for tool confirmation and add agent computer use rules. ([5bad522](https://github.com/steveoon/agent-computer-user/commit/5bad5229882732cda1089be3de2507119b203867))
+* Introduce geocoding service with sync statistics display and enhance brand data editor to infer and show store cities. ([0d0ad4a](https://github.com/steveoon/agent-computer-user/commit/0d0ad4aeccfdee75b75bebafaa8f383a13346045))
+* 实现消息分类和基于门店数据的上下文构建逻辑，并为测试页面和API添加品牌冲突解析及详细调试信息。 ([5c6b1ab](https://github.com/steveoon/agent-computer-user/commit/5c6b1ab2b3f028f8c0702904d3090ff7d9b3ce66))
+
 # [1.17.0](https://github.com/steveoon/agent-computer-user/compare/v1.16.0...v1.17.0) (2025-11-21)
 
 

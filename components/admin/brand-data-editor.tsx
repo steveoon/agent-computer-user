@@ -104,13 +104,26 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
 
     const brandCount = Object.keys(localData.brands).length;
     const storeCount = localData.stores.length;
-    const cityInfo = localData.city;
+
+    // 🏙️ 从门店推断覆盖城市（优先使用门店级别的 city 字段）
+    const storeCities = localData.stores
+      .map(store => store.city)
+      .filter((city): city is string => Boolean(city));
+    const uniqueCities = Array.from(new Set(storeCities));
+    // 如果没有门店级别的城市，降级使用全局 city
+    const cityInfo =
+      uniqueCities.length > 0
+        ? uniqueCities.length === 1
+          ? uniqueCities[0]
+          : `${uniqueCities.length}个城市`
+        : localData.city || "未设置";
+    const cityTooltip = uniqueCities.length > 1 ? uniqueCities.join("、") : undefined;
 
     return (
       <div className="space-y-6">
         {/* 统计卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card>
+          <Card className="glass-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">品牌数量</CardTitle>
               <Database className="h-4 w-4 text-muted-foreground" />
@@ -121,7 +134,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="glass-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">门店数量</CardTitle>
               <Database className="h-4 w-4 text-muted-foreground" />
@@ -132,20 +145,26 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="glass-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">覆盖城市</CardTitle>
               <Database className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{cityInfo}</div>
-              <p className="text-xs text-muted-foreground">主要城市</p>
+              <div className="text-2xl font-bold" title={cityTooltip}>
+                {cityInfo}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {uniqueCities.length > 1
+                  ? `${uniqueCities.slice(0, 3).join("、")}${uniqueCities.length > 3 ? "等" : ""}`
+                  : "主要城市"}
+              </p>
             </CardContent>
           </Card>
         </div>
 
         {/* 品牌列表 */}
-        <Card>
+        <Card className="glass-card">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -186,10 +205,13 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Object.entries(localData.brands).map(([brandName, brandConfig]) => (
-                  <div key={brandName} className="p-4 border rounded-lg">
+                  <div
+                    key={brandName}
+                    className="p-4 border rounded-lg bg-white/40 backdrop-blur-sm hover:bg-white/60 transition-colors"
+                  >
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="font-medium">{brandName}</h3>
-                      <Badge variant="outline">
+                      <Badge variant="outline" className="bg-white/50">
                         {localData.stores.filter(store => store.brand === brandName).length} 门店
                       </Badge>
                     </div>
@@ -206,7 +228,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1"
+                        className="flex-1 bg-white/50 hover:bg-white/80"
                         onClick={() => {
                           setEditingBrand(brandName);
                           setEditingType("templates");
@@ -218,7 +240,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1"
+                        className="flex-1 bg-white/50 hover:bg-white/80"
                         onClick={() => {
                           setEditingBrand(brandName);
                           setEditingType("schedule");
@@ -236,7 +258,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
         </Card>
 
         {/* 门店列表 */}
-        <Card>
+        <Card className="glass-card">
           <CardHeader>
             <CardTitle>所有品牌门店配置</CardTitle>
             <CardDescription>门店分布和基本信息</CardDescription>
@@ -273,7 +295,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
         </Card>
 
         {/* 使用说明 */}
-        <Card>
+        <Card className="glass-card">
           <CardHeader>
             <CardTitle>编辑说明</CardTitle>
             <CardDescription>如何编辑品牌数据配置</CardDescription>
@@ -293,7 +315,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
 
   if (!data) {
     return (
-      <Card>
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle>品牌数据编辑器</CardTitle>
           <CardDescription>配置品牌信息和门店数据</CardDescription>
@@ -313,7 +335,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
   return (
     <div className="space-y-6">
       {/* 头部操作栏 */}
-      <Card>
+      <Card className="glass-card">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -359,12 +381,12 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
 
       {/* 编辑模式切换 */}
       <Tabs value={editMode} onValueChange={value => setEditMode(value as "overview" | "json")}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
+        <TabsList className="grid w-full grid-cols-2 glass-tabs">
+          <TabsTrigger value="overview" className="flex items-center gap-2 glass-tab-active">
             <Eye className="h-4 w-4" />
             数据概览
           </TabsTrigger>
-          <TabsTrigger value="json" className="flex items-center gap-2">
+          <TabsTrigger value="json" className="flex items-center gap-2 glass-tab-active">
             <Code2 className="h-4 w-4" />
             JSON编辑
           </TabsTrigger>
@@ -375,7 +397,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
 
         {/* JSON编辑模式 */}
         <TabsContent value="json">
-          <Card>
+          <Card className="glass-card">
             <CardHeader>
               <CardTitle className="text-lg">JSON 数据编辑</CardTitle>
               <CardDescription>直接编辑品牌数据的JSON格式，请确保语法正确</CardDescription>
@@ -384,8 +406,9 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
               <textarea
                 value={jsonData}
                 onChange={e => updateJsonData(e.target.value)}
-                className="w-full h-96 p-4 font-mono text-sm border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                className="w-full h-96 p-4 font-mono text-sm border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-slate-950 text-slate-50 leading-relaxed"
                 placeholder="输入品牌数据的JSON格式..."
+                spellCheck={false}
               />
               <div className="mt-2 text-xs text-muted-foreground">
                 提示：修改后请点击"保存"按钮保存更改

@@ -9,6 +9,8 @@ import {
   MessageClassification,
   ReplyContextSchema,
   ReplyContext,
+  Store,
+  Position,
 } from "../../types/zhipin";
 import { generateText, generateObject } from "ai";
 import { z } from "zod";
@@ -24,6 +26,13 @@ import type { ModelConfig } from "@/lib/config/models";
 import type { CandidateInfo } from "@/lib/tools/zhipin/types";
 import type { SalaryDetails } from "../../types/zhipin";
 import type { BrandResolutionInput, BrandResolutionOutput } from "../../types/brand-resolution";
+import {
+  geocodingService,
+  extractCityFromAddress,
+  mostFrequent,
+  isValidCoordinates,
+} from "../services/geocoding.service";
+import type { StoreWithDistance } from "@/types/geocoding";
 // 使用新的模块化 prompt engineering
 import {
   ClassificationPromptBuilder,
@@ -254,7 +263,9 @@ export function generateSmartReply(
 
     // 使用实际选中门店的品牌名，而不是目标品牌名
     const actualBrand = randomStore.brand;
-    let reply = `你好，${data.city}各区有${actualBrand}门店岗位空缺，兼职排班 ${randomPosition.workHours} 小时。基本薪资：${randomPosition.salary.base} 元/小时。`;
+    // 使用门店级别的城市，优先级：门店 city > 全局 data.city
+    const storeCity = getStoreCity(randomStore, data.city);
+    let reply = `你好，${storeCity}各区有${actualBrand}门店岗位空缺，兼职排班 ${randomPosition.workHours} 小时。基本薪资：${randomPosition.salary.base} 元/小时。`;
     if (randomPosition.salary.range) {
       reply += `薪资范围：${randomPosition.salary.range}。`;
     }
@@ -313,7 +324,9 @@ export function generateSmartReply(
     }
 
     // 否则询问用户位置
-    return `你好，${data.city}目前各区有门店岗位空缺，你在什么位置？我可以查下你附近`;
+    // 🔧 优先级: 门店 store.city → 门店地址提取 → data.city (fallback)
+    const inferredCity = inferCityFromStores(data.stores, data.city);
+    return `你好，${inferredCity}目前各区有门店岗位空缺，你在什么位置？我可以查下你附近`;
   }
 
   // 3. 时间安排咨询
@@ -416,7 +429,9 @@ export function generateSmartReply(
   }
 
   // 9. 默认回复
-  return `你好，${data.city}目前各区有门店岗位空缺，你在什么位置？我可以查下你附近`;
+  // 🔧 优先级: 门店 store.city → 门店地址提取 → data.city (fallback)
+  const defaultCity = inferCityFromStores(data.stores, data.city);
+  return `你好，${defaultCity}目前各区有门店岗位空缺，你在什么位置？我可以查下你附近`;
 }
 
 /**
@@ -446,13 +461,14 @@ export async function classifyUserMessage(
   // 创建分类构建器
   const classificationBuilder = new ClassificationPromptBuilder();
 
-  // 构建分类参数
+  // 构建分类参数（城市从门店推断，优先级：门店 city > 全局 data.city）
+  const inferredCity = inferCityFromStores(data.stores, data.city);
   const classificationParams: ClassificationParams = {
     message,
     conversationHistory,
     candidateInfo,
     brandData: {
-      city: data.city,
+      city: inferredCity,
       defaultBrand: data.defaultBrand || getBrandName(data),
       availableBrands: Object.keys(data.brands),
       storeCount: data.stores.length,
@@ -535,7 +551,18 @@ export async function generateSmartReplyWithLLM(
   candidateInfo?: CandidateInfo,
   defaultWechatId?: string,
   brandPriorityStrategy?: BrandPriorityStrategy
-): Promise<{ replyType: string; text: string; reasoningText: string }> {
+): Promise<{
+  replyType: string;
+  text: string;
+  reasoningText: string;
+  debugInfo?: {
+    relevantStores: StoreWithDistance[];
+    storeCount: number;
+    detailLevel: string;
+    classification: MessageClassification;
+  };
+  contextInfo?: string;
+}> {
   try {
     // 🎯 获取配置的模型和provider设置
     const replyModel = modelConfig?.replyModel || DEFAULT_MODEL_CONFIG.replyModel;
@@ -582,13 +609,14 @@ export async function generateSmartReplyWithLLM(
       effectiveReplyPrompts[classification.replyType as keyof typeof effectiveReplyPrompts] ||
       effectiveReplyPrompts.general_chat;
 
-    // 构建上下文信息并获取解析后的品牌
-    const { contextInfo, resolvedBrand } = buildContextInfo(
+    // 构建上下文信息并获取解析后的品牌（异步：支持真实距离计算）
+    const { contextInfo, resolvedBrand, debugInfo } = await buildContextInfo(
       data,
       classification,
       preferredBrand,
       toolBrand,
-      brandPriorityStrategy
+      brandPriorityStrategy,
+      candidateInfo // 传递候选人信息，用于获取 jobAddress
     );
 
     // 创建回复构建器
@@ -628,6 +656,8 @@ export async function generateSmartReplyWithLLM(
       replyType: classification.replyType,
       text: finalReply.text,
       reasoningText: classification.reasoningText,
+      debugInfo,
+      contextInfo,
     };
   } catch (error) {
     console.error("LLM智能回复生成失败:", error);
@@ -736,8 +766,6 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
   switch (strategy) {
     case "user-selected": {
       // 优先级：UI选择 → 配置默认 → 第一个可用品牌
-      console.log("📌 品牌解析策略: user-selected (UI选择优先)");
-
       // 1. 尝试 UI 选择的品牌
       const uiMatched = tryMatchBrand(uiSelectedBrand, "UI选择");
       if (uiMatched) {
@@ -774,8 +802,6 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
 
     case "conversation-extracted": {
       // 优先级：对话提取 → UI选择 → 配置默认 → 第一个可用品牌
-      console.log("💬 品牌解析策略: conversation-extracted (对话提取优先)");
-
       // 1. 尝试对话提取的品牌
       const conversationMatched = tryMatchBrand(conversationBrand, "对话提取");
       if (conversationMatched) {
@@ -826,8 +852,6 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
     default: {
       // 优先级：对话提取 → UI选择 → 配置默认 → 第一个可用品牌
       // 特殊逻辑：如果对话品牌和UI品牌都存在且不同，进行智能判断
-      console.log("🔍 品牌解析策略: smart (智能判断)");
-
       const conversationMatched = tryMatchBrand(conversationBrand, "对话提取");
       const uiMatched = tryMatchBrand(uiSelectedBrand, "UI选择");
 
@@ -839,28 +863,20 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
 
         if (isSameBrandFamily) {
           // 同系列品牌，优先使用对话提取的品牌（更符合当前上下文意图）
-          console.log(
-            `🔍 品牌智能判断 [同系列]: 对话=${conversationMatched}, UI=${uiMatched} → 优先使用对话提取`
-          );
-
           return {
             resolvedBrand: conversationMatched,
             matchType: conversationMatched === conversationBrand ? "exact" : "fuzzy",
             source: "conversation",
-            reason: `智能策略: 同系列品牌，优先对话上下文 (对话=${conversationMatched}, UI=${uiMatched})`,
+            reason: `同系列品牌冲突，优先对话`,
             originalInput: conversationBrand,
           };
         } else {
           // 不同品牌系列，优先对话提取（因为更符合当前上下文）
-          console.log(
-            `⚡ 品牌智能判断 [不同系列]: 对话=${conversationMatched}, UI=${uiMatched} → 优先对话提取`
-          );
-
           return {
             resolvedBrand: conversationMatched,
             matchType: conversationMatched === conversationBrand ? "exact" : "fuzzy",
             source: "conversation",
-            reason: `智能策略: 不同品牌系列，优先对话上下文 (对话=${conversationMatched}, UI=${uiMatched})`,
+            reason: `不同品牌冲突，优先对话`,
             originalInput: conversationBrand,
           };
         }
@@ -912,23 +928,482 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
 }
 
 /**
+ * 🎯 信息详细级别类型
+ */
+type DetailLevel = "minimal" | "standard" | "detailed";
+
+/**
+ * 🎯 门店评分结构
+ */
+interface StoreScore {
+  store: Store;
+  score: number;
+  breakdown: {
+    locationMatch: number; // 位置匹配得分 (0-40)
+    districtMatch: number; // 区域匹配得分 (0-30)
+    positionDiversity: number; // 岗位多样性得分 (0-20)
+    availability: number; // 可用性得分 (0-10)
+  };
+}
+
+// 🗺️ StoreWithDistance 类型从 @/types/geocoding 导入
+// 重新导出供其他模块使用
+export type { StoreWithDistance } from "@/types/geocoding";
+
+/**
+ * 🌐 推断城市
+ * 从分类结果或门店数据中推断用户所在城市
+ */
+function inferCity(classification: MessageClassification, stores: Store[]): string {
+  // 1. 优先使用分类结果的 city
+  if (classification.extractedInfo.city) {
+    return classification.extractedInfo.city;
+  }
+
+  // 2. 从门店数据推断城市
+  return inferCityFromStores(stores);
+}
+
+/**
+ * 🏙️ 从门店列表推断城市
+ * 优先使用门店级别的 city 字段，其次从地址提取
+ * @param stores 门店列表
+ * @param fallback 备用值（可选）
+ * @returns 最常见的城市名称
+ */
+function inferCityFromStores(stores: Store[], fallback?: string): string {
+  // 1. 优先收集门店级别的 city 字段
+  const storeCities = stores.map(s => s.city).filter((c): c is string => Boolean(c));
+
+  if (storeCities.length > 0) {
+    return mostFrequent(storeCities) || fallback || "当地";
+  }
+
+  // 2. 降级：从门店地址提取城市
+  const addressCities = stores.map(s => extractCityFromAddress(s.location)).filter(Boolean);
+  return mostFrequent(addressCities) || fallback || "当地";
+}
+
+/**
+ * 🏪 获取门店所在城市
+ * @param store 门店对象
+ * @param fallback 备用值
+ * @returns 门店城市
+ */
+function getStoreCity(store: Store, fallback?: string): string {
+  return store.city || fallback || "当地";
+}
+
+/**
+ * 🔍 基于文本匹配的门店排序（降级方案）
+ * @returns 带距离信息的门店列表（文本匹配时 distance 为 undefined）
+ */
+function rankStoresByTextMatch(
+  stores: Store[],
+  classification: MessageClassification
+): StoreWithDistance[] {
+  const { mentionedLocations, mentionedDistricts } = classification.extractedInfo;
+
+  const scoredStores: StoreScore[] = stores.map(store => {
+    let locationMatch = 0;
+    let districtMatch = 0;
+    let positionDiversity = 0;
+    let availability = 0;
+
+    // 1. 位置匹配（40%权重）
+    if (mentionedLocations && mentionedLocations.length > 0) {
+      const matchingLocation = mentionedLocations.find(
+        loc =>
+          store.name.includes(loc.location) ||
+          store.location.includes(loc.location) ||
+          store.subarea.includes(loc.location)
+      );
+      if (matchingLocation) {
+        locationMatch = matchingLocation.confidence * 40;
+      }
+    }
+
+    // 2. 区域匹配（30%权重）
+    if (mentionedDistricts && mentionedDistricts.length > 0) {
+      const matchingDistrict = mentionedDistricts.find(
+        dist => store.district.includes(dist.district) || store.subarea.includes(dist.district)
+      );
+      if (matchingDistrict) {
+        districtMatch = matchingDistrict.confidence * 30;
+      }
+    }
+
+    // 3. 岗位多样性（20%权重）
+    const uniquePositionTypes = new Set(store.positions.map(p => p.name));
+    positionDiversity = Math.min(uniquePositionTypes.size * 5, 20);
+
+    // 4. 岗位可用性（10%权重）
+    const availablePositions = store.positions.filter(p =>
+      p.availableSlots?.some(slot => slot.isAvailable)
+    );
+    availability = Math.min(availablePositions.length * 2, 10);
+
+    const totalScore = locationMatch + districtMatch + positionDiversity + availability;
+
+    return {
+      store,
+      score: totalScore,
+      breakdown: { locationMatch, districtMatch, positionDiversity, availability },
+    };
+  });
+
+  const ranked = scoredStores.sort((a, b) => b.score - a.score);
+
+  if (ranked.length > 0 && ranked[0].score > 0) {
+    console.log(
+      `📊 文本匹配排序: 前3名得分 = ${ranked
+        .slice(0, 3)
+        .map(s => `${s.store.name}(${s.score.toFixed(1)})`)
+        .join(", ")}`
+    );
+  }
+
+  // 返回带距离信息的结构（文本匹配时无距离）
+  return ranked.map(item => ({ store: item.store, distance: undefined }));
+}
+
+/**
+ * 🔍 智能门店排序函数（异步版本）
+ * 优先使用真实地理距离排序，失败时降级到文本匹配
+ *
+ * @param stores 待排序的门店列表
+ * @param classification 消息分类结果（包含位置、区域等提取信息）
+ * @returns 带距离信息的门店列表（按距离/相关性排序）
+ */
+async function rankStoresByRelevance(
+  stores: Store[],
+  classification: MessageClassification
+): Promise<StoreWithDistance[]> {
+  const { mentionedLocations } = classification.extractedInfo;
+
+  // 🗺️ 如果有位置信息，尝试使用真实距离排序
+  if (mentionedLocations && mentionedLocations.length > 0) {
+    const primaryLocation = mentionedLocations[0];
+
+    // 检查是否有门店有有效坐标
+    const storesWithCoords = stores.filter(s => isValidCoordinates(s.coordinates));
+
+    if (storesWithCoords.length > 0) {
+      try {
+        // 推断城市
+        const city = inferCity(classification, stores);
+
+        // 获取用户位置坐标（使用智能编码：优先 POI 搜索，适合小区/楼盘名）
+        console.log(`\n━━━ 🗺️ 坐标获取 ━━━\n   目标: ${primaryLocation.location} (城市: ${city || "未知"})`);
+        const userCoords = await geocodingService.smartGeocode(primaryLocation.location, city);
+
+        if (userCoords) {
+          // 计算各门店到用户的距离
+          const storesWithDistance = geocodingService.calculateDistancesToTarget(
+            storesWithCoords,
+            userCoords
+          );
+
+          // 合并无坐标的门店（排在最后，距离为 undefined）
+          const storesWithoutCoords = stores.filter(s => !isValidCoordinates(s.coordinates));
+
+          console.log(
+            `   排序结果: ${storesWithDistance
+              .slice(0, 3)
+              .map(s => `${s.store.name}(${geocodingService.formatDistance(s.distance)})`)
+              .join(" → ")}`
+          );
+
+          // 返回带距离信息的结构
+          return [
+            ...storesWithDistance.map(s => ({ store: s.store, distance: s.distance })),
+            ...storesWithoutCoords.map(s => ({ store: s, distance: undefined })),
+          ];
+        } else {
+          console.warn(`⚠️ 无法获取用户位置坐标: ${primaryLocation.location}，降级到文本匹配`);
+        }
+      } catch (error) {
+        console.error("❌ 距离排序失败，降级到文本匹配:", error);
+      }
+    } else {
+      console.warn("⚠️ 没有门店有有效坐标，使用文本匹配排序");
+    }
+  }
+
+  // 降级：使用原有的文本匹配排序
+  return rankStoresByTextMatch(stores, classification);
+}
+
+/**
+ * 🔢 确定展示门店数量
+ * 根据对话类型动态决定展示多少个门店
+ *
+ * @param rankedStores 已排序的门店列表
+ * @param replyType 回复类型
+ * @returns 应展示的门店数量
+ */
+function determineStoreCount(rankedStores: Store[], replyType: ReplyContext): number {
+  // 早期探索阶段 → 5个门店（提供更多选择）
+  const earlyStages: ReplyContext[] = ["initial_inquiry", "location_inquiry", "no_location_match"];
+
+  // 具体咨询阶段 → 3个门店（聚焦相关信息）
+  const specificStages: ReplyContext[] = [
+    "salary_inquiry",
+    "schedule_inquiry",
+    "attendance_inquiry",
+    "flexibility_inquiry",
+    "work_hours_inquiry",
+    "availability_inquiry",
+  ];
+
+  if (earlyStages.includes(replyType)) {
+    return Math.min(5, rankedStores.length);
+  }
+
+  if (specificStages.includes(replyType)) {
+    return Math.min(3, rankedStores.length);
+  }
+
+  // 默认3个
+  return Math.min(3, rankedStores.length);
+}
+
+/**
+ * 🎨 回复类型到信息详细级别的映射
+ */
+const REPLY_TYPE_DETAIL_MAP: Record<ReplyContext, DetailLevel> = {
+  // Minimal：初次探索，仅展示关键信息
+  initial_inquiry: "minimal",
+  location_inquiry: "minimal",
+  no_location_match: "minimal",
+  age_concern: "minimal",
+  insurance_inquiry: "minimal",
+
+  // Standard：常规咨询，展示核心信息
+  salary_inquiry: "standard",
+  schedule_inquiry: "standard",
+  interview_request: "standard",
+  general_chat: "standard",
+  followup_chat: "standard",
+
+  // Detailed：深度咨询，展示完整信息
+  attendance_inquiry: "detailed",
+  flexibility_inquiry: "detailed",
+  attendance_policy_inquiry: "detailed",
+  work_hours_inquiry: "detailed",
+  availability_inquiry: "detailed",
+  part_time_support: "detailed",
+};
+
+/**
+ * 🎯 确定信息详细级别
+ * 根据回复类型返回对应的信息详细程度
+ *
+ * @param replyType 回复类型
+ * @returns 信息详细级别 (minimal | standard | detailed)
+ */
+function determineDetailLevel(replyType: ReplyContext): DetailLevel {
+  return REPLY_TYPE_DETAIL_MAP[replyType] || "standard";
+}
+
+/**
+ * 📝 构建岗位信息
+ * 根据详细级别和回复类型动态生成岗位信息
+ *
+ * @param position 岗位对象
+ * @param detailLevel 信息详细级别
+ * @param replyType 回复类型
+ * @returns 格式化的岗位信息字符串
+ */
+function buildPositionInfo(
+  position: Position,
+  detailLevel: DetailLevel,
+  replyType: ReplyContext
+): string {
+  let info = "";
+
+  // ========== 所有级别都包含的基础信息 ==========
+  info += `  职位：${position.name}\n`;
+
+  // 时间段（最多显示2个）
+  const timeSlots = position.timeSlots.slice(0, 2).join("、");
+  info += `  时间：${timeSlots}${position.timeSlots.length > 2 ? "等" : ""}\n`;
+
+  // 薪资信息（使用现有的智能构建函数）
+  const salaryInfo = buildSalaryDescription(position.salary);
+  info += `  薪资：${salaryInfo}\n`;
+
+  // ⭐ 重要：年龄要求必须在所有级别展示（用户要求）
+  if (position.requirements && position.requirements.length > 0) {
+    const requirements = position.requirements.filter(req => req !== "无");
+    if (requirements.length > 0) {
+      info += `  要求：${requirements.join("、")}\n`;
+    }
+  }
+
+  // ========== Minimal 级别：添加基础排班信息 ==========
+  if (detailLevel === "minimal") {
+    const scheduleTypeText = getScheduleTypeText(position.scheduleType);
+    const flexText = position.schedulingFlexibility.canSwapShifts ? "（可换班）" : "";
+    info += `  排班：${scheduleTypeText}${flexText}\n`;
+    return info;
+  }
+
+  // ========== Standard 级别：根据 replyType 添加聚焦信息 ==========
+  if (detailLevel === "standard") {
+    if (replyType === "salary_inquiry") {
+      // 薪资咨询：重点展示奖金和福利
+      if (position.salary.bonus) {
+        info += `  奖金：${position.salary.bonus}\n`;
+      }
+      if (position.benefits?.items?.length) {
+        const benefits = position.benefits.items.filter(item => item !== "无");
+        if (benefits.length > 0) {
+          info += `  福利：${benefits.slice(0, 3).join("、")}\n`;
+        }
+      }
+    } else if (replyType === "schedule_inquiry" || replyType === "flexibility_inquiry") {
+      // 排班咨询：重点展示灵活性和工时
+      const flexibility = position.schedulingFlexibility;
+      const features = [];
+      if (flexibility.canSwapShifts) features.push("可换班");
+      if (flexibility.partTimeAllowed) features.push("支持兼职");
+      if (flexibility.weekendRequired) features.push("需周末");
+      if (features.length > 0) {
+        info += `  排班特点：${features.join("、")}\n`;
+      }
+
+      if (position.minHoursPerWeek || position.maxHoursPerWeek) {
+        info += `  每周工时：${position.minHoursPerWeek || 0}-${position.maxHoursPerWeek || "不限"}小时\n`;
+      }
+    } else {
+      // 其他场景：展示基础排班和部分福利
+      const scheduleTypeText = getScheduleTypeText(position.scheduleType);
+      const flexText = position.schedulingFlexibility.canSwapShifts ? "（可换班）" : "";
+      info += `  排班：${scheduleTypeText}${flexText}\n`;
+
+      // 展示前2个福利
+      if (position.benefits?.items?.length) {
+        const benefits = position.benefits.items.filter(item => item !== "无");
+        if (benefits.length > 0) {
+          info += `  福利：${benefits.slice(0, 2).join("、")}\n`;
+        }
+      }
+    }
+    return info;
+  }
+
+  // ========== Detailed 级别：展示完整信息 ==========
+  if (detailLevel === "detailed") {
+    // 1. 完整薪资和福利
+    if (position.salary.bonus) {
+      info += `  奖金：${position.salary.bonus}\n`;
+    }
+    if (position.benefits && position.benefits.items && position.benefits.items.length > 0) {
+      const benefitsList = position.benefits.items.filter(item => item !== "无");
+      if (benefitsList.length > 0) {
+        info += `  福利：${benefitsList.join("、")}\n`;
+      }
+    }
+    if (position.benefits && position.benefits.promotion) {
+      info += `  晋升福利：${position.benefits.promotion}\n`;
+    }
+
+    // 2. 完整排班信息
+    const scheduleTypeText = getScheduleTypeText(position.scheduleType);
+    const canSwapText = position.schedulingFlexibility.canSwapShifts
+      ? "（可换班）"
+      : "（不可换班）";
+    info += `  排班类型：${scheduleTypeText}${canSwapText}\n`;
+
+    // 3. 可用时段（如果与 replyType 相关）
+    if (replyType === "availability_inquiry" || replyType === "schedule_inquiry") {
+      const availableSlots = position.availableSlots?.filter(slot => slot.isAvailable);
+      if (availableSlots && availableSlots.length > 0) {
+        info += `  可预约时段：${availableSlots
+          .slice(0, 3)
+          .map(slot => `${slot.slot}(${slot.currentBooked}/${slot.maxCapacity}人)`)
+          .join("、")}\n`;
+      }
+    }
+
+    // 4. 考勤政策
+    if (position.attendancePolicy.punctualityRequired) {
+      info += `  考勤要求：准时到岗，最多迟到${position.attendancePolicy.lateToleranceMinutes}分钟\n`;
+    }
+
+    // 5. 排班灵活性特点
+    const flexibility = position.schedulingFlexibility;
+    const flexibilityFeatures = [];
+    if (flexibility.canSwapShifts) flexibilityFeatures.push("可换班");
+    if (flexibility.partTimeAllowed) flexibilityFeatures.push("兼职");
+    if (flexibility.weekendRequired) flexibilityFeatures.push("需周末");
+    if (flexibility.holidayRequired) flexibilityFeatures.push("需节假日");
+    if (flexibilityFeatures.length > 0) {
+      info += `  排班特点：${flexibilityFeatures.join("、")}\n`;
+    }
+
+    // 6. 工时要求
+    if (position.minHoursPerWeek || position.maxHoursPerWeek) {
+      info += `  每周工时：${position.minHoursPerWeek || 0}-${position.maxHoursPerWeek || "不限"}小时\n`;
+    }
+
+    // 7. 工作日偏好
+    if (position.preferredDays && position.preferredDays.length > 0) {
+      info += `  工作日偏好：${position.preferredDays.map(day => getDayText(day)).join("、")}\n`;
+    }
+
+    // 8. 出勤要求
+    if (position.attendanceRequirement) {
+      const req = position.attendanceRequirement;
+      let reqText = `出勤要求：${req.description}`;
+      if (req.requiredDays && req.requiredDays.length > 0) {
+        const dayNames = req.requiredDays.map(dayNum => getDayNumberText(dayNum));
+        reqText += `（需要：${dayNames.join("、")}）`;
+      }
+      if (req.minimumDays) {
+        reqText += `，最少${req.minimumDays}天/周`;
+      }
+      info += `  ${reqText}\n`;
+    }
+  }
+
+  return info;
+}
+
+/**
  * 构建上下文信息，根据提取的信息筛选相关数据
  * @param data 配置数据
  * @param classification 消息分类结果
  * @param uiSelectedBrand UI选择的品牌（来自brand-selector组件）
  * @param toolBrand 工具调用时从职位详情识别的品牌
  * @param brandPriorityStrategy 品牌优先级策略
+ * @param candidateInfo 候选人信息（包含 jobAddress 等）
  * @returns 返回上下文信息和解析后的品牌
  */
-function buildContextInfo(
+async function buildContextInfo(
   data: ZhipinData,
   classification: MessageClassification,
   uiSelectedBrand?: string,
   toolBrand?: string,
-  brandPriorityStrategy?: BrandPriorityStrategy
-): { contextInfo: string; resolvedBrand: string } {
+  brandPriorityStrategy?: BrandPriorityStrategy,
+  candidateInfo?: CandidateInfo
+): Promise<{
+  contextInfo: string;
+  resolvedBrand: string;
+  debugInfo: {
+    relevantStores: StoreWithDistance[];
+    storeCount: number;
+    detailLevel: string;
+    classification: MessageClassification;
+  };
+}> {
   const extractedInfo = classification.extractedInfo;
   const { city, mentionedLocations, mentionedDistricts } = extractedInfo;
+
+  // 📍 jobAddress 是岗位发布地址，单独用于门店过滤（不用于距离计算）
+  // mentionedLocations 是候选人提到的位置，用于门店过滤 + 距离排序
+  const jobAddressForFilter = candidateInfo?.jobAddress;
 
   // 使用新的冲突解析逻辑，传入三个独立的品牌源
   const brandResolution = resolveBrandConflict({
@@ -941,9 +1416,10 @@ function buildContextInfo(
 
   const targetBrand = brandResolution.resolvedBrand;
   console.log(
-    `🏢 品牌输入: UI选择=${uiSelectedBrand}, 工具识别=${toolBrand}, 配置默认=${data.defaultBrand}`
+    `\n━━━ 🏢 品牌解析 ━━━\n` +
+      `   输入: UI=${uiSelectedBrand || "无"} | 工具=${toolBrand || "无"} | 默认=${data.defaultBrand}\n` +
+      `   结果: ${targetBrand} (${brandResolution.reason})`
   );
-  console.log(`✅ 品牌解析完成: ${targetBrand} (${brandResolution.reason})`);
 
   // 获取目标品牌的所有门店
   const brandStores = data.stores.filter(store => store.brand === targetBrand);
@@ -954,13 +1430,23 @@ function buildContextInfo(
     return {
       contextInfo: `品牌：${targetBrand}\n注意：该品牌当前没有门店数据。**门店可能暂时没有在招岗位**。`,
       resolvedBrand: targetBrand,
+      debugInfo: {
+        relevantStores: [],
+        storeCount: 0,
+        detailLevel: "minimal",
+        classification,
+      },
     };
   }
 
   // 优先使用明确提到的工作城市进行过滤
-  if (city && city !== data.city) {
-    // 如果提到的城市与数据城市不匹配，记录但不过滤（避免误判）
-    console.warn(`候选人提到的城市 "${city}" 与数据城市 "${data.city}" 不匹配`);
+  // 🔧 优先级: 门店 store.city → 门店地址提取 → data.city (fallback)
+  const brandCity = inferCityFromStores(relevantStores, data.city);
+
+  // 位置过滤日志收集
+  const locationLogs: string[] = [];
+  if (city && city !== brandCity) {
+    locationLogs.push(`⚠️ 城市不匹配: 候选人="${city}" vs 门店="${brandCity}"`);
   }
 
   // 根据提到的位置进一步过滤（按置信度排序）
@@ -980,10 +1466,10 @@ function buildContextInfo(
 
       if (filteredStores.length > 0) {
         relevantStores = filteredStores;
-        console.log(`✅ 位置匹配成功: ${location} (置信度: ${confidence})`);
+        locationLogs.push(`✅ 位置匹配: ${location} → ${filteredStores.length}家门店`);
         break;
       } else {
-        console.log(`❌ 位置匹配失败: ${location} (置信度: ${confidence})`);
+        locationLogs.push(`   尝试: ${location} (${confidence}) → 无匹配`);
       }
     }
   }
@@ -1005,111 +1491,75 @@ function buildContextInfo(
 
       if (districtFiltered.length > 0) {
         relevantStores = districtFiltered;
-        console.log(
-          `✅ 区域匹配成功: ${sortedDistricts
-            .map(d => `${d.district}(置信度:${d.confidence})`)
-            .join(", ")}`
+        locationLogs.push(
+          `✅ 区域匹配: ${sortedDistricts.map(d => d.district).join("/")} → ${districtFiltered.length}家门店`
         );
       } else {
-        console.log(`❌ 区域匹配失败: 没有找到匹配的区域`);
+        locationLogs.push(`   区域尝试: ${sortedDistricts.map(d => d.district).join("/")} → 无匹配`);
       }
     } else {
-      console.log(`⚠️ 所有区域置信度过低 (≤0.6)，跳过区域过滤`);
+      locationLogs.push(`   区域置信度过低，跳过`);
     }
+  }
+
+  // 📍 如果候选人没有提到位置（门店未被过滤），使用岗位地址过滤
+  if (relevantStores.length === brandStores.length && jobAddressForFilter) {
+    locationLogs.push(`📍 使用岗位地址: ${jobAddressForFilter}`);
+    const jobAddressFiltered = relevantStores.filter(
+      store =>
+        store.name.includes(jobAddressForFilter) ||
+        store.location.includes(jobAddressForFilter) ||
+        store.district.includes(jobAddressForFilter) ||
+        store.subarea.includes(jobAddressForFilter)
+    );
+
+    if (jobAddressFiltered.length > 0) {
+      relevantStores = jobAddressFiltered;
+      locationLogs.push(`✅ 岗位地址匹配 → ${jobAddressFiltered.length}家门店`);
+    } else {
+      locationLogs.push(`   岗位地址无匹配`);
+    }
+  }
+
+  // 输出位置过滤日志
+  if (locationLogs.length > 0) {
+    console.log(`\n━━━ 📍 位置过滤 ━━━\n` + locationLogs.map(l => `   ${l}`).join("\n"));
   }
 
   // 构建上下文信息
   let context = `默认推荐品牌：${targetBrand}\n`;
+  let rankedStoresWithDistance: StoreWithDistance[] = [];
 
   if (relevantStores.length > 0) {
+    // 🎯 智能门店排序（异步：支持真实距离计算）
+    rankedStoresWithDistance = await rankStoresByRelevance(relevantStores, classification);
+
+    // 🔢 确定展示门店数量（使用门店数组）
+    const storeCount = determineStoreCount(
+      rankedStoresWithDistance.map(s => s.store),
+      classification.replyType
+    );
+
+    // 📊 确定信息详细级别
+    const detailLevel = determineDetailLevel(classification.replyType);
+
+    console.log(
+      `\n━━━ 📊 上下文构建 ━━━\n` +
+        `   回复类型: ${classification.replyType}\n` +
+        `   展示门店: ${storeCount}家 | 详细级别: ${detailLevel}`
+    );
+
     context += `匹配到的门店信息：\n`;
-    // 显示该品牌下的所有门店（不限制数量）
-    relevantStores.slice(0, 3).forEach(store => {
-      context += `• ${store.name}（${store.district}${store.subarea}）：${store.location}\n`;
+
+    // 🏢 构建优化后的门店信息（包含距离）
+    rankedStoresWithDistance.slice(0, storeCount).forEach(({ store, distance }) => {
+      // 🗺️ 如果有距离信息，显示在门店名称后
+      const distanceText =
+        distance !== undefined ? `【距离约${geocodingService.formatDistance(distance)}】` : "";
+      context += `• ${store.name}${distanceText}（${store.district}${store.subarea}）：${store.location}\n`;
+
       store.positions.forEach(pos => {
-        // 🔧 智能薪资信息构建（包含memo解析）
-        const salaryInfo = buildSalaryDescription(pos.salary);
-        context += `  职位：${pos.name}，时间：${pos.timeSlots.join("、")}，薪资：${salaryInfo}\n`;
-
-        if (pos.salary.bonus) {
-          context += `  奖金：${pos.salary.bonus}\n`;
-        }
-
-        // 处理结构化福利对象
-        if (pos.benefits && pos.benefits.items && pos.benefits.items.length > 0) {
-          const benefitsList = pos.benefits.items.filter(item => item !== "无");
-          if (benefitsList.length > 0) {
-            context += `  福利：${benefitsList.join("、")}\n`;
-          }
-        }
-        if (pos.benefits && pos.benefits.promotion) {
-          context += `  晚升福利：${pos.benefits.promotion}\n`;
-        }
-
-        // 新增：考勤和排班信息
-        const scheduleTypeText = getScheduleTypeText(pos.scheduleType);
-        const canSwapText = pos.schedulingFlexibility.canSwapShifts ? "（可换班）" : "（不可换班）";
-        context += `  排班类型：${scheduleTypeText}${canSwapText}\n`;
-
-        // 可用时间段信息
-        const availableSlots = pos.availableSlots.filter(slot => slot.isAvailable);
-        if (availableSlots.length > 0) {
-          context += `  可预约时段：${availableSlots
-            .map(
-              slot =>
-                `${slot.slot}(${slot.currentBooked}/${
-                  slot.maxCapacity
-                }人，${getPriorityText(slot.priority)}优先级)`
-            )
-            .join("、")}\n`;
-        }
-
-        // 考勤要求
-        const attendance = pos.attendancePolicy;
-        if (attendance.punctualityRequired) {
-          context += `  考勤要求：准时到岗，最多迟到${attendance.lateToleranceMinutes}分钟\n`;
-        }
-
-        // 排班灵活性
-        const flexibility = pos.schedulingFlexibility;
-        const flexibilityFeatures = [];
-        if (flexibility.canSwapShifts) flexibilityFeatures.push("可换班");
-        if (flexibility.partTimeAllowed) flexibilityFeatures.push("兼职");
-        if (flexibility.weekendRequired) flexibilityFeatures.push("需周末");
-        if (flexibility.holidayRequired) flexibilityFeatures.push("需节假日");
-
-        if (flexibilityFeatures.length > 0) {
-          context += `  排班特点：${flexibilityFeatures.join("、")}\n`;
-        }
-
-        // 每周工时要求
-        if (pos.minHoursPerWeek || pos.maxHoursPerWeek) {
-          context += `  每周工时：${pos.minHoursPerWeek || 0}-${
-            pos.maxHoursPerWeek || "不限"
-          }小时\n`;
-        }
-
-        // 偏好工作日
-        if (pos.preferredDays && pos.preferredDays.length > 0) {
-          context += `  工作日偏好：${pos.preferredDays.map(day => getDayText(day)).join("、")}\n`;
-        }
-
-        // 新增：出勤要求
-        if (pos.attendanceRequirement) {
-          const req = pos.attendanceRequirement;
-          let reqText = `出勤要求：${req.description}`;
-
-          if (req.requiredDays && req.requiredDays.length > 0) {
-            const dayNames = req.requiredDays.map(dayNum => getDayNumberText(dayNum));
-            reqText += `（需要：${dayNames.join("、")}）`;
-          }
-
-          if (req.minimumDays) {
-            reqText += `，最少${req.minimumDays}天/周`;
-          }
-
-          context += `  ${reqText}\n`;
-        }
+        context += buildPositionInfo(pos, detailLevel, classification.replyType);
       });
     });
   } else {
@@ -1161,7 +1611,28 @@ function buildContextInfo(
     }
   }
 
-  return { contextInfo: context, resolvedBrand: targetBrand };
+  // 如果没有排序结果，将原始门店转换为带距离的结构
+  const finalStoresWithDistance: StoreWithDistance[] =
+    rankedStoresWithDistance.length > 0
+      ? rankedStoresWithDistance
+      : relevantStores.map(store => ({ store, distance: undefined }));
+
+  return {
+    contextInfo: context,
+    resolvedBrand: targetBrand,
+    debugInfo: {
+      relevantStores: finalStoresWithDistance,
+      storeCount:
+        rankedStoresWithDistance.length > 0
+          ? determineStoreCount(
+              rankedStoresWithDistance.map(s => s.store),
+              classification.replyType
+            )
+          : 0,
+      detailLevel: determineDetailLevel(classification.replyType),
+      classification,
+    },
+  };
 }
 
 /**
@@ -1179,20 +1650,6 @@ function getScheduleTypeText(
     on_call: "随叫随到",
   };
   return typeMap[scheduleType] || "灵活排班";
-}
-
-/**
- * 获取优先级的中文描述
- */
-function getPriorityText(priority: "high" | "medium" | "low" | string): string {
-  if (!priority) return "中"; // 默认值
-
-  const priorityMap: Record<string, string> = {
-    high: "高",
-    medium: "中",
-    low: "低",
-  };
-  return priorityMap[priority] || "中";
 }
 
 /**

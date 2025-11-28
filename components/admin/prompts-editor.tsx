@@ -108,7 +108,7 @@ export const PromptsEditor: React.FC<PromptsEditorProps> = ({ data, onSave }) =>
 
   if (!data) {
     return (
-      <Card>
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle>回复指令编辑器</CardTitle>
           <CardDescription>配置智能回复的模板指令</CardDescription>
@@ -128,7 +128,7 @@ export const PromptsEditor: React.FC<PromptsEditorProps> = ({ data, onSave }) =>
   return (
     <div className="space-y-6">
       {/* 头部操作栏 */}
-      <Card>
+      <Card className="glass-card">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -168,30 +168,30 @@ export const PromptsEditor: React.FC<PromptsEditorProps> = ({ data, onSave }) =>
       )}
 
       {/* 统计信息 */}
-      <Card>
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle>回复指令概览</CardTitle>
           <CardDescription>当前配置的智能回复模板统计</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-muted rounded-lg">
+            <div className="text-center p-4 bg-white/30 rounded-lg">
               <div className="text-2xl font-bold text-primary">{Object.keys(prompts).length}</div>
               <div className="text-sm text-muted-foreground">总指令数</div>
             </div>
-            <div className="text-center p-4 bg-muted rounded-lg">
+            <div className="text-center p-4 bg-white/30 rounded-lg">
               <div className="text-2xl font-bold text-primary">
                 {Object.values(prompts).filter(p => p && p.length > 0).length}
               </div>
               <div className="text-sm text-muted-foreground">已配置</div>
             </div>
-            <div className="text-center p-4 bg-muted rounded-lg">
+            <div className="text-center p-4 bg-white/30 rounded-lg">
               <div className="text-2xl font-bold text-primary">
                 {Object.values(prompts).reduce((acc, p) => acc + (p?.length || 0), 0)}
               </div>
               <div className="text-sm text-muted-foreground">总字符数</div>
             </div>
-            <div className="text-center p-4 bg-muted rounded-lg">
+            <div className="text-center p-4 bg-white/30 rounded-lg">
               <div className="text-2xl font-bold text-primary">
                 {Math.round(
                   Object.values(prompts).reduce((acc, p) => acc + (p?.length || 0), 0) /
@@ -207,7 +207,7 @@ export const PromptsEditor: React.FC<PromptsEditorProps> = ({ data, onSave }) =>
       {/* 回复指令列表 */}
       <div className="space-y-4">
         {Object.entries(prompts).map(([key, value]) => (
-          <Card key={key}>
+          <Card key={key} className="glass-card">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div>
@@ -237,7 +237,7 @@ export const PromptsEditor: React.FC<PromptsEditorProps> = ({ data, onSave }) =>
       </div>
 
       {/* 使用说明 */}
-      <Card>
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle>编辑说明</CardTitle>
           <CardDescription>回复指令的作用和编辑注意事项</CardDescription>

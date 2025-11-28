@@ -3,8 +3,15 @@ import { generateSmartReplyWithLLM } from "../../../lib/loaders/zhipin-data.load
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, brand, modelConfig, configData, replyPrompts, conversationHistory } =
-      await request.json();
+    const {
+      message,
+      brand,
+      toolBrand,
+      modelConfig,
+      configData,
+      replyPrompts,
+      conversationHistory,
+    } = await request.json();
 
     if (!message || typeof message !== "string") {
       return NextResponse.json({ error: "请提供有效的消息内容" }, { status: 400 });
@@ -36,7 +43,7 @@ export async function POST(request: NextRequest) {
       message.trim(), // 1. message
       conversationHistory || [], // 2. conversationHistory
       brand, // 3. preferredBrand
-      undefined, // 4. toolBrand (API调用不需要工具品牌)
+      toolBrand, // 4. toolBrand (客户端传递)
       modelConfig, // 5. modelConfig
       configData, // 6. configData
       replyPrompts // 7. replyPrompts
@@ -47,6 +54,8 @@ export async function POST(request: NextRequest) {
       reply: reply.text,
       replyType: reply.replyType,
       reasoningText: reply.reasoningText,
+      debugInfo: reply.debugInfo,
+      contextInfo: reply.contextInfo,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

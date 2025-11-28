@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CoordinatesSchema } from "./geocoding";
 
 // Boss直聘相关数据类型定义
 
@@ -258,13 +259,11 @@ export const PositionSchema = z.object({
 export const StoreSchema = z.object({
   id: z.string(),
   name: z.string(),
+  city: z.string().optional(), // 门店所在城市（从 API cityName 获取）
   location: z.string(),
   district: z.string(),
   subarea: z.string(),
-  coordinates: z.object({
-    lat: z.number(),
-    lng: z.number(),
-  }),
+  coordinates: CoordinatesSchema, // 引用统一的坐标 Schema
   transportation: z.string(),
   positions: z.array(PositionSchema),
   brand: z.string(),

@@ -13,6 +13,7 @@ import {
 } from "@/types/zhipin";
 import { getBrandNameByOrgId } from "@/actions/brand-mapping";
 import { getDistrictByRegionId } from "@/lib/constants/organization-mapping";
+// Note: 地理编码已移至 API route (server-only) 以避免客户端 bundler 错误
 
 /**
  * 将 Duliday API 的列表响应转换为我们的本地数据格式
@@ -76,9 +77,13 @@ export async function convertDulidayListToZhipinData(
     },
   };
 
+  // 获取门店列表
+  // Note: 地理编码在 API route 中进行，此处只做数据转换
+  const storeList = Array.from(stores.values());
+
   return {
     city: dulidayResponse.data.result[0]?.cityName[0] || "上海市",
-    stores: Array.from(stores.values()),
+    stores: storeList,
     brands: {
       [brandName]: brandConfig,
     },
@@ -93,6 +98,7 @@ function convertToStore(dulidayData: DulidayRaw.Position, brandName: string): St
   return {
     id: `store_${dulidayData.storeId}`,
     name: dulidayData.storeName,
+    city: dulidayData.cityName[0], // 门店所在城市（从 API cityName 获取）
     location: dulidayData.storeAddress,
     district: extractDistrict(dulidayData.storeAddress, dulidayData.storeRegionId),
     subarea: extractSubarea(dulidayData.storeName),

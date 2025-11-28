@@ -1,12 +1,22 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { generateSmartReplyWithLLM } from "@/lib/loaders/zhipin-data.loader";
-import { loadZhipinData } from "@/lib/loaders/zhipin-data.loader";
-import type { ZhipinData } from "@/types/zhipin";
+import { generateSmartReplyWithLLM, loadZhipinData } from "@/lib/loaders/zhipin-data.loader";
+import type { StoreWithDistance } from "@/types/geocoding";
+import type { ZhipinData, MessageClassification } from "@/types/zhipin";
 import type { ReplyPromptsConfig, BrandPriorityStrategy } from "@/types/config";
 import type { ModelConfig } from "@/lib/config/models";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import { CandidateInfoSchema } from "@/lib/tools/zhipin/types";
+
+/**
+ * 调试信息类型
+ */
+type ReplyDebugInfo = {
+  relevantStores: StoreWithDistance[];
+  storeCount: number;
+  detailLevel: string;
+  classification: MessageClassification;
+};
 
 /**
  * 智能回复工具的执行结果类型
@@ -17,6 +27,7 @@ type ZhipinReplyToolResult = {
   reasoningText: string;
   candidateMessage: string;
   historyCount: number;
+  debugInfo?: ReplyDebugInfo;
   stats?: {
     totalStores: number;
     totalPositions: number;
@@ -152,6 +163,7 @@ export const zhipinReplyTool = (
           reasoningText: replyResult.reasoningText || "未提供分类依据",
           candidateMessage: candidate_message,
           historyCount: processedHistory.length,
+          debugInfo: replyResult.debugInfo, // 包含匹配到的门店信息
         };
 
         // 如果需要包含统计信息

@@ -16,6 +16,7 @@ export const CandidateInfoSchema = z.object({
   education: z.string().optional(),
   expectedSalary: z.string().optional(), // 期望薪资
   expectedLocation: z.string().optional(), // 期望工作地
+  jobAddress: z.string().optional(), // 岗位地址（从聊天详情DOM解析）
   height: z.string().optional(), // 身高
   weight: z.string().optional(), // 体重
   healthCertificate: z.boolean().optional(), // 是否有健康证

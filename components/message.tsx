@@ -11,11 +11,20 @@ const PurePreviewMessage = ({
   message,
   isLatestMessage,
   status,
+  addToolOutput,
+  sendMessage,
 }: {
   message: UIMessage;
   isLoading: boolean;
   status: "error" | "submitted" | "streaming" | "ready";
   isLatestMessage: boolean;
+  // HITL: 工具确认相关
+  addToolOutput?: (params: {
+    toolCallId: string;
+    tool: string;
+    output: string;
+  }) => Promise<void>;
+  sendMessage?: () => void;
 }) => {
   return (
     <AnimatePresence key={message.id}>
@@ -38,6 +47,8 @@ const PurePreviewMessage = ({
                 message={message}
                 isLatestMessage={isLatestMessage}
                 status={status}
+                addToolOutput={addToolOutput}
+                sendMessage={sendMessage}
               />
             </div>
           )}

@@ -168,7 +168,7 @@ export function BrandTable() {
   };
 
   return (
-    <Card>
+    <Card className="glass-card">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -183,9 +183,13 @@ export function BrandTable() {
 
       <CardContent>
         {/* Tab 切换 */}
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "active" | "deleted")} className="mb-4">
-          <TabsList>
-            <TabsTrigger value="active">
+        <Tabs
+          value={activeTab}
+          onValueChange={value => setActiveTab(value as "active" | "deleted")}
+          className="mb-4"
+        >
+          <TabsList className="glass-tabs">
+            <TabsTrigger value="active" className="glass-tab-active">
               活跃品牌
               {data && activeTab === "active" && (
                 <Badge variant="secondary" className="ml-2">
@@ -193,7 +197,7 @@ export function BrandTable() {
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="deleted">
+            <TabsTrigger value="deleted" className="glass-tab-active">
               已删除品牌
               {data && activeTab === "deleted" && data.total > 0 && (
                 <Badge variant="secondary" className="ml-2">

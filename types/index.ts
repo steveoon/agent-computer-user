@@ -44,6 +44,24 @@ export { CONFIG_STORAGE_KEY, CONFIG_VERSION } from "./config";
 export * from "./image-optimize-type";
 export * from "./feishu";
 
+// 从 geocoding.ts 导出地理编码相关类型
+export type {
+  Coordinates,
+  StoreWithDistance,
+  BatchGeocodingStats,
+  BatchGeocodingResult,
+  AmapMCPResponse,
+  MapsGeoParams,
+  MapsTextSearchParams,
+  MapsSearchDetailParams,
+  MapsGeoResult,
+  MapsTextSearchResult,
+  MapsSearchDetailResult,
+  AmapMCPTools,
+} from "./geocoding";
+
+export { CoordinatesSchema, CHINA_BOUNDS } from "./geocoding";
+
 // AI SDK 相关类型
 export type FinishReason =
   | "stop"
