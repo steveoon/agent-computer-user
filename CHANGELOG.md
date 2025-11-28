@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.18.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.18.0-develop.1...v1.18.0-develop.2) (2025-11-28)
+
+
+### Features
+
+* Add ErrorBoundary component to enhance error handling in RootLayout and ChatPanel ([78eca3d](https://github.com/steveoon/agent-computer-user/commit/78eca3d8b0867c2e15a1b255c8c1ec59a0d97769))
+
 # [1.18.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.17.0...v1.18.0-develop.1) (2025-11-28)
 
 
