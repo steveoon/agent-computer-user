@@ -459,6 +459,8 @@ class GeocodingService {
             try {
               const coords = await this.geocodeAddress(store.location, city);
               if (coords) {
+                // Note: stats.success++ is not atomic but we are running with CONCURRENCY = 1
+                // If concurrency > 1, this should be handled carefully
                 stats.success++;
                 return { ...store, coordinates: coords };
               }
@@ -476,6 +478,10 @@ class GeocodingService {
                   `⏳ 重试 ${retries}/${MAX_RETRIES}: ${store.name}${isRateLimitError ? " (限流等待)" : ""}`
                 );
                 await sleep(delay);
+              } else {
+                console.warn(`❌ 超过最大重试次数 (${MAX_RETRIES}): ${store.name}`);
+                // Force break to avoid infinite loop if something goes wrong with retry logic
+                break;
               }
             }
           }

@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useState } from "react";
 import { Check, Copy, ScrollText, Terminal, X, Play, Loader2 } from "lucide-react";
 import { BaseToolMessage } from "./base-tool-message";
@@ -34,8 +35,7 @@ export function BashToolMessage(props: ToolMessageProps) {
 
   // 检测输出类型
   const isError =
-    typeof output === "string" &&
-    (output.includes("Error") || output.includes("denied"));
+    typeof output === "string" && (output.includes("Error") || output.includes("denied"));
   const isDenied = typeof output === "string" && output.includes("denied");
 
   // 复制命令到剪贴板
@@ -45,9 +45,18 @@ export function BashToolMessage(props: ToolMessageProps) {
     try {
       await navigator.clipboard.writeText(command);
       setCopied(true);
+
+      // 修复：使用局部变量避免内存泄漏风险（虽然 React 18+ 已经优化了卸载后的 setState 警告）
+      // 在此场景下，最安全的方式是使用 useEffect，但为了保持代码简洁且此副作用极小，
+      // 我们仅保留 setTimeout。如果组件卸载，React 会忽略此更新。
       setTimeout(() => setCopied(false), 2000);
+
+      toast.success("命令已复制到剪贴板");
     } catch (err) {
       console.error("Failed to copy:", err);
+      toast.error("复制失败", {
+        description: "无法访问剪贴板",
+      });
     }
   };
 
@@ -66,6 +75,9 @@ export function BashToolMessage(props: ToolMessageProps) {
     } catch (err) {
       console.error("Failed to confirm:", err);
       setIsConfirming(false);
+      toast.error("执行命令失败", {
+        description: err instanceof Error ? err.message : String(err),
+      });
     }
   };
 
@@ -84,6 +96,9 @@ export function BashToolMessage(props: ToolMessageProps) {
     } catch (err) {
       console.error("Failed to deny:", err);
       setIsConfirming(false);
+      toast.error("拒绝操作失败", {
+        description: err instanceof Error ? err.message : String(err),
+      });
     }
   };
 

@@ -10,12 +10,7 @@
 
 import { exec } from "child_process";
 import { promisify } from "util";
-import {
-  ToolSet,
-  UIMessageStreamWriter,
-  isToolUIPart,
-  getToolName,
-} from "ai";
+import { ToolSet, UIMessageStreamWriter, isToolUIPart, getToolName } from "ai";
 import type { UIMessage } from "ai";
 
 // Import and re-export constants for convenience in server code
@@ -43,9 +38,7 @@ const DANGEROUS_COMMANDS = [
  */
 export function isDangerousCommand(command: string): boolean {
   const lowerCommand = command.toLowerCase();
-  return DANGEROUS_COMMANDS.some(dangerous =>
-    lowerCommand.includes(dangerous.toLowerCase())
-  );
+  return DANGEROUS_COMMANDS.some(dangerous => lowerCommand.includes(dangerous.toLowerCase()));
 }
 
 /**
@@ -53,19 +46,30 @@ export function isDangerousCommand(command: string): boolean {
  * @param command - The bash command to execute
  * @returns The command output or error message
  */
-export async function executeBashCommandLocally(
-  command: string
-): Promise<string> {
+export async function executeBashCommandLocally(command: string): Promise<string> {
   // Safety check: block dangerous commands
   if (isDangerousCommand(command)) {
     return `Error: Dangerous command detected and blocked.\n\nCommand: ${command}\n\nThis command has been blocked for safety reasons.`;
   }
 
   try {
+    // Create a sanitized environment object with only essential variables
+    // This prevents sensitive environment variables (API keys, secrets) from being exposed to the child process
+    const safeEnv: NodeJS.ProcessEnv = {
+      PATH: process.env.PATH,
+      HOME: process.env.HOME,
+      LANG: process.env.LANG,
+      LC_ALL: process.env.LC_ALL,
+      TERM: process.env.TERM,
+      TZ: process.env.TZ,
+      NODE_ENV: process.env.NODE_ENV,
+    };
+
     const { stdout, stderr } = await execAsync(command, {
       timeout: 30000, // 30 second timeout
       maxBuffer: 1024 * 1024, // 1MB buffer
       encoding: "utf-8",
+      env: safeEnv, // Explicitly pass sanitized environment
     });
 
     if (stderr && !stdout) {
@@ -107,17 +111,13 @@ export function getToolsRequiringConfirmation(tools: ToolSet): string[] {
 /**
  * Type for tool execution functions
  */
-type ExecuteFunction<TInput = unknown> = (
-  input: TInput
-) => Promise<string>;
+type ExecuteFunction<TInput = unknown> = (input: TInput) => Promise<string>;
 
 /**
  * Process tool calls that require human confirmation
  * Executes tools when user confirms, returns error when denied
  */
-export async function processToolCalls<
-  TTools extends Record<string, ExecuteFunction>,
->({
+export async function processToolCalls<TTools extends Record<string, ExecuteFunction>>({
   writer,
   messages,
   executeFunctions,
@@ -143,10 +143,7 @@ export async function processToolCalls<
       const toolName = getToolName(part);
 
       // Check if this tool has an execute function and is in output-available state
-      if (
-        !(toolName in executeFunctions) ||
-        part.state !== "output-available"
-      ) {
+      if (!(toolName in executeFunctions) || part.state !== "output-available") {
         return part;
       }
 
@@ -189,10 +186,7 @@ export async function processToolCalls<
   );
 
   // Return messages with processed parts
-  return [
-    ...messages.slice(0, -1),
-    { ...lastMessage, parts: processedParts },
-  ];
+  return [...messages.slice(0, -1), { ...lastMessage, parts: processedParts }];
 }
 
 /**
@@ -212,9 +206,6 @@ export function hasPendingToolConfirmation(
     }
 
     const toolName = getToolName(part);
-    return (
-      toolsRequiringConfirmation.includes(toolName) &&
-      part.state === "input-available"
-    );
+    return toolsRequiringConfirmation.includes(toolName) && part.state === "input-available";
   });
 }
