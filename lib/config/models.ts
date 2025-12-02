@@ -84,7 +84,7 @@ export const MODEL_DICTIONARY = {
     provider: "openai",
     name: "GPT-5 Mini",
     description: "OpenAI GPT-5 Mini",
-    categories: ["chat","general"] as ModelCategory[],
+    categories: ["chat", "general"] as ModelCategory[],
   },
   "openai/gpt-4o": {
     provider: "openai",
@@ -111,18 +111,6 @@ export const MODEL_DICTIONARY = {
     name: "Kimi K2 0905",
     description: "通过OpenRouter访问的Kimi K2 0905",
     categories: ["chat", "general"] as ModelCategory[],
-  },
-  "openrouter/deepseek/deepseek-chat-v3-0324": {
-    provider: "openrouter",
-    name: "DeepSeek Chat v3",
-    description: "通过OpenRouter访问的DeepSeek Chat v3",
-    categories: ["general"] as ModelCategory[],
-  },
-  "openrouter/deepseek/deepseek-r1-0528": {
-    provider: "openrouter",
-    name: "DeepSeek R1",
-    description: "通过OpenRouter访问的DeepSeek R1",
-    categories: ["general"] as ModelCategory[],
   },
   "openrouter/anthropic/claude-3.7-sonnet": {
     provider: "openrouter",
@@ -175,7 +163,15 @@ export const MODEL_DICTIONARY = {
     name: "Kimi K2 Thinking Turbo",
     description: "通过MoonshotAI访问的Kimi K2 Thinking Turbo",
     categories: ["chat", "general"] as ModelCategory[],
-  }
+  },
+
+  // DeepSeek 模型
+  "deepseek/deepseek-chat": {
+    provider: "deepseek",
+    name: "DeepSeek Chat",
+    description: "通过DeepSeek访问的DeepSeek Chat",
+    categories: ["chat", "general"] as ModelCategory[],
+  },
 } as const;
 
 // 模型ID类型
@@ -221,6 +217,11 @@ export const DEFAULT_PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
     name: "MoonshotAI",
     baseURL: "https://api.moonshot.cn/v1",
     description: "MoonshotAI 统一接口",
+  },
+  deepseek: {
+    name: "DeepSeek",
+    baseURL: "https://api.deepseek.com/v1",
+    description: "DeepSeek 统一接口",
   },
   qwen: {
     name: "Qwen",

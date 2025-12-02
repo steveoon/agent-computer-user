@@ -45,6 +45,12 @@ export function createDynamicRegistry(providerConfigs: Record<string, ProviderCo
         apiKey: process.env.MOONSHOT_API_KEY,
       }),
 
+      deepseek: createOpenAICompatible({
+        name: "deepseek",
+        baseURL: providerConfigs.deepseek?.baseURL || "https://api.deepseek.com/v1",
+        apiKey: process.env.DEEPSEEK_API_KEY,
+      }),
+
       // Google provider
       google: createGoogleGenerativeAI({
         apiKey: process.env.GEMINI_API_KEY,
