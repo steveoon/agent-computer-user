@@ -26,8 +26,10 @@ import {
   createSuccessResponse,
   createErrorResponse,
   generateCorrelationId,
+  handleUnknownError,
   ApiErrorType,
 } from "@/lib/utils/api-response";
+import { ErrorCode } from "@/lib/errors";
 import { DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
 import type { ModelConfig } from "@/lib/config/models";
 
@@ -287,12 +289,7 @@ export async function POST(req: Request) {
       });
     }
   } catch (error) {
-    console.error(`[${correlationId}] Unexpected error:`, error);
-
-    return createErrorResponse(ApiErrorType.InternalServerError, {
-      message: "Internal server error",
-      details: error instanceof Error ? error.message : "Unknown error",
-      correlationId,
-    });
+    // 使用结构化错误处理，自动识别 LLM/网络/认证等错误类型
+    return handleUnknownError(error, correlationId, ErrorCode.LLM_GENERATION_FAILED);
   }
 }

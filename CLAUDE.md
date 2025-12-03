@@ -93,6 +93,7 @@ z.string({ error: issue => issue.input === undefined ? "Required" : "Invalid" })
 - **Tools**: `lib/tools/` with tool-specific subdirectories
 - **Stores**: `lib/stores/` (Zustand)
 - **Services**: `lib/services/` (singletons)
+- **Errors**: `lib/errors/` (structured error handling - AppError, error codes, factories)
 - **Types**: `types/` for shared TypeScript definitions
 
 ## Available AI Tools
@@ -230,6 +231,28 @@ HANDLERS[type].execute();
 - Record audit logs: INSERT stores `newData`, UPDATE/DELETE stores both `oldData` and `newData`
 
 ## Error Handling & Debugging
+
+### Structured Error System (Required for Open API)
+
+All `app/api/v1/*` endpoints MUST use `lib/errors/` to preserve error chains:
+
+```typescript
+import { wrapError, extractErrorContext, logError, ErrorCode } from "@/lib/errors";
+
+catch (error) {
+  const appError = wrapError(error, ErrorCode.LLM_GENERATION_FAILED);
+  logError("Context", appError);
+  return { error: appError.userMessage, errorContext: extractErrorContext(appError) };
+}
+```
+
+**Key APIs:** `wrapError()` auto-detects AI SDK/network errors, `extractErrorContext()` returns `{ errorCode, category, originalError }`
+
+**Categories:** `LLM`, `CONFIG`, `AUTH`, `NETWORK`, `VALIDATION`, `BUSINESS`, `SYSTEM`
+
+**Common Codes:** `LLM_UNAUTHORIZED`, `LLM_MODEL_NOT_FOUND`, `CONFIG_MISSING_FIELD`, `NETWORK_TIMEOUT`
+
+❌ `return { error: "硬编码错误信息" }` → ✅ `return { error: appError.userMessage }`
 
 ### Common Issues
 

@@ -40,6 +40,14 @@ import {
   type ClassificationParams,
   type ReplyBuilderParams,
 } from "@/lib/prompt-engineering";
+// 结构化错误处理
+import {
+  wrapError,
+  extractErrorContext,
+  logError,
+  ErrorCode,
+  type ErrorContext,
+} from "@/lib/errors";
 
 /**
  * 🔧 智能薪资描述构建器
@@ -562,6 +570,8 @@ export async function generateSmartReplyWithLLM(
     classification: MessageClassification;
   };
   contextInfo?: string;
+  /** 错误上下文（仅在 replyType="error" 时存在） */
+  errorContext?: ErrorContext;
 }> {
   try {
     // 🎯 获取配置的模型和provider设置
@@ -660,7 +670,9 @@ export async function generateSmartReplyWithLLM(
       contextInfo,
     };
   } catch (error) {
-    console.error("LLM智能回复生成失败:", error);
+    // 使用结构化错误处理，保留完整错误链
+    const appError = wrapError(error, ErrorCode.LLM_GENERATION_FAILED);
+    logError("LLM智能回复生成", appError);
 
     try {
       // 降级逻辑：仅在浏览器环境中尝试
@@ -691,21 +703,26 @@ export async function generateSmartReplyWithLLM(
           reasoningText: "降级模式：使用规则引擎生成回复",
         };
       } else {
-        // 服务端环境降级：返回错误回复
-        console.error("服务端环境无法降级，缺少必要的配置数据");
+        // 服务端环境降级：返回错误回复（保留原始错误信息）
+        const errorContext: ErrorContext = extractErrorContext(appError);
         return {
           replyType: "error",
           text: "抱歉，当前系统繁忙，请稍后再试或直接联系我们的客服。",
-          reasoningText: "系统错误：服务端环境缺少必要的配置数据",
+          reasoningText: `系统错误：${appError.userMessage}`,
+          errorContext, // 包含 errorCode、category、originalError 等技术信息
         };
       }
     } catch (dataError) {
-      console.error("降级模式数据加载失败，返回通用错误回复:", dataError);
-      // 最终降级：返回通用错误回复
+      // 降级模式也失败，包装并记录错误
+      const fallbackError = wrapError(dataError, ErrorCode.CONFIG_LOAD_FAILED);
+      logError("降级模式数据加载", fallbackError);
+
+      const errorContext: ErrorContext = extractErrorContext(fallbackError);
       return {
         replyType: "error",
         text: "抱歉，当前系统繁忙，请稍后再试或直接联系我们的客服。",
-        reasoningText: "系统错误：数据加载失败",
+        reasoningText: `系统错误：${fallbackError.userMessage}`,
+        errorContext,
       };
     }
   }
