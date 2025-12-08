@@ -2,6 +2,36 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.19.0](https://github.com/steveoon/agent-computer-user/compare/v1.18.0...v1.19.0) (2025-12-08)
+
+
+### Bug Fixes
+
+* **security:** upgrade Next.js to 15.4.8 for CVE-2025-55182 (React2Shell) ([07cbe00](https://github.com/steveoon/agent-computer-user/commit/07cbe0088aa40d3a61b69d76775baa3b119cc486))
+
+
+### Features
+
+* add `BackButton` component and apply new background styling to sync page. ([83e3238](https://github.com/steveoon/agent-computer-user/commit/83e32387783a8c8aee86ae775d538bc1c9c3ae9c))
+* Add DeepSeek model support, update AI SDK dependencies, and refactor agent configuration page UI. ([f5c78ac](https://github.com/steveoon/agent-computer-user/commit/f5c78acc15d89fa219bd6b4327b28ddd415a4c97))
+* Add structured error handling system with error chain preservation ([039cc89](https://github.com/steveoon/agent-computer-user/commit/039cc897f294ea7a5f6eff6fb00ef81e554745e5))
+* **multi-agent:** 添加 standalone 模式和 Chrome 优雅关闭 ([6afa797](https://github.com/steveoon/agent-computer-user/commit/6afa797e2ecc306a1fd2bd634bf7cbcbda93c1e4))
+
+# [1.19.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.18.0...v1.19.0-develop.1) (2025-12-08)
+
+
+### Bug Fixes
+
+* **security:** upgrade Next.js to 15.4.8 for CVE-2025-55182 (React2Shell) ([07cbe00](https://github.com/steveoon/agent-computer-user/commit/07cbe0088aa40d3a61b69d76775baa3b119cc486))
+
+
+### Features
+
+* add `BackButton` component and apply new background styling to sync page. ([83e3238](https://github.com/steveoon/agent-computer-user/commit/83e32387783a8c8aee86ae775d538bc1c9c3ae9c))
+* Add DeepSeek model support, update AI SDK dependencies, and refactor agent configuration page UI. ([f5c78ac](https://github.com/steveoon/agent-computer-user/commit/f5c78acc15d89fa219bd6b4327b28ddd415a4c97))
+* Add structured error handling system with error chain preservation ([039cc89](https://github.com/steveoon/agent-computer-user/commit/039cc897f294ea7a5f6eff6fb00ef81e554745e5))
+* **multi-agent:** 添加 standalone 模式和 Chrome 优雅关闭 ([6afa797](https://github.com/steveoon/agent-computer-user/commit/6afa797e2ecc306a1fd2bd634bf7cbcbda93c1e4))
+
 # [1.18.0](https://github.com/steveoon/agent-computer-user/compare/v1.17.0...v1.18.0) (2025-11-28)
 
 
