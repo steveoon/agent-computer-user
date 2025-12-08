@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
 import { CHAT_SELECTORS } from "./constants";
 import { randomDelay, wrapAntiDetectionScript } from "./anti-detection-utils";
+import { recruitmentEventService, recruitmentContext } from "@/lib/services/recruitment-event";
 
 /**
  * 解析 puppeteer_evaluate 的结果
@@ -55,9 +56,18 @@ export const zhipinSendMessageTool = () =>
       message: z.string().describe("要发送的消息内容"),
       clearBefore: z.boolean().optional().default(true).describe("发送前是否清空输入框"),
       waitAfterSend: z.number().optional().default(1000).describe("发送后等待时间（毫秒）"),
+      // 埋点上下文（可选）
+      candidateName: z.string().optional().describe("候选人姓名，用于埋点统计"),
+      candidatePosition: z.string().optional().describe("候选人应聘职位，用于埋点统计"),
     }),
 
-    execute: async ({ message, clearBefore = true, waitAfterSend = 1000 }) => {
+    execute: async ({
+      message,
+      clearBefore = true,
+      waitAfterSend = 1000,
+      candidateName,
+      candidatePosition,
+    }) => {
       try {
         const client = await getPuppeteerMCPClient();
         const tools = await client.tools();
@@ -221,6 +231,16 @@ export const zhipinSendMessageTool = () =>
           // 等待消息发送完成
           if (waitAfterSend > 0) {
             await randomDelay(waitAfterSend * 0.8, waitAfterSend * 1.2);
+          }
+
+          // 埋点：记录消息发送事件（fire-and-forget）
+          const ctx = recruitmentContext.getContext();
+          if (ctx && candidateName) {
+            const event = recruitmentEventService
+              .event(ctx)
+              .candidate({ name: candidateName, position: candidatePosition })
+              .messageSent(message);
+            recruitmentEventService.recordAsync(event);
           }
 
           return {

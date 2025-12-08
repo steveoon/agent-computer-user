@@ -3,7 +3,10 @@ import { createSelectSchema, createInsertSchema } from "drizzle-zod";
 import {
   dataDictionary,
   dictionaryTypeDefinition,
-  dictionaryChangeLog
+  dictionaryChangeLog,
+  recruitmentEvents,
+  recruitmentDailyStats,
+  recruitmentAgents,
 } from "./schema";
 
 // ==================== 数据字典相关类型 ====================
@@ -13,16 +16,16 @@ import {
  * 仅保留海棉系统和其他，不从 BOSS 直聘和鱼泡网同步品牌
  */
 export const SourceSystem = {
-  HAIMIAN: 'haimian',
-  OTHER: 'other',
+  HAIMIAN: "haimian",
+  OTHER: "other",
 } as const;
 
-export type SourceSystemValue = typeof SourceSystem[keyof typeof SourceSystem];
+export type SourceSystemValue = (typeof SourceSystem)[keyof typeof SourceSystem];
 
 /**
  * 来源系统 Zod Schema
  */
-export const sourceSystemSchema = z.enum(['haimian', 'other']);
+export const sourceSystemSchema = z.enum(["haimian", "other"]);
 
 /**
  * 数据字典查询 Schema（从 Drizzle Schema 生成）
@@ -59,21 +62,22 @@ export type UpdateDataDictionary = z.infer<typeof updateDataDictionarySchema>;
  * 创建品牌输入类型
  * 基于 InsertDataDictionary，移除 dictionaryType（固定为 'brand'），添加 operatedBy 用于审计
  */
-export type CreateBrandInput = Omit<InsertDataDictionary, 'dictionaryType'> & {
-  operatedBy: string;  // 操作人（用于审计日志）
+export type CreateBrandInput = Omit<InsertDataDictionary, "dictionaryType"> & {
+  operatedBy: string; // 操作人（用于审计日志）
 };
 
 /**
  * 字典类型枚举
  */
 export const DictionaryType = {
-  BRAND: 'brand',
-  REGION: 'region',
-  EDUCATION: 'education',
-  OTHER: 'other'
+  BRAND: "brand",
+  REGION: "region",
+  EDUCATION: "education",
+  POSITION: "position",
+  OTHER: "other",
 } as const;
 
-export type DictionaryTypeValue = typeof DictionaryType[keyof typeof DictionaryType];
+export type DictionaryTypeValue = (typeof DictionaryType)[keyof typeof DictionaryType];
 
 /**
  * 类型安全的字典类型访问器
@@ -81,7 +85,7 @@ export type DictionaryTypeValue = typeof DictionaryType[keyof typeof DictionaryT
  */
 export const getDictionaryType = <K extends keyof typeof DictionaryType>(
   key: K
-): typeof DictionaryType[K] => {
+): (typeof DictionaryType)[K] => {
   return DictionaryType[key];
 };
 
@@ -106,7 +110,7 @@ export type UpdateDictionaryTypeDefinition = z.infer<typeof updateDictionaryType
 
 export const selectChangeLogSchema = createSelectSchema(dictionaryChangeLog);
 export const insertChangeLogSchema = createInsertSchema(dictionaryChangeLog, {
-  operation: z.enum(['INSERT', 'UPDATE', 'DELETE', 'INIT']),
+  operation: z.enum(["INSERT", "UPDATE", "DELETE", "INIT"]),
   oldData: z.any().optional(),
   newData: z.any().optional(),
   changeReason: z.string().optional(),
@@ -124,9 +128,9 @@ export type InsertDictionaryChangeLog = z.infer<typeof insertChangeLogSchema>;
  */
 export interface BrandMapping {
   id: number;
-  organizationId: string;  // 改为 string 以支持不同类型的键
+  organizationId: string; // 改为 string 以支持不同类型的键
   brandName: string;
-  sourceSystem?: SourceSystemValue;   // 来源系统
+  sourceSystem?: SourceSystemValue; // 来源系统
   description?: string;
   isActive: boolean;
   displayOrder: number;
@@ -138,7 +142,7 @@ export interface BrandMapping {
  * 品牌映射查询参数
  */
 export const brandMappingQuerySchema = z.object({
-  organizationId: z.string().optional(),  // 改为 string
+  organizationId: z.string().optional(), // 改为 string
   brandName: z.string().optional(),
   sourceSystem: sourceSystemSchema.optional(),
   isActive: z.boolean().optional(),
@@ -152,15 +156,17 @@ export type BrandMappingQuery = z.infer<typeof brandMappingQuerySchema>;
  * 批量导入数据字典的 Schema
  */
 export const bulkImportDictionarySchema = z.object({
-  dictionaryType: z.enum(['brand', 'region', 'education', 'other']),
-  sourceSystem: sourceSystemSchema.optional(),  // 来源系统
-  mappings: z.array(z.object({
-    key: z.string(),  // 改为 string
-    value: z.string().min(1),
-    description: z.string().optional(),
-    displayOrder: z.number().optional(),
-    metadata: z.any().optional(),
-  })),
+  dictionaryType: z.enum(["brand", "region", "education", "other"]),
+  sourceSystem: sourceSystemSchema.optional(), // 来源系统
+  mappings: z.array(
+    z.object({
+      key: z.string(), // 改为 string
+      value: z.string().min(1),
+      description: z.string().optional(),
+      displayOrder: z.number().optional(),
+      metadata: z.any().optional(),
+    })
+  ),
   replaceExisting: z.boolean().default(false), // 是否替换现有数据
 });
 
@@ -185,7 +191,7 @@ export function dataDictionaryToBrandMapping(dict: DataDictionary): BrandMapping
 
   return {
     id: dict.id,
-    organizationId: dict.mappingKey,  // 现在是 string 类型
+    organizationId: dict.mappingKey, // 现在是 string 类型
     brandName: dict.mappingValue,
     sourceSystem,
     description: dict.description ?? undefined,
@@ -200,15 +206,285 @@ export function dataDictionaryToBrandMapping(dict: DataDictionary): BrandMapping
  * 转换品牌映射为数据字典格式
  */
 export function brandMappingToDataDictionary(
-  brand: Omit<BrandMapping, 'id' | 'createdAt' | 'updatedAt'>
+  brand: Omit<BrandMapping, "id" | "createdAt" | "updatedAt">
 ): InsertDataDictionary {
   return {
     dictionaryType: DictionaryType.BRAND,
-    mappingKey: brand.organizationId,  // 现在是 string 类型
+    mappingKey: brand.organizationId, // 现在是 string 类型
     mappingValue: brand.brandName,
     sourceSystem: brand.sourceSystem,
     description: brand.description,
     isActive: brand.isActive,
     displayOrder: brand.displayOrder,
+  };
+}
+
+// ==================== 招聘统计相关类型 ====================
+
+/**
+ * 事件类型枚举值
+ */
+export const RecruitmentEventType = {
+  CANDIDATE_CONTACTED: "candidate_contacted",
+  MESSAGE_SENT: "message_sent",
+  MESSAGE_RECEIVED: "message_received",
+  WECHAT_EXCHANGED: "wechat_exchanged",
+  INTERVIEW_BOOKED: "interview_booked",
+  CANDIDATE_HIRED: "candidate_hired",
+} as const;
+
+export type RecruitmentEventTypeValue =
+  (typeof RecruitmentEventType)[keyof typeof RecruitmentEventType];
+
+/**
+ * 数据来源枚举
+ */
+export const DataSource = {
+  TOOL_AUTO: "tool_auto",
+  MANUAL: "manual",
+  API_CALLBACK: "api_callback",
+} as const;
+
+export type DataSourceValue = (typeof DataSource)[keyof typeof DataSource];
+
+/**
+ * 来源平台枚举
+ */
+export const SourcePlatform = {
+  ZHIPIN: "zhipin",
+  YUPAO: "yupao",
+} as const;
+
+export type SourcePlatformValue = (typeof SourcePlatform)[keyof typeof SourcePlatform];
+
+/**
+ * API来源枚举
+ * 区分请求来自网页端还是开放接口
+ */
+export const ApiSource = {
+  WEB: "web",
+  OPEN_API: "open_api",
+} as const;
+
+export type ApiSourceValue = (typeof ApiSource)[keyof typeof ApiSource];
+
+// --- Drizzle-Zod 生成的基础类型 ---
+
+/**
+ * 招聘事件 Schema 和类型
+ */
+export const selectRecruitmentEventSchema = createSelectSchema(recruitmentEvents);
+export const insertRecruitmentEventSchema = createInsertSchema(recruitmentEvents, {
+  agentId: z.string().min(1, "Agent ID 不能为空").max(50),
+  candidateKey: z.string().min(1, "候选人标识不能为空").max(255),
+  sessionId: z.string().max(100).optional(),
+  candidateName: z.string().max(100).optional(),
+  candidatePosition: z.string().max(100).optional(),
+  candidateAge: z.string().max(20).optional(),
+  candidateGender: z.string().max(10).optional(),
+  candidateEducation: z.string().max(50).optional(),
+  candidateExpectedSalary: z.string().max(50).optional(),
+  candidateExpectedLocation: z.string().max(100).optional(),
+  candidateHeight: z.string().max(20).optional(),
+  candidateWeight: z.string().max(20).optional(),
+  candidateHealthCert: z.boolean().optional(),
+  sourcePlatform: z.string().max(50).optional(),
+  jobName: z.string().max(100).optional(),
+  dataSource: z.string().max(20).optional(),
+  apiSource: z.string().max(20).optional(),
+  unreadCountBeforeReply: z.number().int().optional(),
+});
+
+export type RecruitmentEvent = z.infer<typeof selectRecruitmentEventSchema>;
+export type InsertRecruitmentEvent = z.infer<typeof insertRecruitmentEventSchema>;
+
+/**
+ * 每日统计 Schema 和类型
+ */
+export const selectRecruitmentDailyStatsSchema = createSelectSchema(recruitmentDailyStats);
+export const insertRecruitmentDailyStatsSchema = createInsertSchema(recruitmentDailyStats, {
+  agentId: z.string().min(1).max(50),
+});
+
+export type RecruitmentDailyStats = z.infer<typeof selectRecruitmentDailyStatsSchema>;
+export type InsertRecruitmentDailyStats = z.infer<typeof insertRecruitmentDailyStatsSchema>;
+
+/**
+ * Agent 配置 Schema 和类型
+ */
+export const selectRecruitmentAgentSchema = createSelectSchema(recruitmentAgents);
+export const insertRecruitmentAgentSchema = createInsertSchema(recruitmentAgents, {
+  agentId: z.string().min(1, "Agent ID 不能为空").max(50),
+  displayName: z.string().min(1, "显示名称不能为空").max(100),
+  platform: z.string().max(50).optional(),
+});
+
+export type RecruitmentAgent = z.infer<typeof selectRecruitmentAgentSchema>;
+export type InsertRecruitmentAgent = z.infer<typeof insertRecruitmentAgentSchema>;
+
+// --- eventDetails 类型安全定义（Discriminated Union）---
+
+/**
+ * 消息发送事件详情
+ */
+export const messageSentDetailsSchema = z.object({
+  type: z.literal("message_sent"),
+  content: z.string(),
+  isAutoReply: z.boolean().optional(),
+});
+
+export type MessageSentDetails = z.infer<typeof messageSentDetailsSchema>;
+
+/**
+ * 消息接收事件详情
+ */
+export const messageReceivedDetailsSchema = z.object({
+  type: z.literal("message_received"),
+  content: z.string().optional(),
+  senderType: z.enum(["candidate", "recruiter", "system", "unknown"]).optional(),
+});
+
+export type MessageReceivedDetails = z.infer<typeof messageReceivedDetailsSchema>;
+
+/**
+ * 微信交换事件详情
+ */
+export const wechatExchangedDetailsSchema = z.object({
+  type: z.literal("wechat_exchanged"),
+  wechatNumber: z.string().optional(),
+});
+
+export type WechatExchangedDetails = z.infer<typeof wechatExchangedDetailsSchema>;
+
+/**
+ * 面试预约事件详情
+ */
+export const interviewBookedDetailsSchema = z.object({
+  type: z.literal("interview_booked"),
+  interviewTime: z.string(),
+  dulidayJobId: z.number().optional(),
+  address: z.string().optional(),
+  candidatePhone: z.string().optional(),
+});
+
+export type InterviewBookedDetails = z.infer<typeof interviewBookedDetailsSchema>;
+
+/**
+ * 候选人接触事件详情
+ */
+export const candidateContactedDetailsSchema = z.object({
+  type: z.literal("candidate_contacted"),
+  unreadCount: z.number().optional(),
+  lastMessagePreview: z.string().optional(),
+});
+
+export type CandidateContactedDetails = z.infer<typeof candidateContactedDetailsSchema>;
+
+/**
+ * 候选人上岗事件详情
+ */
+export const candidateHiredDetailsSchema = z.object({
+  type: z.literal("candidate_hired"),
+  hireDate: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export type CandidateHiredDetails = z.infer<typeof candidateHiredDetailsSchema>;
+
+/**
+ * 事件详情联合类型
+ */
+export const eventDetailsSchema = z.discriminatedUnion("type", [
+  messageSentDetailsSchema,
+  messageReceivedDetailsSchema,
+  wechatExchangedDetailsSchema,
+  interviewBookedDetailsSchema,
+  candidateContactedDetailsSchema,
+  candidateHiredDetailsSchema,
+]);
+
+export type EventDetails = z.infer<typeof eventDetailsSchema>;
+
+// --- 辅助函数 ---
+
+/**
+ * 生成候选人唯一标识（candidateKey）
+ *
+ * 生成规则：平台_姓名_职位_品牌ID
+ * 注意：接受"同名同职位不同人"被合并的风险
+ */
+export function generateCandidateKey(params: {
+  platform: string;
+  candidateName: string;
+  candidatePosition?: string;
+  brandId?: number;
+}): string {
+  const parts = [
+    params.platform,
+    params.candidateName,
+    params.candidatePosition || "unknown",
+    params.brandId?.toString() || "0",
+  ];
+  return parts.join("_");
+}
+
+/**
+ * 生成会话ID（sessionId）
+ *
+ * 生成规则：agentId_candidateKey_YYYY-MM-DD
+ * 同一候选人同一天的所有事件归为一个会话（按账号隔离）
+ */
+export function generateSessionId(agentId: string, candidateKey: string, eventTime: Date): string {
+  const dateStr = eventTime.toISOString().split("T")[0]; // YYYY-MM-DD
+  return `${agentId}_${candidateKey}_${dateStr}`;
+}
+
+/**
+ * 创建招聘事件的便捷函数
+ */
+export function createRecruitmentEventInput(params: {
+  agentId: string;
+  eventType: RecruitmentEventTypeValue;
+  eventTime: Date;
+  candidateName: string;
+  candidatePosition?: string;
+  brandId?: number;
+  sourcePlatform?: SourcePlatformValue;
+  eventDetails?: EventDetails;
+  wasUnreadBeforeReply?: boolean;
+  unreadCountBeforeReply?: number;
+  messageSequence?: number;
+  jobId?: number;
+  jobName?: string;
+  dataSource?: DataSourceValue;
+  apiSource?: ApiSourceValue;
+}): InsertRecruitmentEvent {
+  const candidateKey = generateCandidateKey({
+    platform: params.sourcePlatform || SourcePlatform.ZHIPIN,
+    candidateName: params.candidateName,
+    candidatePosition: params.candidatePosition,
+    brandId: params.brandId,
+  });
+
+  const sessionId = generateSessionId(params.agentId, candidateKey, params.eventTime);
+
+  return {
+    agentId: params.agentId,
+    eventType: params.eventType,
+    eventTime: params.eventTime,
+    candidateKey,
+    sessionId,
+    candidateName: params.candidateName,
+    candidatePosition: params.candidatePosition,
+    brandId: params.brandId,
+    sourcePlatform: params.sourcePlatform || SourcePlatform.ZHIPIN,
+    eventDetails: params.eventDetails,
+    wasUnreadBeforeReply: params.wasUnreadBeforeReply,
+    unreadCountBeforeReply: params.unreadCountBeforeReply,
+    messageSequence: params.messageSequence,
+    jobId: params.jobId,
+    jobName: params.jobName,
+    dataSource: params.dataSource || DataSource.TOOL_AUTO,
+    apiSource: params.apiSource || ApiSource.WEB,
   };
 }

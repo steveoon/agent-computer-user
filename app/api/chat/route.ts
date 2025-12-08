@@ -16,6 +16,12 @@ import { getBossZhipinSystemPrompt } from "@/lib/loaders/system-prompts.loader";
 import { DEFAULT_PROVIDER_CONFIGS, DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import { APPROVAL, executeBashCommandLocally } from "@/lib/utils/hitl-utils";
 import type { ChatRequestBody } from "@/types";
+import { SourcePlatform, ApiSource } from "@/db/types";
+import {
+  recruitmentContext,
+  processStepToolResults,
+  type RecruitmentContext,
+} from "@/lib/services/recruitment-event";
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 300;
@@ -131,13 +137,23 @@ export async function POST(req: Request) {
     maxSteps,
   }: ChatRequestBody = await req.json();
 
-  try {
-    // 🎯 获取配置的模型和provider设置
-    const chatModel = modelConfig?.chatModel || DEFAULT_MODEL_CONFIG.chatModel;
-    const providerConfigs = modelConfig?.providerConfigs || DEFAULT_PROVIDER_CONFIGS;
+  // 📊 Set up recruitment event context for tracking
+  const eventContext: RecruitmentContext = {
+    agentId: process.env.AGENT_ID || "default",
+    sourcePlatform: SourcePlatform.ZHIPIN,
+    apiSource: ApiSource.WEB,
+    // brandId is not available in configData for web route
+  };
 
-    // 使用动态registry
-    const dynamicRegistry = getDynamicRegistry(providerConfigs);
+  // Run with context for event tracking
+  return recruitmentContext.runAsync(eventContext, async () => {
+    try {
+      // 🎯 获取配置的模型和provider设置
+      const chatModel = modelConfig?.chatModel || DEFAULT_MODEL_CONFIG.chatModel;
+      const providerConfigs = modelConfig?.providerConfigs || DEFAULT_PROVIDER_CONFIGS;
+
+      // 使用动态registry
+      const dynamicRegistry = getDynamicRegistry(providerConfigs);
 
     console.log(`[CHAT API] 使用模型: ${chatModel}`);
 
@@ -325,13 +341,19 @@ export async function POST(req: Request) {
             anthropic: { cacheControl: { type: "ephemeral" } },
           },
           stopWhen: stepCountIs(maxSteps || 30),
-          onStepFinish: async ({ finishReason, usage, toolCalls }) => {
+          onStepFinish: async ({ finishReason, usage, toolCalls, toolResults }) => {
             const toolInfo = toolCalls?.length
               ? ` | tools: [${toolCalls.map(t => t.toolName).join(", ")}]`
               : "";
             console.log(
               `📊 Step finish=${finishReason}${toolInfo} | tokens: ${usage?.totalTokens || 0}`
             );
+
+            // 📊 Record events for read-type tools
+            const ctx = recruitmentContext.getContext();
+            if (ctx && toolCalls && toolResults) {
+              processStepToolResults(ctx, toolCalls, toolResults);
+            }
           },
           onFinish: async ({ usage, finishReason, steps }) => {
             console.log(
@@ -392,4 +414,5 @@ export async function POST(req: Request) {
       headers: { "Content-Type": "application/json" },
     });
   }
+  });
 }

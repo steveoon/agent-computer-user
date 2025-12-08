@@ -8,6 +8,20 @@
       "when": 1762759169609,
       "tag": "0000_yielding_robin_chapel",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1764841375634,
+      "tag": "0001_pink_epoch",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1764920660039,
+      "tag": "0002_parallel_thing",
+      "breakpoints": true
     }
   ]
 }

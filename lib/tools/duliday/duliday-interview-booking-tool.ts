@@ -2,6 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { getEducationIdByName, EDUCATION_MAPPING } from "@/lib/constants/organization-mapping";
 import { interviewBookingResponseSchema } from "./types";
+import { recruitmentEventService, recruitmentContext } from "@/lib/services/recruitment-event";
 
 /**
  * Duliday预约面试工具
@@ -39,6 +40,8 @@ export const dulidayInterviewBookingTool = (customToken?: string) =>
         .default([])
         .describe("客户标签列表，默认为空数组"),
       operateType: z.number().optional().default(3).describe("操作类型，默认为3"),
+      // 埋点上下文（可选）
+      candidatePosition: z.string().optional().describe("候选人应聘职位名称，用于埋点统计"),
     }),
     execute: async ({
       name,
@@ -51,6 +54,7 @@ export const dulidayInterviewBookingTool = (customToken?: string) =>
       hasHealthCertificate = 1,
       customerLabelList = [],
       operateType = 3,
+      candidatePosition,
     }) => {
       console.log("🔍 duliday_interview_booking tool called with:", {
         name,
@@ -148,12 +152,28 @@ export const dulidayInterviewBookingTool = (customToken?: string) =>
         }
 
         const data = parseResult.data;
+        const isSuccess = data.code === 0;
+
+        // 埋点：记录面试预约事件（fire-and-forget）
+        if (isSuccess) {
+          const ctx = recruitmentContext.getContext();
+          if (ctx && name) {
+            const event = recruitmentEventService
+              .event(ctx)
+              .candidate({ name, position: candidatePosition })
+              .interviewBooked({
+                interviewTime,
+                candidatePhone: phone,
+              });
+            recruitmentEventService.recordAsync(event);
+          }
+        }
 
         // 返回原始API响应数据，让组件处理展示
         return {
           type: "object" as const,
           object: {
-            success: data.code === 0,
+            success: isSuccess,
             code: data.code,
             message: data.message,
             notice: data.data?.notice || null,

@@ -7,6 +7,7 @@ import {
   randomDelay,
   clickWithMouseTrajectory,
 } from "./anti-detection-utils";
+import { recruitmentEventService, recruitmentContext } from "@/lib/services/recruitment-event";
 
 /**
  * 交换微信工具
@@ -51,6 +52,9 @@ export const zhipinExchangeWechatTool = () =>
         .optional()
         .default(1500)
         .describe("交换完成后的最大等待时间（毫秒）"),
+      // 埋点上下文（可选）
+      candidateName: z.string().optional().describe("候选人姓名，用于埋点统计"),
+      candidatePosition: z.string().optional().describe("候选人应聘职位，用于埋点统计"),
     }),
 
     execute: async ({
@@ -58,6 +62,8 @@ export const zhipinExchangeWechatTool = () =>
       waitBetweenClicksMax = 800,
       waitAfterExchangeMin = 800,
       waitAfterExchangeMax = 1500,
+      candidateName,
+      candidatePosition,
     }) => {
       try {
         const client = await getPuppeteerMCPClient();
@@ -418,6 +424,16 @@ export const zhipinExchangeWechatTool = () =>
 
         // 等待交换完成（随机延迟）
         await randomDelay(waitAfterExchangeMin, waitAfterExchangeMax);
+
+        // 埋点：记录微信交换事件（fire-and-forget）
+        const ctx = recruitmentContext.getContext();
+        if (ctx && candidateName) {
+          const event = recruitmentEventService
+            .event(ctx)
+            .candidate({ name: candidateName, position: candidatePosition })
+            .wechatExchanged();
+          recruitmentEventService.recordAsync(event);
+        }
 
         return {
           success: true,

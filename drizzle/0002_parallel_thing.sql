@@ -1,0 +1,1 @@
+ALTER TABLE "app_huajune"."recruitment_events" ADD COLUMN "api_source" varchar(20) DEFAULT 'web';

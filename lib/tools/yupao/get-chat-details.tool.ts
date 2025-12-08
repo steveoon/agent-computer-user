@@ -76,14 +76,37 @@ export const yupaoChatDetailsTool = () =>
               '[class*="_chat-conversation"] > div:first-child'
             ],
             candidateName: [
+              // 2025-12-05: 新版DOM结构使用span而非p
+              '[class*="_base-info"] span[class*="_name_"]',
+              '[class*="_user-info"] span[class*="_name_"]',
+              'span[class*="_name_"]:not([class*="wrap"])',
+              // 旧版兼容
               '[class*="_base-info"] p[class*="_name"]',
-              '[class*="_user-info"] p[class*="_name"]',
               'p[class*="_name_"]:not([class*="wrap"])'
             ],
             candidateStats: [
               '${createDynamicClassSelector("_stats")}',
-              'p[class*="_stats_"]',
-              'p[class*="_stats_"] span'
+              'span[class*="_stats_"]',
+              '[class*="_stats_"] span'
+            ],
+            // 2025-12-05: 新增 _other-info 选择器获取年龄和学历
+            otherInfo: [
+              'span[class*="_other-info_"]',
+              '[class*="_base-info"] span[class*="_other-info_"]'
+            ],
+            // 2025-12-05: 新增 _info-row 选择器获取沟通职位和期望
+            infoRow: [
+              '[class*="_info-row_"]',
+              '[class*="_resume-expand"] [class*="_info-row_"]'
+            ],
+            infoLabel: [
+              '[class*="_info-label_"]'
+            ],
+            infoVal: [
+              '[class*="_info-val_"]'
+            ],
+            infoSalary: [
+              'span[class*="_info-salary_"]'
             ],
             occName: [
               '${createDynamicClassSelector("_occ-name")}',
@@ -219,9 +242,71 @@ export const yupaoChatDetailsTool = () =>
           let resumeTags = [];
           let gender = '';
           let age = '';
+          let education = '';
           let expectedLocation = '';
-          
+          let communicationPosition = ''; // 沟通职位
+          let expectedPositionFromRow = ''; // 期望职位（从_info-row获取）
+          let expectedSalaryFromRow = ''; // 期望薪资（从_info-row获取）
+
           if (topInfoArea) {
+            // 2025-12-05: 首先尝试从 _other-info 获取年龄和学历
+            for (const selector of selectors.otherInfo) {
+              try {
+                const otherInfoEls = topInfoArea.querySelectorAll(selector);
+                if (otherInfoEls.length > 0) {
+                  Array.from(otherInfoEls).forEach(el => {
+                    const text = el.textContent.trim();
+                    if (text.includes('岁')) {
+                      age = text;
+                    } else if (text.includes('中') || text.includes('高中') || text.includes('大专') || text.includes('本科') || text.includes('硕士') || text.includes('博士') || text.includes('学历')) {
+                      education = text;
+                    }
+                  });
+                  break;
+                }
+              } catch (e) {}
+            }
+
+            // 2025-12-05: 从 _info-row 获取沟通职位和期望信息
+            for (const selector of selectors.infoRow) {
+              try {
+                const infoRows = topInfoArea.querySelectorAll(selector);
+                if (infoRows.length > 0) {
+                  Array.from(infoRows).forEach(row => {
+                    const labelEl = row.querySelector('[class*="_info-label_"]');
+                    const valEl = row.querySelector('[class*="_info-val_"]');
+                    if (!labelEl || !valEl) return;
+
+                    const label = labelEl.textContent.trim();
+
+                    if (label.includes('沟通职位')) {
+                      // 沟通职位
+                      communicationPosition = valEl.textContent.trim();
+                    } else if (label.includes('期望')) {
+                      // 期望：上海·店员/营业员·面议
+                      const spans = valEl.querySelectorAll('span');
+                      const values = Array.from(spans)
+                        .map(s => s.textContent.trim())
+                        .filter(t => t && t !== '·');
+
+                      if (values.length >= 1) expectedLocation = values[0]; // 城市
+                      if (values.length >= 2) expectedPositionFromRow = values[1]; // 职位
+
+                      // 尝试获取薪资
+                      const salaryEl = valEl.querySelector('[class*="_info-salary_"]');
+                      if (salaryEl) {
+                        expectedSalaryFromRow = salaryEl.textContent.trim();
+                      } else if (values.length >= 3) {
+                        expectedSalaryFromRow = values[2]; // 薪资
+                      }
+                    }
+                  });
+                  break;
+                }
+              } catch (e) {}
+            }
+
+            // 旧版兼容：从 resumeTag 获取
             for (const selector of selectors.resumeTag) {
               try {
                 const tags = topInfoArea.querySelectorAll(selector);
@@ -231,14 +316,14 @@ export const yupaoChatDetailsTool = () =>
                 }
               } catch (e) {}
             }
-            
+
             resumeTags.forEach(tag => {
               const text = tag.textContent.trim();
               if (text === '男' || text === '女') {
                 gender = text;
-              } else if (text.includes('岁')) {
+              } else if (text.includes('岁') && !age) {
                 age = text;
-              } else if (text.includes('期望工作地')) {
+              } else if (text.includes('期望工作地') && !expectedLocation) {
                 expectedLocation = text.replace('期望工作地：', '').trim();
               }
             });
@@ -322,14 +407,15 @@ export const yupaoChatDetailsTool = () =>
           }
           
           // 组装候选人信息
+          // 2025-12-05: 优先使用沟通职位，其次期望职位，最后岗位信息
           candidateInfo = {
             name: candidateName,
-            position: expectedPosition || jobInfo.jobPosition || '',
+            position: communicationPosition || expectedPositionFromRow || expectedPosition || jobInfo.jobPosition || '',
             age: age,
             gender: gender,
             experience: candidateExperience,  // 使用候选人的实际经验
-            education: '', // Yupao通常不在这里显示学历
-            expectedSalary: expectedSalary,
+            education: education, // 2025-12-05: 从 _other-info 获取学历
+            expectedSalary: expectedSalaryFromRow || expectedSalary,
             expectedLocation: expectedLocation,
             // 🆕 添加岗位地址信息（从岗位信息卡片中提取）
             jobAddress: jobInfo.jobAddress || '',
@@ -338,7 +424,9 @@ export const yupaoChatDetailsTool = () =>
             healthCertificate: hasHealthCertificate,
             activeTime: activeTime,
             info: additionalInfo,
-            fullText: jobInfo.jobDescription || ''
+            fullText: jobInfo.jobDescription || '',
+            // 2025-12-05: 新增沟通职位字段
+            communicationPosition: communicationPosition
           };
           
           // 获取聊天记录
@@ -607,10 +695,14 @@ export const yupaoChatDetailsTool = () =>
                     candidatePosition: parsedResult.candidateInfo?.position || "未知职位",
                     candidateGender: parsedResult.candidateInfo?.gender || "",
                     candidateAge: parsedResult.candidateInfo?.age || "",
+                    // 2025-12-05: 新增学历字段
+                    candidateEducation: parsedResult.candidateInfo?.education || "",
                     candidateExpectedSalary: parsedResult.candidateInfo?.expectedSalary || "",
                     candidateExpectedLocation: parsedResult.candidateInfo?.expectedLocation || "",
                     // 🆕 岗位地址（从岗位信息卡片提取，如"上海 徐汇区 龙华"）
                     jobAddress: parsedResult.candidateInfo?.jobAddress || "",
+                    // 2025-12-05: 新增沟通职位字段
+                    communicationPosition: parsedResult.candidateInfo?.communicationPosition || "",
                     totalMessages: parsedResult.stats?.totalMessages || 0,
                     lastMessageTime:
                       parsedResult.chatMessages?.[parsedResult.chatMessages.length - 1]?.time ||

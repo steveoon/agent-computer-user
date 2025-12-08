@@ -98,14 +98,21 @@
   - 定义：对当日每次"发送前"抓取该会话的 `unreadCount` 累加。
   - 计算：在Agent调用层实现，发送动作前调用 `get-unread-candidates-improved.tool.ts` 获取目标候选人的 `unreadCount`，累加到统计中。
   - **实现方案**：
+
     ```javascript
     // Agent层实现示例
     const unreadList = await getUnreadCandidatesImproved();
     const candidate = unreadList.find(c => c.name === targetName);
     const unreadCount = candidate?.unreadCount || 0;
-    await sendMessage(message);
-    stats.unreadReplied += unreadCount;
+
+    // 写入数据库 recruitment_events 表
+    await saveEvent({
+      eventType: "message_sent",
+      unreadCountBeforeReply: unreadCount, // 存入新增字段
+      // ...其他字段
+    });
     ```
+
   - 依据：反映"回复时积压强度"，便于诊断 SLA 与漏斗损耗。
   - 工具/来源：`get-unread-candidates-improved.tool.ts`（需要在Agent层实现发送前的数据采集）。
 
@@ -152,7 +159,7 @@
 - **会话-候选人关系**：
   - 一个会话视为一位候选人
   - 基于候选人姓名进行去重（接受重名风险）
-  - 建议记录格式：`候选人姓名_账号名称_日期` 作为会话唯一标识
+  - 建议记录格式：`agentId_candidateKey_YYYY-MM-DD` 作为会话唯一标识（确保账号隔离）
 
 ---
 
@@ -302,7 +309,7 @@ const sample = {
 
 - **当前限制**：只能基于候选人姓名进行去重
 - **风险说明**：存在重名可能性，但概率较低（可接受）
-- **记录格式**：`候选人姓名_账号名称_日期` 作为会话唯一标识
+- **记录格式**：`agentId_candidateKey_YYYY-MM-DD` 作为会话唯一标识
 - **未来优化**：若能获取微信号（交换后），可作为辅助去重依据
 
 ### 数据采集埋点
@@ -314,7 +321,7 @@ const sample = {
 ### 岗位归一化
 
 - **业务规范**：BOSS直聘发布的岗位名称必须与Duliday系统保持一致
-- **技术方案**：建立岗位名称映射表（需要业务层面维护）
+- **技术方案**：建立岗位名称映射表（已在 Schema `dictionaryTypeEnum` 中添加 `position` 类型支持）
 - **降级策略**：无法映射时，使用原始岗位名称
 
 ### 账号维度采集

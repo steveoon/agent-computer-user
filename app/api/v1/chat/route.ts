@@ -32,13 +32,27 @@ import {
 import { ErrorCode } from "@/lib/errors";
 import { DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
 import type { ModelConfig } from "@/lib/config/models";
+import { SourcePlatform, ApiSource } from "@/db/types";
+import {
+  recruitmentContext,
+  processStepToolResults,
+  type RecruitmentContext,
+} from "@/lib/services/recruitment-event";
 
 export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const correlationId = generateCorrelationId();
 
-  try {
+  // 📊 Set up recruitment event context for tracking (Open API)
+  const eventContext: RecruitmentContext = {
+    agentId: process.env.AGENT_ID || "default",
+    sourcePlatform: SourcePlatform.ZHIPIN,
+    apiSource: ApiSource.OPEN_API,
+  };
+
+  return recruitmentContext.runAsync(eventContext, async () => {
+    try {
     // Step 1: Parse and validate request
     const body = await req.json();
     let requestData: OpenChatRequest;
@@ -215,6 +229,13 @@ export async function POST(req: Request) {
         messages: convertToModelMessages(processedMessages),
         tools: Object.keys(tools).length > 0 ? tools : undefined,
         stopWhen: stepCountIs(30),
+        onStepFinish: async ({ toolCalls, toolResults }) => {
+          // 📊 Process tool results for recruitment event tracking
+          const ctx = recruitmentContext.getContext();
+          if (ctx && toolCalls && toolResults) {
+            processStepToolResults(ctx, toolCalls, toolResults);
+          }
+        },
       });
 
       const response = result.toUIMessageStreamResponse();
@@ -247,6 +268,13 @@ export async function POST(req: Request) {
         messages: convertToModelMessages(processedMessages),
         tools: Object.keys(tools).length > 0 ? tools : undefined,
         stopWhen: stepCountIs(30),
+        onStepFinish: async ({ toolCalls, toolResults }) => {
+          // 📊 Process tool results for recruitment event tracking
+          const ctx = recruitmentContext.getContext();
+          if (ctx && toolCalls && toolResults) {
+            processStepToolResults(ctx, toolCalls, toolResults);
+          }
+        },
       });
 
       // Convert generateText result to UIMessage array
@@ -292,4 +320,5 @@ export async function POST(req: Request) {
     // 使用结构化错误处理，自动识别 LLM/网络/认证等错误类型
     return handleUnknownError(error, correlationId, ErrorCode.LLM_GENERATION_FAILED);
   }
+  });
 }

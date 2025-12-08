@@ -3,6 +3,8 @@ import { z } from "zod";
 import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
 import { YUPAO_INPUT_SELECTORS } from "./constants";
 import { randomDelay, wrapAntiDetectionScript } from "../zhipin/anti-detection-utils";
+import { SourcePlatform } from "@/db/types";
+import { recruitmentEventService, recruitmentContext } from "@/lib/services/recruitment-event";
 
 /**
  * 解析 puppeteer_evaluate 的结果
@@ -55,9 +57,18 @@ export const yupaoSendMessageTool = () =>
       message: z.string().describe("要发送的消息内容"),
       clearBefore: z.boolean().optional().default(true).describe("发送前是否清空输入框"),
       waitAfterSend: z.number().optional().default(1000).describe("发送后等待时间（毫秒）"),
+      // 埋点上下文（可选）
+      candidateName: z.string().optional().describe("候选人姓名，用于埋点统计"),
+      candidatePosition: z.string().optional().describe("候选人应聘职位，用于埋点统计"),
     }),
 
-    execute: async ({ message, clearBefore = true, waitAfterSend = 1000 }) => {
+    execute: async ({
+      message,
+      clearBefore = true,
+      waitAfterSend = 1000,
+      candidateName,
+      candidatePosition,
+    }) => {
       try {
         const client = await getPuppeteerMCPClient();
         const tools = await client.tools();
@@ -261,6 +272,18 @@ export const yupaoSendMessageTool = () =>
 
           const verifyResult = await puppeteerEvaluate.execute({ script: verifyScript });
           const verifyData = parseEvaluateResult(verifyResult);
+
+          // 📊 埋点：记录消息发送事件（fire-and-forget）
+          const ctx = recruitmentContext.getContext();
+          if (ctx && candidateName) {
+            // 覆盖 sourcePlatform 为 yupao
+            const yupaoCtx = { ...ctx, sourcePlatform: SourcePlatform.YUPAO };
+            const event = recruitmentEventService
+              .event(yupaoCtx)
+              .candidate({ name: candidateName, position: candidatePosition })
+              .messageSent(message);
+            recruitmentEventService.recordAsync(event);
+          }
 
           return {
             success: true,
