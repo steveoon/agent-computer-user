@@ -37,8 +37,8 @@ export const SyncHistory = () => {
   const [selectedRecord, setSelectedRecord] = useState<string | null>(null);
 
   // 从 Brand Management Store 获取品牌列表
-  const availableBrands = useBrandManagementStore((state) => state.availableBrands);
-  const loadAvailableBrands = useBrandManagementStore((state) => state.loadAvailableBrands);
+  const availableBrands = useBrandManagementStore(state => state.availableBrands);
+  const loadAvailableBrands = useBrandManagementStore(state => state.loadAvailableBrands);
 
   // 初次加载品牌列表
   useEffect(() => {
@@ -73,7 +73,7 @@ export const SyncHistory = () => {
   const selectedRecordData = syncHistory.find(record => record.id === selectedRecord);
 
   return (
-    <Card>
+    <Card className="glass-card">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>

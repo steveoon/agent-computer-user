@@ -29,6 +29,8 @@ readonly CHROME_PROCESS_CHECK_INTERVAL=1    # Chrome 进程检查间隔 (秒)
 readonly APP_STARTUP_TIMEOUT=30             # 应用启动超时 (秒)
 readonly APP_HEALTH_CHECK_INTERVAL=1        # 应用健康检查间隔 (秒)
 readonly AGENT_STOP_WAIT_TIME=2             # Agent 停止后等待时间 (秒)
+readonly CHROME_GRACEFUL_WAIT_TIME=5        # Chrome 优雅关闭等待时间 (秒)
+readonly CHROME_FORCE_WAIT_TIME=3           # Chrome 强制关闭后等待时间 (秒)
 readonly AGENT_RESTART_WAIT_TIME=2          # Agent 重启前等待时间 (秒)
 readonly PORT_RELEASE_WAIT_TIME=2           # 端口释放等待时间 (秒)
 
@@ -397,10 +399,65 @@ start_app() {
     local app_port=$(echo "$agent" | jq -r '.appPort')
     local chrome_port=$(echo "$agent" | jq -r '.chromePort')
 
+    # 检查 standalone 构建是否存在
+    local standalone_dir="$PROJECT_ROOT/.next/standalone"
+    if [[ ! -d "$standalone_dir" ]]; then
+        log_error "standalone 构建不存在，请先运行 pnpm build"
+        return 1
+    fi
+
+    # 为每个 Agent 创建独立的运行目录，避免多进程竞争
+    local agent_runtime_dir="/tmp/agent-runtime/${agent_id}"
+
+    # 如果运行目录已存在且有进程在用，跳过复制
+    if [[ -d "$agent_runtime_dir" ]] && [[ -f "$PIDS_DIR/${agent_id}.pid" ]]; then
+        local old_pid=$(cat "$PIDS_DIR/${agent_id}.pid" 2>/dev/null)
+        if ps -p "$old_pid" > /dev/null 2>&1; then
+            log_warn "Agent $agent_id 似乎已在运行"
+            return 1
+        fi
+    fi
+
+    log_step "准备 Agent 运行环境..."
+    rm -rf "$agent_runtime_dir"
+    mkdir -p "$agent_runtime_dir"
+
+    # 复制 standalone 构建（使用硬链接加速，失败则普通复制）
+    cp -al "$standalone_dir/." "$agent_runtime_dir/" 2>/dev/null || \
+        cp -a "$standalone_dir/." "$agent_runtime_dir/"
+
+    # 复制静态资源（standalone 模式需要）
+    if [[ -d "$PROJECT_ROOT/.next/static" ]]; then
+        mkdir -p "$agent_runtime_dir/.next"
+        cp -al "$PROJECT_ROOT/.next/static" "$agent_runtime_dir/.next/" 2>/dev/null || \
+            cp -a "$PROJECT_ROOT/.next/static" "$agent_runtime_dir/.next/"
+    fi
+    if [[ -d "$PROJECT_ROOT/public" ]]; then
+        cp -al "$PROJECT_ROOT/public" "$agent_runtime_dir/" 2>/dev/null || \
+            cp -a "$PROJECT_ROOT/public" "$agent_runtime_dir/"
+    fi
+
+    # 复制环境变量文件（standalone 模式需要）
+    for env_file in "$PROJECT_ROOT"/.env*; do
+        [[ -f "$env_file" ]] && cp "$env_file" "$agent_runtime_dir/"
+    done
+
     log_step "启动应用服务器 (端口: $app_port)..."
 
-    cd "$PROJECT_ROOT"
-    PORT=$app_port CHROME_REMOTE_DEBUGGING_PORT=$chrome_port pnpm start > "$LOGS_DIR/${agent_id}-app.log" 2>&1 &
+    # 使用 standalone 模式启动
+    # 注意：standalone 模式下 node server.js 不会自动加载 .env 文件
+    # 使用 bash -c 在子进程中 source .env 文件后启动
+    cd "$agent_runtime_dir"
+    bash -c "
+        set -a
+        [[ -f .env ]] && source .env
+        [[ -f .env.local ]] && source .env.local
+        set +a
+        export PORT=$app_port
+        export HOSTNAME=0.0.0.0
+        export CHROME_REMOTE_DEBUGGING_PORT=$chrome_port
+        exec node server.js
+    " > "$LOGS_DIR/${agent_id}-app.log" 2>&1 &
     local app_pid=$!
 
     # 保存应用 PID
@@ -511,17 +568,53 @@ cmd_stop() {
         rm -f "$PIDS_DIR/${target_id}.pid"
     fi
 
-    # 停止 Chrome
+    # 停止 Chrome (优雅关闭以保护 IndexedDB)
     if [[ -f "$PIDS_DIR/${target_id}-chrome.pid" ]]; then
         local chrome_pid=$(cat "$PIDS_DIR/${target_id}-chrome.pid")
+        local agent=$(jq -c ".agents[] | select(.id == \"$target_id\")" "$CONFIG_FILE" 2>/dev/null)
+        local chrome_port=$(echo "$agent" | jq -r '.chromePort' 2>/dev/null)
+        local user_data_dir=$(echo "$agent" | jq -r '.userDataDir' 2>/dev/null)
+
         if ps -p "$chrome_pid" > /dev/null 2>&1; then
             log_step "停止 Chrome (PID: $chrome_pid)..."
-            kill "$chrome_pid" 2>/dev/null || true
-            sleep "$AGENT_STOP_WAIT_TIME"
-            # 强制杀死
+
+            # 步骤1: 尝试通过 DevTools Protocol 优雅关闭 (给 IndexedDB 时间刷盘)
+            if [[ -n "$chrome_port" && "$chrome_port" != "null" ]]; then
+                log_info "  尝试通过 DevTools Protocol 优雅关闭..."
+                curl -s "http://localhost:$chrome_port/json/close" > /dev/null 2>&1 || true
+                sleep 1
+            fi
+
+            # 步骤2: 发送 SIGTERM 信号 (允许进程清理)
+            kill -TERM "$chrome_pid" 2>/dev/null || true
+
+            # 步骤3: 等待更长时间让 Chrome 完成 IndexedDB 写入
+            local wait_count=0
+            while ps -p "$chrome_pid" > /dev/null 2>&1 && (( wait_count < CHROME_GRACEFUL_WAIT_TIME )); do
+                sleep 1
+                ((wait_count++))
+                log_info "  等待 Chrome 优雅关闭... ($wait_count/$CHROME_GRACEFUL_WAIT_TIME)"
+            done
+
+            # 步骤4: 如果还活着，强制终止所有相关进程
             if ps -p "$chrome_pid" > /dev/null 2>&1; then
+                log_warn "  Chrome 未响应 SIGTERM，强制终止..."
+                # 杀死主进程及其所有子进程
+                pkill -9 -P "$chrome_pid" 2>/dev/null || true
                 kill -9 "$chrome_pid" 2>/dev/null || true
             fi
+
+            # 步骤5: 清理可能残留的 Chrome 进程 (使用 user-data-dir 匹配)
+            if [[ -n "$user_data_dir" && "$user_data_dir" != "null" ]]; then
+                local stale_pids=$(pgrep -f "user-data-dir=$user_data_dir" 2>/dev/null || true)
+                if [[ -n "$stale_pids" ]]; then
+                    log_warn "  清理残留 Chrome 进程: $stale_pids"
+                    echo "$stale_pids" | xargs kill -9 2>/dev/null || true
+                fi
+            fi
+
+            # 步骤6: 等待文件锁完全释放
+            sleep "$CHROME_FORCE_WAIT_TIME"
         fi
         rm -f "$PIDS_DIR/${target_id}-chrome.pid"
     fi

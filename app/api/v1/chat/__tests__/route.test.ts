@@ -973,7 +973,7 @@ describe("POST /api/v1/chat", () => {
       expect(response.headers.get("X-Message-Pruned")).toBe("true");
     });
 
-    it("convertToModelMessages 抛错时应返回 500 InternalServerError", async () => {
+    it("convertToModelMessages 抛错时应返回 502 BadGateway（LLM 上下文错误）", async () => {
       const ai = await import("ai");
       (ai.convertToModelMessages as unknown as { mockImplementation: Function }).mockImplementation(
         () => {
@@ -984,9 +984,10 @@ describe("POST /api/v1/chat", () => {
       const request = mockRequest({});
       const response = await POST(request);
 
-      expect(response.status).toBe(500);
+      // 在 LLM 端点上下文中，未识别的错误归类为 LLM 错误 (502 BadGateway)
+      expect(response.status).toBe(502);
       const data = await response.json();
-      expect(data.error).toBe("InternalServerError");
+      expect(data.error).toBe("BadGateway");
     });
 
     it("promptType 含 computer 且缺少 sandboxId（error 策略）应返回 400", async () => {

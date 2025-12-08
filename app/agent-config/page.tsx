@@ -23,10 +23,9 @@ import {
   RefreshCw,
   CheckCircle,
   AlertCircle,
-  ArrowLeft,
 } from "lucide-react";
+import { BackButton } from "@/components/ui/back-button";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 
 import { useModelConfig } from "@/lib/stores/model-config-store";
 import {
@@ -51,8 +50,6 @@ function getModelName(modelId: ModelId): string {
 }
 
 export default function AgentConfigPage() {
-  const router = useRouter();
-
   const {
     chatModel,
     classifyModel,
@@ -119,254 +116,255 @@ export default function AgentConfigPage() {
   };
 
   return (
-    <div className="container max-w-6xl mx-auto p-6 space-y-6">
-      {/* 页面头部 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.back()}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            返回
-          </Button>
-          <div className="flex items-center gap-3">
-            <Settings className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-3xl font-bold">Agent配置</h1>
-              <p className="text-muted-foreground">配置AI模型和服务提供商参数</p>
+    <div className="relative min-h-screen w-full bg-background">
+      {/* 背景光斑效果 - 固定定位 */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="bg-blob bg-blob-1" />
+        <div className="bg-blob bg-blob-2" />
+        <div className="bg-blob bg-blob-3" />
+      </div>
+
+      <div className="relative z-10 container max-w-6xl mx-auto p-6 space-y-6">
+        {/* 页面头部 */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <BackButton size="sm" className="flex items-center gap-2" title="返回" />
+            <div className="flex items-center gap-3">
+              <Settings className="h-8 w-8 text-primary" />
+              <div>
+                <h1 className="text-3xl font-bold">Agent配置</h1>
+                <p className="text-muted-foreground">配置AI模型和服务提供商参数</p>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex gap-2">
-          {hasUnsavedChanges && (
-            <Button variant="outline" onClick={saveProviderConfigs} className="gap-2">
-              <CheckCircle className="h-4 w-4" />
-              保存更改
+          <div className="flex gap-2">
+            {hasUnsavedChanges && (
+              <Button variant="outline" onClick={saveProviderConfigs} className="gap-2">
+                <CheckCircle className="h-4 w-4" />
+                保存更改
+              </Button>
+            )}
+            <Button variant="outline" onClick={handleResetAll} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              重置全部
             </Button>
-          )}
-          <Button variant="outline" onClick={handleResetAll} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            重置全部
-          </Button>
-        </div>
-      </div>
-
-      {hasUnsavedChanges && (
-        <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-          <AlertCircle className="h-4 w-4 text-amber-600" />
-          <span className="text-sm text-amber-800">有未保存的Provider配置更改</span>
-        </div>
-      )}
-
-      {/* 模型配置区域 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Chat API 主模型 */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-blue-500" />
-              Chat API 主模型
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">用于 /api/chat 接口的主要对话模型</p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Select value={chatModel} onValueChange={setChatModel}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {getChatModels().map(modelId => {
-                  const model = MODEL_DICTIONARY[modelId];
-                  if (!model) {
-                    console.warn(`[AGENT CONFIG] 跳过无效模型: ${modelId}`);
-                    return null;
-                  }
-                  return (
-                    <SelectItem key={modelId} value={modelId}>
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium">{model.name}</span>
-                        <span className="text-xs text-muted-foreground">{model.description}</span>
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-            <Badge variant="outline" className="text-xs">
-              当前: {getModelName(chatModel)}
-            </Badge>
-          </CardContent>
-        </Card>
-
-        {/* 消息分类模型 */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-green-500" />
-              消息分类模型
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">用于分析用户消息意图的模型</p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Select value={classifyModel} onValueChange={setClassifyModel}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {getGeneralModels().map(modelId => {
-                  const model = MODEL_DICTIONARY[modelId];
-                  if (!model) {
-                    console.warn(`[AGENT CONFIG] 跳过无效模型: ${modelId}`);
-                    return null;
-                  }
-                  return (
-                    <SelectItem key={modelId} value={modelId}>
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium">{model.name}</span>
-                        <span className="text-xs text-muted-foreground">{model.description}</span>
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-            <Badge variant="outline" className="text-xs">
-              当前: {getModelName(classifyModel)}
-            </Badge>
-          </CardContent>
-        </Card>
-
-        {/* 智能回复模型 */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2">
-              <Bot className="h-5 w-5 text-purple-500" />
-              智能回复模型
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">用于生成最终回复内容的模型</p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Select value={replyModel} onValueChange={setReplyModel}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {getGeneralModels().map(modelId => {
-                  const model = MODEL_DICTIONARY[modelId];
-                  if (!model) {
-                    console.warn(`[AGENT CONFIG] 跳过无效模型: ${modelId}`);
-                    return null;
-                  }
-                  return (
-                    <SelectItem key={modelId} value={modelId}>
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium">{model.name}</span>
-                        <span className="text-xs text-muted-foreground">{model.description}</span>
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-            <Badge variant="outline" className="text-xs">
-              当前: {getModelName(replyModel)}
-            </Badge>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Separator />
-
-      {/* Provider配置区域 */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Globe className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-semibold">服务提供商配置</h2>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {Object.entries(tempProviderConfigs).map(([provider, config]) => (
-            <Card key={provider}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="capitalize">{config.name}</CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleResetProvider(provider)}
-                    className="gap-1"
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                    重置
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">{config.description}</p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor={`${provider}-baseurl`}>Base URL</Label>
-                  <Input
-                    id={`${provider}-baseurl`}
-                    value={config.baseURL}
-                    onChange={e => updateTempConfig(provider, "baseURL", e.target.value)}
-                    placeholder="https://api.example.com/v1"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={`${provider}-desc`}>描述</Label>
-                  <Input
-                    id={`${provider}-desc`}
-                    value={config.description}
-                    onChange={e => updateTempConfig(provider, "description", e.target.value)}
-                    placeholder="服务描述"
-                  />
-                </div>
-
-                {/* 显示当前使用此Provider的模型 */}
-                <div className="pt-2">
-                  <Label className="text-xs text-muted-foreground">使用此Provider的模型:</Label>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {Object.entries(MODEL_DICTIONARY)
-                      .filter(([, model]) => model.provider === provider)
-                      .map(([modelId, model]) => (
-                        <Badge key={modelId} variant="secondary" className="text-xs">
-                          {model.name}
-                        </Badge>
-                      ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* 配置状态信息 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>当前配置状态</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Chat模型</Label>
-              <p className="font-medium">{getModelName(chatModel)}</p>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">分类模型</Label>
-              <p className="font-medium">{getModelName(classifyModel)}</p>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">回复模型</Label>
-              <p className="font-medium">{getModelName(replyModel)}</p>
-            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        {hasUnsavedChanges && (
+          <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <span className="text-sm text-amber-800">有未保存的Provider配置更改</span>
+          </div>
+        )}
+
+        {/* 模型配置区域 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Chat API 主模型 */}
+          <Card className="glass-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-blue-500" />
+                Chat API 主模型
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">用于 /api/chat 接口的主要对话模型</p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Select value={chatModel} onValueChange={setChatModel}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {getChatModels().map(modelId => {
+                    const model = MODEL_DICTIONARY[modelId];
+                    if (!model) {
+                      console.warn(`[AGENT CONFIG] 跳过无效模型: ${modelId}`);
+                      return null;
+                    }
+                    return (
+                      <SelectItem key={modelId} value={modelId}>
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">{model.name}</span>
+                          <span className="text-xs text-muted-foreground">{model.description}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <Badge variant="outline" className="text-xs">
+                当前: {getModelName(chatModel)}
+              </Badge>
+            </CardContent>
+          </Card>
+
+          {/* 消息分类模型 */}
+          <Card className="glass-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-green-500" />
+                消息分类模型
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">用于分析用户消息意图的模型</p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Select value={classifyModel} onValueChange={setClassifyModel}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {getGeneralModels().map(modelId => {
+                    const model = MODEL_DICTIONARY[modelId];
+                    if (!model) {
+                      console.warn(`[AGENT CONFIG] 跳过无效模型: ${modelId}`);
+                      return null;
+                    }
+                    return (
+                      <SelectItem key={modelId} value={modelId}>
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">{model.name}</span>
+                          <span className="text-xs text-muted-foreground">{model.description}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <Badge variant="outline" className="text-xs">
+                当前: {getModelName(classifyModel)}
+              </Badge>
+            </CardContent>
+          </Card>
+
+          {/* 智能回复模型 */}
+          <Card className="glass-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5 text-purple-500" />
+                智能回复模型
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">用于生成最终回复内容的模型</p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Select value={replyModel} onValueChange={setReplyModel}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {getGeneralModels().map(modelId => {
+                    const model = MODEL_DICTIONARY[modelId];
+                    if (!model) {
+                      console.warn(`[AGENT CONFIG] 跳过无效模型: ${modelId}`);
+                      return null;
+                    }
+                    return (
+                      <SelectItem key={modelId} value={modelId}>
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">{model.name}</span>
+                          <span className="text-xs text-muted-foreground">{model.description}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              <Badge variant="outline" className="text-xs">
+                当前: {getModelName(replyModel)}
+              </Badge>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Separator />
+
+        {/* Provider配置区域 */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Globe className="h-6 w-6 text-primary" />
+            <h2 className="text-2xl font-semibold">服务提供商配置</h2>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {Object.entries(tempProviderConfigs).map(([provider, config]) => (
+              <Card key={provider} className="glass-card">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="capitalize">{config.name}</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleResetProvider(provider)}
+                      className="gap-1"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      重置
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{config.description}</p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor={`${provider}-baseurl`}>Base URL</Label>
+                    <Input
+                      id={`${provider}-baseurl`}
+                      value={config.baseURL}
+                      onChange={e => updateTempConfig(provider, "baseURL", e.target.value)}
+                      placeholder="https://api.example.com/v1"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`${provider}-desc`}>描述</Label>
+                    <Input
+                      id={`${provider}-desc`}
+                      value={config.description}
+                      onChange={e => updateTempConfig(provider, "description", e.target.value)}
+                      placeholder="服务描述"
+                    />
+                  </div>
+
+                  {/* 显示当前使用此Provider的模型 */}
+                  <div className="pt-2">
+                    <Label className="text-xs text-muted-foreground">使用此Provider的模型:</Label>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {Object.entries(MODEL_DICTIONARY)
+                        .filter(([, model]) => model.provider === provider)
+                        .map(([modelId, model]) => (
+                          <Badge key={modelId} variant="secondary" className="text-xs">
+                            {model.name}
+                          </Badge>
+                        ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* 配置状态信息 */}
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle>当前配置状态</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Chat模型</Label>
+                <p className="font-medium">{getModelName(chatModel)}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">分类模型</Label>
+                <p className="font-medium">{getModelName(classifyModel)}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">回复模型</Label>
+                <p className="font-medium">{getModelName(replyModel)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

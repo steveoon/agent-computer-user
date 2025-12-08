@@ -11,7 +11,6 @@ import {
   MessageSquare,
   Cpu,
   RefreshCw,
-  ArrowLeft,
   Download,
   Upload,
   RotateCcw,
@@ -21,6 +20,7 @@ import { PromptsEditor } from "@/components/admin/prompts-editor";
 import { SystemPromptsEditor } from "@/components/admin/system-prompts-editor";
 import { GeneralConfigManager } from "@/components/admin/general-config-manager";
 import { BrandTable } from "@/components/admin/brand-management";
+import { BackButton } from "@/components/ui/back-button";
 import { useConfigManager } from "@/hooks/useConfigManager";
 import { useRouter } from "next/navigation";
 
@@ -97,15 +97,7 @@ export default function AdminSettingsPage() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             {/* 返回按钮 */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.push("/")}
-              className="rounded-full bg-white/40 hover:bg-white/60 backdrop-blur-sm shadow-sm"
-              title="返回首页"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            <BackButton href="/" title="返回首页" />
 
             <div>
               <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">

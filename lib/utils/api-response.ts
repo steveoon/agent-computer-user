@@ -5,6 +5,14 @@
 
 import { NextResponse } from "next/server";
 import type { APISuccessResponse, APIErrorResponse } from "@/types/api";
+import {
+  wrapError,
+  extractErrorContext,
+  logError,
+  ErrorCode,
+  ErrorCategory,
+  type AppError,
+} from "@/lib/errors";
 
 /**
  * 生成关联 ID
@@ -154,18 +162,61 @@ export function createSuccessResponse<T>(
 }
 
 /**
+ * ErrorCategory 到 ApiErrorType 的映射
+ */
+const ERROR_CATEGORY_TO_API_TYPE: Record<ErrorCategory, ApiErrorType> = {
+  [ErrorCategory.LLM]: ApiErrorType.BadGateway, // LLM 服务错误
+  [ErrorCategory.CONFIG]: ApiErrorType.InternalServerError, // 配置错误
+  [ErrorCategory.AUTH]: ApiErrorType.Unauthorized, // 认证错误
+  [ErrorCategory.NETWORK]: ApiErrorType.GatewayTimeout, // 网络错误
+  [ErrorCategory.VALIDATION]: ApiErrorType.BadRequest, // 验证错误
+  [ErrorCategory.BUSINESS]: ApiErrorType.UnprocessableEntity, // 业务错误
+  [ErrorCategory.SYSTEM]: ApiErrorType.InternalServerError, // 系统错误
+};
+
+/**
+ * 特定错误代码到 ApiErrorType 的覆盖映射（优先级高于分类映射）
+ */
+const ERROR_CODE_OVERRIDES: Partial<Record<ErrorCode, ApiErrorType>> = {
+  [ErrorCode.LLM_UNAUTHORIZED]: ApiErrorType.Unauthorized,
+  [ErrorCode.LLM_RATE_LIMITED]: ApiErrorType.TooManyRequests,
+  [ErrorCode.LLM_TIMEOUT]: ApiErrorType.GatewayTimeout,
+  [ErrorCode.AUTH_FORBIDDEN]: ApiErrorType.Forbidden,
+  [ErrorCode.AUTH_TOKEN_EXPIRED]: ApiErrorType.Unauthorized,
+  [ErrorCode.BUSINESS_RESOURCE_NOT_FOUND]: ApiErrorType.NotFound,
+};
+
+/**
+ * 从 AppError 获取对应的 ApiErrorType
+ */
+function getApiErrorType(appError: AppError): ApiErrorType {
+  // 优先使用特定错误代码的覆盖映射
+  const codeOverride = ERROR_CODE_OVERRIDES[appError.code];
+  if (codeOverride) {
+    return codeOverride;
+  }
+  // 回退到分类映射
+  return ERROR_CATEGORY_TO_API_TYPE[appError.category];
+}
+
+/**
  * 处理未知错误并返回标准化响应
+ * 使用结构化错误系统自动识别错误类型
  */
 export function handleUnknownError(
   error: unknown,
-  correlationId?: string
+  correlationId?: string,
+  fallbackCode: ErrorCode = ErrorCode.SYSTEM_INTERNAL
 ): NextResponse {
-  const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-  const errorDetails = error instanceof Error ? error.stack : error;
+  const appError = wrapError(error, fallbackCode);
+  const apiErrorType = getApiErrorType(appError);
 
-  return createErrorResponse(ApiErrorType.InternalServerError, {
-    message: errorMessage,
-    details: errorDetails,
+  // 记录完整错误链
+  logError(`API Error [${correlationId}]`, appError);
+
+  return createErrorResponse(apiErrorType, {
+    message: appError.userMessage,
+    details: extractErrorContext(appError),
     correlationId,
   });
 }
