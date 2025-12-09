@@ -324,7 +324,14 @@ export async function POST(req: Request) {
           providerOptions: {
             anthropic: { cacheControl: { type: "ephemeral" } },
           },
+          // 🎯 传递中止信号，支持客户端停止生成
+          abortSignal: req.signal,
           stopWhen: stepCountIs(maxSteps || 30),
+          onAbort: async ({ steps }) => {
+            console.log(`⏹️ Stream被客户端中止 | 已完成步数: ${steps.length}`);
+            // 清理沙箱资源
+            await cleanupSandboxIfNeeded(sandboxId, new Error("User aborted"), "Stream aborted");
+          },
           onStepFinish: async ({ finishReason, usage, toolCalls }) => {
             const toolInfo = toolCalls?.length
               ? ` | tools: [${toolCalls.map(t => t.toolName).join(", ")}]`
@@ -334,9 +341,17 @@ export async function POST(req: Request) {
             );
           },
           onFinish: async ({ usage, finishReason, steps }) => {
-            console.log(
-              `\n🏁 Stream完成 | 原因: ${finishReason} | 总步数: ${steps.length} | 总tokens: ${usage?.totalTokens || 0}`
-            );
+            // 区分正常完成和被中止（中止时 finishReason 为 unknown 或 other）
+            const isAborted = finishReason === "unknown" || finishReason === "other";
+            if (isAborted) {
+              console.log(
+                `\n⏹️ Stream被中止 | 原因: ${finishReason} | 总步数: ${steps.length} | 总tokens: ${usage?.totalTokens || 0}`
+              );
+            } else {
+              console.log(
+                `\n🏁 Stream完成 | 原因: ${finishReason} | 总步数: ${steps.length} | 总tokens: ${usage?.totalTokens || 0}`
+              );
+            }
             // 打印每步摘要
             if (steps.length > 0) {
               console.log("📋 步骤摘要:");
