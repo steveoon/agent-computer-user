@@ -95,6 +95,14 @@ export const CHAT_DETAILS_SELECTORS = {
   candidateName: ".name-box, .geek-name, .base-name",
   candidateInfoItem: ".geek-info-item, .base-info-item, .base-info-single-detial > div",
   candidateTag: ".geek-tag, .high-light-boss",
+  // 沟通职位（待招岗位）- "沟通职位：肯德基-兼职-全市可安排"
+  communicationPosition: ".position-name",
+  communicationPositionAlt: ".position-item:not(.expect) .value.high-light-boss",
+  // 候选人期望信息（来自"最近关注"）- "上海 · 服务员 3-8K"
+  candidateExpectContainer: ".position-item.expect",
+  candidateExpectValue: ".position-item.expect .value.job",
+  candidateExpectSalary: ".position-item.expect .high-light-orange",
+  // Legacy selectors for backward compatibility
   candidatePosition: ".geek-position, .position-name",
   candidatePositionAlt: ".position-content .value, .position-item .value",
 

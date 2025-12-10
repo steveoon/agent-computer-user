@@ -74,36 +74,73 @@ export const zhipinGetChatDetailsTool = () =>
             // 提取候选人姓名
             const nameElement = candidateInfoElement.querySelector('${CHAT_DETAILS_SELECTORS.candidateName}');
             const name = nameElement ? nameElement.textContent.trim() : '';
-            
+
             // 提取年龄、经验等信息
             const infoElements = candidateInfoElement.querySelectorAll('${CHAT_DETAILS_SELECTORS.candidateInfoItem}, ${CHAT_DETAILS_SELECTORS.candidateTag}');
             const infoTexts = Array.from(infoElements).map(el => el.textContent.trim()).filter(text => text);
-            
-            // 提取职位信息
-            const positionElement = candidateInfoElement.querySelector('${CHAT_DETAILS_SELECTORS.candidatePosition}, ${CHAT_DETAILS_SELECTORS.candidatePositionAlt}');
-            const position = positionElement ? positionElement.textContent.trim() : '';
-            
+
+            // 提取沟通职位（待招岗位）- "肯德基-兼职-全市可安排"
+            const communicationPositionElement = candidateInfoElement.querySelector('${CHAT_DETAILS_SELECTORS.communicationPosition}, ${CHAT_DETAILS_SELECTORS.communicationPositionAlt}');
+            let communicationPosition = '';
+            if (communicationPositionElement) {
+              // 克隆元素并移除隐藏的子元素（如 tooltip "更换职位"）
+              const clone = communicationPositionElement.cloneNode(true);
+              const hiddenElements = clone.querySelectorAll('[style*="display: none"], [style*="display:none"], .popover-wrap, .tooltip-job');
+              hiddenElements.forEach(el => el.remove());
+              communicationPosition = clone.textContent.trim();
+            }
+
+            // 提取候选人期望信息（从"最近关注"）- "上海 · 服务员 3-8K"
+            const expectValueElement = candidateInfoElement.querySelector('${CHAT_DETAILS_SELECTORS.candidateExpectValue}');
+            const expectSalaryElement = candidateInfoElement.querySelector('${CHAT_DETAILS_SELECTORS.candidateExpectSalary}');
+
+            let candidatePosition = '';
+            let expectedLocation = '';
+            let expectedSalary = '';
+
+            if (expectValueElement) {
+              // 获取完整文本（包含薪资）
+              const expectFullText = expectValueElement.textContent.trim();
+              // 获取薪资
+              expectedSalary = expectSalaryElement ? expectSalaryElement.textContent.trim() : '';
+
+              // 解析"上海 · 服务员"格式 - 移除薪资部分
+              const expectTextWithoutSalary = expectFullText.replace(expectedSalary, '').trim();
+              const expectParts = expectTextWithoutSalary.split(/[·・]/);
+
+              if (expectParts.length >= 2) {
+                expectedLocation = expectParts[0].trim();
+                candidatePosition = expectParts[1].trim();
+              } else if (expectParts.length === 1) {
+                // 可能只有职位没有城市
+                candidatePosition = expectParts[0].trim();
+              }
+            }
+
             // 尝试从完整文本中提取更多信息
             const fullText = candidateInfoElement.textContent.trim();
-            
+
             // 解析年龄
             const ageMatch = fullText.match(/(\\d{2,3})岁/);
-            const age = ageMatch ? ageMatch[1] : '';
-            
+            const age = ageMatch ? ageMatch[1] + '岁' : '';
+
             // 解析经验
             const experienceMatch = fullText.match(/(\\d+年|\\d+年以上|应届生|在校生)/);
             const experience = experienceMatch ? experienceMatch[1] : '';
-            
+
             // 解析学历
             const educationMatch = fullText.match(/(初中|高中|中专|大专|本科|硕士|博士|初中及以下|高中及以下)/);
             const education = educationMatch ? educationMatch[1] : '';
-            
+
             candidateInfo = {
               name: name || '未知',
-              position: position,
+              position: candidatePosition, // 候选人期望职位（如"服务员"）
+              communicationPosition: communicationPosition, // 沟通职位/待招岗位（如"肯德基-兼职-全市可安排"）
               age: age,
               experience: experience,
               education: education,
+              expectedLocation: expectedLocation, // 期望城市（如"上海"）
+              expectedSalary: expectedSalary, // 期望薪资（如"3-8K"）
               info: infoTexts,
               fullText: fullText
             };
@@ -326,8 +363,16 @@ export const zhipinGetChatDetailsTool = () =>
                   message: "成功获取聊天详情",
                   data: parsedResult,
                   summary: {
+                    // 候选人基本信息
                     candidateName: parsedResult.candidateInfo?.name || "未知",
-                    candidatePosition: parsedResult.candidateInfo?.position || "未知职位",
+                    candidatePosition: parsedResult.candidateInfo?.position || "", // 候选人期望职位（如"服务员"）
+                    candidateAge: parsedResult.candidateInfo?.age || "", // 候选人年龄（如"37岁"）
+                    candidateEducation: parsedResult.candidateInfo?.education || "", // 学历（如"硕士"）
+                    candidateExpectedSalary: parsedResult.candidateInfo?.expectedSalary || "", // 期望薪资（如"3-8K"）
+                    candidateExpectedLocation: parsedResult.candidateInfo?.expectedLocation || "", // 期望城市（如"上海"）
+                    // 沟通职位（待招岗位）
+                    communicationPosition: parsedResult.candidateInfo?.communicationPosition || "", // 如"肯德基-兼职-全市可安排"
+                    // 聊天统计
                     totalMessages: parsedResult.stats?.totalMessages || 0,
                     lastMessageTime:
                       parsedResult.chatMessages?.[parsedResult.chatMessages.length - 1]?.time ||

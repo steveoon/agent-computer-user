@@ -29,8 +29,9 @@ import {
   type DrizzleSelectEvent,
 } from "./repository";
 import type { RecruitmentContext } from "./types";
+import type { RecruitmentEventTypeValue } from "@/db/types";
 
-const LOG_PREFIX = "[RecruitmentEventService]";
+const LOG_PREFIX = "[RecruitmentEvent][Service]";
 
 class RecruitmentEventService {
   /**
@@ -153,6 +154,33 @@ class RecruitmentEventService {
     limit?: number
   ): Promise<DrizzleSelectEvent[]> {
     return recruitmentEventsRepository.findByCandidateKey(candidateKey, limit);
+  }
+
+  /**
+   * Get the next message sequence number for a session
+   *
+   * Uses SQL aggregation for efficiency instead of fetching all events.
+   *
+   * @param sessionId - Session ID to query
+   * @returns Next sequence number (1-based)
+   */
+  async getNextMessageSequence(sessionId: string): Promise<number> {
+    const maxSeq = await recruitmentEventsRepository.getMaxMessageSequence(sessionId);
+    return maxSeq + 1;
+  }
+
+  /**
+   * Check if a specific event type exists for a session
+   *
+   * Used to avoid duplicate event recording (e.g., wechat_exchanged)
+   *
+   * @param sessionId - Session ID to query
+   * @param eventType - Event type to check
+   * @returns True if at least one event of this type exists
+   */
+  async hasEventForSession(sessionId: string, eventType: RecruitmentEventTypeValue): Promise<boolean> {
+    const events = await recruitmentEventsRepository.findBySessionAndType(sessionId, eventType);
+    return events.length > 0;
   }
 }
 

@@ -253,6 +253,7 @@ export type DataSourceValue = (typeof DataSource)[keyof typeof DataSource];
 export const SourcePlatform = {
   ZHIPIN: "zhipin",
   YUPAO: "yupao",
+  DULIDAY: "duliday",
 } as const;
 
 export type SourcePlatformValue = (typeof SourcePlatform)[keyof typeof SourcePlatform];

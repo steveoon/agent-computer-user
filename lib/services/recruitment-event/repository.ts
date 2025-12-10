@@ -5,9 +5,10 @@
  * Uses Drizzle ORM with PostgreSQL.
  */
 
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { recruitmentEvents } from "@/db/schema";
+import type { RecruitmentEventTypeValue } from "@/db/types";
 
 /**
  * Use Drizzle's native type inference for database operations
@@ -16,7 +17,7 @@ import { recruitmentEvents } from "@/db/schema";
 export type DrizzleInsertEvent = typeof recruitmentEvents.$inferInsert;
 export type DrizzleSelectEvent = typeof recruitmentEvents.$inferSelect;
 
-const LOG_PREFIX = "[RecruitmentEventsRepository]";
+const LOG_PREFIX = "[RecruitmentEvent][Repository]";
 
 /** Maximum retry attempts for database operations */
 const MAX_RETRIES = 2;
@@ -164,6 +165,54 @@ class RecruitmentEventsRepository {
     }, "findByCandidateKey");
 
     return result ?? [];
+  }
+
+  /**
+   * Find events by session ID and event type
+   *
+   * @param sessionId - The session ID to filter by
+   * @param eventType - The event type to filter by
+   * @returns Array of matching events
+   */
+  async findBySessionAndType(
+    sessionId: string,
+    eventType: RecruitmentEventTypeValue
+  ): Promise<DrizzleSelectEvent[]> {
+    const result = await withRetry(async () => {
+      const db = getDb();
+      return db
+        .select()
+        .from(recruitmentEvents)
+        .where(
+          and(
+            eq(recruitmentEvents.sessionId, sessionId),
+            eq(recruitmentEvents.eventType, eventType)
+          )
+        )
+        .orderBy(desc(recruitmentEvents.eventTime));
+    }, "findBySessionAndType");
+
+    return result ?? [];
+  }
+
+  /**
+   * Get the maximum message_sequence for a session using SQL aggregation
+   *
+   * More efficient than fetching all events and iterating in memory.
+   *
+   * @param sessionId - The session ID to query
+   * @returns Maximum message_sequence value, or 0 if no events exist
+   */
+  async getMaxMessageSequence(sessionId: string): Promise<number> {
+    const result = await withRetry(async () => {
+      const db = getDb();
+      return db
+        .select({ maxSeq: sql<number>`COALESCE(MAX(${recruitmentEvents.messageSequence}), 0)` })
+        .from(recruitmentEvents)
+        .where(eq(recruitmentEvents.sessionId, sessionId));
+    }, "getMaxMessageSequence");
+
+    return result?.[0]?.maxSeq ?? 0;
   }
 }
 

@@ -407,10 +407,15 @@ export const yupaoChatDetailsTool = () =>
           }
           
           // 组装候选人信息
-          // 2025-12-05: 优先使用沟通职位，其次期望职位，最后岗位信息
+          // 2025-12-09: 分离候选人期望职位和沟通职位
+          // 2025-12-10: 修复 position 优先级，期望职位 > 沟通职位
           candidateInfo = {
             name: candidateName,
-            position: communicationPosition || expectedPositionFromRow || expectedPosition || jobInfo.jobPosition || '',
+            // position 保持兼容性（用于 candidate_key 生成等）
+            // 优先使用候选人期望职位，而不是沟通职位（岗位名称）
+            position: expectedPositionFromRow || expectedPosition || communicationPosition || jobInfo.jobPosition || '',
+            // 🆕 候选人期望职位（区别于沟通职位）
+            expectedPosition: expectedPositionFromRow || expectedPosition || '',
             age: age,
             gender: gender,
             experience: candidateExperience,  // 使用候选人的实际经验
@@ -425,7 +430,7 @@ export const yupaoChatDetailsTool = () =>
             activeTime: activeTime,
             info: additionalInfo,
             fullText: jobInfo.jobDescription || '',
-            // 2025-12-05: 新增沟通职位字段
+            // 沟通职位（待招岗位）
             communicationPosition: communicationPosition
           };
           
@@ -692,7 +697,8 @@ export const yupaoChatDetailsTool = () =>
                   data: parsedResult,
                   summary: {
                     candidateName: parsedResult.candidateInfo?.name || "未知",
-                    candidatePosition: parsedResult.candidateInfo?.position || "未知职位",
+                    // 2025-12-09: candidatePosition 改为候选人期望职位，而不是沟通职位
+                    candidatePosition: parsedResult.candidateInfo?.expectedPosition || parsedResult.candidateInfo?.position || "未知职位",
                     candidateGender: parsedResult.candidateInfo?.gender || "",
                     candidateAge: parsedResult.candidateInfo?.age || "",
                     // 2025-12-05: 新增学历字段
@@ -701,7 +707,7 @@ export const yupaoChatDetailsTool = () =>
                     candidateExpectedLocation: parsedResult.candidateInfo?.expectedLocation || "",
                     // 🆕 岗位地址（从岗位信息卡片提取，如"上海 徐汇区 龙华"）
                     jobAddress: parsedResult.candidateInfo?.jobAddress || "",
-                    // 2025-12-05: 新增沟通职位字段
+                    // 沟通职位（待招岗位，如"肯德基-长期兼职服务员"）
                     communicationPosition: parsedResult.candidateInfo?.communicationPosition || "",
                     totalMessages: parsedResult.stats?.totalMessages || 0,
                     lastMessageTime:

@@ -8,31 +8,9 @@ import {
   clickWithMouseTrajectory,
 } from "../zhipin/anti-detection-utils";
 import { createDynamicClassSelector } from "./dynamic-selector-utils";
+import { parseEvaluateResult } from "../shared/puppeteer-utils";
 import { SourcePlatform } from "@/db/types";
-import { recruitmentEventService, recruitmentContext } from "@/lib/services/recruitment-event";
-
-/**
- * 解析 puppeteer_evaluate 的结果
- */
-function parseEvaluateResult(result: unknown): Record<string, unknown> | null {
-  try {
-    const mcpResult = result as { content?: Array<{ text?: string }> };
-    if (mcpResult?.content?.[0]?.text) {
-      const resultText = mcpResult.content[0].text;
-      const executionMatch = resultText.match(
-        /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
-      );
-
-      if (executionMatch && executionMatch[1].trim() !== "undefined") {
-        const jsonResult = executionMatch[1].trim();
-        return JSON.parse(jsonResult) as Record<string, unknown>;
-      }
-    }
-  } catch (e) {
-    console.error("Failed to parse evaluate result:", e);
-  }
-  return null;
-}
+import { recordWechatExchangedEvent } from "@/lib/services/recruitment-event";
 
 /**
  * Yupao交换微信工具
@@ -45,16 +23,25 @@ function parseEvaluateResult(result: unknown): Record<string, unknown> | null {
 export const yupaoExchangeWechatTool = () =>
   tool({
     description: `Yupao交换微信功能
-    
+
     功能：
     - 自动点击"换微信"按钮
     - 在确认对话框中点击"确定"按钮
     - 完成微信号交换流程
-    
+
     注意：
     - 需要先打开候选人聊天窗口
     - 需要确保当前聊天对象支持交换微信
-    - 操作有先后顺序，会自动等待弹窗出现`,
+    - 操作有先后顺序，会自动等待弹窗出现
+
+    重要：交换微信时请传入候选人信息用于数据统计，这些信息来自 yupao_get_chat_details 工具返回的 summary 对象：
+    - candidateName: summary.candidateName
+    - candidatePosition: summary.candidatePosition（候选人期望职位）
+    - candidateAge: summary.candidateAge（如"21岁"）
+    - candidateEducation: summary.candidateEducation（如"本科"）
+    - candidateExpectedSalary: summary.candidateExpectedSalary（如"3000-4000元"）
+    - candidateExpectedLocation: summary.candidateExpectedLocation（如"大连"）
+    - jobName: summary.communicationPosition（沟通职位/待招岗位）`,
 
     inputSchema: z.object({
       waitBetweenClicksMin: z
@@ -77,9 +64,15 @@ export const yupaoExchangeWechatTool = () =>
         .optional()
         .default(1500)
         .describe("交换完成后的最大等待时间（毫秒）"),
-      // 埋点上下文（可选）
-      candidateName: z.string().optional().describe("候选人姓名，用于埋点统计"),
-      candidatePosition: z.string().optional().describe("候选人应聘职位，用于埋点统计"),
+      // 埋点上下文 - 来自 yupao_get_chat_details 返回的 summary 对象
+      candidateName: z.string().optional().describe("候选人姓名，来自 summary.candidateName"),
+      candidatePosition: z.string().optional().describe("候选人期望职位，来自 summary.candidatePosition"),
+      candidateAge: z.string().optional().describe("候选人年龄，来自 summary.candidateAge（如'21岁'）"),
+      candidateEducation: z.string().optional().describe("候选人学历，来自 summary.candidateEducation（如'本科'）"),
+      candidateExpectedSalary: z.string().optional().describe("候选人期望薪资，来自 summary.candidateExpectedSalary（如'3000-4000元'）"),
+      candidateExpectedLocation: z.string().optional().describe("候选人期望地点，来自 summary.candidateExpectedLocation（如'大连'）"),
+      jobId: z.number().optional().describe("岗位ID"),
+      jobName: z.string().optional().describe("沟通职位/待招岗位名称，来自 summary.communicationPosition"),
     }),
 
     execute: async ({
@@ -89,6 +82,12 @@ export const yupaoExchangeWechatTool = () =>
       waitAfterExchangeMax = 1500,
       candidateName,
       candidatePosition,
+      candidateAge,
+      candidateEducation,
+      candidateExpectedSalary,
+      candidateExpectedLocation,
+      jobId,
+      jobName,
     }) => {
       try {
         const client = await getPuppeteerMCPClient();
@@ -515,24 +514,98 @@ export const yupaoExchangeWechatTool = () =>
         // 等待交换完成
         await randomDelay(waitAfterExchangeMin, waitAfterExchangeMax);
 
+        // 尝试提取交换后的微信号
+        let wechatNumber: string | undefined;
+        try {
+          // Yupao DOM 结构 (参考 get-chat-details.tool.ts):
+          // - 容器: .view-phone-box
+          // - 微信图标: .yp-weixinlogo 或 .yp-pc.yp-weixinlogo
+          // - 微信号文本: .view-phone-box .text
+          const extractWechatScript = wrapAntiDetectionScript(`
+            // 选择器列表（按优先级）
+            const containerSelectors = ['.view-phone-box', 'div[class*="view-phone-box"]'];
+            const wechatIconSelectors = ['.yp-weixinlogo', '.yp-pc.yp-weixinlogo', 'i[class*="yp-weixin"]'];
+            const phoneIconSelectors = ['.yp-shouji3', '.yp-pc.yp-shouji3', 'i[class*="yp-shouji"]'];
+            const textSelectors = ['.text', 'p[class*="text"]', 'span[class*="text"]'];
+
+            // 查找所有 view-phone-box 容器（从最新的开始）
+            for (const containerSel of containerSelectors) {
+              const boxes = document.querySelectorAll(containerSel);
+              for (const box of Array.from(boxes).reverse()) {
+                // 检查是否包含微信图标
+                let hasWechatIcon = false;
+                for (const iconSel of wechatIconSelectors) {
+                  if (box.querySelector(iconSel)) {
+                    hasWechatIcon = true;
+                    break;
+                  }
+                }
+
+                // 确保不是电话图标（排除电话交换的情况）
+                let hasPhoneIcon = false;
+                for (const iconSel of phoneIconSelectors) {
+                  if (box.querySelector(iconSel)) {
+                    hasPhoneIcon = true;
+                    break;
+                  }
+                }
+                if (!hasWechatIcon || hasPhoneIcon) continue;
+
+                // 查找微信号文本
+                for (const textSel of textSelectors) {
+                  const textEl = box.querySelector(textSel);
+                  if (textEl && textEl.textContent) {
+                    const wechat = textEl.textContent.trim();
+                    // 验证: 非空、长度合理 (5-30字符)、不是提示文本
+                    if (wechat &&
+                        wechat.length >= 5 &&
+                        wechat.length <= 30 &&
+                        !wechat.includes('点击') &&
+                        !wechat.includes('查看') &&
+                        !wechat.includes('交换') &&
+                        !wechat.includes('请求')) {
+                      return { wechatId: wechat };
+                    }
+                  }
+                }
+              }
+            }
+            return { wechatId: null };
+          `);
+
+          const wechatResult = await puppeteerEvaluate.execute({ script: extractWechatScript });
+          const wechatData = parseEvaluateResult(wechatResult);
+          if (wechatData?.wechatId && typeof wechatData.wechatId === "string") {
+            wechatNumber = wechatData.wechatId;
+          }
+        } catch {
+          // 静默处理错误，微信号提取失败不影响主流程
+        }
+
         // 📊 埋点：记录微信交换事件（fire-and-forget）
-        const ctx = recruitmentContext.getContext();
-        if (ctx && candidateName) {
-          // 覆盖 sourcePlatform 为 yupao
-          const yupaoCtx = { ...ctx, sourcePlatform: SourcePlatform.YUPAO };
-          const event = recruitmentEventService
-            .event(yupaoCtx)
-            .candidate({ name: candidateName, position: candidatePosition })
-            .wechatExchanged();
-          recruitmentEventService.recordAsync(event);
+        if (candidateName) {
+          recordWechatExchangedEvent({
+            platform: SourcePlatform.YUPAO,
+            candidate: {
+              name: candidateName,
+              position: candidatePosition,
+              age: candidateAge,
+              education: candidateEducation,
+              expectedSalary: candidateExpectedSalary,
+              expectedLocation: candidateExpectedLocation,
+            },
+            jobInfo: { jobId, jobName },
+            wechatNumber,
+          });
         }
 
         return {
           success: true,
-          message: "成功交换微信",
+          message: wechatNumber ? `成功交换微信: ${wechatNumber}` : "成功交换微信",
           details: {
             exchangeButtonSelector: (exchangeData.selector as string) || "unknown",
             confirmButtonSelector: (confirmData.selector as string) || "unknown",
+            wechatNumber: wechatNumber || undefined,
           },
         };
       } catch (error) {

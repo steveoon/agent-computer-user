@@ -20,6 +20,7 @@ import {
   generateCandidateKey,
   generateSessionId,
   type RecruitmentEventTypeValue,
+  type SourcePlatformValue,
   type EventDetails,
 } from "@/db/types";
 import { recruitmentContext } from "./context";
@@ -132,6 +133,25 @@ export class RecruitmentEventBuilder {
    */
   forBrand(brandId: number): this {
     this.data.brandId = brandId;
+    return this;
+  }
+
+  /**
+   * Override source platform (if different from context)
+   *
+   * Useful when the tool knows the specific platform (e.g., yupao, zhipin)
+   * but the context might have a default or different value.
+   *
+   * @param platform - Source platform identifier
+   * @returns this for chaining
+   *
+   * @example
+   * ```typescript
+   * builder.forPlatform(SourcePlatform.YUPAO).candidate({ name: "张三" });
+   * ```
+   */
+  forPlatform(platform: SourcePlatformValue): this {
+    this.data.sourcePlatform = platform;
     return this;
   }
 
@@ -252,8 +272,9 @@ export class RecruitmentEventBuilder {
     const eventTime = this.data.eventTime || new Date();
 
     // Generate candidateKey (convert null to undefined for brandId)
+    // Use this.data.sourcePlatform which may be overridden by forPlatform()
     const candidateKey = generateCandidateKey({
-      platform: this.context.sourcePlatform,
+      platform: this.data.sourcePlatform!,
       candidateName: this.data.candidateName || "unknown",
       candidatePosition: this.data.candidatePosition ?? undefined,
       brandId: this.data.brandId ?? undefined,

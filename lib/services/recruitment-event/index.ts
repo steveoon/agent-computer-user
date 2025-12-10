@@ -47,6 +47,25 @@ export {
 // Time parser utility
 export { parseMessageTime, formatDateForSession } from "./time-parser";
 
+// Brand lookup utility
+export { extractBrandIdFromJobName } from "./brand-lookup";
+
+// Candidate info parser utilities
+export { parseAge, parseSalary } from "./candidate-parser";
+
+// Tool helper functions for recording events
+export {
+  recordMessageSentEvent,
+  recordWechatExchangedEvent,
+  type RawCandidateInfo,
+  type JobInfo,
+  type RecordMessageSentParams,
+  type RecordWechatExchangedParams,
+} from "./tool-helpers";
+
+// Key generation utilities (for computing sessionId to get message sequence)
+export { generateCandidateKey, generateSessionId } from "@/db/types";
+
 // Step handlers for onStepFinish integration
 export {
   handleChatDetailsEvent,
