@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.19.1-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.19.0...v1.19.1-develop.1) (2025-12-09)
+
+
+### Bug Fixes
+
+* **chat:** add abortSignal to streamText for proper client-side stop support ([8c6aacb](https://github.com/steveoon/agent-computer-user/commit/8c6aacbabe693edb4117c1f5e4896ab25bc44539))
+
 # [1.19.0](https://github.com/steveoon/agent-computer-user/compare/v1.18.0...v1.19.0) (2025-12-08)
 
 
