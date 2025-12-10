@@ -60,7 +60,7 @@ const suggestions: PromptSuggestion[] = [
   {
     text: "预约面试",
     prompt: `帮我为求职者预约面试，以下是信息：
-姓名：李青，电话：13585516989，性别：男，年龄：39，
+姓名：李青，电话：13585516989，性别：男，年龄：39，学历：大专，健康证：有，
 门店：奥乐齐世茂店，岗位：兼职，面试时间：2025-07-22 13:00:00
 
 请按以下步骤操作：
@@ -73,6 +73,8 @@ const suggestions: PromptSuggestion[] = [
       { key: "电话", pattern: /电话：(\d+)/g },
       { key: "性别", pattern: /性别：([男女])/g },
       { key: "年龄", pattern: /年龄：(\d+)/g },
+      { key: "学历", pattern: /学历：([^，\n]+)/g },
+      { key: "健康证", pattern: /健康证：([有无])/g },
       { key: "门店", pattern: /门店：([^，\n]+)/g },
       { key: "岗位", pattern: /岗位：([^，\n]+)/g },
       { key: "面试时间", pattern: /面试时间：([\d\-\s:]+)/g },

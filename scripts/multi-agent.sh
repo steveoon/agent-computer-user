@@ -456,6 +456,7 @@ start_app() {
         export PORT=$app_port
         export HOSTNAME=0.0.0.0
         export CHROME_REMOTE_DEBUGGING_PORT=$chrome_port
+        export AGENT_ID=$agent_id
         exec node server.js
     " > "$LOGS_DIR/${agent_id}-app.log" 2>&1 &
     local app_pid=$!
