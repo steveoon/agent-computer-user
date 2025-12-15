@@ -30,7 +30,6 @@ import type {
   CandidateSnapshot,
   MessageSentOptions,
   InterviewBookingDetails,
-  MessageSenderType,
 } from "./types";
 
 export class RecruitmentEventBuilder {
@@ -174,24 +173,6 @@ export class RecruitmentEventBuilder {
   }
 
   /**
-   * Create a MESSAGE_RECEIVED event
-   *
-   * @param content - Message content
-   * @param senderType - Who sent the message
-   * @returns Complete event ready for insertion
-   */
-  messageReceived(content: string, senderType: MessageSenderType): DrizzleInsertEvent {
-    return this.finalize({
-      eventType: RecruitmentEventType.MESSAGE_RECEIVED,
-      eventDetails: {
-        type: "message_received",
-        content,
-        senderType,
-      },
-    });
-  }
-
-  /**
    * Create a WECHAT_EXCHANGED event
    *
    * @param wechatNumber - Optional WeChat number if captured
@@ -227,19 +208,39 @@ export class RecruitmentEventBuilder {
   }
 
   /**
-   * Create a CANDIDATE_CONTACTED event
+   * Create a MESSAGE_RECEIVED event (inbound: candidate → us)
    *
-   * @param unreadCount - Number of unread messages
-   * @param lastMessagePreview - Preview of last message
+   * Triggered when get_unread_candidates detects unread messages.
+   * Records the number of unread messages for Total Flow calculation.
+   *
+   * @param unreadCount - Number of unread messages detected
+   * @param lastMessagePreview - Preview of the last message
    * @returns Complete event ready for insertion
    */
-  candidateContacted(unreadCount: number, lastMessagePreview?: string): DrizzleInsertEvent {
+  messageReceived(unreadCount: number, lastMessagePreview?: string): DrizzleInsertEvent {
+    return this.finalize({
+      eventType: RecruitmentEventType.MESSAGE_RECEIVED,
+      eventDetails: {
+        type: "message_received",
+        unreadCount,
+        lastMessagePreview,
+      },
+    });
+  }
+
+  /**
+   * Create a CANDIDATE_CONTACTED event (proactive outbound: we → candidate via say_hello)
+   *
+   * Triggered when say_hello tool successfully sends initial greeting.
+   * Used for tracking proactive outreach separate from reply messages.
+   *
+   * @returns Complete event ready for insertion
+   */
+  candidateContacted(): DrizzleInsertEvent {
     return this.finalize({
       eventType: RecruitmentEventType.CANDIDATE_CONTACTED,
       eventDetails: {
         type: "candidate_contacted",
-        unreadCount,
-        lastMessagePreview,
       },
     });
   }
@@ -271,13 +272,12 @@ export class RecruitmentEventBuilder {
   }): DrizzleInsertEvent {
     const eventTime = this.data.eventTime || new Date();
 
-    // Generate candidateKey (convert null to undefined for brandId)
+    // Generate candidateKey
     // Use this.data.sourcePlatform which may be overridden by forPlatform()
     const candidateKey = generateCandidateKey({
       platform: this.data.sourcePlatform!,
       candidateName: this.data.candidateName || "unknown",
       candidatePosition: this.data.candidatePosition ?? undefined,
-      brandId: this.data.brandId ?? undefined,
     });
 
     // Generate sessionId

@@ -106,6 +106,14 @@ export const ErrorCode = {
   SYSTEM_RESOURCE_UNAVAILABLE: "SYSTEM_RESOURCE_UNAVAILABLE",
   /** 未知错误 */
   SYSTEM_UNKNOWN: "SYSTEM_UNKNOWN",
+
+  // ========== 统计聚合错误 ==========
+  /** 统计聚合失败 */
+  STATS_AGGREGATION_FAILED: "STATS_AGGREGATION_FAILED",
+  /** 统计查询失败 */
+  STATS_QUERY_FAILED: "STATS_QUERY_FAILED",
+  /** 调度器错误 */
+  STATS_SCHEDULER_ERROR: "STATS_SCHEDULER_ERROR",
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -157,6 +165,11 @@ export const ERROR_CODE_TO_CATEGORY: Record<ErrorCode, ErrorCategory> = {
   [ErrorCode.SYSTEM_DEPENDENCY_FAILED]: ErrorCategory.SYSTEM,
   [ErrorCode.SYSTEM_RESOURCE_UNAVAILABLE]: ErrorCategory.SYSTEM,
   [ErrorCode.SYSTEM_UNKNOWN]: ErrorCategory.SYSTEM,
+
+  // STATS
+  [ErrorCode.STATS_AGGREGATION_FAILED]: ErrorCategory.SYSTEM,
+  [ErrorCode.STATS_QUERY_FAILED]: ErrorCategory.SYSTEM,
+  [ErrorCode.STATS_SCHEDULER_ERROR]: ErrorCategory.SYSTEM,
 };
 
 /**
@@ -206,6 +219,11 @@ export const ERROR_USER_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.SYSTEM_DEPENDENCY_FAILED]: "依赖服务异常，请稍后重试",
   [ErrorCode.SYSTEM_RESOURCE_UNAVAILABLE]: "系统资源不可用，请稍后重试",
   [ErrorCode.SYSTEM_UNKNOWN]: "发生未知错误，请稍后重试",
+
+  // STATS
+  [ErrorCode.STATS_AGGREGATION_FAILED]: "统计数据聚合失败，请稍后重试",
+  [ErrorCode.STATS_QUERY_FAILED]: "统计数据查询失败，请稍后重试",
+  [ErrorCode.STATS_SCHEDULER_ERROR]: "统计调度器异常，请联系管理员",
 };
 
 /**

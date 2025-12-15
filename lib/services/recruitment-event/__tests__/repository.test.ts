@@ -31,6 +31,13 @@ vi.mock("@/db/schema", () => ({
   },
 }));
 
+// Mock @/lib/services/recruitment-stats to avoid dependency chain
+vi.mock("@/lib/services/recruitment-stats", () => ({
+  recruitmentStatsRepository: {
+    markDirty: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 describe("RecruitmentEventsRepository", () => {
   const mockEvent = {
     agentId: "test-agent",

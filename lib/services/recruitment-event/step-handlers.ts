@@ -85,13 +85,13 @@ interface ChatDetailsResult {
 
 /**
  * Unread candidates result type (simplified)
- * Compatible with both zhipin (preview) and yupao (lastMessage, position)
+ * Compatible with both zhipin (preview) and yupao (lastMessage)
  */
 interface UnreadCandidatesResult {
   success: boolean;
   candidates?: Array<{
     name?: string;
-    position?: string; // yupao only - used for jobName
+    position?: string; // 候选人期望职位 (zhipin: .source-job, yupao: position field)
     hasUnread?: boolean;
     unreadCount?: number;
     preview?: string; // zhipin
@@ -102,41 +102,26 @@ interface UnreadCandidatesResult {
 /**
  * Handle zhipin_get_chat_details tool result
  *
- * Records a candidate_contacted event with chat session stats.
- * Uses existing event type to avoid schema changes.
+ * @deprecated This function is no longer used in TOOL_HANDLERS.
+ * Chat details reading doesn't trigger any event in the new model.
+ * Events are only recorded when:
+ * - MESSAGE_RECEIVED: get_unread_candidates detects unread messages
+ * - CANDIDATE_CONTACTED: say_hello sends initial greeting
+ * - MESSAGE_SENT: send_message replies to candidate
+ * - WECHAT_EXCHANGED: WeChat exchange detected
  *
- * @param ctx - Recruitment context
- * @param result - Tool result
+ * Kept for backward compatibility but does nothing.
  */
-export function handleChatDetailsEvent(ctx: RecruitmentContext, result: unknown): void {
-  try {
-    const data = result as ChatDetailsResult;
-    if (!data?.success || !data?.data) return;
-
-    const { candidateInfo, stats } = data.data;
-    if (!candidateInfo?.name) return;
-
-    console.log(
-      `📊 [RecruitmentEvent][StepHandlers] Recording chat_details event: ${candidateInfo.name} (${ctx.sourcePlatform})`
-    );
-
-    // Record as candidate_contacted event with stats in details
-    const event = recruitmentEventService
-      .event(ctx)
-      .candidate({ name: candidateInfo.name, position: candidateInfo.position })
-      .candidateContacted(stats?.candidateMessages || 0, `聊天记录读取: 总消息${stats?.totalMessages || 0}条`);
-
-    recruitmentEventService.recordAsync(event);
-  } catch (error) {
-    // Silent fail - don't affect main flow
-    console.warn("[RecruitmentEvent][StepHandlers] handleChatDetailsEvent error:", error);
-  }
+export function handleChatDetailsEvent(_ctx: RecruitmentContext, _result: unknown): void {
+  // No-op: Chat details reading doesn't trigger events in the new model
+  // WeChat exchange detection is handled by handleChatDetailsWechatExchange
 }
 
 /**
  * Handle zhipin_get_unread_candidates_improved tool result
  *
- * Records candidate_contacted events for candidates with unread messages.
+ * Records MESSAGE_RECEIVED events for candidates with unread messages.
+ * This represents inbound events (candidate → us).
  * Includes deduplication to prevent duplicate events on browser reconnect.
  *
  * @param ctx - Recruitment context
@@ -157,26 +142,25 @@ export async function handleUnreadCandidatesEvent(
       `📊 [RecruitmentEvent][StepHandlers] Processing unread_candidates: ${unreadCandidates.length} candidates (${ctx.sourcePlatform})`
     );
 
-    // Record each candidate as a contacted event (with deduplication)
+    // Record each candidate as a message_received event (with deduplication)
     for (const candidate of unreadCandidates) {
       // Generate sessionId to check for existing events
       const candidateKey = generateCandidateKey({
         platform: ctx.sourcePlatform,
         candidateName: candidate.name!,
         candidatePosition: candidate.position,
-        brandId: undefined, // brandId not available at this stage
       });
       const sessionId = generateSessionId(ctx.agentId, candidateKey, new Date());
 
-      // Check if candidate_contacted event already exists for this session
+      // Check if message_received event already exists for this session
       const alreadyRecorded = await recruitmentEventService.hasEventForSession(
         sessionId,
-        RecruitmentEventType.CANDIDATE_CONTACTED
+        RecruitmentEventType.MESSAGE_RECEIVED
       );
 
       if (alreadyRecorded) {
         console.log(
-          `📊 [RecruitmentEvent][StepHandlers] Skipping duplicate candidate_contacted for: ${candidate.name} (session: ${sessionId})`
+          `📊 [RecruitmentEvent][StepHandlers] Skipping duplicate message_received for: ${candidate.name} (session: ${sessionId})`
         );
         continue;
       }
@@ -185,21 +169,22 @@ export async function handleUnreadCandidatesEvent(
       // yupao provides position, zhipin doesn't - use position as jobName when available
       const builder = recruitmentEventService
         .event(ctx)
-        .candidate({ name: candidate.name!, position: candidate.position });
+        .candidate({ name: candidate.name!, position: candidate.position })
+        .withUnreadContext(candidate.unreadCount || 0); // Set unread context for Total Flow
 
       // Set jobName from position if available (yupao only)
       if (candidate.position) {
         builder.forJob(0, candidate.position); // jobId=0 as placeholder, jobName from position
       }
 
-      const event = builder.candidateContacted(
+      const event = builder.messageReceived(
         candidate.unreadCount || 0,
         candidate.preview || candidate.lastMessage // zhipin uses preview, yupao uses lastMessage
       );
 
       recruitmentEventService.recordAsync(event);
       console.log(
-        `📊 [RecruitmentEvent][StepHandlers] Recorded candidate_contacted for: ${candidate.name}`
+        `📊 [RecruitmentEvent][StepHandlers] Recorded message_received for: ${candidate.name} (unread: ${candidate.unreadCount || 0})`
       );
     }
   } catch (error) {
@@ -242,12 +227,11 @@ export async function handleChatDetailsWechatExchange(
     const jobName = candidateInfo.communicationPosition;
     const brandId = await extractBrandIdFromJobName(jobName);
 
-    // Generate session ID to check for existing events (include brandId for consistency)
+    // Generate session ID to check for existing events
     const candidateKey = generateCandidateKey({
       platform: ctx.sourcePlatform,
       candidateName: candidateInfo.name,
       candidatePosition: candidateInfo.position,
-      brandId: brandId,
     });
     const sessionId = generateSessionId(ctx.agentId, candidateKey, new Date());
 

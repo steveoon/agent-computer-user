@@ -38,12 +38,11 @@ export const zhipinSendMessageTool = () =>
 
     2. 候选人信息（来自 zhipin_get_chat_details 的 summary）：
        - candidateName: summary.candidateName
-       - candidatePosition: summary.candidatePosition（候选人期望职位）
        - candidateAge: summary.candidateAge（如"21岁"）
        - candidateEducation: summary.candidateEducation（如"本科"）
        - candidateExpectedSalary: summary.candidateExpectedSalary（如"3000-4000元"）
        - candidateExpectedLocation: summary.candidateExpectedLocation（如"大连"）
-       - jobName: summary.communicationPosition（沟通职位/待招岗位）`,
+       - jobName: summary.communicationPosition（沟通职位/待招岗位，用于 candidate_key 生成）`,
 
     inputSchema: z.object({
       message: z.string().describe("要发送的消息内容"),
@@ -51,7 +50,6 @@ export const zhipinSendMessageTool = () =>
       waitAfterSend: z.number().optional().default(1000).describe("发送后等待时间（毫秒）"),
       // 埋点上下文 - 来自 zhipin_get_chat_details 返回的 summary 对象
       candidateName: z.string().optional().describe("候选人姓名，来自 summary.candidateName"),
-      candidatePosition: z.string().optional().describe("候选人期望职位，来自 summary.candidatePosition"),
       candidateAge: z.string().optional().describe("候选人年龄，来自 summary.candidateAge（如'21岁'）"),
       candidateEducation: z.string().optional().describe("候选人学历，来自 summary.candidateEducation（如'本科'）"),
       candidateExpectedSalary: z.string().optional().describe("候选人期望薪资，来自 summary.candidateExpectedSalary（如'3000-4000元'）"),
@@ -72,7 +70,6 @@ export const zhipinSendMessageTool = () =>
       clearBefore = true,
       waitAfterSend = 1000,
       candidateName,
-      candidatePosition,
       candidateAge,
       candidateEducation,
       candidateExpectedSalary,
@@ -247,12 +244,14 @@ export const zhipinSendMessageTool = () =>
           }
 
           // 埋点：记录消息发送事件（fire-and-forget）
+          // 注意：zhipin 使用沟通职位（jobName）作为 candidate.position 用于 candidate_key 生成
+          // 这与 yupao 不同，yupao 使用候选人期望职位
           if (candidateName) {
             recordMessageSentEvent({
               platform: SourcePlatform.ZHIPIN,
               candidate: {
                 name: candidateName,
-                position: candidatePosition,
+                position: jobName, // 使用沟通职位（communicationPosition）作为 candidate_key
                 age: candidateAge,
                 education: candidateEducation,
                 expectedSalary: candidateExpectedSalary,

@@ -37,24 +37,71 @@
 
 ---
 
+## 事件类型模型
+
+系统使用事件溯源模式记录招聘过程中的关键节点，事件存储在 `recruitment_events` 表中。
+
+### 核心事件类型
+
+| 事件类型 | 触发场景 | 语义 | `was_unread_before_reply` |
+|---------|---------|------|---------------------------|
+| `MESSAGE_RECEIVED` | `get_unread_candidates` 检测到未读消息 | **入站事件**：候选人 → 我们 | `true`（始终） |
+| `CANDIDATE_CONTACTED` | `say_hello` 主动打招呼成功 | **主动出站事件**：我们主动联系 → 候选人 | `false`（无先前未读） |
+| `MESSAGE_SENT` | `send_message` 回复候选人消息 | **回复出站事件**：我们 → 候选人 | `true`=立即回复，`false`=延迟回复 |
+| `WECHAT_EXCHANGED` | 检测到微信交换成功 | **转化事件**：微信获取 | - |
+| `INTERVIEW_BOOKED` | `duliday_interview_booking` 成功 | **转化事件**：面试预约 | - |
+
+### 事件流示例
+
+```
+T1: 候选人张三发送消息
+T2: get_unread_candidates 检测到 → 记录 MESSAGE_RECEIVED (unread_count=1, was_unread=true)
+T3: LLM 分析后决定跳过（无事件）
+T4: 用户手动回复 → 记录 MESSAGE_SENT (was_unread=false，因为 T2~T4 间隔过长)
+
+T5: say_hello 主动向李四打招呼 → 记录 CANDIDATE_CONTACTED (was_unread=false)
+T6: 李四回复
+T7: get_unread_candidates 检测到 → 记录 MESSAGE_RECEIVED
+T8: Agent 立即回复 → 记录 MESSAGE_SENT (was_unread=true，立即回复)
+```
+
+### 字段说明
+
+- **`unread_count_before_reply`**：`MESSAGE_RECEIVED` 事件中记录检测到的未读消息数量，用于计算 Total Flow
+- **`was_unread_before_reply`**：标识回复时是否为立即回复（`true`）还是延迟回复（`false`）
+- **`message_sequence`**：同一会话中的消息序号，用于追踪对话轮次
+
+---
+
 ## 指标定义、计算方法与逻辑依据
 
 ### 1) 入站与去重相关
 
 - 指标：Total Flow（当日总咨询事件数）
-  - 定义：统计窗口内，候选人发来的所有入站消息“事件数”（同一人多条消息均计入）。
-  - 计算：对每个会话统计 `sender === 'candidate'` 的消息条数 `m_i`，Total Flow = Σ m_i。
-  - 依据：这是需求侧真实“流量事件”，不受我方运营策略（回复频次）影响；与 RecruitFlow-Estimator 用户手册中“总咨询事件(事件数而非人数)”定义一致。
-  - 工具/来源：`get-chat-details.tool.ts` 返回的 `chatMessages` 中按 `sender` 判定。
+  - 定义：统计窗口内，候选人发来的所有入站消息"事件数"（同一人多条消息均计入）。
+  - 计算（基于事件表）：
+    ```sql
+    SELECT SUM(unread_count_before_reply)
+    FROM recruitment_events
+    WHERE event_type = 'message_received'
+      AND event_time BETWEEN :start AND :end
+    ```
+  - 依据：这是需求侧真实"流量事件"，不受我方运营策略（回复频次）影响；与 RecruitFlow-Estimator 用户手册中"总咨询事件(事件数而非人数)"定义一致。
+  - 数据来源：`MESSAGE_RECEIVED` 事件的 `unread_count_before_reply` 字段累加。
+  - **精度说明**：由于 `get_unread_candidates` 可能在候选人发送多条消息后才被调用，`unread_count` 可能大于实际新增消息数。这是可接受的近似值。
 
-- 指标：Unique Candidates（当日独特候选人数）
+- 指标：Inbound Candidates（入站候选人数，原 Unique Candidates / candidates_contacted）
   - 定义：统计窗口内至少有一条入站消息的候选人数量。
-  - 计算：Unique Candidates（当日）= 当日内“存在至少一条 `sender==='candidate'` 且时间落入统计窗口”的会话数量。仅存在历史（非当日）消息而当日无入站的会话不计入。
-  - 模式：
-    - 严格模式（推荐）：仅当消息带可解析为当日的绝对/规范化时间戳才计入，否则不计入。
-    - 宽松模式（备选）：对无日期仅有“HH:MM”的消息，结合页面“今天/昨天”分隔或最新系统分隔标签推断当日；无法推断时不计入。
-  - 依据：代表“咨询岗位的人数”（去重后的人数）。
-  - 工具/来源：`get-chat-details.tool.ts`（每个会话代表一位候选人）。
+  - **字段名变更**：数据库字段从 `candidates_contacted` 重命名为 `inbound_candidates`，以区分主动触达场景。
+  - 计算（基于事件表）：
+    ```sql
+    SELECT COUNT(DISTINCT candidate_key)
+    FROM recruitment_events
+    WHERE event_type = 'message_received'
+      AND event_time BETWEEN :start AND :end
+    ```
+  - 依据：代表"咨询岗位的人数"（去重后的人数）。
+  - 数据来源：`MESSAGE_RECEIVED` 事件按 `candidate_key` 去重计数。
 
 - 指标：Repeat Rate（当日跨账号重复候选人率）
   - 定义：以"候选人-账号-当日"的会话为事件（会话事件），若同一候选人在同一统计日内咨询了多个账号，则视为重复。该指标衡量跨账号重复带来的"会话事件"冗余比例。
@@ -82,55 +129,115 @@
 
 ### 2) 回复相关
 
-- 指标：Replied Candidates（当日被回复的候选人数）
-  - 定义：统计窗口内至少有一条我方消息的候选人数量。
-  - 计算：计数会话中 `sender === 'recruiter'` 且时间落在窗口内。
-  - 依据：反映覆盖率。
-  - 工具/来源：`get-chat-details.tool.ts`。
+- 指标：Replied Candidates（当日被回复的入站候选人数）
+  - 定义：统计窗口内，入站候选人中至少有一条我方回复消息的候选人数量。
+  - 计算（基于事件表）：
+    ```sql
+    -- 只统计入站候选人中被回复的数量
+    -- 确保 reply_rate = candidates_replied / candidates_contacted <= 100%
+    SELECT COUNT(DISTINCT candidate_key)
+    FROM recruitment_events
+    WHERE event_type = 'message_sent'
+      AND event_time BETWEEN :start AND :end
+      AND candidate_key IN (
+        SELECT DISTINCT candidate_key
+        FROM recruitment_events
+        WHERE event_type = 'message_received'
+          AND event_time BETWEEN :start AND :end
+      )
+    ```
+  - 依据：反映入站候选人的回复覆盖率。主动打招呼（CANDIDATE_CONTACTED）后的回复不计入此指标。
+  - 数据来源：`MESSAGE_SENT` 事件与 `MESSAGE_RECEIVED` 事件做交集，按 `candidate_key` 去重计数。
 
 - 指标：Reply Count（当日我方回复总次数）
   - 定义：我方发出的消息总条数。
-  - 计算：Σ 会话内 `sender === 'recruiter'` 的消息条数。
-  - 依据：反映运营强度，不用于定义 Total Flow。
-  - 工具/来源：`get-chat-details.tool.ts`。
-
-- 指标：Unread Replied（当次回复时未读消息合计）
-  - 定义：对当日每次"发送前"抓取该会话的 `unreadCount` 累加。
-  - 计算：在Agent调用层实现，发送动作前调用 `get-unread-candidates-improved.tool.ts` 获取目标候选人的 `unreadCount`，累加到统计中。
-  - **实现方案**：
-
-    ```javascript
-    // Agent层实现示例
-    const unreadList = await getUnreadCandidatesImproved();
-    const candidate = unreadList.find(c => c.name === targetName);
-    const unreadCount = candidate?.unreadCount || 0;
-
-    // 写入数据库 recruitment_events 表
-    await saveEvent({
-      eventType: "message_sent",
-      unreadCountBeforeReply: unreadCount, // 存入新增字段
-      // ...其他字段
-    });
+  - 计算（基于事件表）：
+    ```sql
+    SELECT COUNT(*)
+    FROM recruitment_events
+    WHERE event_type = 'message_sent'
+      AND event_time BETWEEN :start AND :end
     ```
+  - 依据：反映运营强度，不用于定义 Total Flow。
+  - 数据来源：`MESSAGE_SENT` 事件计数。
 
-  - 依据：反映"回复时积压强度"，便于诊断 SLA 与漏斗损耗。
-  - 工具/来源：`get-unread-candidates-improved.tool.ts`（需要在Agent层实现发送前的数据采集）。
+- 指标：Reply Rate（回复率）
+  - 定义：被回复的候选人数占入站候选人数的比例。
+  - 计算：`Reply Rate = Replied Candidates / Unique Candidates`
+  - 依据：衡量响应覆盖程度。
+
+- 指标：Immediate Reply Count（立即回复次数）
+  - 定义：检测到未读后立即回复的消息数。
+  - 计算（基于事件表）：
+    ```sql
+    SELECT COUNT(*)
+    FROM recruitment_events
+    WHERE event_type = 'message_sent'
+      AND was_unread_before_reply = true
+      AND event_time BETWEEN :start AND :end
+    ```
+  - 依据：反映 Agent 实时响应能力，用于诊断 SLA 达成率。
+
+### 2.5) 出站漏斗（主动触达）
+
+> **说明**：出站漏斗追踪通过 `say_hello` 工具主动打招呼的效果，与入站漏斗（候选人主动联系我们）分开统计。
+
+- 指标：Proactive Outreach（主动触达候选人数）
+  - 定义：统计窗口内通过 `say_hello` 主动打招呼的候选人数量。
+  - 计算（基于事件表）：
+    ```sql
+    SELECT COUNT(DISTINCT candidate_key)
+    FROM recruitment_events
+    WHERE event_type = 'candidate_contacted'
+      AND event_time BETWEEN :start AND :end
+    ```
+  - 数据来源：`CANDIDATE_CONTACTED` 事件按 `candidate_key` 去重计数。
+  - 数据库字段：`proactive_outreach`
+
+- 指标：Proactive Responded（主动触达后回复的候选人数）
+  - 定义：我们主动打招呼后，对方回复了消息的候选人数量。
+  - 计算（基于事件表）：
+    ```sql
+    -- 主动触达候选人中收到对方回复的数量
+    SELECT COUNT(DISTINCT candidate_key)
+    FROM recruitment_events
+    WHERE event_type = 'message_received'
+      AND event_time BETWEEN :start AND :end
+      AND candidate_key IN (
+        SELECT DISTINCT candidate_key
+        FROM recruitment_events
+        WHERE event_type = 'candidate_contacted'
+          AND event_time BETWEEN :start AND :end
+      )
+    ```
+  - 数据来源：`MESSAGE_RECEIVED` 事件与 `CANDIDATE_CONTACTED` 事件做交集，按 `candidate_key` 去重计数。
+  - 数据库字段：`proactive_responded`
+
+- 指标：Response Rate（主动触达回复率）
+  - 定义：主动打招呼后对方回复的比例。
+  - 计算：`Response Rate = Proactive Responded / Proactive Outreach`
+  - 依据：衡量主动触达的效果，用于评估候选人列表质量和打招呼话术效果。
 
 ### 3) 微信交换相关
 
 - 指标：WeChat Obtained Candidates（当日获取到微信号的候选人数）
-  - 定义：统计窗口内发生“微信交换”事件的候选人数。
-  - 计算：
-    1. `get-chat-details.tool.ts` 中 `messageType === 'wechat-exchange'` 的会话计数；
-    2. 与 `exchange-wechat.tool.ts` 的成功回执交叉验证（若存在差异，以聊天记录为准）。
-  - 依据：聊天记录是事实来源，点击回执作为冗余校验。
-  - 工具/来源：两者联合，主以 `get-chat-details.tool.ts` 为准。
+  - 定义：统计窗口内发生"微信交换"事件的候选人数。
+  - 计算（基于事件表）：
+    ```sql
+    SELECT COUNT(DISTINCT candidate_key)
+    FROM recruitment_events
+    WHERE event_type = 'wechat_exchanged'
+      AND event_time BETWEEN :start AND :end
+    ```
+  - 数据来源：`WECHAT_EXCHANGED` 事件按 `candidate_key` 去重计数。
+  - 触发方式：
+    1. `exchange-wechat.tool.ts` 成功交换时记录
+    2. `get-chat-details.tool.ts` 检测到 `messageType === 'wechat-exchange'` 时补录
 
-- 指标：WeChat Exchange Events（当日微信交换事件次数）
-  - 定义：发生“微信交换”的事件总数（同一会话多次也累计）。
-  - 计算：统计 `messageType === 'wechat-exchange'` 的消息条数。
-  - 依据：反映操作频度与重复尝试。
-  - 工具/来源：`get-chat-details.tool.ts`。
+- 指标：WeChat Conversion Rate（微信转化率）
+  - 定义：获取微信的候选人数占入站候选人数的比例。
+  - 计算：`WeChat Conversion Rate = WeChat Obtained Candidates / Unique Candidates`
+  - 依据：衡量招聘漏斗第一级转化效率。
 
 ### 4) 积压/排序辅助指标（可选）
 
@@ -174,108 +281,143 @@
 
 ## 与 RecruitFlow-Estimator 数据字段映射
 
-下表给出“工具侧指标 → Python 训练数据字段”的一对一或一对多映射。若为多账号聚合，需先按账号分摊/归一。
+下表给出"事件表指标 → Python 训练数据字段"的映射。数据来源统一为 `recruitment_events` 表。
 
-| 工具侧指标                      | 定义/窗口（默认会话事件口径）                | 计算公式                                                       | 逻辑依据                                       | Python 字段           | 跨账号聚合口径                            |
-| ------------------------------- | -------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------- | --------------------- | ----------------------------------------- |
-| Total Flow（会话事件）          | 当日"候选人-账号"存在入站消息的事件总数      | TotalFlow_session = \|sessions_day\|                           | 会话事件更贴近"咨询会话"流量，避免消息粒度噪声 | flows（单账号日流量） | flows = TotalFlow_session / 账号数        |
-| Unique Candidates（人数）       | 当日至少一次入站消息的候选人数（跨账号去重） | UniqueCandidates_day = \|{candidate_id}\|                      | 人数口径（去重后）                             | （不直接入表）        | 用于推导 repeat_rates 与转化率            |
-| Repeat Rate（跨账号重复候选人） | 跨账号重复导致的会话事件冗余比例             | (TotalFlow_session − UniqueCandidates_day) / TotalFlow_session | 贴合"同一候选人多账号咨询"的现实重复问题       | repeat_rates          | 直接以全量计算后作为当日值                |
-| Avg Repeat Degree               | 重复者平均重复次数（消息口径，参考）         | Σ\_{m_i>1} m_i / count(m_i>1)                                  | 补充刻画重复强度（消息层），可做分析特征       | （可选）              | 可作为分析特征，模型中默认2.5             |
-| WeChat Conversion Rate          | 微信转化率                                   | WeChatObtained / UniqueCandidates_day                          | RecruitFlow-Estimator 的 wechat_conversions    | wechat_conversions    | WeChatObtained 为"当日获得微信的候选人数" |
-| Interview Rate                  | 面试转化率                                   | duliday_interview_booking调用次数 / wechat_adds                | 通过Duliday工具调用统计                        | interview_rates       | 使用duliday-interview-booking-tool.ts统计 |
-| Onboard Rate                    | 上岗转化率                                   | onboards / interviews                                          | 需要外部系统或人工输入                         | onboard_rates         | 暂时通过人工预估或默认分布采样            |
+| 指标 | 事件表计算公式 | Python 字段 | 说明 |
+|------|---------------|-------------|------|
+| Total Flow | `SUM(unread_count_before_reply) WHERE event_type='message_received'` | flows | 入站消息总数 |
+| Unique Candidates | `COUNT(DISTINCT candidate_key) WHERE event_type='message_received'` | - | 用于计算转化率 |
+| Replied Candidates | `COUNT(DISTINCT candidate_key) WHERE event_type='message_sent'` | - | 被回复的候选人数 |
+| Reply Rate | `Replied Candidates / Unique Candidates` | - | 响应覆盖率 |
+| WeChat Obtained | `COUNT(DISTINCT candidate_key) WHERE event_type='wechat_exchanged'` | - | 获取微信的候选人数 |
+| WeChat Conversion Rate | `WeChat Obtained / Unique Candidates` | wechat_conversions | 微信转化率 |
+| Interview Booked | `COUNT(DISTINCT candidate_key) WHERE event_type='interview_booked'` | - | 预约面试的候选人数 |
+| Interview Rate | `Interview Booked / WeChat Obtained` | interview_rates | 面试转化率 |
+| Onboard Rate | 外部系统数据 | onboard_rates | 需人工输入 |
+
+### 聚合字段映射（recruitment_daily_stats 表）
+
+| 聚合字段 | 计算公式 | 说明 |
+|---------|---------|------|
+| `messages_received` | `SUM(unread_count_before_reply) WHERE event_type='message_received'` | Total Flow（入站消息总数） |
+| `inbound_candidates` | `COUNT(DISTINCT candidate_key) WHERE event_type='message_received'` | 入站候选人数 |
+| `messages_sent` | `COUNT(*) WHERE event_type='message_sent'` | 发送消息次数 |
+| `candidates_replied` | `COUNT(DISTINCT candidate_key) WHERE event_type='message_sent' AND candidate_key IN (入站候选人)` | 被回复的入站候选人数 |
+| `wechats_exchanged` | `COUNT(DISTINCT candidate_key) WHERE event_type='wechat_exchanged'` | 获取微信的候选人数 |
+| `interviews_booked` | `COUNT(DISTINCT candidate_key) WHERE event_type='interview_booked'` | 预约面试的候选人数 |
 
 说明：
-
-- flows 的“单账号日流量”需由总事件数按账号数均分（或直接按账号维度采集后再求均值）。
-- wechat_conversions 的分母应为 Unique Candidates（独特人数），对应用户手册与模型实现。
+- `messages_received` 字段名保持不变以兼容现有代码，但语义改为 Total Flow（入站消息总数）
+- `inbound_candidates` 统计入站候选人数（区别于 `proactive_outreach` 主动触达候选人数）
 
 ---
 
 ## 指标到模型的落地公式
 
-设（会话事件口径）：
+基于 `recruitment_events` 表的事件驱动计算：
 
-- 账号数 `A`，统计窗口为 1 天；
-- `sessions_day = {(candidate_id, account_id) | 当日该组合存在至少一条入站消息}`；
-- `WeChatObtained` 为当日有 `wechat-exchange` 的候选人数（按候选人去重）。
+```sql
+-- 统计窗口: 当日 [startOfDay, endOfDay) Asia/Shanghai
 
-则：
+-- Total Flow（入站消息总数）
+SELECT SUM(unread_count_before_reply) AS total_flow
+FROM recruitment_events
+WHERE event_type = 'message_received'
+  AND event_time BETWEEN :start AND :end;
 
+-- Unique Candidates（入站候选人数，去重）
+SELECT COUNT(DISTINCT candidate_key) AS unique_candidates
+FROM recruitment_events
+WHERE event_type = 'message_received'
+  AND event_time BETWEEN :start AND :end;
+
+-- WeChat Obtained（获取微信的候选人数）
+SELECT COUNT(DISTINCT candidate_key) AS wechat_obtained
+FROM recruitment_events
+WHERE event_type = 'wechat_exchanged'
+  AND event_time BETWEEN :start AND :end;
+
+-- 转化率计算
+wechat_conversions = wechat_obtained / unique_candidates
 ```
-TotalFlow_session = |sessions_day|
-UniqueCandidates_day = |{ candidate_id }|
-RepeatRate = (TotalFlow_session − UniqueCandidates_day) / TotalFlow_session
 
-flows (per-account) = TotalFlow_session / A
-wechat_conversions = WeChatObtained / UniqueCandidates_day
-```
-
-以上两列值（`flows`, `repeat_rates`, `wechat_conversions`）即可直接作为 `RecruitFlow-Estimator` 的训练样本输入；`interview_rates`, `onboard_rates` 如暂无，可留空或以先验 Beta 分布采样。
+以上值可直接作为 `RecruitFlow-Estimator` 的训练样本输入。
 
 ---
 
-## 指标采集参考实现（伪代码）
+## 指标采集参考实现
+
+### 事件记录（工具层）
+
+事件在工具执行时自动记录，无需手动采集：
 
 ```ts
-// 1) 拉取会话详情（需包含消息方向与时间），按账号分别执行
-//    注意：仅当某会话当日存在至少一条候选人入站消息，才视为一条"会话事件"
-const sessionsDay: Array<{
-  accountId: string;
-  candidateName: string; // 使用姓名作为标识
-  positionKey?: string;
-}> = [];
-
-// 面试预约统计
-let interviewBookings = 0;
-
-for (const account of allAccounts) {
-  const { chatMessages, candidateInfo } = await getChatDetails(account);
-
-  // 2) 过滤统计窗口内的候选人入站消息
-  const inboundToday = chatMessages.filter(m => m.sender === "candidate" && inDateRange(m.time));
-
-  if (inboundToday.length > 0) {
-    // 使用候选人姓名作为标识（接受重名风险）
-    const candidateName = candidateInfo?.name || "未知";
-    const positionKey = candidateInfo?.position; // 岗位名称需要与Duliday保持一致
-
-    sessionsDay.push({
-      accountId: account.id,
-      candidateName,
-      positionKey,
-    });
+// 1) get_unread_candidates 检测到未读时记录 MESSAGE_RECEIVED
+// lib/services/recruitment-event/step-handlers.ts
+export async function handleUnreadCandidatesEvent(ctx: RecruitmentContext, result: unknown) {
+  for (const candidate of unreadCandidates) {
+    const event = recruitmentEventService
+      .event(ctx)
+      .candidate({ name: candidate.name, position: candidate.position })
+      .withUnreadContext(candidate.unreadCount || 0)
+      .messageReceived(candidate.unreadCount || 0, candidate.preview); // MESSAGE_RECEIVED 事件
+    recruitmentEventService.recordAsync(event);
   }
 }
 
-// 3) 会话事件与候选人聚合（基于姓名去重）
-const totalFlowSession = sessionsDay.length;
-const uniqueCandidatesDay = new Set(sessionsDay.map(s => s.candidateName)).size;
+// 2) send_message 回复时记录 MESSAGE_SENT
+// lib/tools/zhipin/send-message.tool.ts
+await recordMessageSentEvent({
+  platform: SourcePlatform.ZHIPIN,
+  candidate: { name, position },
+  unreadCount: unreadCountBeforeReply, // 决定 was_unread_before_reply
+  message: content,
+});
 
-// 4) 跨账号重复率（会话事件口径）
-const repeatRate =
-  totalFlowSession > 0 ? (totalFlowSession - uniqueCandidatesDay) / totalFlowSession : 0;
+// 3) say_hello 主动打招呼时记录 CANDIDATE_CONTACTED
+// lib/tools/zhipin/say-hello-simple.tool.ts
+await recordCandidateContactedEvent({
+  platform: SourcePlatform.ZHIPIN,
+  candidate: { name, position },
+});
 
-// 5) 微信新增（按候选人姓名去重）
-const wechatObtainedCandidates = countWeChatObtainedCandidatesInDay();
-const wechatConversionRate =
-  uniqueCandidatesDay > 0 ? wechatObtainedCandidates / uniqueCandidatesDay : 0;
+// 4) exchange_wechat 或检测到微信交换时记录 WECHAT_EXCHANGED
+await recordWechatExchangedEvent({
+  platform: SourcePlatform.ZHIPIN,
+  candidate: { name, position },
+  wechatNumber,
+});
+```
 
-// 6) 面试转化率（通过Duliday工具统计）
-// 注意：需要在Agent层统计duliday_interview_booking的调用次数
-const interviewRate =
-  wechatObtainedCandidates > 0 ? interviewBookings / wechatObtainedCandidates : 0;
+### 指标聚合（定时任务）
 
-// 7) 映射到模型字段
-const flowsPerAccount = totalFlowSession / accountCount;
-const sample = {
-  flows: flowsPerAccount,
-  repeat_rates: repeatRate,
-  wechat_conversions: wechatConversionRate,
-  interview_rates: interviewRate,
-  onboard_rates: 0.08, // 暂时使用默认值或人工输入
-};
+```ts
+// lib/services/recruitment-stats/aggregation.service.ts
+const stats = await db
+  .select({
+    // Total Flow: 入站消息总数
+    messagesReceived: sql<number>`COALESCE(SUM(${recruitmentEvents.unreadCountBeforeReply})
+      FILTER (WHERE ${recruitmentEvents.eventType} = 'message_received'), 0)`,
+
+    // Unique Candidates: 入站候选人数
+    candidatesContacted: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey})
+      FILTER (WHERE ${recruitmentEvents.eventType} = 'message_received')`,
+
+    // Replied Candidates: 被回复的入站候选人数
+    // 注意：需要单独查询，使用子查询与入站候选人做交集
+    // candidatesReplied = COUNT(DISTINCT candidate_key)
+    //   WHERE event_type='message_sent'
+    //   AND candidate_key IN (SELECT candidate_key WHERE event_type='message_received')
+
+    // WeChat Obtained: 获取微信的候选人数
+    wechatsExchanged: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey})
+      FILTER (WHERE ${recruitmentEvents.eventType} = 'wechat_exchanged')`,
+  })
+  .from(recruitmentEvents)
+  .where(and(
+    gte(recruitmentEvents.eventTime, startOfDay),
+    lt(recruitmentEvents.eventTime, endOfDay),
+  ));
 ```
 
 ---

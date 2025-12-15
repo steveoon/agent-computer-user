@@ -337,12 +337,17 @@ export const messageSentDetailsSchema = z.object({
 export type MessageSentDetails = z.infer<typeof messageSentDetailsSchema>;
 
 /**
- * 消息接收事件详情
+ * 入站消息事件详情（MESSAGE_RECEIVED）
+ *
+ * 由 get_unread_candidates 检测到未读消息时触发
+ * 记录未读消息数量用于 Total Flow 计算
  */
 export const messageReceivedDetailsSchema = z.object({
   type: z.literal("message_received"),
-  content: z.string().optional(),
-  senderType: z.enum(["candidate", "recruiter", "system", "unknown"]).optional(),
+  /** 检测到的未读消息数量 */
+  unreadCount: z.number().optional(),
+  /** 最后一条消息预览 */
+  lastMessagePreview: z.string().optional(),
 });
 
 export type MessageReceivedDetails = z.infer<typeof messageReceivedDetailsSchema>;
@@ -371,12 +376,13 @@ export const interviewBookedDetailsSchema = z.object({
 export type InterviewBookedDetails = z.infer<typeof interviewBookedDetailsSchema>;
 
 /**
- * 候选人接触事件详情
+ * 主动打招呼事件详情（CANDIDATE_CONTACTED）
+ *
+ * 由 say_hello 工具成功发送初始招呼时触发
+ * 用于追踪主动外联，区别于回复消息
  */
 export const candidateContactedDetailsSchema = z.object({
   type: z.literal("candidate_contacted"),
-  unreadCount: z.number().optional(),
-  lastMessagePreview: z.string().optional(),
 });
 
 export type CandidateContactedDetails = z.infer<typeof candidateContactedDetailsSchema>;
@@ -411,20 +417,18 @@ export type EventDetails = z.infer<typeof eventDetailsSchema>;
 /**
  * 生成候选人唯一标识（candidateKey）
  *
- * 生成规则：平台_姓名_职位_品牌ID
+ * 生成规则：平台_姓名_职位
  * 注意：接受"同名同职位不同人"被合并的风险
  */
 export function generateCandidateKey(params: {
   platform: string;
   candidateName: string;
   candidatePosition?: string;
-  brandId?: number;
 }): string {
   const parts = [
     params.platform,
     params.candidateName,
     params.candidatePosition || "unknown",
-    params.brandId?.toString() || "0",
   ];
   return parts.join("_");
 }
@@ -464,7 +468,6 @@ export function createRecruitmentEventInput(params: {
     platform: params.sourcePlatform || SourcePlatform.ZHIPIN,
     candidateName: params.candidateName,
     candidatePosition: params.candidatePosition,
-    brandId: params.brandId,
   });
 
   const sessionId = generateSessionId(params.agentId, candidateKey, params.eventTime);

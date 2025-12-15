@@ -38,12 +38,11 @@ export const zhipinExchangeWechatTool = () =>
 
     重要：交换微信时请传入候选人信息用于数据统计，这些信息来自 zhipin_get_chat_details 工具返回的 summary 对象：
     - candidateName: summary.candidateName
-    - candidatePosition: summary.candidatePosition（候选人期望职位，如"兼职服务员"）
     - candidateAge: summary.candidateAge（如"21岁"）
     - candidateEducation: summary.candidateEducation（如"本科"）
     - candidateExpectedSalary: summary.candidateExpectedSalary（如"3000-4000元"）
     - candidateExpectedLocation: summary.candidateExpectedLocation（如"大连"）
-    - jobName: summary.communicationPosition（沟通职位/待招岗位，如"大连肯德基-兼职服务员-就近安排"）`,
+    - jobName: summary.communicationPosition（沟通职位/待招岗位，用于 candidate_key 生成）`,
 
     inputSchema: z.object({
       waitBetweenClicksMin: z
@@ -68,7 +67,6 @@ export const zhipinExchangeWechatTool = () =>
         .describe("交换完成后的最大等待时间（毫秒）"),
       // 埋点上下文 - 来自 zhipin_get_chat_details 返回的 summary 对象
       candidateName: z.string().optional().describe("候选人姓名，来自 summary.candidateName"),
-      candidatePosition: z.string().optional().describe("候选人期望职位，来自 summary.candidatePosition（如'兼职服务员'，注意不是岗位名称）"),
       candidateAge: z.string().optional().describe("候选人年龄，来自 summary.candidateAge（如'21岁'）"),
       candidateEducation: z.string().optional().describe("候选人学历，来自 summary.candidateEducation（如'本科'）"),
       candidateExpectedSalary: z.string().optional().describe("候选人期望薪资，来自 summary.candidateExpectedSalary（如'3000-4000元'）"),
@@ -83,7 +81,6 @@ export const zhipinExchangeWechatTool = () =>
       waitAfterExchangeMin = 800,
       waitAfterExchangeMax = 1500,
       candidateName,
-      candidatePosition,
       candidateAge,
       candidateEducation,
       candidateExpectedSalary,
@@ -537,11 +534,13 @@ export const zhipinExchangeWechatTool = () =>
           // 从 jobName 提取 brandId（精确匹配 data_dictionary）
           const brandId = await extractBrandIdFromJobName(jobName);
 
+          // 注意：zhipin 使用沟通职位（jobName）作为 candidate.position 用于 candidate_key 生成
+          // 这与 yupao 不同，yupao 使用候选人期望职位
           const builder = recruitmentEventService
             .event(zhipinCtx)
             .candidate({
               name: candidateName,
-              position: candidatePosition,
+              position: jobName, // 使用沟通职位（communicationPosition）作为 candidate_key
               age: parseAge(candidateAge),
               education: candidateEducation,
               expectedSalary: parseSalary(candidateExpectedSalary),

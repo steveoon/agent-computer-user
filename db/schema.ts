@@ -165,9 +165,9 @@ export const dictionaryChangeLog = appSchema.table(
  * 定义招聘流程中的关键事件节点
  */
 export const recruitmentEventTypeEnum = appSchema.enum("recruitment_event_type", [
-  "candidate_contacted", // 候选人首次接触（获取未读消息）
-  "message_sent", // 发送消息
-  "message_received", // 收到消息
+  "candidate_contacted", // 主动打招呼（say_hello），我们 → 候选人
+  "message_sent", // 回复消息（send_message），我们 → 候选人
+  "message_received", // 入站消息（get_unread_candidates 检测到未读），候选人 → 我们
   "wechat_exchanged", // 微信交换成功
   "interview_booked", // 面试预约成功
   "candidate_hired", // 候选人上岗（需人工录入或API回调）
@@ -283,12 +283,16 @@ export const recruitmentDailyStats = appSchema.table(
     uniqueCandidates: integer("unique_candidates").default(0).notNull(), // 独立候选人数
     uniqueSessions: integer("unique_sessions").default(0).notNull(), // 独立会话数
 
-    // === 消息指标 ===
-    messagesSent: integer("messages_sent").default(0).notNull(), // 发送消息数
-    messagesReceived: integer("messages_received").default(0).notNull(), // 收到消息数
-    candidatesContacted: integer("candidates_contacted").default(0).notNull(), // 接触候选人数
-    candidatesReplied: integer("candidates_replied").default(0).notNull(), // 回复的候选人数
-    unreadReplied: integer("unread_replied").default(0).notNull(), // 未读回复数
+    // === 入站漏斗指标 ===
+    messagesSent: integer("messages_sent").default(0).notNull(), // 发送消息数（COUNT(*) WHERE MESSAGE_SENT）
+    messagesReceived: integer("messages_received").default(0).notNull(), // Total Flow: 入站消息总数（SUM(unread_count) WHERE MESSAGE_RECEIVED）
+    inboundCandidates: integer("inbound_candidates").default(0).notNull(), // Inbound Candidates: 入站候选人数（COUNT DISTINCT WHERE MESSAGE_RECEIVED）
+    candidatesReplied: integer("candidates_replied").default(0).notNull(), // Replied Candidates: 入站候选人中被回复的数量（COUNT DISTINCT WHERE MESSAGE_SENT ∩ MESSAGE_RECEIVED）
+    unreadReplied: integer("unread_replied").default(0).notNull(), // 立即回复的未读消息数（SUM WHERE MESSAGE_SENT AND was_unread=true）
+
+    // === 出站漏斗指标 ===
+    proactiveOutreach: integer("proactive_outreach").default(0).notNull(), // Proactive Outreach: 主动打招呼候选人数（COUNT DISTINCT WHERE CANDIDATE_CONTACTED）
+    proactiveResponded: integer("proactive_responded").default(0).notNull(), // Proactive Responded: 主动触达后对方回复的候选人数（COUNT DISTINCT WHERE CANDIDATE_CONTACTED ∩ MESSAGE_RECEIVED）
 
     // === 转化指标 ===
     wechatExchanged: integer("wechat_exchanged").default(0).notNull(), // 微信交换数

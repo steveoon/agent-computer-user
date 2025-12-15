@@ -168,17 +168,20 @@ describe("RecruitmentEventBuilder", () => {
       });
     });
 
-    it("messageReceived() 应该创建 MESSAGE_RECEIVED 事件", () => {
+    it("messageReceived() 应该创建 MESSAGE_RECEIVED 事件（入站消息检测）", () => {
       const event = new RecruitmentEventBuilder(testContext)
         .candidate({ name: "测试" })
-        .messageReceived("我想了解一下工作内容", "candidate");
+        .withUnreadContext(5)
+        .messageReceived(5, "您好，想了解一下岗位");
 
       expect(event.eventType).toBe(RecruitmentEventType.MESSAGE_RECEIVED);
       expect(event.eventDetails).toEqual({
         type: "message_received",
-        content: "我想了解一下工作内容",
-        senderType: "candidate",
+        unreadCount: 5,
+        lastMessagePreview: "您好，想了解一下岗位",
       });
+      expect(event.wasUnreadBeforeReply).toBe(true);
+      expect(event.unreadCountBeforeReply).toBe(5);
     });
 
     it("wechatExchanged() 应该创建 WECHAT_EXCHANGED 事件", () => {
@@ -223,16 +226,14 @@ describe("RecruitmentEventBuilder", () => {
       });
     });
 
-    it("candidateContacted() 应该创建 CANDIDATE_CONTACTED 事件", () => {
+    it("candidateContacted() 应该创建 CANDIDATE_CONTACTED 事件（主动打招呼）", () => {
       const event = new RecruitmentEventBuilder(testContext)
         .candidate({ name: "测试" })
-        .candidateContacted(3, "最新消息预览");
+        .candidateContacted();
 
       expect(event.eventType).toBe(RecruitmentEventType.CANDIDATE_CONTACTED);
       expect(event.eventDetails).toEqual({
         type: "candidate_contacted",
-        unreadCount: 3,
-        lastMessagePreview: "最新消息预览",
       });
     });
 

@@ -9,6 +9,8 @@ import {
   shouldAddRandomBehavior,
 } from "./anti-detection-utils";
 import type { AutomationResult } from "./types";
+import { SourcePlatform } from "@/db/types";
+import { recordCandidateContactedEvent } from "@/lib/services/recruitment-event/tool-helpers";
 
 /**
  * Zhipin打招呼结果类型
@@ -218,6 +220,90 @@ export const zhipinSayHelloSimpleTool = () =>
               if (nameEl) {
                 candidateName = nameEl.textContent?.trim() || candidateName;
               }
+
+              // 获取候选人年龄和学历 - 从 .base-info 文本中提取
+              // 格式: "24岁|3年|大专|离职-随时到岗" (蓝领) 或 "25岁|7年|本科|离职-随时到岗" (白领)
+              let candidateAge = null;
+              let candidateEducation = null;
+              const baseInfoEl = targetCard.querySelector('.base-info');
+              if (baseInfoEl) {
+                // 遍历子节点提取文本（跳过分隔符）
+                const infoParts = [];
+                baseInfoEl.childNodes.forEach(node => {
+                  if (node.nodeType === Node.TEXT_NODE) {
+                    const text = node.textContent?.trim();
+                    if (text) {
+                      infoParts.push(text);
+                    }
+                  }
+                });
+                // infoParts: ["24岁", "3年", "大专", "离职-随时到岗"]
+                for (const part of infoParts) {
+                  if (part.includes('岁')) {
+                    candidateAge = part;
+                  } else if (['初中', '中专', '中技', '高中', '大专', '本科', '硕士', '博士'].some(edu => part.includes(edu))) {
+                    candidateEducation = part;
+                  }
+                }
+              }
+
+              // 获取候选人期望职位和期望位置
+              // 白领结构: .row-flex .content .join-text-wrap
+              // 蓝领结构: .timeline-wrap.expect .content.join-text-wrap
+              let candidatePosition = null;
+              let candidateExpectedLocation = null;
+
+              // 辅助函数：从 join-text-wrap 中提取文本部分
+              const extractFromJoinTextWrap = (joinTextWrap) => {
+                const textParts = [];
+                joinTextWrap.childNodes.forEach(node => {
+                  if (node.nodeType === Node.TEXT_NODE) {
+                    const text = node.textContent?.trim();
+                    if (text) {
+                      textParts.push(text);
+                    }
+                  }
+                });
+                return textParts;
+              };
+
+              // 策略1: 白领结构 - .row-flex .content
+              const expectRow = targetCard.querySelector('.row-flex:not(.geek-desc)');
+              if (expectRow) {
+                const labelEl = expectRow.querySelector('.label');
+                const contentEl = expectRow.querySelector('.content');
+                const labelText = labelEl?.textContent || '';
+                // 支持 "期望" 和 "最近关注" 两种 label
+                if ((labelText.includes('期望') || labelText.includes('最近关注')) && contentEl) {
+                  const joinTextWrap = contentEl.querySelector('.join-text-wrap');
+                  if (joinTextWrap) {
+                    const textParts = extractFromJoinTextWrap(joinTextWrap);
+                    if (textParts.length >= 1) candidateExpectedLocation = textParts[0];
+                    if (textParts.length >= 2) candidatePosition = textParts[1];
+                  }
+                }
+              }
+
+              // 策略2: 蓝领结构 - .timeline-wrap.expect .content
+              if (!candidateExpectedLocation && !candidatePosition) {
+                const timelineExpect = targetCard.querySelector('.timeline-wrap.expect');
+                if (timelineExpect) {
+                  const contentEl = timelineExpect.querySelector('.content.join-text-wrap') ||
+                                   timelineExpect.querySelector('.content .join-text-wrap');
+                  if (contentEl) {
+                    const textParts = extractFromJoinTextWrap(contentEl);
+                    if (textParts.length >= 1) candidateExpectedLocation = textParts[0];
+                    if (textParts.length >= 2) candidatePosition = textParts[1];
+                  }
+                }
+              }
+
+              // 获取候选人期望薪资 - 从 .salary-wrap 中提取
+              let candidateExpectedSalary = null;
+              const salaryEl = targetCard.querySelector('.salary-wrap');
+              if (salaryEl) {
+                candidateExpectedSalary = salaryEl.textContent?.trim() || null;
+              }
               
               // 查找打招呼按钮
               const greetBtn = targetCard.querySelector('button.btn.btn-greet');
@@ -281,11 +367,16 @@ export const zhipinSayHelloSimpleTool = () =>
                 // 标记为已点击
                 greetBtn.setAttribute('data-zhipin-clicked', 'true');
                 
-                return { 
-                  success: true, 
+                return {
+                  success: true,
                   buttonText: greetBtn.textContent?.trim(),
                   candidateName: candidateName,
                   candidateId: candidateId,
+                  candidateAge: candidateAge,
+                  candidateEducation: candidateEducation,
+                  candidatePosition: candidatePosition,
+                  candidateExpectedLocation: candidateExpectedLocation,
+                  candidateExpectedSalary: candidateExpectedSalary,
                   clicked: true
                 };
               } catch (clickError) {
@@ -304,6 +395,11 @@ export const zhipinSayHelloSimpleTool = () =>
               buttonText?: string;
               candidateName?: string;
               candidateId?: string;
+              candidateAge?: string;
+              candidateEducation?: string;
+              candidatePosition?: string;
+              candidateExpectedLocation?: string;
+              candidateExpectedSalary?: string;
               error?: string;
               clicked?: boolean;
             } | null;
@@ -320,12 +416,28 @@ export const zhipinSayHelloSimpleTool = () =>
             }
 
             // 点击成功
+            const successCandidateName = result.candidateName || `候选人${candidateIndex}`;
             results.push({
-              candidateName: result.candidateName || `候选人${candidateIndex}`,
+              candidateName: successCandidateName,
               candidateId: result.candidateId,
               success: true,
               message: `成功点击${result.buttonText || "打招呼按钮"}`,
               timestamp: new Date().toISOString(),
+            });
+
+            // 记录 CANDIDATE_CONTACTED 事件（主动打招呼）
+            recordCandidateContactedEvent({
+              platform: SourcePlatform.ZHIPIN,
+              candidate: {
+                name: successCandidateName,
+                age: result.candidateAge,
+                education: result.candidateEducation,
+                position: result.candidatePosition,
+                expectedLocation: result.candidateExpectedLocation,
+                expectedSalary: result.candidateExpectedSalary,
+              },
+            }).catch((err) => {
+              console.warn("[ZhipinSayHello] Failed to record candidate_contacted event:", err);
             });
 
             // 等待系统处理和发送消息

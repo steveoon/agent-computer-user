@@ -9,6 +9,7 @@ import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { recruitmentEvents } from "@/db/schema";
 import type { RecruitmentEventTypeValue } from "@/db/types";
+import { recruitmentStatsRepository } from "@/lib/services/recruitment-stats";
 
 /**
  * Use Drizzle's native type inference for database operations
@@ -66,12 +67,28 @@ class RecruitmentEventsRepository {
    * @returns The inserted event or null if failed
    */
   async insert(event: DrizzleInsertEvent): Promise<DrizzleSelectEvent | null> {
-    return withRetry(async () => {
+    const result = await withRetry(async () => {
       const db = getDb();
-      const [result] = await db.insert(recruitmentEvents).values(event).returning();
-      console.log(`${LOG_PREFIX} Event inserted: ${result.id} (${result.eventType})`);
-      return result;
+      const [inserted] = await db.insert(recruitmentEvents).values(event).returning();
+      console.log(`${LOG_PREFIX} Event inserted: ${inserted.id} (${inserted.eventType})`);
+      return inserted;
     }, "insert");
+
+    // 标记统计数据为脏（需要重新聚合）
+    if (result) {
+      recruitmentStatsRepository
+        .markDirty(
+          result.agentId,
+          result.eventTime,
+          result.brandId ?? undefined,
+          result.jobId ?? undefined
+        )
+        .catch((err) => {
+          console.warn(`${LOG_PREFIX} Failed to mark stats dirty:`, err);
+        });
+    }
+
+    return result;
   }
 
   /**

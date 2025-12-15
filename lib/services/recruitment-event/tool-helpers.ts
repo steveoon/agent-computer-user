@@ -79,6 +79,15 @@ export interface RecordWechatExchangedParams {
 }
 
 /**
+ * Parameters for recording a CANDIDATE_CONTACTED event (proactive outreach via say_hello)
+ */
+export interface RecordCandidateContactedParams {
+  platform: SourcePlatformValue;
+  candidate: RawCandidateInfo;
+  jobInfo?: JobInfo;
+}
+
+/**
  * Record a MESSAGE_SENT event (fire-and-forget)
  *
  * Handles all the common logic:
@@ -137,7 +146,6 @@ export async function recordMessageSentEvent(
       platform,
       candidateName: candidate.name,
       candidatePosition: candidate.position,
-      brandId,
     });
     const sessionId = generateSessionId(ctx.agentId, candidateKey, eventTime);
     const messageSequence = await recruitmentEventService.getNextMessageSequence(sessionId);
@@ -200,5 +208,63 @@ export async function recordWechatExchangedEvent(
     recruitmentEventService.recordAsync(event);
   } catch (error) {
     console.error(`${LOG_PREFIX} Failed to record wechat_exchanged:`, error);
+  }
+}
+
+/**
+ * Record a CANDIDATE_CONTACTED event (fire-and-forget)
+ *
+ * Used for proactive outreach via say_hello tools.
+ * This event represents "we → candidate" proactive contact.
+ *
+ * @param params - Event parameters
+ */
+export async function recordCandidateContactedEvent(
+  params: RecordCandidateContactedParams
+): Promise<void> {
+  const { platform, candidate, jobInfo } = params;
+
+  const ctx = recruitmentContext.getContext();
+  if (!ctx || !candidate.name) {
+    console.warn(`${LOG_PREFIX} Skipping candidate_contacted: missing context or candidate name`);
+    return;
+  }
+
+  try {
+    // Extract brand ID from job name
+    const brandId = await extractBrandIdFromJobName(jobInfo?.jobName);
+
+    // Build event with parsed candidate info
+    const builder = recruitmentEventService
+      .event(ctx)
+      .forPlatform(platform)
+      .candidate({
+        name: candidate.name,
+        position: candidate.position,
+        age: parseAge(candidate.age),
+        education: candidate.education,
+        expectedSalary: parseSalary(candidate.expectedSalary),
+        expectedLocation: candidate.expectedLocation,
+      });
+
+    // Set job info
+    if (jobInfo?.jobName) {
+      builder.forJob(jobInfo.jobId || 0, jobInfo.jobName);
+    }
+
+    // Set brand
+    if (brandId) {
+      builder.forBrand(brandId);
+    }
+
+    // Record event (fire-and-forget)
+    const event = builder.candidateContacted();
+    recruitmentEventService.recordAsync(event);
+
+    console.log(
+      `${LOG_PREFIX} Recorded candidate_contacted for: ${candidate.name} (${platform})`
+    );
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Failed to record candidate_contacted:`, error);
   }
 }
