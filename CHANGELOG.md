@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.20.1](https://github.com/steveoon/agent-computer-user/compare/v1.20.0...v1.20.1) (2025-12-19)
+
+
+### Bug Fixes
+
+* 修复生产环境调度器状态不共享问题 ([69572c6](https://github.com/steveoon/agent-computer-user/commit/69572c63f3e45853a80dcc0e9f11520328377a51))
+
 ## [1.20.1-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.20.0...v1.20.1-develop.1) (2025-12-19)
 
 
