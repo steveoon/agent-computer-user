@@ -227,10 +227,23 @@ allocate_ports() {
 # Agent 管理命令
 # ============================================================================
 
+# 检查 Agent ID 是否已存在
+agent_id_exists() {
+    local id=$1
+    jq -e ".agents[] | select(.id == \"$id\")" "$CONFIG_FILE" > /dev/null 2>&1
+}
+
 # 添加 Agent
 cmd_add() {
     local type=$1
-    local count=${2:-1}
+    local custom_id=${2:-}
+    local count=${3:-1}
+
+    # 如果指定了自定义 ID，count 必须为 1
+    if [[ -n "$custom_id" && "$count" -gt 1 ]]; then
+        log_error "使用自定义 ID 时不能同时指定 --count"
+        exit 1
+    fi
 
     # 验证类型
     if ! jq -e ".templates.$type" "$TEMPLATE_FILE" > /dev/null 2>&1; then
@@ -254,8 +267,28 @@ cmd_add() {
     log_step "添加 $count 个 $template_name..."
 
     for i in $(seq 1 "$count"); do
-        local agent_num=$(get_next_agent_number "$type")
-        local agent_id="${type}-${agent_num}"
+        local agent_id
+        local agent_num
+
+        if [[ -n "$custom_id" ]]; then
+            # 使用自定义 ID
+            agent_id="$custom_id"
+            # 从自定义 ID 中提取编号用于显示名称（如果符合 type-N 格式）
+            if [[ "$custom_id" =~ -([0-9]+)$ ]]; then
+                agent_num=${BASH_REMATCH[1]}
+            else
+                agent_num=1
+            fi
+            # 检查 ID 是否已存在
+            if agent_id_exists "$agent_id"; then
+                log_error "Agent ID 已存在: $agent_id"
+                exit 1
+            fi
+        else
+            # 自动生成 ID
+            agent_num=$(get_next_agent_number "$type")
+            agent_id="${type}-${agent_num}"
+        fi
 
         # 分配端口
         local ports
@@ -1033,7 +1066,11 @@ ${YELLOW}用法:${NC}
   $0 <command> [options]
 
 ${YELLOW}命令:${NC}
-  ${GREEN}add${NC} <type> [--count N]    添加 Agent (类型: zhipin, yupao)
+  ${GREEN}add${NC} <type> [id] [options] 添加 Agent (类型: zhipin, yupao)
+    ${YELLOW}选项:${NC}
+      <id>                     自定义 Agent ID (位置参数或 --id)
+      --id <id>                自定义 Agent ID
+      --count N                添加 N 个 Agent (不能与自定义 ID 同时使用)
   ${GREEN}list${NC}                       列出所有 Agent
   ${GREEN}start${NC} [agent-id]           启动 Agent (不指定则启动全部)
   ${GREEN}stop${NC} [agent-id]            停止 Agent (不指定则停止全部)
@@ -1048,8 +1085,10 @@ ${YELLOW}命令:${NC}
 
 ${YELLOW}示例:${NC}
   ${CYAN}基础操作:${NC}
-  $0 add zhipin              # 添加 1 个 BOSS直聘 Agent
-  $0 add zhipin --count 3    # 添加 3 个 BOSS直聘 Agent
+  $0 add zhipin              # 添加 1 个 BOSS直聘 Agent (自动 ID: zhipin-1)
+  $0 add zhipin siwen-boss   # 添加自定义 ID 的 Agent
+  $0 add zhipin --id test-1  # 使用 --id 指定自定义 ID
+  $0 add zhipin --count 3    # 添加 3 个 BOSS直聘 Agent (自动 ID)
   $0 add yupao --count 2     # 添加 2 个鱼泡网 Agent
   $0 list                    # 列出所有 Agent
   $0 start                   # 启动所有 Agent
@@ -1084,12 +1123,35 @@ main() {
         add)
             local type=$1
             shift || true
+            local custom_id=""
             local count=1
-            if [[ "${1:-}" == "--count" ]]; then
-                shift
-                count=${1:-1}
-            fi
-            cmd_add "$type" "$count"
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --count)
+                        shift
+                        count=${1:-1}
+                        shift
+                        ;;
+                    --id)
+                        shift
+                        custom_id=${1:-}
+                        shift
+                        ;;
+                    -*)
+                        log_error "未知选项: $1"
+                        show_help
+                        exit 1
+                        ;;
+                    *)
+                        # 位置参数作为自定义 ID
+                        if [[ -z "$custom_id" ]]; then
+                            custom_id=$1
+                        fi
+                        shift
+                        ;;
+                esac
+            done
+            cmd_add "$type" "$custom_id" "$count"
             ;;
         list)
             cmd_list

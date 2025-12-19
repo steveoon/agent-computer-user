@@ -51,10 +51,7 @@ export const yupaoSendMessageTool = () =>
       waitAfterSend: z.number().optional().default(1000).describe("发送后等待时间（毫秒）"),
       // 埋点上下文 - 来自 yupao_get_chat_details 返回的 summary 对象
       candidateName: z.string().optional().describe("候选人姓名，来自 summary.candidateName"),
-      candidatePosition: z
-        .string()
-        .optional()
-        .describe("候选人期望职位，来自 summary.candidatePosition"),
+      candidatePosition: z.string().describe("候选人期望职位，来自 summary.candidatePosition"),
       candidateAge: z
         .string()
         .optional()

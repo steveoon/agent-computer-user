@@ -106,8 +106,11 @@ class AggregationService {
         messagesSent: sql<number>`COUNT(*) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_SENT})`,
         // Total Flow: 入站消息总数 = SUM(unread_count) WHERE type=MESSAGE_RECEIVED
         messagesReceived: sql<number>`COALESCE(SUM(${recruitmentEvents.unreadCountBeforeReply}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_RECEIVED}), 0)`,
-        // Inbound Candidates: 入站候选人数 = COUNT DISTINCT candidate_key WHERE type=MESSAGE_RECEIVED
-        inboundCandidates: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_RECEIVED})`,
+        // Inbound Candidates: 入站候选人数（给我们发过消息的候选人）
+        // 两种来源合并：
+        // 1. 有 MESSAGE_RECEIVED 事件（通过 get_unread_messages 检测到）
+        // 2. 或有 MESSAGE_SENT 且 was_unread_before_reply=true（Agent 直接回复，说明对方发过消息）
+        inboundCandidates: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_RECEIVED} OR (${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_SENT} AND ${recruitmentEvents.wasUnreadBeforeReply} = true))`,
         // Immediate Reply: 立即回复的未读消息数（wasUnreadBeforeReply=true 的 MESSAGE_SENT）
         unreadReplied: sql<number>`COALESCE(SUM(${recruitmentEvents.unreadCountBeforeReply}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_SENT} AND ${recruitmentEvents.wasUnreadBeforeReply} = true), 0)`,
         // === 出站漏斗指标 ===
@@ -140,26 +143,20 @@ class AggregationService {
     const [subqueryStats] = await db
       .select({
         // candidatesReplied: 入站候选人中被回复的数量
-        // 逻辑：同时有 MESSAGE_RECEIVED 和 MESSAGE_SENT 的候选人
+        // 逻辑：发送消息时 was_unread_before_reply = true 的候选人
+        // 说明：was_unread_before_reply 表示"发送消息前对方有未读消息"，即对方之前发过消息
+        // 这比依赖 MESSAGE_RECEIVED 事件更可靠，因为 MESSAGE_RECEIVED 只在 get_unread_messages 时记录
+        // 而 Agent 可能直接打开聊天回复，不一定经过 get_unread_messages 流程
         candidatesReplied: sql<number>`(
           SELECT COUNT(DISTINCT sent.candidate_key)
           FROM ${recruitmentEvents} AS sent
           WHERE sent.event_type = ${RecruitmentEventType.MESSAGE_SENT}
+            AND sent.was_unread_before_reply = true
             AND sent.agent_id = ${agentId}
             AND sent.event_time >= ${dayStartStr}::timestamptz
             AND sent.event_time <= ${dayEndStr}::timestamptz
             ${brandCondition}
             ${jobCondition}
-            AND sent.candidate_key IN (
-              SELECT DISTINCT received.candidate_key
-              FROM ${recruitmentEvents} AS received
-              WHERE received.event_type = ${RecruitmentEventType.MESSAGE_RECEIVED}
-                AND received.agent_id = ${agentId}
-                AND received.event_time >= ${dayStartStr}::timestamptz
-                AND received.event_time <= ${dayEndStr}::timestamptz
-                ${brandCondition}
-                ${jobCondition}
-            )
         )`,
         // proactiveResponded: 主动触达后对方回复的候选人数
         // 逻辑：同时有 CANDIDATE_CONTACTED 和 MESSAGE_RECEIVED 的候选人
