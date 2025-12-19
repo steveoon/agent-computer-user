@@ -255,7 +255,7 @@ class SchedulerService {
 /**
  * 单例实例
  *
- * 使用 globalThis 确保在 Next.js 开发模式下（HMR/不同执行上下文）
+ * 使用 globalThis 确保在所有环境下（开发模式 HMR / 生产环境不同执行上下文）
  * instrumentation.ts 和 Server Actions 使用同一个实例
  */
 const globalForScheduler = globalThis as unknown as {
@@ -265,6 +265,5 @@ const globalForScheduler = globalThis as unknown as {
 export const schedulerService =
   globalForScheduler.schedulerService ?? new SchedulerService();
 
-if (process.env.NODE_ENV !== "production") {
-  globalForScheduler.schedulerService = schedulerService;
-}
+// 始终保存到 globalThis，确保生产环境也能共享实例
+globalForScheduler.schedulerService = schedulerService;
