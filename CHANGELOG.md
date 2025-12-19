@@ -2,6 +2,21 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.20.0](https://github.com/steveoon/agent-computer-user/compare/v1.19.1...v1.20.0) (2025-12-19)
+
+
+### Bug Fixes
+
+* **security:** 升级 Next.js 和 React 修复安全漏洞 ([8a8ae33](https://github.com/steveoon/agent-computer-user/commit/8a8ae336d40d902d026ddd0ce780ba4614fa890f))
+* 优化聚合逻辑与工具参数 ([568d720](https://github.com/steveoon/agent-computer-user/commit/568d720f3d8d0433f0a274d232d895cf6cf059da))
+* 修复 zhipin 平台 candidate_key 匹配问题 ([dd540d9](https://github.com/steveoon/agent-computer-user/commit/dd540d9f79aefb18b44a80e1c32b6c6685908b11))
+
+
+### Features
+
+* Add recruitment event tracking system for yupao and zhipin platforms ([3510a85](https://github.com/steveoon/agent-computer-user/commit/3510a850b4ab14929206b418840f552181d37bf2))
+* **dashboard:** 添加待回复候选人组件与图表颜色修复 ([e3230fb](https://github.com/steveoon/agent-computer-user/commit/e3230fb7a0a90378a4abfa0aeceeb0583cb3c0bf))
+
 # [1.20.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.19.1...v1.20.0-develop.1) (2025-12-19)
 
 
