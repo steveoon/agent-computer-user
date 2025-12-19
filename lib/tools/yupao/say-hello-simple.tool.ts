@@ -12,6 +12,8 @@ import {
 } from "../zhipin/anti-detection-utils";
 import { createDynamicClassSelector } from "./dynamic-selector-utils";
 import type { YupaoSayHelloResult } from "./types";
+import { SourcePlatform } from "@/db/types";
+import { recordCandidateContactedEvent } from "@/lib/services/recruitment-event/tool-helpers";
 
 /**
  * 解析 puppeteer_evaluate 的结果
@@ -117,7 +119,7 @@ export const yupaoSayHelloSimpleTool = () =>
             const markScript = wrapAntiDetectionScript(`
               // 方法1: 通过data-index查找
               let card = document.querySelector('[data-index="${candidateIndex}"]');
-              
+
               // 方法2: 通过索引查找所有卡片
               if (!card) {
                 const allCards = document.querySelectorAll('${createDynamicClassSelector("_card")}');
@@ -131,11 +133,11 @@ export const yupaoSayHelloSimpleTool = () =>
                   card = allCards[${candidateIndex}];
                 }
               }
-              
+
               if (!card) {
                 return { success: false, error: '未找到候选人卡片' };
               }
-              
+
               // 查找聊天按钮
               const btnSelectors = [
                 '${YUPAO_SAY_HELLO_SELECTORS.chatBtn}',
@@ -143,7 +145,7 @@ export const yupaoSayHelloSimpleTool = () =>
                 '${createDynamicClassSelector("_chatBtn")}',
                 'button:first-of-type'
               ];
-              
+
               let btn = null;
               for (const selector of btnSelectors) {
                 try {
@@ -154,7 +156,7 @@ export const yupaoSayHelloSimpleTool = () =>
                   btn = null;
                 } catch (e) {}
               }
-              
+
               // 备用方案：查找所有按钮
               if (!btn) {
                 const allBtns = card.querySelectorAll('button');
@@ -165,24 +167,141 @@ export const yupaoSayHelloSimpleTool = () =>
                   }
                 }
               }
-              
+
               if (!btn) {
                 return { success: false, error: '未找到聊天按钮' };
               }
-              
-              // 获取候选人姓名（可选）
+
+              // 获取候选人姓名
               let candidateName = '候选人';
               const nameEl = card.querySelector('[class*="_name_"]:not([class*="_nameR_"])');
               if (nameEl) {
                 candidateName = nameEl.textContent?.trim() || candidateName;
               }
-              
+
+              // 获取候选人年龄和学历 - 从基本信息中提取
+              // 支持两种结构:
+              // - 旧结构: _baseInfoStr_ 内容如 "女丨32岁丨大专"
+              // - 新结构: _baseInfoRow_ 内容如 "<span>24岁</span><span>丨大专</span><span>丨离职</span>"
+              let candidateAge = null;
+              let candidateEducation = null;
+              const educationList = ['初中', '中专', '中技', '高中', '大专', '本科', '硕士', '博士'];
+              const baseInfoSelectors = [
+                '${createDynamicClassSelector("_baseInfoStr")}',
+                '${createDynamicClassSelector("_baseInfoRow")}'
+              ];
+              for (const selector of baseInfoSelectors) {
+                try {
+                  const baseInfoEl = card.querySelector(selector);
+                  if (baseInfoEl) {
+                    const baseInfoText = baseInfoEl.textContent || '';
+                    // 提取年龄
+                    const ageMatch = baseInfoText.match(/(\\d+)岁/);
+                    if (ageMatch) {
+                      candidateAge = ageMatch[1] + '岁';
+                    }
+                    // 提取学历
+                    for (const edu of educationList) {
+                      if (baseInfoText.includes(edu)) {
+                        candidateEducation = edu;
+                        break;
+                      }
+                    }
+                    if (candidateAge) break;
+                  }
+                } catch (e) {}
+              }
+
+              // 获取期望信息 - 从期望区域提取位置和职位
+              // 支持两种结构:
+              // - 旧结构: _cardMRI_ 内有span元素
+              // - 新结构: _recentEventRow_ 内有div元素，用 _divideDot_ 分隔
+              let candidatePosition = null;
+              let candidateExpectedLocation = null;
+              let candidateExpectedSalary = null;
+
+              const expectationSelectors = [
+                '${createDynamicClassSelector("_cardMRI")}',
+                '${createDynamicClassSelector("_recentEventRow")}'
+              ];
+
+              for (const selector of expectationSelectors) {
+                try {
+                  const expectationEl = card.querySelector(selector);
+                  if (!expectationEl) continue;
+
+                  // 新结构: 查找包含期望信息的flex容器
+                  const flexContainer = expectationEl.querySelector('.flex.gap-\\\\[4px\\\\]') ||
+                                       expectationEl.querySelector('div.flex.overflow-hidden');
+                  if (flexContainer) {
+                    // 新结构: div元素按顺序排列 [位置, ·, 职位, ·, 薪资]
+                    const children = Array.from(flexContainer.children);
+                    const textItems = children.filter(el =>
+                      !el.classList.contains('_divideDot_') &&
+                      !el.className.includes('_divideDot_') &&
+                      !el.className.includes('_dot_')
+                    ).map(el => el.textContent?.trim()).filter(Boolean);
+
+                    if (textItems.length >= 1) candidateExpectedLocation = textItems[0];
+                    if (textItems.length >= 2) candidatePosition = textItems[1];
+                    if (textItems.length >= 3) candidateExpectedSalary = textItems[2];
+                    break;
+                  }
+
+                  // 旧结构: span元素
+                  const spanEls = expectationEl.querySelectorAll('span:not([class*="_cardMRIT_"]):not([class*="_dot_"]):not([class*="_salary_"])');
+                  for (const span of spanEls) {
+                    const text = span.textContent?.trim();
+                    if (text && text.includes('·')) {
+                      const parts = text.split('·').map(p => p.trim());
+                      if (parts.length >= 2) {
+                        candidateExpectedLocation = parts[0];
+                        candidatePosition = parts[1];
+                      }
+                    } else if (text && !candidateExpectedLocation) {
+                      candidateExpectedLocation = text;
+                    }
+                  }
+
+                  // 旧结构: 单独的薪资元素
+                  const salaryEl = expectationEl.querySelector('[class*="_salary_"]');
+                  if (salaryEl) {
+                    candidateExpectedSalary = salaryEl.textContent?.trim() || null;
+                  }
+
+                  if (candidatePosition || candidateExpectedLocation) break;
+                } catch (e) {}
+              }
+
+              // 备用: 直接查找薪资元素
+              if (!candidateExpectedSalary) {
+                const salarySelectors = [
+                  '${createDynamicClassSelector("_salary")}',
+                  '.text-\\\\[\\\\#0092FF\\\\]',
+                  'div.flex-none.text-\\\\[\\\\#0092FF\\\\]'
+                ];
+                for (const selector of salarySelectors) {
+                  try {
+                    const salaryEl = card.querySelector(selector);
+                    if (salaryEl) {
+                      candidateExpectedSalary = salaryEl.textContent?.trim() || null;
+                      break;
+                    }
+                  } catch (e) {}
+                }
+              }
+
               // 标记按钮
               btn.setAttribute('data-say-hello-target', 'true');
-              return { 
-                success: true, 
+              return {
+                success: true,
                 buttonText: btn.textContent?.trim(),
-                candidateName: candidateName
+                candidateName: candidateName,
+                candidateAge: candidateAge,
+                candidateEducation: candidateEducation,
+                candidatePosition: candidatePosition,
+                candidateExpectedLocation: candidateExpectedLocation,
+                candidateExpectedSalary: candidateExpectedSalary
               };
             `);
 
@@ -191,6 +310,11 @@ export const yupaoSayHelloSimpleTool = () =>
               success: boolean;
               buttonText?: string;
               candidateName?: string;
+              candidateAge?: string;
+              candidateEducation?: string;
+              candidatePosition?: string;
+              candidateExpectedLocation?: string;
+              candidateExpectedSalary?: string;
               error?: string;
             } | null;
 
@@ -232,8 +356,10 @@ export const yupaoSayHelloSimpleTool = () =>
 
               const modals = Array.from(document.querySelectorAll('.ant-modal-content'));
               const conflictModal = modals.find(m => {
-                // 1. 检查文本内容
-                if (!m.textContent || !m.textContent.includes('您的同事近期联系过该牛人')) return false;
+                // 1. 检查文本内容 - 使用更宽松的匹配
+                const text = m.textContent || '';
+                const isConflictModal = text.includes('同事') && text.includes('联系过该牛人');
+                if (!isConflictModal) return false;
                 
                 // 2. 检查可见性
                 // Antd Modal 通常通过父级 .ant-modal-wrap 控制显示
@@ -275,11 +401,27 @@ export const yupaoSayHelloSimpleTool = () =>
               await new Promise(r => setTimeout(r, 500));
             }
 
+            const successCandidateName = marked.candidateName || `候选人${candidateIndex}`;
             results.push({
-              candidateName: marked.candidateName || `候选人${candidateIndex}`,
+              candidateName: successCandidateName,
               success: true,
               message: resultMessage,
               timestamp: new Date().toISOString(),
+            });
+
+            // 记录 CANDIDATE_CONTACTED 事件（主动打招呼）
+            recordCandidateContactedEvent({
+              platform: SourcePlatform.YUPAO,
+              candidate: {
+                name: successCandidateName,
+                age: marked.candidateAge,
+                education: marked.candidateEducation,
+                position: marked.candidatePosition,
+                expectedLocation: marked.candidateExpectedLocation,
+                expectedSalary: marked.candidateExpectedSalary,
+              },
+            }).catch((err) => {
+              console.warn("[YupaoSayHello] Failed to record candidate_contacted event:", err);
             });
 
             // 等待系统处理和发送消息

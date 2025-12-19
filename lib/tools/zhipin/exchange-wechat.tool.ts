@@ -7,6 +7,12 @@ import {
   randomDelay,
   clickWithMouseTrajectory,
 } from "./anti-detection-utils";
+import { SourcePlatform } from "@/db/types";
+import {
+  recruitmentEventService,
+  recruitmentContext,
+  extractBrandIdFromJobName,
+} from "@/lib/services/recruitment-event";
 
 /**
  * 交换微信工具
@@ -19,16 +25,24 @@ import {
 export const zhipinExchangeWechatTool = () =>
   tool({
     description: `BOSS直聘交换微信功能
-    
+
     功能：
     - 自动点击"换微信"按钮
     - 在确认对话框中点击"确定"按钮
     - 完成微信号交换流程
-    
+
     注意：
     - 需要先打开候选人聊天窗口
     - 需要确保当前聊天对象支持交换微信
-    - 操作有先后顺序，会自动等待弹窗出现`,
+    - 操作有先后顺序，会自动等待弹窗出现
+
+    重要：交换微信时请传入候选人信息用于数据统计，这些信息来自 zhipin_get_chat_details 工具返回的 summary 对象：
+    - candidateName: summary.candidateName
+    - candidateAge: summary.candidateAge（如"21岁"）
+    - candidateEducation: summary.candidateEducation（如"本科"）
+    - candidateExpectedSalary: summary.candidateExpectedSalary（如"3000-4000元"）
+    - candidateExpectedLocation: summary.candidateExpectedLocation（如"大连"）
+    - jobName: summary.communicationPosition（沟通职位/待招岗位，用于 candidate_key 生成）`,
 
     inputSchema: z.object({
       waitBetweenClicksMin: z
@@ -51,6 +65,14 @@ export const zhipinExchangeWechatTool = () =>
         .optional()
         .default(1500)
         .describe("交换完成后的最大等待时间（毫秒）"),
+      // 埋点上下文 - 来自 zhipin_get_chat_details 返回的 summary 对象
+      candidateName: z.string().optional().describe("候选人姓名，来自 summary.candidateName"),
+      candidateAge: z.string().optional().describe("候选人年龄，来自 summary.candidateAge（如'21岁'）"),
+      candidateEducation: z.string().optional().describe("候选人学历，来自 summary.candidateEducation（如'本科'）"),
+      candidateExpectedSalary: z.string().optional().describe("候选人期望薪资，来自 summary.candidateExpectedSalary（如'3000-4000元'）"),
+      candidateExpectedLocation: z.string().optional().describe("候选人期望地点，来自 summary.candidateExpectedLocation（如'大连'）"),
+      jobId: z.number().optional().describe("岗位ID"),
+      jobName: z.string().optional().describe("沟通职位/待招岗位名称，来自 summary.communicationPosition"),
     }),
 
     execute: async ({
@@ -58,6 +80,13 @@ export const zhipinExchangeWechatTool = () =>
       waitBetweenClicksMax = 800,
       waitAfterExchangeMin = 800,
       waitAfterExchangeMax = 1500,
+      candidateName,
+      candidateAge,
+      candidateEducation,
+      candidateExpectedSalary,
+      candidateExpectedLocation,
+      jobId,
+      jobName,
     }) => {
       try {
         const client = await getPuppeteerMCPClient();
@@ -419,12 +448,126 @@ export const zhipinExchangeWechatTool = () =>
         // 等待交换完成（随机延迟）
         await randomDelay(waitAfterExchangeMin, waitAfterExchangeMax);
 
+        // 尝试提取交换后的微信号
+        // Zhipin DOM 结构 (参考 get-chat-details.tool.ts):
+        // - 容器: .message-card-top-wrap 或 [class*="d-top-text"]
+        // - 微信号: 8-15位数字 或 "微信：xxx" 格式
+        let wechatNumber: string | undefined;
+        try {
+          const extractWechatScript = wrapAntiDetectionScript(`
+            // 策略1: 查找微信交换卡片 (.message-card-top-wrap 或 d-top-text)
+            const wechatCardSelectors = [
+              '.message-card-top-wrap',
+              '[class*="d-top-text"]',
+              '.message-card-top-title'
+            ];
+
+            for (const selector of wechatCardSelectors) {
+              const cards = document.querySelectorAll(selector);
+              for (const card of Array.from(cards).reverse()) {
+                const cardText = card.textContent || '';
+
+                // 方法1: 查找连续的数字（8-15位，微信号常见格式）
+                const numMatch = cardText.match(/\\b(\\d{8,15})\\b/);
+                if (numMatch) {
+                  return { wechatId: numMatch[1] };
+                }
+
+                // 方法2: 查找"微信"关键词后面的内容
+                const wechatTextMatch = cardText.match(/微信[：:号]*\\s*([a-zA-Z0-9_-]{5,20})/);
+                if (wechatTextMatch) {
+                  return { wechatId: wechatTextMatch[1] };
+                }
+
+                // 方法3: 查找字母开头的微信号（字母+数字组合，6-20位）
+                const alphaMatch = cardText.match(/\\b([a-zA-Z][a-zA-Z0-9_-]{5,19})\\b/);
+                if (alphaMatch && !['微信', 'WeChat'].includes(alphaMatch[1])) {
+                  return { wechatId: alphaMatch[1] };
+                }
+              }
+            }
+
+            // 策略2: 查找 msg-item 中的微信交换信息
+            const msgItems = document.querySelectorAll('.message-item, .msg-item');
+            for (const item of Array.from(msgItems).reverse()) {
+              const hasWechatCard = item.querySelector('.message-card-top-wrap, [class*="d-top-text"]');
+              if (hasWechatCard) {
+                const text = hasWechatCard.textContent || '';
+                const numMatch = text.match(/\\b(\\d{8,15})\\b/);
+                if (numMatch) {
+                  return { wechatId: numMatch[1] };
+                }
+              }
+            }
+
+            return { wechatId: null };
+          `);
+
+          const wechatResult = await puppeteerEvaluate.execute({ script: extractWechatScript });
+          const wechatData = parseEvaluateResult(wechatResult);
+          if (wechatData?.wechatId && typeof wechatData.wechatId === "string") {
+            wechatNumber = wechatData.wechatId;
+          }
+        } catch {
+          // 静默处理错误，微信号提取失败不影响主流程
+        }
+
+        // 埋点：记录微信交换事件（fire-and-forget）
+        const ctx = recruitmentContext.getContext();
+        if (ctx && candidateName) {
+          // 显式设置 sourcePlatform 为 zhipin
+          const zhipinCtx = { ...ctx, sourcePlatform: SourcePlatform.ZHIPIN };
+
+          // 解析年龄：从 "36岁" 提取数字 "36"
+          const parseAge = (ageStr?: string): string | undefined => {
+            if (!ageStr) return undefined;
+            const match = ageStr.match(/(\d+)/);
+            return match ? match[1] : ageStr;
+          };
+          // 解析薪资：从 "3000-4000元" 提取 "3000-4000"
+          const parseSalary = (salaryStr?: string): string | undefined => {
+            if (!salaryStr) return undefined;
+            // 移除"元"、"元/月"等后缀，保留数字和分隔符
+            return salaryStr.replace(/元.*$/, "").trim();
+          };
+
+          // 从 jobName 提取 brandId（精确匹配 data_dictionary）
+          const brandId = await extractBrandIdFromJobName(jobName);
+
+          // 注意：zhipin 使用沟通职位（jobName）作为 candidate.position 用于 candidate_key 生成
+          // 这与 yupao 不同，yupao 使用候选人期望职位
+          const builder = recruitmentEventService
+            .event(zhipinCtx)
+            .candidate({
+              name: candidateName,
+              position: jobName, // 使用沟通职位（communicationPosition）作为 candidate_key
+              age: parseAge(candidateAge),
+              education: candidateEducation,
+              expectedSalary: parseSalary(candidateExpectedSalary),
+              expectedLocation: candidateExpectedLocation,
+            });
+
+          // 设置岗位信息
+          if (jobName) {
+            builder.forJob(jobId || 0, jobName);
+          }
+
+          // 设置品牌信息
+          if (brandId) {
+            builder.forBrand(brandId);
+          }
+
+          const event = builder.wechatExchanged(wechatNumber); // 传入提取的微信号
+          recruitmentEventService.recordAsync(event);
+        }
+
         return {
           success: true,
-          message: "成功交换微信",
+          message: wechatNumber ? `成功交换微信: ${wechatNumber}` : "成功交换微信",
           details: {
             exchangeButtonSelector: (exchangeData.selector as string) || "unknown",
             confirmButtonSelector: (confirmData.selector as string) || "unknown",
+            wechatNumber: wechatNumber || undefined,
           },
         };
       } catch (error) {

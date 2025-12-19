@@ -50,7 +50,7 @@ export const getUnreadCandidatesImprovedTool = tool({
         // 使用改进的选择器查找名字
         const nameElement = element.querySelector('${UNREAD_SELECTORS.candidateNameSelectors}');
         const name = nameElement ? nameElement.textContent.trim() : '';
-        
+
         // 如果找不到名字，尝试从文本中提取
         let extractedName = name;
         if (!extractedName) {
@@ -58,9 +58,13 @@ export const getUnreadCandidatesImprovedTool = tool({
           const nameMatch = textContent.match(/[\\u4e00-\\u9fa5]{2,4}/);
           extractedName = nameMatch ? nameMatch[0] : '';
         }
-        
+
         if (!extractedName) return; // 跳过没有名字的元素
-        
+
+        // 提取候选人期望职位 (.source-job)
+        const positionElement = element.querySelector('${UNREAD_SELECTORS.jobTitle}');
+        const position = positionElement ? positionElement.textContent.trim() : '';
+
         // 检查未读状态 - 减少querySelector调用
         const hasUnread = !!(
           element.querySelector('${UNREAD_SELECTORS.unreadBadge}') ||
@@ -102,6 +106,7 @@ export const getUnreadCandidatesImprovedTool = tool({
         if (shouldAdd) {
           results.push({
             name: extractedName,
+            position: position,
             time: time,
             preview: preview,
             hasUnread: hasUnread,

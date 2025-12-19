@@ -70,3 +70,8 @@ test-review-*.ts
 # multi-agent runtime files
 configs/agents.json
 pids/
+
+# debug sample data (not for commit)
+docs/sample-data/recruitment_events.json
+docs/sample-data/recruitment_daily_stats.json
+docs/sample-data/recruitment_daily_stats_new.json

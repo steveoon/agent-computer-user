@@ -184,6 +184,7 @@ export const YUPAO_USER_SELECTORS = {
 } as const;
 
 // Say Hello page selectors (牛人打招呼页面)
+// Note: Page structure changed - now has two variants (old: xejow, new: ywecx)
 export const YUPAO_SAY_HELLO_SELECTORS = {
   // Main container
   container: ".ant-spin-container",
@@ -194,29 +195,50 @@ export const YUPAO_SAY_HELLO_SELECTORS = {
 
   // Candidate info elements
   candidateName: "._name_xejow_104",
-  candidateNameAlt: '[class*="_name_"]:not([class*="_nameR_"])',
+  candidateNameAlt: '[class*="_name_"]:not([class*="_nameR_"]):not([class*="_nameRow_"])',
 
   // Basic info (gender, age, experience)
+  // Old structure: _baseInfoStr_ | New structure: _baseInfoRow_
   baseInfoStr: "._baseInfoStr_xejow_168",
   baseInfoStrAlt: '[class*="_baseInfoStr_"]',
+  baseInfoRow: "._baseInfoRow_ywecx_27",
+  baseInfoRowAlt: '[class*="_baseInfoRow_"]',
 
   // Introduction text
+  // Old structure: _introduce_ | New structure: _introduceRow_
   introduce: "._introduce_xejow_182",
   introduceAlt: '[class*="_introduce_"]',
+  introduceRow: "._introduceRow_ywecx_30",
+  introduceRowAlt: '[class*="_introduceRow_"]',
 
   // Expected job info
+  // Old structure: _cardMRI_ | New structure: _recentEventRow_
   expectedInfo: "._cardMRI_xejow_199",
   expectedInfoAlt: '[class*="_cardMRI_"]',
+  recentEventRow: "._recentEventRow_ywecx_29",
+  recentEventRowAlt: '[class*="_recentEventRow_"]',
   expectedTitle: "._cardMRIT_xejow_208",
   expectedTitleAlt: '[class*="_cardMRIT_"]',
+
+  // Salary
+  // Old structure: _salary_ | New structure: no class, uses text-[#0092FF]
   salary: "._salary_xejow_217",
   salaryAlt: '[class*="_salary_"]',
+  salaryByColor: '.text-\\[\\#0092FF\\]',
+  salaryByColorAlt: '[class*="text-[#0092FF]"]',
+
+  // Divider dot
+  // Old structure: _dot_ | New structure: _divideDot_
+  dot: "._dot_xejow_213",
+  dotAlt: '[class*="_dot_"]',
+  divideDot: "._divideDot_ywecx_245",
+  divideDotAlt: '[class*="_divideDot_"]',
 
   // Online status
   onlineYes: "._onlineYes_xejow_51",
   online: "._online_xejow_51",
   relation: "._relation_xejow_38",
-  onlineAlt: '[class*="_online"][class*="_xejow_"]',
+  onlineAlt: '[class*="_online"]',
 
   // Chat button
   chatBtn: "._chatBtn_xejow_256",

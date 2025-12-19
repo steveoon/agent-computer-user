@@ -76,14 +76,44 @@ export function getAdaptiveSelectors(elementType: string): string[] {
       'div[class*="_cardML_"] > p:last-child',
     ],
     candidateBaseInfo: [
+      // Old structure: _baseInfoStr_
       createDynamicClassSelector("_baseInfoStr"),
       'p[class*="_baseInfoStr_"]',
+      // New structure: _baseInfoRow_
+      createDynamicClassSelector("_baseInfoRow"),
+      'div[class*="_baseInfoRow_"]',
+      // Fallback
       'div[class*="_cardML_"] > p:first-child',
     ],
     candidateSalary: [
+      // Old structure: _salary_
       createDynamicClassSelector("_salary"),
       'span[class*="_salary_"]',
+      // New structure: uses Tailwind color class
+      '.text-\\[\\#0092FF\\]',
+      'div.flex-none.text-\\[\\#0092FF\\]',
+      // Fallback: match by content pattern
       "span:matches(/\\d+[-~]\\d+元/)",
+    ],
+    candidateExpectation: [
+      // Old structure: _cardMRI_
+      createDynamicClassSelector("_cardMRI"),
+      'div[class*="_cardMRI_"]',
+      // New structure: _recentEventRow_
+      createDynamicClassSelector("_recentEventRow"),
+      'div[class*="_recentEventRow_"]',
+      // Fallback
+      'div[class*="_cardMR_"] > div:first-child',
+    ],
+    candidateIntroduce: [
+      // Old structure: _introduce_
+      createDynamicClassSelector("_introduce"),
+      'p[class*="_introduce_"]',
+      // New structure: _introduceRow_
+      createDynamicClassSelector("_introduceRow"),
+      'div[class*="_introduceRow_"]',
+      // Fallback
+      'div[class*="_cardML_"] > p:last-child',
     ],
     candidateOnlineStatus: [
       createDynamicClassSelector("_onlineYes"),

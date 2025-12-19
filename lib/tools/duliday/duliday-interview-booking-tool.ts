@@ -2,6 +2,12 @@ import { tool } from "ai";
 import { z } from "zod";
 import { getEducationIdByName, EDUCATION_MAPPING } from "@/lib/constants/organization-mapping";
 import { interviewBookingResponseSchema } from "./types";
+import {
+  recruitmentEventService,
+  recruitmentContext,
+  extractBrandIdFromJobName,
+} from "@/lib/services/recruitment-event";
+import { SourcePlatform } from "@/db/types";
 
 /**
  * Duliday预约面试工具
@@ -39,6 +45,9 @@ export const dulidayInterviewBookingTool = (customToken?: string) =>
         .default([])
         .describe("客户标签列表，默认为空数组"),
       operateType: z.number().optional().default(3).describe("操作类型，默认为3"),
+      // 埋点上下文（可选）- 来自用户输入或 duliday_job_list 结果
+      candidatePosition: z.string().optional().describe("候选人应聘的岗位类型，来自用户输入（如'兼职'、'服务员'）"),
+      jobName: z.string().optional().describe("Duliday 岗位名称，来自 duliday_job_list 返回的岗位名称，用于提取品牌信息"),
     }),
     execute: async ({
       name,
@@ -51,6 +60,8 @@ export const dulidayInterviewBookingTool = (customToken?: string) =>
       hasHealthCertificate = 1,
       customerLabelList = [],
       operateType = 3,
+      candidatePosition,
+      jobName,
     }) => {
       console.log("🔍 duliday_interview_booking tool called with:", {
         name,
@@ -148,12 +159,60 @@ export const dulidayInterviewBookingTool = (customToken?: string) =>
         }
 
         const data = parseResult.data;
+        const isSuccess = data.code === 0;
+
+        // 埋点：记录面试预约事件（fire-and-forget）
+        if (isSuccess) {
+          const baseCtx = recruitmentContext.getContext();
+          if (baseCtx && name) {
+            // 创建 Duliday 专用的上下文，覆盖 sourcePlatform
+            const dulidayCtx = {
+              ...baseCtx,
+              sourcePlatform: SourcePlatform.DULIDAY,
+            };
+
+            // 转换性别ID为字符串：1=男, 2=女
+            const genderMap: Record<number, string> = { 1: "男", 2: "女" };
+            const gender = genderId ? genderMap[genderId] : undefined;
+
+            // 从 jobName 提取 brandId
+            const brandId = await extractBrandIdFromJobName(jobName);
+
+            const builder = recruitmentEventService
+              .event(dulidayCtx)
+              .candidate({
+                name,
+                position: candidatePosition,
+                age: age, // 已经是字符串格式
+                gender: gender,
+                education: education,
+              });
+
+            // 设置岗位信息
+            if (jobName) {
+              builder.forJob(jobId, jobName);
+            } else {
+              builder.forJob(jobId, undefined);
+            }
+
+            // 设置品牌信息
+            if (brandId) {
+              builder.forBrand(brandId);
+            }
+
+            const event = builder.interviewBooked({
+              interviewTime,
+              candidatePhone: phone,
+            });
+            recruitmentEventService.recordAsync(event);
+          }
+        }
 
         // 返回原始API响应数据，让组件处理展示
         return {
           type: "object" as const,
           object: {
-            success: data.code === 0,
+            success: isSuccess,
             code: data.code,
             message: data.message,
             notice: data.data?.notice || null,

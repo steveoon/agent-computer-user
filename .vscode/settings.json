@@ -28,5 +28,13 @@
   "[markdown]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "cSpell.words": ["Duliday", "feishu", "wechat"]
+  "cSpell.words": ["Duliday", "feishu", "wechat"],
+  "search.useIgnoreFiles": false,
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.next": true,
+    "**/coverage": true,
+    "**/pnpm-lock.yaml": true,
+    "**/.git": true
+  }
 }

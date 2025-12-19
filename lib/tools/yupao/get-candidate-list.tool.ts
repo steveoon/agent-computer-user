@@ -116,23 +116,41 @@ export const yupaoGetCandidateListTool = () =>
               }
               
               // 获取基本信息（性别、年龄等）
+              // 支持两种结构:
+              // - 旧结构: _baseInfoStr_ 内容如 "女丨32岁丨3年经验"
+              // - 新结构: _baseInfoRow_ 内容如 "<span>35岁</span><span>离职-随时到岗</span>"
               const baseInfoSelectors = [
                 '${YUPAO_SAY_HELLO_SELECTORS.baseInfoStr}',
                 '${YUPAO_SAY_HELLO_SELECTORS.baseInfoStrAlt}',
-                '${createDynamicClassSelector("_baseInfoStr")}'
+                '${createDynamicClassSelector("_baseInfoStr")}',
+                '${YUPAO_SAY_HELLO_SELECTORS.baseInfoRow}',
+                '${YUPAO_SAY_HELLO_SELECTORS.baseInfoRowAlt}',
+                '${createDynamicClassSelector("_baseInfoRow")}'
               ];
-              
+
               for (const selector of baseInfoSelectors) {
                 try {
                   const infoEl = card.querySelector(selector);
                   if (infoEl) {
                     const infoText = infoEl.textContent?.trim();
                     if (infoText) {
-                      const parts = infoText.split('丨').map(s => s.trim());
-                      candidate.gender = parts[0];
-                      candidate.age = parts[1];
-                      candidate.experience = parts[2];
-                      candidate.education = parts[3];
+                      // 尝试用丨分割（旧结构）
+                      if (infoText.includes('丨')) {
+                        const parts = infoText.split('丨').map(s => s.trim());
+                        candidate.gender = parts[0];
+                        candidate.age = parts[1];
+                        candidate.experience = parts[2];
+                        candidate.education = parts[3];
+                      } else {
+                        // 新结构: 直接从文本中提取
+                        const ageMatch = infoText.match(/(\\d+)岁/);
+                        if (ageMatch) {
+                          candidate.age = ageMatch[0];
+                        }
+                        // 尝试提取其他信息
+                        if (infoText.includes('男')) candidate.gender = '男';
+                        else if (infoText.includes('女')) candidate.gender = '女';
+                      }
                     }
                     break;
                   }
@@ -140,12 +158,18 @@ export const yupaoGetCandidateListTool = () =>
               }
               
               // 获取自我介绍
+              // 支持两种结构:
+              // - 旧结构: _introduce_
+              // - 新结构: _introduceRow_
               const introSelectors = [
                 '${YUPAO_SAY_HELLO_SELECTORS.introduce}',
                 '${YUPAO_SAY_HELLO_SELECTORS.introduceAlt}',
-                '${createDynamicClassSelector("_introduce")}'
+                '${createDynamicClassSelector("_introduce")}',
+                '${YUPAO_SAY_HELLO_SELECTORS.introduceRow}',
+                '${YUPAO_SAY_HELLO_SELECTORS.introduceRowAlt}',
+                '${createDynamicClassSelector("_introduceRow")}'
               ];
-              
+
               for (const selector of introSelectors) {
                 try {
                   const introEl = card.querySelector(selector);
@@ -155,48 +179,80 @@ export const yupaoGetCandidateListTool = () =>
                   }
                 } catch (e) {}
               }
-              
+
               // 获取期望职位信息
+              // 支持两种结构:
+              // - 旧结构: _cardMRI_ 内有span元素
+              // - 新结构: _recentEventRow_ 内有div元素，用 _divideDot_ 分隔
               const expectedSelectors = [
                 '${YUPAO_SAY_HELLO_SELECTORS.expectedInfo}',
-                '${YUPAO_SAY_HELLO_SELECTORS.expectedInfoAlt}'
+                '${YUPAO_SAY_HELLO_SELECTORS.expectedInfoAlt}',
+                '${YUPAO_SAY_HELLO_SELECTORS.recentEventRow}',
+                '${YUPAO_SAY_HELLO_SELECTORS.recentEventRowAlt}',
+                '${createDynamicClassSelector("_recentEventRow")}'
               ];
-              
+
               for (const selector of expectedSelectors) {
                 try {
-                  const expectedEls = card.querySelectorAll(selector);
-                  expectedEls.forEach(el => {
-                    const text = el.textContent?.trim();
-                    if (text?.includes('期望')) {
-                      const content = text.replace('期望：', '').trim();
-                      if (content.includes('·')) {
-                        const parts = content.split('·').map(s => s.trim());
-                        candidate.expectedLocation = parts[0];
-                        candidate.expectedPosition = parts[1];
-                      } else {
-                        candidate.expectedPosition = content;
-                      }
+                  const expectationEl = card.querySelector(selector);
+                  if (!expectationEl) continue;
+
+                  // 新结构: 查找包含期望信息的flex容器
+                  const flexContainer = expectationEl.querySelector('.flex.gap-\\\\[4px\\\\]') ||
+                                       expectationEl.querySelector('div.flex.overflow-hidden');
+                  if (flexContainer) {
+                    // 新结构: div元素按顺序排列 [位置, ·, 职位, ·, 薪资]
+                    const children = Array.from(flexContainer.children);
+                    const textItems = children.filter(el =>
+                      !el.classList.contains('_divideDot_') &&
+                      !el.className.includes('_divideDot_') &&
+                      !el.className.includes('_dot_')
+                    ).map(el => el.textContent?.trim()).filter(Boolean);
+
+                    if (textItems.length >= 1) candidate.expectedLocation = textItems[0];
+                    if (textItems.length >= 2) candidate.expectedPosition = textItems[1];
+                    if (textItems.length >= 3) candidate.expectedSalary = textItems[2];
+                    break;
+                  }
+
+                  // 旧结构: 从文本解析
+                  const text = expectationEl.textContent?.trim();
+                  if (text?.includes('期望')) {
+                    const content = text.replace('期望：', '').trim();
+                    if (content.includes('·')) {
+                      const parts = content.split('·').map(s => s.trim());
+                      candidate.expectedLocation = parts[0];
+                      candidate.expectedPosition = parts[1];
+                    } else {
+                      candidate.expectedPosition = content;
                     }
-                  });
+                  }
                   if (candidate.expectedPosition) break;
                 } catch (e) {}
               }
-              
-              // 获取薪资
-              const salarySelectors = [
-                '${YUPAO_SAY_HELLO_SELECTORS.salary}',
-                '${YUPAO_SAY_HELLO_SELECTORS.salaryAlt}',
-                '${createDynamicClassSelector("_salary")}'
-              ];
-              
-              for (const selector of salarySelectors) {
-                try {
-                  const salaryEl = card.querySelector(selector);
-                  if (salaryEl) {
-                    candidate.expectedSalary = salaryEl.textContent?.trim();
-                    break;
-                  }
-                } catch (e) {}
+
+              // 获取薪资（如果上面没有获取到）
+              // 支持两种结构:
+              // - 旧结构: _salary_
+              // - 新结构: text-[#0092FF] (Tailwind 蓝色)
+              if (!candidate.expectedSalary) {
+                const salarySelectors = [
+                  '${YUPAO_SAY_HELLO_SELECTORS.salary}',
+                  '${YUPAO_SAY_HELLO_SELECTORS.salaryAlt}',
+                  '${createDynamicClassSelector("_salary")}',
+                  '.text-\\\\[\\\\#0092FF\\\\]',
+                  'div.flex-none.text-\\\\[\\\\#0092FF\\\\]'
+                ];
+
+                for (const selector of salarySelectors) {
+                  try {
+                    const salaryEl = card.querySelector(selector);
+                    if (salaryEl) {
+                      candidate.expectedSalary = salaryEl.textContent?.trim();
+                      break;
+                    }
+                  } catch (e) {}
+                }
               }
               
               // 获取在线状态

@@ -3,29 +3,9 @@ import { z } from "zod";
 import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
 import { CHAT_SELECTORS } from "./constants";
 import { randomDelay, wrapAntiDetectionScript } from "./anti-detection-utils";
-
-/**
- * 解析 puppeteer_evaluate 的结果
- */
-function parseEvaluateResult(result: unknown): Record<string, unknown> | null {
-  try {
-    const mcpResult = result as { content?: Array<{ text?: string }> };
-    if (mcpResult?.content?.[0]?.text) {
-      const resultText = mcpResult.content[0].text;
-      const executionMatch = resultText.match(
-        /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
-      );
-
-      if (executionMatch && executionMatch[1].trim() !== "undefined") {
-        const jsonResult = executionMatch[1].trim();
-        return JSON.parse(jsonResult) as Record<string, unknown>;
-      }
-    }
-  } catch (e) {
-    console.error("Failed to parse evaluate result:", e);
-  }
-  return null;
-}
+import { parseEvaluateResult } from "../shared/puppeteer-utils";
+import { SourcePlatform } from "@/db/types";
+import { recordMessageSentEvent } from "@/lib/services/recruitment-event";
 
 /**
  * 发送消息工具
@@ -40,24 +20,64 @@ function parseEvaluateResult(result: unknown): Record<string, unknown> | null {
 export const zhipinSendMessageTool = () =>
   tool({
     description: `发送消息到BOSS直聘聊天窗口
-    
+
     功能：
     - 在聊天输入框中输入消息
     - 自动查找并点击发送按钮
     - 验证消息是否成功发送
-    
+
     注意：
     - 需要先打开候选人聊天窗口
     - 支持多行消息（使用\\n分隔）
-    - 会自动等待消息发送完成`,
+    - 会自动等待消息发送完成
+
+    【必传参数】发送消息时请传入以下信息用于数据统计：
+
+    1. 未读状态（来自 zhipin_open_candidate_chat_improved）：
+       - unreadCountBeforeReply: candidateInfo.unreadCount（打开候选人时的未读消息数，非常重要！）
+
+    2. 候选人信息（来自 zhipin_get_chat_details 的 summary）：
+       - candidateName: summary.candidateName
+       - candidateAge: summary.candidateAge（如"21岁"）
+       - candidateEducation: summary.candidateEducation（如"本科"）
+       - candidateExpectedSalary: summary.candidateExpectedSalary（如"3000-4000元"）
+       - candidateExpectedLocation: summary.candidateExpectedLocation（如"大连"）
+       - jobName: summary.communicationPosition（沟通职位/待招岗位，用于 candidate_key 生成）`,
 
     inputSchema: z.object({
       message: z.string().describe("要发送的消息内容"),
       clearBefore: z.boolean().optional().default(true).describe("发送前是否清空输入框"),
       waitAfterSend: z.number().optional().default(1000).describe("发送后等待时间（毫秒）"),
+      // 埋点上下文 - 来自 zhipin_get_chat_details 返回的 summary 对象
+      candidateName: z.string().optional().describe("候选人姓名，来自 summary.candidateName"),
+      candidateAge: z.string().optional().describe("候选人年龄，来自 summary.candidateAge（如'21岁'）"),
+      candidateEducation: z.string().optional().describe("候选人学历，来自 summary.candidateEducation（如'本科'）"),
+      candidateExpectedSalary: z.string().optional().describe("候选人期望薪资，来自 summary.candidateExpectedSalary（如'3000-4000元'）"),
+      candidateExpectedLocation: z.string().optional().describe("候选人期望地点，来自 summary.candidateExpectedLocation（如'大连'）"),
+      jobId: z.number().optional().describe("岗位ID"),
+      jobName: z.string().optional().describe("沟通职位/待招岗位名称，来自 summary.communicationPosition"),
+      // 未读消息上下文 - 优先来自 open_candidate_chat，其次来自 get_unread_messages
+      unreadCountBeforeReply: z.number().optional().describe(
+        "回复前的未读消息数。" +
+        "【优先来源】zhipin_open_candidate_chat_improved 返回的 candidateInfo.unreadCount - 这是打开候选人时捕获的最准确数据。" +
+        "【次要来源】zhipin_get_unread_candidates_improved 返回的候选人 unreadCount。" +
+        "重要：如果是连续发送多条消息（对方未发新消息），第二条及之后应传 0，因为未读消息已在第一次回复时被消费。"
+      ),
     }),
 
-    execute: async ({ message, clearBefore = true, waitAfterSend = 1000 }) => {
+    execute: async ({
+      message,
+      clearBefore = true,
+      waitAfterSend = 1000,
+      candidateName,
+      candidateAge,
+      candidateEducation,
+      candidateExpectedSalary,
+      candidateExpectedLocation,
+      jobId,
+      jobName,
+      unreadCountBeforeReply,
+    }) => {
       try {
         const client = await getPuppeteerMCPClient();
         const tools = await client.tools();
@@ -221,6 +241,26 @@ export const zhipinSendMessageTool = () =>
           // 等待消息发送完成
           if (waitAfterSend > 0) {
             await randomDelay(waitAfterSend * 0.8, waitAfterSend * 1.2);
+          }
+
+          // 埋点：记录消息发送事件（fire-and-forget）
+          // 注意：zhipin 使用沟通职位（jobName）作为 candidate.position 用于 candidate_key 生成
+          // 这与 yupao 不同，yupao 使用候选人期望职位
+          if (candidateName) {
+            recordMessageSentEvent({
+              platform: SourcePlatform.ZHIPIN,
+              candidate: {
+                name: candidateName,
+                position: jobName, // 使用沟通职位（communicationPosition）作为 candidate_key
+                age: candidateAge,
+                education: candidateEducation,
+                expectedSalary: candidateExpectedSalary,
+                expectedLocation: candidateExpectedLocation,
+              },
+              jobInfo: { jobId, jobName },
+              unreadCount: unreadCountBeforeReply ?? 0,
+              message,
+            });
           }
 
           return {
