@@ -7,7 +7,7 @@
 
 import { eq, and, gte, lte, sql, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
-import { recruitmentDailyStats, recruitmentEvents } from "@/db/schema";
+import { recruitmentDailyStats } from "@/db/schema";
 import type { DirtyRecord, DailyStatsRecord } from "./types";
 
 const LOG_PREFIX = "[RecruitmentStats][Repository]";
@@ -28,16 +28,13 @@ export type DrizzleSelectStats = typeof recruitmentDailyStats.$inferSelect;
  * Sleep 工具函数
  */
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
  * 重试包装器
  */
-async function withRetry<T>(
-  operation: () => Promise<T>,
-  operationName: string
-): Promise<T | null> {
+async function withRetry<T>(operation: () => Promise<T>, operationName: string): Promise<T | null> {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
@@ -148,7 +145,7 @@ class RecruitmentStatsRepository {
     await withRetry(async () => {
       const db = getDb();
 
-      await db.transaction(async (tx) => {
+      await db.transaction(async tx => {
         // 1. 查找现有记录（正确处理 NULL）
         const existing = await tx
           .select({ id: recruitmentDailyStats.id })
@@ -210,19 +207,14 @@ class RecruitmentStatsRepository {
     await withRetry(async () => {
       const db = getDb();
 
-      await db.transaction(async (tx) => {
+      await db.transaction(async tx => {
         // 1. 查找现有记录（正确处理 NULL）
         const existing = await tx
           .select({ id: recruitmentDailyStats.id })
           .from(recruitmentDailyStats)
           .where(
             and(
-              ...buildDimensionConditions(
-                stats.agentId,
-                stats.statDate,
-                stats.brandId,
-                stats.jobId
-              )
+              ...buildDimensionConditions(stats.agentId, stats.statDate, stats.brandId, stats.jobId)
             )
           )
           .limit(1);
@@ -326,11 +318,19 @@ class RecruitmentStatsRepository {
       if (agentId) {
         conditions.push(eq(recruitmentDailyStats.agentId, agentId));
       }
+      // 当未指定 brandId 时，默认只查询总体聚合记录（brand_id IS NULL）
+      // 避免将总体记录和品牌分解记录重复计算
       if (brandId !== undefined) {
         conditions.push(eq(recruitmentDailyStats.brandId, brandId));
+      } else {
+        conditions.push(isNull(recruitmentDailyStats.brandId));
       }
+      // 当未指定 jobId 时，也过滤 job_id IS NULL（查询总体聚合记录）
+      // 这样可以避免 brand_id: null + job_id: 0 与 brand_id: null + job_id: null 重复计算
       if (jobId !== undefined) {
         conditions.push(eq(recruitmentDailyStats.jobId, jobId));
+      } else {
+        conditions.push(isNull(recruitmentDailyStats.jobId));
       }
 
       return db
@@ -354,27 +354,29 @@ class RecruitmentStatsRepository {
     endDate: Date,
     brandId?: number,
     jobId?: number
-  ): Promise<{
-    agentId: string;
-    brandId: number | null;
-    jobId: number | null;
-    totalEvents: number;
-    uniqueCandidates: number;
-    uniqueSessions: number;
-    // 入站漏斗
-    messagesSent: number;
-    messagesReceived: number;
-    inboundCandidates: number;
-    candidatesReplied: number;
-    unreadReplied: number;
-    // 出站漏斗
-    proactiveOutreach: number;
-    proactiveResponded: number;
-    // 转化指标
-    wechatExchanged: number;
-    interviewsBooked: number;
-    candidatesHired: number;
-  }[]> {
+  ): Promise<
+    {
+      agentId: string;
+      brandId: number | null;
+      jobId: number | null;
+      totalEvents: number;
+      uniqueCandidates: number;
+      uniqueSessions: number;
+      // 入站漏斗
+      messagesSent: number;
+      messagesReceived: number;
+      inboundCandidates: number;
+      candidatesReplied: number;
+      unreadReplied: number;
+      // 出站漏斗
+      proactiveOutreach: number;
+      proactiveResponded: number;
+      // 转化指标
+      wechatExchanged: number;
+      interviewsBooked: number;
+      candidatesHired: number;
+    }[]
+  > {
     const result = await withRetry(async () => {
       const db = getDb();
 
@@ -387,11 +389,19 @@ class RecruitmentStatsRepository {
       if (agentId) {
         conditions.push(eq(recruitmentDailyStats.agentId, agentId));
       }
+      // 当未指定 brandId 时，默认只查询总体聚合记录（brand_id IS NULL）
+      // 避免将总体记录和品牌分解记录重复计算
       if (brandId !== undefined) {
         conditions.push(eq(recruitmentDailyStats.brandId, brandId));
+      } else {
+        conditions.push(isNull(recruitmentDailyStats.brandId));
       }
+      // 当未指定 jobId 时，也过滤 job_id IS NULL（查询总体聚合记录）
+      // 这样可以避免 brand_id: null + job_id: 0 与 brand_id: null + job_id: null 重复计算
       if (jobId !== undefined) {
         conditions.push(eq(recruitmentDailyStats.jobId, jobId));
+      } else {
+        conditions.push(isNull(recruitmentDailyStats.jobId));
       }
 
       return db
@@ -426,7 +436,7 @@ class RecruitmentStatsRepository {
     }, "queryAggregatedStats");
 
     return (
-      result?.map((row) => ({
+      result?.map(row => ({
         agentId: row.agentId,
         brandId: row.brandId,
         jobId: row.jobId,
@@ -450,58 +460,6 @@ class RecruitmentStatsRepository {
     );
   }
 
-  /**
-   * 获取某个 Agent 有事件的所有日期
-   *
-   * 用于全量重算
-   */
-  async getDistinctEventDates(agentId: string): Promise<Date[]> {
-    const result = await withRetry(async () => {
-      const db = getDb();
-      return db
-        .selectDistinct({
-          date: sql<Date>`DATE(${recruitmentEvents.eventTime})`,
-        })
-        .from(recruitmentEvents)
-        .where(eq(recruitmentEvents.agentId, agentId))
-        .orderBy(sql`DATE(${recruitmentEvents.eventTime})`);
-    }, "getDistinctEventDates");
-
-    return result?.map((r) => new Date(r.date)) ?? [];
-  }
-
-  /**
-   * 获取某个 Agent 某天的所有品牌-岗位组合
-   *
-   * 用于细粒度聚合
-   */
-  async getDistinctDimensions(
-    agentId: string,
-    date: Date
-  ): Promise<{ brandId: number | null; jobId: number | null }[]> {
-    const dayStart = normalizeToStartOfDay(date);
-    const dayEnd = new Date(dayStart);
-    dayEnd.setUTCHours(23, 59, 59, 999);
-
-    const result = await withRetry(async () => {
-      const db = getDb();
-      return db
-        .selectDistinct({
-          brandId: recruitmentEvents.brandId,
-          jobId: recruitmentEvents.jobId,
-        })
-        .from(recruitmentEvents)
-        .where(
-          and(
-            eq(recruitmentEvents.agentId, agentId),
-            gte(recruitmentEvents.eventTime, dayStart),
-            lte(recruitmentEvents.eventTime, dayEnd)
-          )
-        );
-    }, "getDistinctDimensions");
-
-    return result ?? [];
-  }
 }
 
 /**

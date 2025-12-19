@@ -16,8 +16,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pnpm test:run` - Run unit tests once
 - `pnpm test:coverage` - Generate test coverage report
 - `pnpm format` - Format code with Prettier
+- `pnpm format:check` - Check formatting without changes
 - `npx tsc --noEmit` - Run TypeScript type checking
 - `pnpm test -- path/to/test.spec.ts` - Run a specific test file
+
+### Database Commands (Drizzle ORM)
+
+- `pnpm db:generate` - Generate migration files from schema changes
+- `pnpm db:migrate` - Run pending migrations
+- `pnpm db:push` - Push schema changes directly (dev only)
+- `pnpm db:studio` - Open Drizzle Studio for database inspection
+- `pnpm db:init` - Initialize brand data seed
 
 ### Docker Commands
 
@@ -29,11 +38,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Manage multiple Agent instances with isolated browser sessions. See [MULTI_AGENT_GUIDE.md](docs/guides/MULTI_AGENT_GUIDE.md) for details.
 
-- `pnpm agent:add zhipin --count 3` - Add Agents
+- `pnpm agent:add zhipin --count 3` - Add Agents with isolated browser profiles
 - `pnpm agent:list` - List all Agents with status
-- `pnpm agent:start/stop` - Start/stop Agents
+- `pnpm agent:start` / `pnpm agent:stop` - Start/stop Agents
+- `pnpm agent:restart` - Restart running Agents
+- `pnpm agent:status` - Check agent and web stack health
+- `pnpm agent:logs <name>` - View agent logs (append `chrome` for browser logs)
 - `pnpm agent:update` - Auto-update: pull + build + restart running Agents
+- `pnpm agent:remove <name>` - Remove an Agent
 - `./scripts/multi-agent.sh help` - See all commands
+
+### Monitoring Commands
+
+- `pnpm monitor:start` - Start unread message monitor
+- `pnpm monitor:start:auto` - Start monitor with auto-submit enabled
 
 ## Architecture Overview
 
@@ -90,11 +108,15 @@ z.string({ error: issue => issue.input === undefined ? "Required" : "Invalid" })
 
 - **Components**: `components/` with domain subdirectories
 - **API Routes**: `app/api/*/route.ts` (Next.js 15 App Router)
+- **Server Actions**: `actions/` for Next.js Server Actions
 - **Tools**: `lib/tools/` with tool-specific subdirectories
 - **Stores**: `lib/stores/` (Zustand)
 - **Services**: `lib/services/` (singletons)
 - **Errors**: `lib/errors/` (structured error handling - AppError, error codes, factories)
 - **Types**: `types/` for shared TypeScript definitions
+- **Database**: `db/` for connection helpers, `drizzle/` for schema and migrations
+- **Scripts**: `scripts/` for automation (multi-agent, deploy, release)
+- **Hooks**: `hooks/` for custom React hooks
 
 ## Available AI Tools
 
@@ -117,8 +139,9 @@ z.string({ error: issue => issue.input === undefined ? "Required" : "Invalid" })
 ### Strategy
 - Vitest with 80% coverage thresholds
 - React Testing Library for components
-- Test files in `__tests__` directories
+- Test files in `__tests__` directories or colocated `*.test.ts(x)` files
 - AI SDK test utilities: `lib/__tests__/test-utils/ai-mocks.ts`
+- Visual debugging: `pnpm test:ui` for Vitest UI interface
 
 ### Endpoints
 - `/test-llm-reply` - Web interface for LLM smart reply testing
@@ -169,7 +192,8 @@ DULIDAY_TOKEN, EXA_API_KEY
 ### MCP Integration
 - Singleton manager for client lifecycle
 - Multiple servers: Puppeteer, Google Maps, Exa
-- Test: `pnpm test:mcp-connection`
+- Test connection: `pnpm test:mcp-connection`
+- Run before shipping MCP protocol changes
 
 ### AI SDK Message Handling
 - Uses `message.parts` array (not `message.content` array)

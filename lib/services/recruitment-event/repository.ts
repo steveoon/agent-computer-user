@@ -76,16 +76,26 @@ class RecruitmentEventsRepository {
 
     // 标记统计数据为脏（需要重新聚合）
     if (result) {
+      // 1. 始终标记汇总行（brand_id: null, job_id: null）为脏
       recruitmentStatsRepository
-        .markDirty(
-          result.agentId,
-          result.eventTime,
-          result.brandId ?? undefined,
-          result.jobId ?? undefined
-        )
+        .markDirty(result.agentId, result.eventTime, null, null)
         .catch((err) => {
-          console.warn(`${LOG_PREFIX} Failed to mark stats dirty:`, err);
+          console.warn(`${LOG_PREFIX} Failed to mark aggregate stats dirty:`, err);
         });
+
+      // 2. 如果有具体 brand/job，也标记该维度为脏
+      if (result.brandId !== null || result.jobId !== null) {
+        recruitmentStatsRepository
+          .markDirty(
+            result.agentId,
+            result.eventTime,
+            result.brandId ?? undefined,
+            result.jobId ?? undefined
+          )
+          .catch((err) => {
+            console.warn(`${LOG_PREFIX} Failed to mark dimension stats dirty:`, err);
+          });
+      }
     }
 
     return result;
@@ -230,6 +240,78 @@ class RecruitmentEventsRepository {
     }, "getMaxMessageSequence");
 
     return result?.[0]?.maxSeq ?? 0;
+  }
+
+  /**
+   * 获取所有有事件记录的 Agent ID
+   *
+   * 用于全量重算
+   */
+  async getDistinctAgents(): Promise<string[]> {
+    const result = await withRetry(async () => {
+      const db = getDb();
+      return db
+        .selectDistinct({
+          agentId: recruitmentEvents.agentId,
+        })
+        .from(recruitmentEvents);
+    }, "getDistinctAgents");
+
+    return result?.map(r => r.agentId) ?? [];
+  }
+
+  /**
+   * 获取某个 Agent 有事件的所有日期
+   *
+   * 用于全量重算
+   */
+  async getDistinctEventDates(agentId: string): Promise<Date[]> {
+    const result = await withRetry(async () => {
+      const db = getDb();
+      return db
+        .selectDistinct({
+          date: sql<Date>`DATE(${recruitmentEvents.eventTime})`,
+        })
+        .from(recruitmentEvents)
+        .where(eq(recruitmentEvents.agentId, agentId))
+        .orderBy(sql`DATE(${recruitmentEvents.eventTime})`);
+    }, "getDistinctEventDates");
+
+    return result?.map(r => new Date(r.date)) ?? [];
+  }
+
+  /**
+   * 获取某个 Agent 某天的所有品牌-岗位组合
+   *
+   * 用于细粒度聚合
+   */
+  async getDistinctDimensions(
+    agentId: string,
+    date: Date
+  ): Promise<{ brandId: number | null; jobId: number | null }[]> {
+    const dayStart = new Date(date);
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setUTCHours(23, 59, 59, 999);
+
+    const result = await withRetry(async () => {
+      const db = getDb();
+      return db
+        .selectDistinct({
+          brandId: recruitmentEvents.brandId,
+          jobId: recruitmentEvents.jobId,
+        })
+        .from(recruitmentEvents)
+        .where(
+          and(
+            eq(recruitmentEvents.agentId, agentId),
+            gte(recruitmentEvents.eventTime, dayStart),
+            lte(recruitmentEvents.eventTime, dayEnd)
+          )
+        );
+    }, "getDistinctDimensions");
+
+    return result ?? [];
   }
 }
 

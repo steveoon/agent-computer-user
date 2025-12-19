@@ -140,13 +140,79 @@ export const yupaoExchangeWechatTool = () =>
         const pendingData = parseEvaluateResult(pendingResult) as { handled: boolean; message?: string } | null;
 
         if (pendingData?.handled) {
+          // 等待交换完成
+          await randomDelay(waitAfterExchangeMin, waitAfterExchangeMax);
+
+          // 尝试提取微信号
+          let wechatNumber: string | undefined;
+          try {
+            const extractWechatScript = wrapAntiDetectionScript(`
+              const containerSelectors = ['.view-phone-box', 'div[class*="view-phone-box"]'];
+              const wechatIconSelectors = ['.yp-weixinlogo', '.yp-pc.yp-weixinlogo', 'i[class*="yp-weixin"]'];
+              const textSelectors = ['.text', 'p[class*="text"]', 'span[class*="text"]'];
+              for (const containerSel of containerSelectors) {
+                const boxes = document.querySelectorAll(containerSel);
+                for (const box of Array.from(boxes).reverse()) {
+                  let hasWechatIcon = false;
+                  for (const iconSel of wechatIconSelectors) {
+                    if (box.querySelector(iconSel)) { hasWechatIcon = true; break; }
+                  }
+                  if (!hasWechatIcon) continue;
+                  for (const textSel of textSelectors) {
+                    const textEl = box.querySelector(textSel);
+                    if (textEl && textEl.textContent) {
+                      const wechat = textEl.textContent.trim();
+                      if (wechat && wechat.length >= 5 && wechat.length <= 30 &&
+                          !wechat.includes('点击') && !wechat.includes('查看') &&
+                          !wechat.includes('交换') && !wechat.includes('请求')) {
+                        return { wechatId: wechat };
+                      }
+                    }
+                  }
+                }
+              }
+              return { wechatId: null };
+            `);
+            const wechatResult = await puppeteerEvaluate.execute({ script: extractWechatScript });
+            const wechatData = parseEvaluateResult(wechatResult);
+            if (wechatData?.wechatId && typeof wechatData.wechatId === "string") {
+              wechatNumber = wechatData.wechatId;
+            }
+          } catch {
+            // 静默处理错误
+          }
+
+          // 📊 埋点：记录微信交换事件（同意对方请求的情况）
+          if (candidateName) {
+            recordWechatExchangedEvent({
+              platform: SourcePlatform.YUPAO,
+              candidate: {
+                name: candidateName,
+                position: candidatePosition,
+                age: candidateAge,
+                education: candidateEducation,
+                expectedSalary: candidateExpectedSalary,
+                expectedLocation: candidateExpectedLocation,
+              },
+              jobInfo: { jobId, jobName },
+              wechatNumber,
+            });
+          } else {
+            console.warn(
+              "[yupao_exchange_wechat] ⚠️ candidateName 未传入（同意请求场景），跳过 wechat_exchanged 事件记录。"
+            );
+          }
+
           return {
             success: true,
-            message: pendingData.message || "成功同意交换微信请求",
+            message: wechatNumber
+              ? `成功同意交换微信: ${wechatNumber}`
+              : pendingData.message || "成功同意交换微信请求",
             details: {
               method: "accepted_request",
-              info: "检测到对方已发起请求，自动点击同意"
-            }
+              info: "检测到对方已发起请求，自动点击同意",
+              wechatNumber: wechatNumber || undefined,
+            },
           };
         }
 
@@ -597,6 +663,10 @@ export const yupaoExchangeWechatTool = () =>
             jobInfo: { jobId, jobName },
             wechatNumber,
           });
+        } else {
+          console.warn(
+            "[yupao_exchange_wechat] ⚠️ candidateName 未传入，跳过 wechat_exchanged 事件记录。请确保调用时传入 candidateName 参数！"
+          );
         }
 
         return {

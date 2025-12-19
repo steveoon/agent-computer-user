@@ -356,8 +356,10 @@ export const yupaoSayHelloSimpleTool = () =>
 
               const modals = Array.from(document.querySelectorAll('.ant-modal-content'));
               const conflictModal = modals.find(m => {
-                // 1. 检查文本内容
-                if (!m.textContent || !m.textContent.includes('您的同事近期联系过该牛人')) return false;
+                // 1. 检查文本内容 - 使用更宽松的匹配
+                const text = m.textContent || '';
+                const isConflictModal = text.includes('同事') && text.includes('联系过该牛人');
+                if (!isConflictModal) return false;
                 
                 // 2. 检查可见性
                 // Antd Modal 通常通过父级 .ant-modal-wrap 控制显示

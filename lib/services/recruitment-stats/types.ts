@@ -85,9 +85,7 @@ export const statsQuerySchema = z.object({
   agentId: z.string().optional(),
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
-  timeRange: z
-    .enum(["day", "week", "month", "year", "custom"])
-    .default("day"),
+  timeRange: z.enum(["day", "week", "month", "year", "custom"]).default("day"),
   brandId: z.coerce.number().optional(),
   jobId: z.coerce.number().optional(),
   groupBy: z
@@ -190,4 +188,39 @@ export interface DashboardSummary {
   previous: AggregatedStats[];
   /** 环比趋势（百分比变化） */
   trend: Record<string, number | null>;
+}
+
+/**
+ * Dashboard 筛选参数
+ */
+export interface DashboardFilters {
+  startDate: string; // ISO date string
+  endDate: string;
+  agentId?: string;
+  brandId?: number;
+  jobId?: number;
+  preset?: "today" | "yesterday" | "last7days" | "last14days" | "last30days";
+}
+
+/**
+ * 日粒度趋势数据项
+ */
+export interface DailyTrendItem {
+  date: string;
+  messagesReceived: number;
+  inboundCandidates: number;
+  candidatesReplied: number;
+  wechatExchanged: number;
+  interviewsBooked: number;
+  unreadReplied: number;
+  proactiveOutreach: number;
+  proactiveResponded: number;
+}
+
+/**
+ * Dashboard 完整数据响应
+ */
+export interface DashboardData {
+  summary: DashboardSummary;
+  dailyTrend: DailyTrendItem[];
 }

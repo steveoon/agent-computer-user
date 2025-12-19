@@ -9,11 +9,8 @@ import { eq, and, gte, lte, sql, count, countDistinct } from "drizzle-orm";
 import { getDb } from "@/db";
 import { recruitmentEvents } from "@/db/schema";
 import { RecruitmentEventType } from "@/db/types";
-import {
-  recruitmentStatsRepository,
-  normalizeToStartOfDay,
-  calculateRate,
-} from "./repository";
+import { recruitmentStatsRepository, normalizeToStartOfDay, calculateRate } from "./repository";
+import { recruitmentEventsRepository } from "@/lib/services/recruitment-event/repository";
 import type { DirtyRecord, AggregationResult, DailyStatsRecord } from "./types";
 
 const LOG_PREFIX = "[RecruitmentStats][Aggregation]";
@@ -267,7 +264,7 @@ class AggregationService {
     console.log(`${LOG_PREFIX} Starting full re-aggregation for: ${agentId}`);
 
     // 获取所有有事件的日期
-    const dates = await recruitmentStatsRepository.getDistinctEventDates(agentId);
+    const dates = await recruitmentEventsRepository.getDistinctEventDates(agentId);
     console.log(`${LOG_PREFIX} Found ${dates.length} days with events`);
 
     for (const date of dates) {
@@ -281,14 +278,13 @@ class AggregationService {
         });
 
         // 获取当天的所有品牌-岗位组合并分别聚合
-        const dimensions = await recruitmentStatsRepository.getDistinctDimensions(
-          agentId,
-          date
-        );
+        const dimensions = await recruitmentEventsRepository.getDistinctDimensions(agentId, date);
 
         for (const dim of dimensions) {
-          // 跳过 null-null（已经在上面处理了）
-          if (dim.brandId === null && dim.jobId === null) continue;
+          // 跳过 brandId 为 null 的维度（已经在上面处理了总体聚合）
+          // 注意：只要 brandId 是 null 就跳过，不管 jobId 是什么值
+          // 因为 brandId: null 意味着"不按品牌过滤"，会聚合所有事件
+          if (dim.brandId === null) continue;
 
           await this.aggregateSingleDay({
             agentId,
@@ -319,6 +315,67 @@ class AggregationService {
       duration,
       errors: errors.length > 0 ? errors : undefined,
     };
+  }
+
+  /**
+   * 主聚合流程
+   *
+   * 完整的聚合逻辑，包含兜底机制：
+   * 1. 先处理所有脏数据记录（增量聚合）
+   * 2. 如果没有脏数据，则执行全量重算（兜底）
+   *
+   * 用于：凌晨定时任务、手动触发聚合按钮
+   *
+   * @param batchSize - 脏数据处理的批量大小（默认 100）
+   */
+  async runMainAggregation(batchSize: number = 100): Promise<AggregationResult> {
+    console.log(`${LOG_PREFIX} Running main aggregation...`);
+
+    // 1. 先处理脏数据
+    const dirtyResult = await this.processDirtyRecords(batchSize);
+    console.log(
+      `${LOG_PREFIX} Dirty records processed: ${dirtyResult.processedCount} success, ${dirtyResult.failedCount} failed`
+    );
+
+    // 2. 如果没有脏数据，执行全量重算（兜底）
+    if (dirtyResult.processedCount === 0) {
+      console.log(`${LOG_PREFIX} No dirty records found, performing full re-aggregation...`);
+
+      const agents = await recruitmentEventsRepository.getDistinctAgents();
+
+      if (agents.length === 0) {
+        console.log(`${LOG_PREFIX} No agents found, skipping full re-aggregation`);
+        return dirtyResult;
+      }
+
+      let totalProcessed = 0;
+      let totalFailed = 0;
+      const allErrors: string[] = [];
+
+      for (const agentId of agents) {
+        console.log(`${LOG_PREFIX} Full re-aggregation for agent: ${agentId}`);
+        const result = await this.fullReaggregation(agentId);
+        totalProcessed += result.processedCount;
+        totalFailed += result.failedCount;
+        if (result.errors) {
+          allErrors.push(...result.errors);
+        }
+      }
+
+      console.log(
+        `${LOG_PREFIX} Full re-aggregation completed: ${totalProcessed} days processed, ${totalFailed} failed`
+      );
+
+      return {
+        success: totalFailed === 0,
+        processedCount: totalProcessed,
+        failedCount: totalFailed,
+        duration: dirtyResult.duration,
+        errors: allErrors.length > 0 ? allErrors : undefined,
+      };
+    }
+
+    return dirtyResult;
   }
 
   /**

@@ -16,6 +16,45 @@
   --color-brand-light: var(--brand-light);
   --color-brand-dark: var(--brand-dark);
 
+  /* Tremor 图表颜色 - blue */
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #93c5fd;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
+  --color-blue-900: #1e3a8a;
+  --color-blue-950: #172554;
+
+  /* Tremor 图表颜色 - emerald */
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-100: #d1fae5;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065f46;
+  --color-emerald-900: #064e3b;
+  --color-emerald-950: #022c22;
+
+  /* Tremor 图表颜色 - violet */
+  --color-violet-50: #f5f3ff;
+  --color-violet-100: #ede9fe;
+  --color-violet-200: #ddd6fe;
+  --color-violet-300: #c4b5fd;
+  --color-violet-400: #a78bfa;
+  --color-violet-500: #8b5cf6;
+  --color-violet-600: #7c3aed;
+  --color-violet-700: #6d28d9;
+  --color-violet-800: #5b21b6;
+  --color-violet-900: #4c1d95;
+  --color-violet-950: #2e1065;
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -244,4 +283,30 @@
       transform: translate(20px, -20px) scale(1.1);
     }
   }
+}
+
+
+/* Tremor 图表颜色覆盖 - 修复 Tailwind v4 兼容性 */
+.tremor-chart-colors [class*="fill-blue"] {
+  fill: #3b82f6 !important;
+}
+
+.tremor-chart-colors [class*="fill-emerald"] {
+  fill: #10b981 !important;
+}
+
+.tremor-chart-colors [class*="fill-violet"] {
+  fill: #8b5cf6 !important;
+}
+
+.tremor-chart-colors [class*="stroke-blue"] {
+  stroke: #3b82f6 !important;
+}
+
+.tremor-chart-colors [class*="stroke-emerald"] {
+  stroke: #10b981 !important;
+}
+
+.tremor-chart-colors [class*="stroke-violet"] {
+  stroke: #8b5cf6 !important;
 }

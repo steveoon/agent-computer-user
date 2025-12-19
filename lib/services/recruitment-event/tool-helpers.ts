@@ -155,6 +155,10 @@ export async function recordMessageSentEvent(
     // Record event (fire-and-forget)
     const event = builder.messageSent(message);
     recruitmentEventService.recordAsync(event);
+
+    console.log(
+      `${LOG_PREFIX} Recorded message_sent for: ${candidate.name} (${platform}, unread: ${unreadCount})`
+    );
   } catch (error) {
     console.error(`${LOG_PREFIX} Failed to record message_sent:`, error);
   }
@@ -206,6 +210,10 @@ export async function recordWechatExchangedEvent(
     // Record event (fire-and-forget)
     const event = builder.wechatExchanged(wechatNumber);
     recruitmentEventService.recordAsync(event);
+
+    console.log(
+      `${LOG_PREFIX} Recorded wechat_exchanged for: ${candidate.name} (${platform})${wechatNumber ? `, wechat: ${wechatNumber}` : ""}`
+    );
   } catch (error) {
     console.error(`${LOG_PREFIX} Failed to record wechat_exchanged:`, error);
   }

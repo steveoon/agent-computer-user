@@ -38,20 +38,16 @@ vi.mock("@/db/schema", () => ({
   },
 }));
 
-// Mock repository
+// Mock repository (stats)
 const mockMarkDirty = vi.fn().mockResolvedValue(undefined);
 const mockUpsertStats = vi.fn().mockResolvedValue(undefined);
 const mockFindDirtyRecords = vi.fn();
-const mockGetDistinctEventDates = vi.fn();
-const mockGetDistinctDimensions = vi.fn();
 
 vi.mock("../repository", () => ({
   recruitmentStatsRepository: {
     markDirty: (...args: unknown[]) => mockMarkDirty(...args),
     upsertStats: (...args: unknown[]) => mockUpsertStats(...args),
     findDirtyRecords: (...args: unknown[]) => mockFindDirtyRecords(...args),
-    getDistinctEventDates: (...args: unknown[]) => mockGetDistinctEventDates(...args),
-    getDistinctDimensions: (...args: unknown[]) => mockGetDistinctDimensions(...args),
   },
   normalizeToStartOfDay: (date: Date) => {
     const normalized = new Date(date);
@@ -61,6 +57,17 @@ vi.mock("../repository", () => ({
   calculateRate: (numerator: number, denominator: number) => {
     if (denominator === 0) return null;
     return Math.round((numerator / denominator) * 10000);
+  },
+}));
+
+// Mock repository (events) - 这些方法已从 stats repository 移至 events repository
+const mockGetDistinctEventDates = vi.fn();
+const mockGetDistinctDimensions = vi.fn();
+
+vi.mock("@/lib/services/recruitment-event/repository", () => ({
+  recruitmentEventsRepository: {
+    getDistinctEventDates: (...args: unknown[]) => mockGetDistinctEventDates(...args),
+    getDistinctDimensions: (...args: unknown[]) => mockGetDistinctDimensions(...args),
   },
 }));
 

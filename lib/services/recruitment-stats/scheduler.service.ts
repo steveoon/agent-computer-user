@@ -133,7 +133,7 @@ class SchedulerService {
     );
 
     this.mainTimeoutId = setTimeout(async () => {
-      await this.runMainAggregation();
+      await this.runScheduledMainAggregation();
       // 重新调度下一天
       this.scheduleMainAggregation();
     }, msUntilNext);
@@ -171,20 +171,22 @@ class SchedulerService {
   /**
    * 运行每日主聚合
    *
-   * 处理所有剩余的脏数据，使用更大的批量大小
+   * 调用 aggregationService.runMainAggregation() 执行完整的聚合流程：
+   * 1. 先处理脏数据
+   * 2. 如果没有脏数据，执行全量重算（兜底）
    */
-  private async runMainAggregation(): Promise<void> {
+  private async runScheduledMainAggregation(): Promise<void> {
     try {
-      console.log(`${LOG_PREFIX} Running main aggregation...`);
-      // 使用更大的批量大小处理所有脏数据
-      this.lastRunResult = await aggregationService.processDirtyRecords(1000);
+      console.log(`${LOG_PREFIX} Running scheduled main aggregation...`);
+      // 使用更大的批量大小（1000）用于定时任务
+      this.lastRunResult = await aggregationService.runMainAggregation(1000);
       this.lastRunTime = new Date();
 
       console.log(
-        `${LOG_PREFIX} Main aggregation completed: ${this.lastRunResult.processedCount} records processed`
+        `${LOG_PREFIX} Scheduled main aggregation completed: ${this.lastRunResult.processedCount} records processed`
       );
     } catch (error) {
-      console.error(`${LOG_PREFIX} Main aggregation failed:`, error);
+      console.error(`${LOG_PREFIX} Scheduled main aggregation failed:`, error);
       this.lastRunResult = {
         success: false,
         processedCount: 0,
@@ -199,18 +201,20 @@ class SchedulerService {
   /**
    * 手动触发聚合
    *
-   * @param agentId - 可选 Agent ID，如果提供则进行全量重算
+   * @param agentId - 可选 Agent ID，如果提供则仅对该 Agent 进行全量重算
    */
   async triggerManual(agentId?: string): Promise<AggregationResult> {
     if (agentId) {
+      // 指定 Agent：仅对该 Agent 全量重算
       console.log(`${LOG_PREFIX} Manual full re-aggregation triggered for: ${agentId}`);
       const result = await aggregationService.fullReaggregation(agentId);
       this.lastRunResult = result;
       this.lastRunTime = new Date();
       return result;
     } else {
-      console.log(`${LOG_PREFIX} Manual dirty aggregation triggered`);
-      const result = await aggregationService.processDirtyRecords(this.config.batchSize);
+      // 未指定 Agent：执行完整主聚合流程（脏数据 + 兜底全量）
+      console.log(`${LOG_PREFIX} Manual main aggregation triggered`);
+      const result = await aggregationService.runMainAggregation(this.config.batchSize);
       this.lastRunResult = result;
       this.lastRunTime = new Date();
       return result;
@@ -250,5 +254,17 @@ class SchedulerService {
 
 /**
  * 单例实例
+ *
+ * 使用 globalThis 确保在 Next.js 开发模式下（HMR/不同执行上下文）
+ * instrumentation.ts 和 Server Actions 使用同一个实例
  */
-export const schedulerService = new SchedulerService();
+const globalForScheduler = globalThis as unknown as {
+  schedulerService: SchedulerService | undefined;
+};
+
+export const schedulerService =
+  globalForScheduler.schedulerService ?? new SchedulerService();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForScheduler.schedulerService = schedulerService;
+}
