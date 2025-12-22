@@ -5,9 +5,10 @@
  * 提供日/周/月/年等多时间维度的查询支持
  */
 
-import { eq, and, or, gte, lte, sql } from "drizzle-orm";
+import { eq, and, or, gte, lte, sql, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
-import { recruitmentEvents } from "@/db/schema";
+import { recruitmentEvents, dataDictionary } from "@/db/schema";
+import { getDictionaryType } from "@/db/types";
 import { recruitmentStatsRepository, calculateRate } from "./repository";
 import type {
   StatsQuery,
@@ -83,11 +84,15 @@ class QueryService {
    * @param agentId - 可选 Agent ID
    * @param days - 周期天数（默认 7 天）
    * @param referenceEndDate - 参考结束日期（默认为今天，用于支持"昨天"等历史日期查询）
+   * @param brandId - 可选品牌 ID
+   * @param jobId - 可选职位 ID
    */
   async getDashboardSummary(
     agentId?: string,
     days: number = 7,
-    referenceEndDate?: Date
+    referenceEndDate?: Date,
+    brandId?: number,
+    jobId?: number
   ): Promise<DashboardSummary> {
     // 使用传入的结束日期，或默认为今天
     const endDateRef = referenceEndDate ?? new Date();
@@ -115,8 +120,8 @@ class QueryService {
 
     // 并行查询当前和上一周期
     const [currentRaw, previousRaw] = await Promise.all([
-      recruitmentStatsRepository.queryAggregatedStats(agentId, currentStart, currentEnd),
-      recruitmentStatsRepository.queryAggregatedStats(agentId, previousStart, previousEnd),
+      recruitmentStatsRepository.queryAggregatedStats(agentId, currentStart, currentEnd, brandId, jobId),
+      recruitmentStatsRepository.queryAggregatedStats(agentId, previousStart, previousEnd, brandId, jobId),
     ]);
 
     // 转换格式
@@ -526,6 +531,54 @@ class QueryService {
     console.log(`${LOG_PREFIX} Found ${unreplied.length} unreplied candidates`);
 
     return unreplied;
+  }
+
+  /**
+   * 获取筛选器选项
+   *
+   * 返回可用的 Agent 和 Brand 列表
+   */
+  async getFilterOptions(): Promise<{
+    agents: Array<{ agentId: string; displayName: string }>;
+    brands: Array<{ id: number; name: string }>;
+  }> {
+    console.log(`${LOG_PREFIX} Getting filter options`);
+
+    // 并行获取 Agent 和 Brand IDs
+    const [agentIds, brandIds] = await Promise.all([
+      recruitmentStatsRepository.getDistinctAgents(),
+      recruitmentStatsRepository.getDistinctBrandIds(),
+    ]);
+
+    // Agent 列表（暂时使用 agentId 作为显示名称）
+    const agents = agentIds.map(agentId => ({
+      agentId,
+      displayName: agentId,
+    }));
+
+    // Brand 列表（关联 data_dictionary 获取名称）
+    let brands: Array<{ id: number; name: string }> = [];
+    if (brandIds.length > 0) {
+      const db = getDb();
+      brands = await db
+        .select({
+          id: dataDictionary.id,
+          name: dataDictionary.mappingValue,
+        })
+        .from(dataDictionary)
+        .where(
+          and(
+            eq(dataDictionary.dictionaryType, getDictionaryType("BRAND")),
+            eq(dataDictionary.isActive, true),
+            inArray(dataDictionary.id, brandIds)
+          )
+        )
+        .orderBy(dataDictionary.displayOrder);
+    }
+
+    console.log(`${LOG_PREFIX} Filter options: ${agents.length} agents, ${brands.length} brands`);
+
+    return { agents, brands };
   }
 }
 

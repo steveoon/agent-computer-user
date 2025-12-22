@@ -3,15 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageCircleReply, Send, ArrowRightLeft, AlertCircle } from "lucide-react";
 import { useDashboardStatsStore } from "@/lib/stores/dashboard-stats-store";
-
-/**
- * 格式化百分比率
- * 数据库中存储为 整数 * 100，如 85.5% = 8550
- */
-function formatRate(rate: number | null | undefined): string {
-  if (rate === null || rate === undefined) return "N/A";
-  return `${(rate / 100).toFixed(1)}%`;
-}
+import { AnimatedNumber } from "@/components/ui/animated-number";
 
 /**
  * 汇总统计数据数组
@@ -60,39 +52,43 @@ export function OperationalMetrics() {
   // 汇总当前周期的所有数据
   const currentStats = sumStats(summary?.current);
 
+  // 计算主动触达回复率（百分比形式，如 10.5）
+  const proactiveResponseRatePercent =
+    currentStats?.proactiveResponseRate != null
+      ? currentStats.proactiveResponseRate / 100
+      : 0;
+
   // 运营效率指标配置 - 名称对齐 docs/OPERATIONAL_METRICS_GUIDE.md
   const metrics = [
     {
       title: "未读秒回覆盖量",
       icon: MessageCircleReply,
       value: currentStats?.unreadReplied ?? 0,
+      isRate: false,
       description: "Unread Instant Reply Coverage",
     },
     {
       title: "主动触达数",
       icon: Send,
       value: currentStats?.proactiveOutreach ?? 0,
+      isRate: false,
       description: "Proactive Outreach",
     },
     {
       title: "主动触达回复率",
       icon: ArrowRightLeft,
-      value: formatRate(currentStats?.proactiveResponseRate),
+      value: proactiveResponseRatePercent,
       isRate: true,
       description: "Proactive Response Rate",
-      warnThreshold: 1000, // 10%
-      warnValue: currentStats?.proactiveResponseRate,
+      warnThreshold: 10, // 10%
     },
   ];
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {metrics.map(metric => {
-        const isWarning =
-          metric.warnThreshold &&
-          metric.warnValue !== null &&
-          metric.warnValue !== undefined &&
-          metric.warnValue < metric.warnThreshold;
+      {metrics.map((metric) => {
+        // 对于回复率，检查是否低于阈值
+        const isWarning = metric.isRate && metric.warnThreshold && metric.value < metric.warnThreshold;
 
         return (
           <Card
@@ -113,7 +109,19 @@ export function OperationalMetrics() {
                 ) : (
                   <div className="flex items-baseline gap-3 mt-1">
                     <span className="text-3xl font-bold tracking-tight text-foreground">
-                      {metric.value}
+                      {metric.isRate ? (
+                        <AnimatedNumber
+                          value={metric.value}
+                          decimals={1}
+                          suffix="%"
+                          duration={0.6}
+                        />
+                      ) : (
+                        <AnimatedNumber
+                          value={metric.value}
+                          duration={0.6}
+                        />
+                      )}
                     </span>
                     {isWarning && (
                       <AlertCircle className="h-4 w-4 text-amber-500" />

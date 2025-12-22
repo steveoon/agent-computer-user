@@ -108,7 +108,7 @@ export async function getDashboardData(
     // 并行获取汇总数据和趋势数据
     // 注意：传入 endDate 作为参考日期，支持"昨天"等历史日期查询
     const [summary, dailyTrend] = await Promise.all([
-      queryService.getDashboardSummary(agentId, days, endDate),
+      queryService.getDashboardSummary(agentId, days, endDate, brandId, jobId),
       queryService.getStatsTrend(agentId, startDate, endDate, brandId, jobId),
     ]);
 
@@ -313,6 +313,53 @@ export async function getUnrepliedCandidates(
     return {
       success: false,
       error: error instanceof Error ? error.message : "获取未回复候选人失败",
+    };
+  }
+}
+
+/**
+ * Agent 筛选选项
+ */
+export interface AgentOption {
+  agentId: string;
+  displayName: string;
+}
+
+/**
+ * Brand 筛选选项
+ */
+export interface BrandOption {
+  id: number;
+  name: string;
+}
+
+/**
+ * 筛选器选项
+ */
+export interface FilterOptions {
+  agents: AgentOption[];
+  brands: BrandOption[];
+}
+
+/**
+ * 获取 Dashboard 筛选器选项
+ *
+ * 返回可用的 Agent 和 Brand 列表
+ */
+export async function getFilterOptions(): Promise<
+  { success: true; data: FilterOptions } | { success: false; error: string }
+> {
+  try {
+    const options = await queryService.getFilterOptions();
+    return {
+      success: true,
+      data: options,
+    };
+  } catch (error) {
+    console.error(`${LOG_PREFIX} getFilterOptions failed:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "获取筛选选项失败",
     };
   }
 }

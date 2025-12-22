@@ -318,19 +318,19 @@ class RecruitmentStatsRepository {
       if (agentId) {
         conditions.push(eq(recruitmentDailyStats.agentId, agentId));
       }
-      // 当未指定 brandId 时，默认只查询总体聚合记录（brand_id IS NULL）
-      // 避免将总体记录和品牌分解记录重复计算
+
+      // 品牌筛选逻辑
       if (brandId !== undefined) {
+        // 查询特定品牌的记录（不限制 jobId，因为品牌记录的 job_id 可能是 0）
         conditions.push(eq(recruitmentDailyStats.brandId, brandId));
       } else {
+        // 查询总体聚合记录（brand_id IS NULL + job_id IS NULL）
         conditions.push(isNull(recruitmentDailyStats.brandId));
-      }
-      // 当未指定 jobId 时，也过滤 job_id IS NULL（查询总体聚合记录）
-      // 这样可以避免 brand_id: null + job_id: 0 与 brand_id: null + job_id: null 重复计算
-      if (jobId !== undefined) {
-        conditions.push(eq(recruitmentDailyStats.jobId, jobId));
-      } else {
-        conditions.push(isNull(recruitmentDailyStats.jobId));
+        if (jobId !== undefined) {
+          conditions.push(eq(recruitmentDailyStats.jobId, jobId));
+        } else {
+          conditions.push(isNull(recruitmentDailyStats.jobId));
+        }
       }
 
       return db
@@ -389,19 +389,19 @@ class RecruitmentStatsRepository {
       if (agentId) {
         conditions.push(eq(recruitmentDailyStats.agentId, agentId));
       }
-      // 当未指定 brandId 时，默认只查询总体聚合记录（brand_id IS NULL）
-      // 避免将总体记录和品牌分解记录重复计算
+
+      // 品牌筛选逻辑
       if (brandId !== undefined) {
+        // 查询特定品牌的记录（不限制 jobId，因为品牌记录的 job_id 可能是 0）
         conditions.push(eq(recruitmentDailyStats.brandId, brandId));
       } else {
+        // 查询总体聚合记录（brand_id IS NULL + job_id IS NULL）
         conditions.push(isNull(recruitmentDailyStats.brandId));
-      }
-      // 当未指定 jobId 时，也过滤 job_id IS NULL（查询总体聚合记录）
-      // 这样可以避免 brand_id: null + job_id: 0 与 brand_id: null + job_id: null 重复计算
-      if (jobId !== undefined) {
-        conditions.push(eq(recruitmentDailyStats.jobId, jobId));
-      } else {
-        conditions.push(isNull(recruitmentDailyStats.jobId));
+        if (jobId !== undefined) {
+          conditions.push(eq(recruitmentDailyStats.jobId, jobId));
+        } else {
+          conditions.push(isNull(recruitmentDailyStats.jobId));
+        }
       }
 
       return db
@@ -458,6 +458,41 @@ class RecruitmentStatsRepository {
         candidatesHired: Number(row.candidatesHired) || 0,
       })) ?? []
     );
+  }
+
+  /**
+   * 获取去重的 Agent 列表
+   *
+   * 从 daily_stats 表获取所有有统计数据的 Agent
+   */
+  async getDistinctAgents(): Promise<string[]> {
+    const result = await withRetry(async () => {
+      const db = getDb();
+      return db
+        .selectDistinct({ agentId: recruitmentDailyStats.agentId })
+        .from(recruitmentDailyStats)
+        .orderBy(recruitmentDailyStats.agentId);
+    }, "getDistinctAgents");
+
+    return result?.map(row => row.agentId) ?? [];
+  }
+
+  /**
+   * 获取去重的 Brand ID 列表
+   *
+   * 从 daily_stats 表获取所有有统计数据的 Brand ID（排除 NULL）
+   */
+  async getDistinctBrandIds(): Promise<number[]> {
+    const result = await withRetry(async () => {
+      const db = getDb();
+      return db
+        .selectDistinct({ brandId: recruitmentDailyStats.brandId })
+        .from(recruitmentDailyStats)
+        .where(sql`${recruitmentDailyStats.brandId} IS NOT NULL`)
+        .orderBy(recruitmentDailyStats.brandId);
+    }, "getDistinctBrandIds");
+
+    return result?.map(row => row.brandId).filter((id): id is number => id !== null) ?? [];
   }
 
 }

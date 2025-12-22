@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { BarChart3, RefreshCw, Calculator } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { BarChart3, RefreshCw, Calculator, Pause, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/ui/back-button";
 import { useDashboardStatsStore } from "@/lib/stores/dashboard-stats-store";
 import { triggerAggregation } from "@/actions/recruitment-stats";
+import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { DashboardFilters } from "./components/dashboard-filters";
 import { KpiCards } from "./components/kpi-cards";
 import { OperationalMetrics } from "./components/operational-metrics";
@@ -15,15 +16,32 @@ import { StatsTable } from "./components/stats-table";
 import { SchedulerStatus } from "./components/scheduler-status";
 import { UnrepliedCandidates } from "./components/unreplied-candidates";
 
+/** 自动刷新间隔：30 秒 */
+const AUTO_REFRESH_INTERVAL = 30 * 1000;
+
 /**
  * Dashboard 客户端容器组件
  *
  * 使用 Zustand Store 管理状态，协调各子组件
+ * 支持自动刷新和数字动画效果
  */
 export function DashboardClient() {
-  const { loading, error, refresh } = useDashboardStatsStore();
+  const { loading, isRefreshing, error, refresh } = useDashboardStatsStore();
   const [aggregating, setAggregating] = useState(false);
   const [aggregationMessage, setAggregationMessage] = useState<string | null>(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+
+  // 刷新数据的回调（使用静默刷新）
+  const handleRefresh = useCallback(async () => {
+    await useDashboardStatsStore.getState().loadDashboardData(true);
+  }, []);
+
+  // 自动刷新 Hook
+  const { countdown, isPaused } = useAutoRefresh(handleRefresh, {
+    interval: AUTO_REFRESH_INTERVAL,
+    enabled: autoRefreshEnabled,
+    pauseOnHidden: true,
+  });
 
   // 初始化时加载数据
   useEffect(() => {
@@ -75,7 +93,39 @@ export function DashboardClient() {
           </div>
 
           {/* 操作按钮 */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* 自动刷新状态指示器 */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              {isPaused ? (
+                <span className="flex items-center gap-1.5 text-amber-600">
+                  <Pause className="h-3.5 w-3.5" />
+                  已暂停
+                </span>
+              ) : isRefreshing || loading ? (
+                <span className="flex items-center gap-1.5 text-blue-600">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  刷新中...
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <Play className="h-3.5 w-3.5 text-green-500" />
+                  <span className="tabular-nums">{countdown}s</span>
+                </span>
+              )}
+              <button
+                onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                className={`px-2 py-0.5 text-xs rounded-full transition-colors ${
+                  autoRefreshEnabled
+                    ? "bg-green-100 text-green-700 hover:bg-green-200"
+                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}
+              >
+                {autoRefreshEnabled ? "自动" : "手动"}
+              </button>
+            </div>
+
+            <div className="h-6 w-px bg-gray-200" />
+
             <Button
               variant="outline"
               onClick={handleAggregation}
