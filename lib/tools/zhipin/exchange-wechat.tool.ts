@@ -66,13 +66,13 @@ export const zhipinExchangeWechatTool = () =>
         .default(1500)
         .describe("交换完成后的最大等待时间（毫秒）"),
       // 埋点上下文 - 来自 zhipin_get_chat_details 返回的 summary 对象
-      candidateName: z.string().optional().describe("候选人姓名，来自 summary.candidateName"),
+      candidateName: z.string().describe("【必填】候选人姓名，来自 summary.candidateName"),
       candidateAge: z.string().optional().describe("候选人年龄，来自 summary.candidateAge（如'21岁'）"),
       candidateEducation: z.string().optional().describe("候选人学历，来自 summary.candidateEducation（如'本科'）"),
       candidateExpectedSalary: z.string().optional().describe("候选人期望薪资，来自 summary.candidateExpectedSalary（如'3000-4000元'）"),
       candidateExpectedLocation: z.string().optional().describe("候选人期望地点，来自 summary.candidateExpectedLocation（如'大连'）"),
       jobId: z.number().optional().describe("岗位ID"),
-      jobName: z.string().optional().describe("沟通职位/待招岗位名称，来自 summary.communicationPosition"),
+      jobName: z.string().describe("【必填】沟通职位/待招岗位名称，来自 summary.communicationPosition"),
     }),
 
     execute: async ({

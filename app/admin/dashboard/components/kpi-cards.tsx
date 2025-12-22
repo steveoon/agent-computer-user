@@ -13,15 +13,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useDashboardStatsStore } from "@/lib/stores/dashboard-stats-store";
-
-/**
- * 格式化百分比率
- * 数据库中存储为 整数 * 100，如 85.5% = 8550
- */
-function formatRate(rate: number | null | undefined): string {
-  if (rate === null || rate === undefined) return "N/A";
-  return `${(rate / 100).toFixed(1)}%`;
-}
+import { AnimatedNumber } from "@/components/ui/animated-number";
 
 /**
  * 格式化趋势变化
@@ -100,11 +92,11 @@ export function KpiCards() {
     }
   );
 
-  const aggregateReplyRate = formatRate(
+  // 计算回复率（百分比形式，如 85.5）
+  const replyRatePercent =
     totals.inboundCandidates > 0
-      ? Math.round((totals.candidatesReplied / totals.inboundCandidates) * 10000)
-      : 0
-  );
+      ? (totals.candidatesReplied / totals.inboundCandidates) * 100
+      : 0;
 
   const trend = summary?.trend;
 
@@ -114,34 +106,33 @@ export function KpiCards() {
       title: "入站消息总数",
       icon: Users,
       value: totals.messagesReceived,
-      trendKey: "messagesReceived",
+      isRate: false,
+      trendKey: "messagesReceived" as const,
       description: "Total Flow / Messages Received",
     },
     {
       title: "入站候选人数",
       icon: MessageSquare,
       value: totals.inboundCandidates,
-      trendKey: "inboundCandidates",
+      isRate: false,
+      trendKey: "inboundCandidates" as const,
       description: "Inbound Candidates",
     },
     {
       title: "回复率",
       icon: ArrowRightLeft,
-      value: aggregateReplyRate,
+      value: replyRatePercent,
       isRate: true,
       trendKey: null,
       description: "Reply Rate",
-      warnThreshold: 5000, // 50%
-      warnValue:
-        totals.inboundCandidates > 0
-          ? (totals.candidatesReplied / totals.inboundCandidates) * 10000
-          : 10000,
+      warnThreshold: 50, // 50%
     },
     {
       title: "微信获取数",
       icon: CalendarCheck,
       value: totals.wechatExchanged,
-      trendKey: "wechatExchanged",
+      isRate: false,
+      trendKey: "wechatExchanged" as const,
       description: "WeChat Obtained",
     },
   ];
@@ -149,63 +140,72 @@ export function KpiCards() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {kpis.map((kpi, index) => {
-        const isWarning =
-          kpi.warnThreshold &&
-          kpi.warnValue !== null &&
-          kpi.warnValue !== undefined &&
-          kpi.warnValue < kpi.warnThreshold;
+        // 对于回复率，检查是否低于阈值
+        const isWarning = kpi.isRate && kpi.warnThreshold && kpi.value < kpi.warnThreshold;
 
         return (
           <Card
             key={kpi.title}
             className="relative border-0 shadow-sm bg-white hover:shadow-md transition-shadow overflow-hidden"
           >
-          {/* 左侧彩色装饰条 - 模拟参考图的 Impact 风格 */}
-          <div
-            className={`absolute left-0 top-0 bottom-0 w-1 ${
-              index === 0
-                ? "bg-blue-500"
-                : index === 1
-                  ? "bg-indigo-500"
-                  : index === 2
-                    ? "bg-emerald-500"
-                    : "bg-violet-500"
-            }`}
-          />
+            {/* 左侧彩色装饰条 - 模拟参考图的 Impact 风格 */}
+            <div
+              className={`absolute left-0 top-0 bottom-0 w-1 ${
+                index === 0
+                  ? "bg-blue-500"
+                  : index === 1
+                    ? "bg-indigo-500"
+                    : index === 2
+                      ? "bg-emerald-500"
+                      : "bg-violet-500"
+              }`}
+            />
 
-          <CardContent className="pt-6 pl-6">
-            <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                {kpi.title}
-              </span>
+            <CardContent className="pt-6 pl-6">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  {kpi.title}
+                </span>
 
-              {loading ? (
-                <div className="h-10 w-24 bg-muted/20 rounded animate-pulse mt-1" />
-              ) : (
-                <div className="flex items-baseline gap-3 mt-1">
-                  <span className="text-3xl font-bold tracking-tight text-foreground">
-                    {kpi.value}
-                  </span>
-                  {isWarning && (
-                    <AlertCircle className="h-4 w-4 text-amber-500" />
-                  )}
-                  {kpi.trendKey && trend && (
-                    <div className="scale-90 origin-left">
-                      <TrendIndicator value={trend[kpi.trendKey]} />
-                    </div>
-                  )}
+                {loading ? (
+                  <div className="h-10 w-24 bg-muted/20 rounded animate-pulse mt-1" />
+                ) : (
+                  <div className="flex items-baseline gap-3 mt-1">
+                    <span className="text-3xl font-bold tracking-tight text-foreground">
+                      {kpi.isRate ? (
+                        <AnimatedNumber
+                          value={kpi.value}
+                          decimals={1}
+                          suffix="%"
+                          duration={0.6}
+                        />
+                      ) : (
+                        <AnimatedNumber
+                          value={kpi.value}
+                          duration={0.6}
+                        />
+                      )}
+                    </span>
+                    {isWarning && (
+                      <AlertCircle className="h-4 w-4 text-amber-500" />
+                    )}
+                    {kpi.trendKey && trend && (
+                      <div className="scale-90 origin-left">
+                        <TrendIndicator value={trend[kpi.trendKey]} />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1.5 mt-2">
+                  <kpi.icon className="h-3.5 w-3.5 text-muted-foreground/60" />
+                  <p className="text-xs text-muted-foreground/80 font-light truncate">
+                    {kpi.description}
+                  </p>
                 </div>
-              )}
-
-              <div className="flex items-center gap-1.5 mt-2">
-                <kpi.icon className="h-3.5 w-3.5 text-muted-foreground/60" />
-                <p className="text-xs text-muted-foreground/80 font-light truncate">
-                  {kpi.description}
-                </p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
         );
       })}
     </div>

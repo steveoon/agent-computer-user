@@ -49,16 +49,16 @@ export const zhipinSendMessageTool = () =>
       clearBefore: z.boolean().optional().default(true).describe("发送前是否清空输入框"),
       waitAfterSend: z.number().optional().default(1000).describe("发送后等待时间（毫秒）"),
       // 埋点上下文 - 来自 zhipin_get_chat_details 返回的 summary 对象
-      candidateName: z.string().optional().describe("候选人姓名，来自 summary.candidateName"),
+      candidateName: z.string().describe("【必填】候选人姓名，来自 summary.candidateName"),
       candidateAge: z.string().optional().describe("候选人年龄，来自 summary.candidateAge（如'21岁'）"),
       candidateEducation: z.string().optional().describe("候选人学历，来自 summary.candidateEducation（如'本科'）"),
       candidateExpectedSalary: z.string().optional().describe("候选人期望薪资，来自 summary.candidateExpectedSalary（如'3000-4000元'）"),
       candidateExpectedLocation: z.string().optional().describe("候选人期望地点，来自 summary.candidateExpectedLocation（如'大连'）"),
       jobId: z.number().optional().describe("岗位ID"),
-      jobName: z.string().optional().describe("沟通职位/待招岗位名称，来自 summary.communicationPosition"),
+      jobName: z.string().describe("【必填】沟通职位/待招岗位名称，来自 summary.communicationPosition"),
       // 未读消息上下文 - 优先来自 open_candidate_chat，其次来自 get_unread_messages
-      unreadCountBeforeReply: z.number().optional().describe(
-        "回复前的未读消息数。" +
+      unreadCountBeforeReply: z.number().describe(
+        "【必填】回复前的未读消息数。" +
         "【优先来源】zhipin_open_candidate_chat_improved 返回的 candidateInfo.unreadCount - 这是打开候选人时捕获的最准确数据。" +
         "【次要来源】zhipin_get_unread_candidates_improved 返回的候选人 unreadCount。" +
         "重要：如果是连续发送多条消息（对方未发新消息），第二条及之后应传 0，因为未读消息已在第一次回复时被消费。"

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
-import { getDashboardData } from "@/actions/recruitment-stats";
+import { getDashboardData, getFilterOptions } from "@/actions/recruitment-stats";
+import type { AgentOption, BrandOption } from "@/actions/recruitment-stats";
 import type {
   DashboardFilters,
   DashboardSummary,
@@ -32,16 +33,28 @@ interface DashboardStatsState {
   // 数据状态
   summary: DashboardSummary | null;
   dailyTrend: DailyTrendItem[] | null;
+  /** 初次加载状态（显示 skeleton） */
   loading: boolean;
+  /** 静默刷新状态（不显示 skeleton，数据更新后数字动画过渡） */
+  isRefreshing: boolean;
   error: string | null;
 
   // 筛选参数
   filters: DashboardFilters;
 
+  // 筛选选项（Agent 和 Brand 列表）
+  availableAgents: AgentOption[];
+  availableBrands: BrandOption[];
+  filterOptionsLoading: boolean;
+
   // Actions
   setFilters: (filters: Partial<DashboardFilters>) => void;
   setPreset: (preset: DashboardFilters["preset"]) => void;
-  loadDashboardData: () => Promise<void>;
+  setAgentFilter: (agentId?: string) => void;
+  setBrandFilter: (brandId?: number) => void;
+  clearDimensionFilters: () => void;
+  loadFilterOptions: () => Promise<void>;
+  loadDashboardData: (silent?: boolean) => Promise<void>;
   refresh: () => Promise<void>;
   reset: () => void;
 }
@@ -56,8 +69,14 @@ export const useDashboardStatsStore = create<DashboardStatsState>()(
       summary: null,
       dailyTrend: null,
       loading: false,
+      isRefreshing: false,
       error: null,
       filters: initialFilters,
+
+      // 筛选选项初始状态
+      availableAgents: [],
+      availableBrands: [],
+      filterOptionsLoading: false,
 
       /**
        * 设置筛选参数
@@ -69,6 +88,69 @@ export const useDashboardStatsStore = create<DashboardStatsState>()(
         }));
         // 自动重新加载数据
         get().loadDashboardData();
+      },
+
+      /**
+       * 设置 Agent 筛选
+       * undefined 表示"全部"
+       */
+      setAgentFilter: (agentId) => {
+        set((state) => ({
+          filters: { ...state.filters, agentId },
+        }));
+        get().loadDashboardData();
+      },
+
+      /**
+       * 设置 Brand 筛选
+       * undefined 表示"全部"
+       */
+      setBrandFilter: (brandId) => {
+        set((state) => ({
+          filters: { ...state.filters, brandId },
+        }));
+        get().loadDashboardData();
+      },
+
+      /**
+       * 清除维度筛选（Agent + Brand）
+       * 保留时间范围筛选
+       */
+      clearDimensionFilters: () => {
+        set((state) => ({
+          filters: {
+            ...state.filters,
+            agentId: undefined,
+            brandId: undefined,
+            jobId: undefined,
+          },
+        }));
+        get().loadDashboardData();
+      },
+
+      /**
+       * 加载筛选选项（Agent 和 Brand 列表）
+       */
+      loadFilterOptions: async () => {
+        set({ filterOptionsLoading: true });
+
+        try {
+          const result = await getFilterOptions();
+
+          if (result.success) {
+            set({
+              availableAgents: result.data.agents,
+              availableBrands: result.data.brands,
+              filterOptionsLoading: false,
+            });
+          } else {
+            console.error("[DashboardStatsStore] loadFilterOptions failed:", result.error);
+            set({ filterOptionsLoading: false });
+          }
+        } catch (error) {
+          console.error("[DashboardStatsStore] loadFilterOptions failed:", error);
+          set({ filterOptionsLoading: false });
+        }
       },
 
       /**
@@ -126,10 +208,19 @@ export const useDashboardStatsStore = create<DashboardStatsState>()(
 
       /**
        * 加载 Dashboard 数据
+       * @param silent - 是否静默刷新（不显示 loading skeleton）
        */
-      loadDashboardData: async () => {
-        const { filters } = get();
-        set({ loading: true, error: null });
+      loadDashboardData: async (silent = false) => {
+        const { filters, summary } = get();
+
+        // 如果已有数据，使用静默刷新；否则显示 loading skeleton
+        const isSilent = silent || summary !== null;
+
+        if (isSilent) {
+          set({ isRefreshing: true, error: null });
+        } else {
+          set({ loading: true, error: null });
+        }
 
         try {
           const result = await getDashboardData(filters);
@@ -139,11 +230,13 @@ export const useDashboardStatsStore = create<DashboardStatsState>()(
               summary: result.data.summary,
               dailyTrend: result.data.dailyTrend,
               loading: false,
+              isRefreshing: false,
             });
           } else {
             set({
               error: result.error,
               loading: false,
+              isRefreshing: false,
             });
           }
         } catch (error) {
@@ -151,6 +244,7 @@ export const useDashboardStatsStore = create<DashboardStatsState>()(
           set({
             error: error instanceof Error ? error.message : "加载失败",
             loading: false,
+            isRefreshing: false,
           });
         }
       },
@@ -170,8 +264,12 @@ export const useDashboardStatsStore = create<DashboardStatsState>()(
           summary: null,
           dailyTrend: null,
           loading: false,
+          isRefreshing: false,
           error: null,
           filters: initialFilters,
+          availableAgents: [],
+          availableBrands: [],
+          filterOptionsLoading: false,
         });
       },
     }),

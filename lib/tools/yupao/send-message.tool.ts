@@ -50,7 +50,7 @@ export const yupaoSendMessageTool = () =>
       clearBefore: z.boolean().optional().default(true).describe("发送前是否清空输入框"),
       waitAfterSend: z.number().optional().default(1000).describe("发送后等待时间（毫秒）"),
       // 埋点上下文 - 来自 yupao_get_chat_details 返回的 summary 对象
-      candidateName: z.string().optional().describe("候选人姓名，来自 summary.candidateName"),
+      candidateName: z.string().describe("【必填】候选人姓名，来自 summary.candidateName"),
       candidatePosition: z.string().describe("候选人期望职位，来自 summary.candidatePosition"),
       candidateAge: z
         .string()
@@ -71,8 +71,7 @@ export const yupaoSendMessageTool = () =>
       jobId: z.number().optional().describe("岗位ID"),
       jobName: z
         .string()
-        .optional()
-        .describe("沟通职位/待招岗位名称，来自 summary.communicationPosition"),
+        .describe("【必填】沟通职位/待招岗位名称，来自 summary.communicationPosition"),
       // 未读消息上下文 - 优先来自 open_candidate_chat，其次来自 get_unread_messages
       unreadCountBeforeReply: z
         .number()
