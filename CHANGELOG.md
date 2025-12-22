@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.21.1](https://github.com/steveoon/agent-computer-user/compare/v1.21.0...v1.21.1) (2025-12-22)
+
+
+### Bug Fixes
+
+* **dashboard:** pause marquee at current position on hover ([30129ce](https://github.com/steveoon/agent-computer-user/commit/30129cefaac6802632f7ff1753b56f7dfcd96e4f))
+
 ## [1.21.1-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.21.0...v1.21.1-develop.1) (2025-12-22)
 
 
