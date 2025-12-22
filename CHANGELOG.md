@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.21.0](https://github.com/steveoon/agent-computer-user/compare/v1.20.1...v1.21.0) (2025-12-22)
+
+
+### Features
+
+* **dashboard:** add auto-refresh with animated number transitions ([0d64882](https://github.com/steveoon/agent-computer-user/commit/0d64882dd2425bd1bf385f3ac6af9ad4b83a2e82))
+
 # [1.21.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.20.1...v1.21.0-develop.1) (2025-12-22)
 
 
