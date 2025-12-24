@@ -50,7 +50,8 @@ export namespace DulidayRaw {
     insuranceFundAmount: z.number().nullable(),
     memo: z.string().nullable(),
     promotionWelfare: z.string().nullable(),
-    accommodationNum: z.number().nullable(),
+    // API 可能返回 string（如空字符串）或 number，该字段未被使用
+    accommodationNum: z.union([z.number(), z.string()]).nullable(),
     commuteDistance: z.number().nullable(),
     accommodationEnv: z.string().nullable(),
     imagesDTOList: z.array(z.unknown()).nullable(),
