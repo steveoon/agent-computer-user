@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.21.2](https://github.com/steveoon/agent-computer-user/compare/v1.21.1...v1.21.2) (2025-12-24)
+
+
+### Bug Fixes
+
+* **types:** allow string type for welfare.accommodationNum field ([423d166](https://github.com/steveoon/agent-computer-user/commit/423d166ba7220d0bcebb7edf4a150caad8d705b0))
+
 ## [1.21.2-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.21.1...v1.21.2-develop.1) (2025-12-24)
 
 
