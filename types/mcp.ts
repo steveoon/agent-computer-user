@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod/v3';
 
 // ========== Puppeteer MCP 操作类型定义 ==========
 
@@ -88,20 +88,23 @@ export type PuppeteerParams = z.infer<typeof PuppeteerParamsSchema>;
 
 /**
  * Puppeteer结果类型
+ * Note: Using z.union instead of z.discriminatedUnion because ZodEffects (from .refine())
+ * is not compatible with discriminatedUnion in Zod v4
  */
-export const PuppeteerResultSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("text"),
-    text: z.string(),
-  }),
-  z
-    .object({
-      type: z.literal("image"),
-      data: z.string().optional().describe("Base64编码的图片数据（可选）"),
-      url: z.string().optional().describe("图片的公网URL（可选）"),
-    })
-    .refine(data => data.data || data.url, { message: "图片结果必须包含 data 或 url 其中之一" }),
-]);
+const PuppeteerTextResultSchema = z.object({
+  type: z.literal("text"),
+  text: z.string(),
+});
+
+const PuppeteerImageResultSchema = z
+  .object({
+    type: z.literal("image"),
+    data: z.string().optional().describe("Base64编码的图片数据（可选）"),
+    url: z.string().optional().describe("图片的公网URL（可选）"),
+  })
+  .refine(data => data.data || data.url, { message: "图片结果必须包含 data 或 url 其中之一" });
+
+export const PuppeteerResultSchema = z.union([PuppeteerTextResultSchema, PuppeteerImageResultSchema]);
 
 export type PuppeteerResult = z.infer<typeof PuppeteerResultSchema>;
 

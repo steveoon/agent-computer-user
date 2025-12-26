@@ -5,6 +5,14 @@ import {
   createMockToolCallStream,
 } from "@/lib/__tests__/test-utils/ai-mocks";
 import type { UIMessage } from "ai";
+import type { ProviderRegistryProvider } from "ai";
+
+/**
+ * Mock ProviderRegistryProvider type for testing
+ * Note: The full ProviderRegistryProvider type is complex with generics.
+ * For testing purposes, we only need the languageModel method.
+ */
+type MockRegistry = Pick<ProviderRegistryProvider, "languageModel">;
 
 // Mock dependencies
 vi.mock("@/lib/model-registry/dynamic-registry", () => ({
@@ -38,13 +46,10 @@ describe("Chat API Route", () => {
   it("should handle a simple text response", async () => {
     const mockModel = createMockTextStream(["Hello", ", ", "world!"]);
     const { getDynamicRegistry } = await import("@/lib/model-registry/dynamic-registry");
-    vi.mocked(getDynamicRegistry).mockReturnValue({
+    const mockRegistry: MockRegistry = {
       languageModel: () => mockModel,
-      textEmbeddingModel: () => null as any,
-      imageModel: () => null as any,
-      transcriptionModel: () => null as any,
-      speechModel: () => null as any,
-    });
+    };
+    vi.mocked(getDynamicRegistry).mockReturnValue(mockRegistry as ProviderRegistryProvider);
 
     const messages: UIMessage[] = [
       {
@@ -103,13 +108,10 @@ describe("Chat API Route", () => {
     );
 
     const { getDynamicRegistry } = await import("@/lib/model-registry/dynamic-registry");
-    vi.mocked(getDynamicRegistry).mockReturnValue({
+    const mockRegistry: MockRegistry = {
       languageModel: () => mockModel,
-      textEmbeddingModel: () => null as any,
-      imageModel: () => null as any,
-      transcriptionModel: () => null as any,
-      speechModel: () => null as any,
-    });
+    };
+    vi.mocked(getDynamicRegistry).mockReturnValue(mockRegistry as ProviderRegistryProvider);
 
     const messages: UIMessage[] = [
       {
@@ -187,13 +189,10 @@ describe("Chat API Route", () => {
   it("should apply message pruning for large conversations", async () => {
     const mockModel = createMockTextStream(["Response"]);
     const { getDynamicRegistry } = await import("@/lib/model-registry/dynamic-registry");
-    vi.mocked(getDynamicRegistry).mockReturnValue({
+    const mockRegistry: MockRegistry = {
       languageModel: () => mockModel,
-      textEmbeddingModel: () => null as any,
-      imageModel: () => null as any,
-      transcriptionModel: () => null as any,
-      speechModel: () => null as any,
-    });
+    };
+    vi.mocked(getDynamicRegistry).mockReturnValue(mockRegistry as ProviderRegistryProvider);
 
     // Create a large conversation history
     const messages: UIMessage[] = Array.from({ length: 100 }, (_, i) => {

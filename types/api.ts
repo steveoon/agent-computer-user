@@ -3,7 +3,7 @@
  * 统一管理所有 API 接口的请求和响应类型
  */
 
-import { z } from "zod";
+import { z } from 'zod/v3';
 import type { UIMessage } from "ai";
 import type { ModelConfig } from "@/lib/config/models";
 import type { ZhipinData, SystemPromptsConfig, ReplyPromptsConfig, BrandPriorityStrategy } from "./index";

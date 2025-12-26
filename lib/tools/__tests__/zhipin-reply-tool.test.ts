@@ -89,7 +89,7 @@ describe("zhipinReplyTool - 创建期 Schema 验证", () => {
           {},
           "error"
         );
-      }).toThrow(/stores.*Invalid input/);
+      }).toThrow(/stores.*Required/);
     });
 
     it("缺少 brands 字段应抛出错误", () => {
@@ -106,7 +106,7 @@ describe("zhipinReplyTool - 创建期 Schema 验证", () => {
           {},
           "error"
         );
-      }).toThrow(/brands.*Invalid input/);
+      }).toThrow(/brands.*Required/);
     });
 
     it("缺少 city 字段应抛出错误", () => {
@@ -123,7 +123,7 @@ describe("zhipinReplyTool - 创建期 Schema 验证", () => {
           {},
           "error"
         );
-      }).toThrow(/city.*Invalid input/);
+      }).toThrow(/city.*Required/);
     });
 
     it("brands 中缺少 templates 字段应抛出错误", () => {

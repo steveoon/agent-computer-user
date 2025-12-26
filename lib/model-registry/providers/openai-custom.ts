@@ -38,7 +38,8 @@ export function createCustomOpenAI(config: { apiKey: string | undefined; baseURL
       }
 
       // 处理可选的方法
-      if (prop === "textEmbeddingModel" || prop === "imageModel") {
+      // Note: AI SDK v6 renamed textEmbeddingModel to embeddingModel
+      if (prop === "embeddingModel" || prop === "imageModel") {
         const method = openaiInstance[prop as keyof typeof openaiInstance];
         return method || undefined;
       }

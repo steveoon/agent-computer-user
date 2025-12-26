@@ -1,5 +1,5 @@
 import { tool } from "ai";
-import { z } from "zod";
+import { z } from 'zod/v3';
 import { sendFeishuMessage } from "../send-feishu-message";
 
 // 飞书机器人工具

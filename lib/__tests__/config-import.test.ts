@@ -451,9 +451,12 @@ describe("配置导入数据格式校验", () => {
         },
       };
 
-      // 初始验证应该失败
+      // Note: Zod v4 会自动应用 .default() 值，所以即使缺少 brandPriorityStrategy 字段，
+      // safeParse 也会成功（会应用默认值 "smart"）。这里我们验证旧配置缺少某些品牌模板字段。
       const initialResult = AppConfigDataSchema.safeParse(oldConfig);
-      expect(initialResult.success).toBe(false);
+      // Zod v4 with defaults: validation passes, but some brand template fields are missing
+      // The upgrade function should still fill in proper default values
+      expect(initialResult.success).toBe(true);
 
       // 动态导入升级函数
       const { upgradeConfigData } = await import("@/lib/services/config.service");
@@ -552,9 +555,10 @@ describe("配置导入数据格式校验", () => {
         },
       };
 
-      // 初始验证应该失败（因为缺少 brandPriorityStrategy 和某些模板字段）
+      // Note: Zod v4 会自动应用 .default() 值，brandPriorityStrategy 会被设置为 "smart"
+      // 而品牌模板字段虽然缺失，但 templates 是 z.record() 类型，允许部分数据
       const initialResult = AppConfigDataSchema.safeParse(v120Config);
-      expect(initialResult.success).toBe(false);
+      expect(initialResult.success).toBe(true);
 
       // 动态导入升级函数
       const { upgradeConfigData } = await import("@/lib/services/config.service");

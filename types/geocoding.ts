@@ -4,7 +4,7 @@
  * 集中管理所有与位置、坐标、高德地图 MCP 相关的类型
  */
 
-import { z } from "zod";
+import { z } from 'zod/v3';
 import type { Store } from "./zhipin";
 
 // ============ 坐标类型 ============

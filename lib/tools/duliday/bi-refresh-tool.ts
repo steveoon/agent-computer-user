@@ -1,5 +1,5 @@
 import { tool } from "ai";
-import { z } from "zod";
+import { z } from 'zod/v3';
 
 // ==================== 常量配置 ====================
 const REFRESH_CONFIG = {

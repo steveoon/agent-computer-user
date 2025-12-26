@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod/v3';
 import { CoordinatesSchema } from "./geocoding";
 
 // Boss直聘相关数据类型定义

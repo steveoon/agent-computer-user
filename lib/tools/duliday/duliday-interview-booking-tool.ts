@@ -1,5 +1,5 @@
 import { tool } from "ai";
-import { z } from "zod";
+import { z } from 'zod/v3';
 import { getEducationIdByName, EDUCATION_MAPPING } from "@/lib/constants/organization-mapping";
 import { interviewBookingResponseSchema } from "./types";
 import {

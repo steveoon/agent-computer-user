@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSyncService } from "@/lib/services/duliday-sync.service";
 import { geocodingService } from "@/lib/services/geocoding.service";
-import { z } from "zod";
+import { z } from 'zod/v3';
 
 /**
  * 同步请求体 Schema

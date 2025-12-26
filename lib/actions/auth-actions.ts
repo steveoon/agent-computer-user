@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/utils/supabase/server";
-import { z } from "zod";
+import { z } from 'zod/v3';
 
 /**
  * 登录表单验证模式

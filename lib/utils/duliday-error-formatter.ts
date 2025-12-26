@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod/v3';
 
 /**
  * 格式化 Duliday API 相关的错误信息
@@ -34,8 +34,8 @@ export class DulidayErrorFormatter {
           const keysList = keys && Array.isArray(keys) ? keys.join(", ") : "未知键";
           return `• 字段 "${path}"\n  包含未识别的键: ${keysList}`;
 
-        case "invalid_format":
-          // In Zod v4, string format validation uses "invalid_format" instead of "invalid_string"
+        case "invalid_string":
+          // In Zod v4, string format validation uses "invalid_string"
           return `• 字段 "${path}"\n  字符串格式无效\n  ${issue.message}`;
 
         case "too_small":
@@ -100,7 +100,7 @@ export class DulidayErrorFormatter {
           baseError = `• 字段 "${path}"\n  包含未识别的键: ${keysList}`;
           break;
 
-        case "invalid_format":
+        case "invalid_string":
           baseError = `• 字段 "${path}"\n  字符串格式无效\n  ${issue.message}`;
           break;
 

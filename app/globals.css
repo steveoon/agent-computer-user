@@ -285,7 +285,6 @@
   }
 }
 
-
 /* Tremor 图表颜色覆盖 - 修复 Tailwind v4 兼容性 */
 .tremor-chart-colors [class*="fill-blue"] {
   fill: #3b82f6 !important;
@@ -309,4 +308,18 @@
 
 .tremor-chart-colors [class*="stroke-violet"] {
   stroke: #8b5cf6 !important;
+}
+
+/* 渐变流光动画 */
+@keyframes gradient-flow {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.animate-gradient-flow {
+  animation: gradient-flow 2s linear infinite;
 }

@@ -8,7 +8,7 @@
  * even if not currently imported elsewhere.
  */
 
-import { z } from 'zod';
+import { z } from 'zod/v3';
 import { BrandPriorityStrategy, BrandPriorityStrategySchema } from './config';
 
 /**

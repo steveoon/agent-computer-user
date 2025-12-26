@@ -1,5 +1,5 @@
 import { tool } from "ai";
-import { z } from "zod";
+import { z } from 'zod/v3';
 import { getOrgIdByBrandName, getAvailableBrands } from "@/actions/brand-mapping";
 import { jobListResponseSchema, type JobItem } from "./types";
 

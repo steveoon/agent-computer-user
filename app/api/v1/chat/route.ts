@@ -226,7 +226,7 @@ export async function POST(req: Request) {
       const result = streamText({
         model: dynamicRegistry.languageModel(model as never),
         system: systemPrompt,
-        messages: convertToModelMessages(processedMessages),
+        messages: await convertToModelMessages(processedMessages),
         tools: Object.keys(tools).length > 0 ? tools : undefined,
         stopWhen: stepCountIs(30),
         onStepFinish: async ({ toolCalls, toolResults }) => {
@@ -265,7 +265,7 @@ export async function POST(req: Request) {
       const result = await generateText({
         model: dynamicRegistry.languageModel(model as never),
         system: systemPrompt,
-        messages: convertToModelMessages(processedMessages),
+        messages: await convertToModelMessages(processedMessages),
         tools: Object.keys(tools).length > 0 ? tools : undefined,
         stopWhen: stepCountIs(30),
         onStepFinish: async ({ toolCalls, toolResults }) => {

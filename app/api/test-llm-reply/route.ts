@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateSmartReplyWithLLM } from "../../../lib/loaders/zhipin-data.loader";
+import { generateSmartReply } from "@/lib/agents";
+import { DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "请提供有效的消息内容" }, { status: 400 });
     }
 
-    // 🔧 验证客户端传递的配置数据
+    // 验证客户端传递的配置数据
     if (!configData) {
       return NextResponse.json(
         { error: "缺少配置数据，请确保客户端正确传递 configData" },
@@ -38,24 +39,30 @@ export async function POST(request: NextRequest) {
       replyPromptsCount: Object.keys(replyPrompts).length,
     });
 
-    // 调用LLM智能回复生成函数（使用客户端传递的配置数据）
-    const reply = await generateSmartReplyWithLLM(
-      message.trim(), // 1. message
-      conversationHistory || [], // 2. conversationHistory
-      brand, // 3. preferredBrand
-      toolBrand, // 4. toolBrand (客户端传递)
-      modelConfig, // 5. modelConfig
-      configData, // 6. configData
-      replyPrompts // 7. replyPrompts
-    );
+    // 调用新的 Agent-based 智能回复生成函数
+    // 使用用户传入的 providerConfigs，如果没有则使用默认配置
+    const result = await generateSmartReply({
+      candidateMessage: message.trim(),
+      conversationHistory: conversationHistory || [],
+      preferredBrand: brand, // UI 选择的品牌
+      toolBrand, // 工具识别的品牌
+      modelConfig: {
+        ...modelConfig,
+        providerConfigs: modelConfig?.providerConfigs || DEFAULT_PROVIDER_CONFIGS,
+      },
+      configData,
+      replyPrompts,
+    });
 
     return NextResponse.json({
       success: true,
-      reply: reply.text,
-      replyType: reply.replyType,
-      reasoningText: reply.reasoningText,
-      debugInfo: reply.debugInfo,
-      contextInfo: reply.contextInfo,
+      reply: result.suggestedReply,
+      replyType: result.classification.replyType,
+      reasoningText: result.classification.reasoningText,
+      debugInfo: result.debugInfo,
+      contextInfo: result.contextInfo,
+      confidence: result.confidence,
+      shouldExchangeWechat: result.shouldExchangeWechat,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

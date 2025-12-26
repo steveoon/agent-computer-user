@@ -3,7 +3,7 @@
  * 用于标准化所有 AI SDK 工具的输入输出类型
  */
 
-import { z } from "zod";
+import { z } from 'zod/v3';
 import type { UIMessagePart, UIDataTypes, UITools, Tool } from "ai";
 import type { ModelConfig } from "@/lib/config/models";
 import type { ZhipinData } from "./zhipin";

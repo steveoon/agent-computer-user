@@ -2,7 +2,7 @@
  * TypeScript interfaces for Zhipin automation tools
  */
 
-import { z } from "zod";
+import { z } from 'zod/v3';
 
 /**
  * Candidate information schema and type

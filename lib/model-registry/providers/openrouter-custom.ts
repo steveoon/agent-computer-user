@@ -100,10 +100,12 @@ function createCustomFetch(modelId: string): typeof fetch {
 }
 
 /**
- * 扩展的 Provider 接口，包含 AI SDK 要求的所有方法
+ * 扩展的 Provider 接口，包含 AI SDK v6 要求的所有方法
+ * AI SDK v6 renamed textEmbeddingModel to embeddingModel and added specificationVersion
  */
 interface ExtendedProvider extends OpenRouterProvider {
-  textEmbeddingModel(modelId: string): never;
+  specificationVersion: "v3";
+  embeddingModel(modelId: string): never;
   imageModel(modelId: string): never;
 }
 
@@ -149,10 +151,16 @@ export function createCustomOpenRouter(config: {
         };
       }
 
-      // OpenRouter 不支持 textEmbeddingModel 和 imageModel，返回会抛出错误的函数
-      if (prop === "textEmbeddingModel") {
+      // AI SDK v6: specificationVersion 属性
+      if (prop === "specificationVersion") {
+        return "v3";
+      }
+
+      // OpenRouter 不支持 embeddingModel 和 imageModel，返回会抛出错误的函数
+      // Note: AI SDK v6 renamed textEmbeddingModel to embeddingModel
+      if (prop === "embeddingModel") {
         return (_modelId: string) => {
-          throw new Error("OpenRouter does not support text embedding models");
+          throw new Error("OpenRouter does not support embedding models");
         };
       }
 
