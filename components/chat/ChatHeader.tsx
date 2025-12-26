@@ -45,7 +45,11 @@ export function ChatHeader({
   const logoSrc = resolvedTheme === "dark" ? "/dark_1x-removebg.png" : "/light_1x-removebg.png";
 
   return (
-    <div className="bg-white/30 backdrop-blur-sm border-b border-white/20 py-2 px-4 flex flex-col gap-2 relative">
+    <div
+      className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-white/20 py-2 px-4 flex flex-col gap-2 relative z-50 transition-all duration-300 ${
+        isLoading ? "shadow-none border-b-0" : "shadow-sm"
+      }`}
+    >
       {/* 顶部栏：Logo、用户、主操作 */}
       <div className="flex justify-between items-center h-9">
         {/* 左侧：Logo & 侧边栏开关 */}
@@ -210,11 +214,12 @@ export function ChatHeader({
       </div>
 
       {/* 加载状态指示 (绝对定位在顶部) */}
-      {isLoading && (
-        <div className="absolute bottom-0 left-0 w-full h-0.5 bg-brand-light/30 overflow-hidden">
-          <div className="w-full h-full bg-brand-primary animate-progress-indeterminate origin-left"></div>
-        </div>
-      )}
+      {
+        /* 动态加载条 - 带泛光效果 */
+        isLoading && (
+          <div className="absolute bottom-0 left-0 w-full h-[2px] bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-[length:200%_100%] animate-gradient-flow shadow-[0_0_15px_rgba(168,85,247,0.6)]" />
+        )
+      }
     </div>
   );
 }
