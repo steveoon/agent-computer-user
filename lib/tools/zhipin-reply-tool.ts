@@ -1,11 +1,12 @@
 import { tool } from "ai";
-import { z } from "zod";
-import { generateSmartReplyWithLLM, loadZhipinData } from "@/lib/loaders/zhipin-data.loader";
+import { z } from 'zod/v3';
+import { loadZhipinData } from "@/lib/loaders/zhipin-data.loader";
+import { generateSmartReply } from "@/lib/agents";
 import type { StoreWithDistance } from "@/types/geocoding";
 import type { ZhipinData, MessageClassification } from "@/types/zhipin";
 import type { ReplyPromptsConfig, BrandPriorityStrategy } from "@/types/config";
 import type { ModelConfig } from "@/lib/config/models";
-import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
+import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
 import { CandidateInfoSchema } from "@/lib/tools/zhipin/types";
 
 /**
@@ -28,6 +29,7 @@ type ZhipinReplyToolResult = {
   candidateMessage: string;
   historyCount: number;
   debugInfo?: ReplyDebugInfo;
+  contextInfo?: string;
   stats?: {
     totalStores: number;
     totalPositions: number;
@@ -135,35 +137,46 @@ export const zhipinReplyTool = (
         // 使用传入的模型配置或默认配置
         const effectiveModelConfig = modelConfig || DEFAULT_MODEL_CONFIG;
 
-        // 生成智能回复
-        // preferredBrand 是 UI 选择的品牌
-        // brand 是工具调用时从职位详情识别的品牌
-        const replyResult = await generateSmartReplyWithLLM(
-          candidate_message,
-          processedHistory,
-          preferredBrand,  // UI选择的品牌
-          brand,           // 工具识别的品牌
-          effectiveModelConfig,
-          configData,
+        // 确保有配置数据
+        const effectiveConfigData = configData || (await loadZhipinData(preferredBrand));
+
+        // 生成智能回复（使用新的 Agent-based API）
+        // preferredBrand: UI 选择的品牌
+        // toolBrand (brand): 工具调用时从职位详情识别的品牌
+        // brandPriorityStrategy: 品牌优先级策略（决定哪个品牌优先）
+        // 使用传入的 providerConfigs，保持与主循环一致，避免创建新的 registry
+        const effectiveProviderConfigs = modelConfig?.providerConfigs || DEFAULT_PROVIDER_CONFIGS;
+
+        const replyResult = await generateSmartReply({
+          candidateMessage: candidate_message,
+          conversationHistory: processedHistory,
+          preferredBrand, // UI 选择的品牌
+          toolBrand: brand, // 工具识别的品牌（职位详情）
+          brandPriorityStrategy,
+          modelConfig: {
+            ...effectiveModelConfig,
+            providerConfigs: effectiveProviderConfigs,
+          },
+          configData: effectiveConfigData,
           replyPrompts,
-          candidate_info,
+          candidateInfo: candidate_info,
           defaultWechatId,
-          brandPriorityStrategy
-        );
+        });
 
         console.log(`✅ 回复生成成功`);
-        console.log(`📝 回复内容: ${replyResult.text}`);
-        console.log(`🎯 回复类型: ${replyResult.replyType}`);
-        console.log(`📊 分类依据: ${replyResult.reasoningText}`);
+        console.log(`📝 回复内容: ${replyResult.suggestedReply}`);
+        console.log(`🎯 回复类型: ${replyResult.classification.replyType}`);
+        console.log(`📊 分类依据: ${replyResult.classification.reasoningText}`);
 
         // 构建响应
         const response: ZhipinReplyToolResult = {
-          reply: replyResult.text,
-          replyType: replyResult.replyType,
-          reasoningText: replyResult.reasoningText || "未提供分类依据",
+          reply: replyResult.suggestedReply,
+          replyType: replyResult.classification.replyType,
+          reasoningText: replyResult.classification.reasoningText || "未提供分类依据",
           candidateMessage: candidate_message,
           historyCount: processedHistory.length,
-          debugInfo: replyResult.debugInfo, // 包含匹配到的门店信息
+          debugInfo: replyResult.debugInfo,
+          contextInfo: replyResult.contextInfo,
         };
 
         // 如果需要包含统计信息
@@ -188,19 +201,23 @@ export const zhipinReplyTool = (
       }
     },
 
-    toModelOutput(result: ZhipinReplyToolResult) {
+    toModelOutput(
+      {
+        output
+      }
+    ) {
       // 格式化输出结果
       let content = `✅ 智能回复已生成\n\n`;
-      content += `📝 回复内容:\n"${result.reply}"\n\n`;
-      content += `🎯 回复类型: ${result.replyType}\n`;
-      content += `💬 候选人消息: "${result.candidateMessage}"\n`;
-      content += `📋 历史记录: ${result.historyCount}条\n`;
+      content += `📝 回复内容:\n"${output.reply}"\n\n`;
+      content += `🎯 回复类型: ${output.replyType}\n`;
+      content += `💬 候选人消息: "${output.candidateMessage}"\n`;
+      content += `📋 历史记录: ${output.historyCount}条\n`;
 
-      if (result.stats) {
+      if (output.stats) {
         content += `\n📊 数据统计:\n`;
-        content += `• 品牌: ${result.stats.brand}\n`;
-        content += `• 门店数: ${result.stats.totalStores}家\n`;
-        content += `• 岗位数: ${result.stats.totalPositions}个`;
+        content += `• 品牌: ${output.stats.brand}\n`;
+        content += `• 门店数: ${output.stats.totalStores}家\n`;
+        content += `• 岗位数: ${output.stats.totalPositions}个`;
       }
 
       // AI SDK v5 格式
