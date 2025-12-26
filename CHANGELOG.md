@@ -2,6 +2,18 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.22.0](https://github.com/steveoon/agent-computer-user/compare/v1.21.2...v1.22.0) (2025-12-26)
+
+
+### Bug Fixes
+
+* **scripts:** use package.json as version source for image export ([bb03e3e](https://github.com/steveoon/agent-computer-user/commit/bb03e3ef4000566dc829fece92ddbb7e1bdbe17e))
+
+
+### Features
+
+* **ai-sdk:** upgrade to AI SDK v6 with comprehensive tool updates ([782eac6](https://github.com/steveoon/agent-computer-user/commit/782eac6e346fe598a905d4b303f2c3a1760357ca))
+
 # [1.22.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.21.2...v1.22.0-develop.1) (2025-12-26)
 
 
