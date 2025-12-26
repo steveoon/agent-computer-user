@@ -124,7 +124,7 @@ export abstract class BasePromptBuilder {
         .map(
           (ex, i) =>
             `Example ${i + 1}:\nInput: "${ex.input}"\nOutput: "${ex.output}"${
-              ex.reasoning ? `\nReasoning: ${ex.reasoning}` : ""
+              ex.reasoningText ? `\nReasoning: ${ex.reasoningText}` : ""
             }`
         )
         .join("\n\n");

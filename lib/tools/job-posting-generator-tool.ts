@@ -1,5 +1,5 @@
 import { tool } from "ai";
-import { z } from "zod";
+import { z } from 'zod/v3';
 import { generateObject } from "ai";
 import { getDynamicRegistry } from "@/lib/model-registry/dynamic-registry";
 import { DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";

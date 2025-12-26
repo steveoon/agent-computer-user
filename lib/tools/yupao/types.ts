@@ -2,7 +2,7 @@
  * TypeScript interfaces for Yupao automation tools
  */
 
-import { z } from "zod";
+import { z } from 'zod/v3';
 
 /**
  * Candidate information schema and type for Yupao

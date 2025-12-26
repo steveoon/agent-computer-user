@@ -1,5 +1,5 @@
 import { tool } from "ai";
-import { z } from "zod";
+import { z } from 'zod/v3';
 import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
 import { CHAT_SELECTORS } from "./constants";
 import { randomDelay, wrapAntiDetectionScript } from "./anti-detection-utils";

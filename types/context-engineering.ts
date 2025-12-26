@@ -3,7 +3,7 @@
  * 为 Context Engineering Prompt Builder 提供严格的类型安全
  */
 
-import { z } from "zod";
+import { z } from 'zod/v3';
 import { MessageClassificationSchema, type ReplyContext } from "./zhipin";
 // 使用来自lib/tools/zhipin/types的CandidateInfo，因为这是整个项目实际使用的版本
 import { CandidateInfoSchema } from "@/lib/tools/zhipin/types";
@@ -113,7 +113,7 @@ export const ExampleSchema = z.object({
   scenario: z.string(),
   input: z.string(),
   output: z.string(),
-  reasoning: z.string().optional(),
+  reasoningText: z.string().optional(),
   context: z.string().optional(), // 可选的上下文信息
   metadata: z
     .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]))

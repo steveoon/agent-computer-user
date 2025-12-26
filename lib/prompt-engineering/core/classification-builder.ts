@@ -44,13 +44,13 @@ class ClassificationExampleRepository {
         scenario: "初次询问工作机会",
         input: "有什么兼职工作吗？",
         output: "initial_inquiry",
-        reasoning: "候选人初次询问工作机会，没有具体指向",
+        reasoningText: "候选人初次询问工作机会，没有具体指向",
       },
       {
         scenario: "探索性咨询",
         input: "想了解一下",
         output: "initial_inquiry",
-        reasoning: "候选人表达了解意向，属于初步咨询",
+        reasoningText: "候选人表达了解意向，属于初步咨询",
       },
     ]);
 
@@ -60,13 +60,13 @@ class ClassificationExampleRepository {
         scenario: "询问具体区域",
         input: "浦东有吗？",
         output: "location_inquiry",
-        reasoning: "询问特定区域是否有工作机会",
+        reasoningText: "询问特定区域是否有工作机会",
       },
       {
         scenario: "询问就近位置",
         input: "离我近的有吗？",
         output: "location_inquiry",
-        reasoning: "询问就近位置，需要了解候选人位置",
+        reasoningText: "询问就近位置，需要了解候选人位置",
       },
     ]);
 
@@ -76,13 +76,13 @@ class ClassificationExampleRepository {
         scenario: "直接询问薪资",
         input: "工资多少？",
         output: "salary_inquiry",
-        reasoning: "直接询问薪资待遇",
+        reasoningText: "直接询问薪资待遇",
       },
       {
         scenario: "询问薪资范围",
         input: "一个月能挣多少钱？",
         output: "salary_inquiry",
-        reasoning: "询问月收入，属于薪资咨询",
+        reasoningText: "询问月收入，属于薪资咨询",
       },
     ]);
 
@@ -92,13 +92,13 @@ class ClassificationExampleRepository {
         scenario: "年龄偏大担忧",
         input: "我50岁了能做吗？",
         output: "age_concern",
-        reasoning: "提及年龄并询问是否合适，属于年龄敏感话题",
+        reasoningText: "提及年龄并询问是否合适，属于年龄敏感话题",
       },
       {
         scenario: "年龄偏小询问",
         input: "我才18岁可以吗？",
         output: "age_concern",
-        reasoning: "询问年龄是否符合要求",
+        reasoningText: "询问年龄是否符合要求",
       },
     ]);
 
@@ -108,13 +108,13 @@ class ClassificationExampleRepository {
         scenario: "询问排班灵活性",
         input: "可以只做周末吗？",
         output: "schedule_inquiry",
-        reasoning: "询问特定时间段的工作安排",
+        reasoningText: "询问特定时间段的工作安排",
       },
       {
         scenario: "询问工作时间",
         input: "几点上班几点下班？",
         output: "schedule_inquiry",
-        reasoning: "询问具体工作时间安排",
+        reasoningText: "询问具体工作时间安排",
       },
     ]);
 
@@ -124,13 +124,13 @@ class ClassificationExampleRepository {
         scenario: "主动要求面试",
         input: "我想去面试",
         output: "interview_request",
-        reasoning: "明确表达面试意向",
+        reasoningText: "明确表达面试意向",
       },
       {
         scenario: "询问面试时间",
         input: "什么时候可以面试？",
         output: "interview_request",
-        reasoning: "询问面试安排，表达面试意向",
+        reasoningText: "询问面试安排，表达面试意向",
       },
     ]);
 
@@ -140,7 +140,7 @@ class ClassificationExampleRepository {
         scenario: "询问社保",
         input: "有五险一金吗？",
         output: "insurance_inquiry",
-        reasoning: "询问保险福利，属于敏感话题",
+        reasoningText: "询问保险福利，属于敏感话题",
       },
     ]);
 
@@ -150,7 +150,7 @@ class ClassificationExampleRepository {
         scenario: "询问出勤要求",
         input: "需要每天都上班吗？",
         output: "attendance_inquiry",
-        reasoning: "询问出勤频率要求",
+        reasoningText: "询问出勤频率要求",
       },
     ]);
 
@@ -160,7 +160,7 @@ class ClassificationExampleRepository {
         scenario: "询问兼职",
         input: "支持兼职吗？",
         output: "part_time_support",
-        reasoning: "询问是否支持兼职工作",
+        reasoningText: "询问是否支持兼职工作",
       },
     ]);
   }
@@ -366,7 +366,7 @@ export class ClassificationPromptBuilder extends BasePromptBuilder {
         .map(
           (ex, i) =>
             `Example ${i + 1}:\nInput: "${ex.input}"\nOutput: "${ex.output}"${
-              ex.reasoning ? `\nReasoning: ${ex.reasoning}` : ""
+              ex.reasoningText ? `\nReasoning: ${ex.reasoningText}` : ""
             }`
         )
         .join("\n\n");

@@ -142,7 +142,7 @@ vi.mock("@/types/tool-common", () => ({
     return {
       name: toolDef.name,
       description: `Mock ${toolDef.name} tool`,
-      parameters: {},
+      inputSchema: {},
       execute: vi.fn().mockResolvedValue("mock result"),
     };
   }),

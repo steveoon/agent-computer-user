@@ -21,7 +21,7 @@
  */
 
 import puppeteer, { Browser, Page } from "puppeteer";
-import { z } from "zod";
+import { z } from 'zod/v3';
 import * as fs from "fs";
 import * as path from "path";
 import * as readline from "readline";

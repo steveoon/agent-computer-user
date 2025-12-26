@@ -335,7 +335,7 @@ export async function POST(req: Request) {
           const textResult = streamText({
             model: dynamicRegistry.languageModel(chatModel),
             system: systemPrompt,
-            messages: convertToModelMessages(mutableMessages),
+            messages: await convertToModelMessages(mutableMessages),
             tools: filteredTools,
             providerOptions: {
               anthropic: { cacheControl: { type: "ephemeral" } },
@@ -363,8 +363,8 @@ export async function POST(req: Request) {
               }
             },
             onFinish: async ({ usage, finishReason, steps }) => {
-              // 区分正常完成和被中止（中止时 finishReason 为 unknown 或 other）
-              const isAborted = finishReason === "unknown" || finishReason === "other";
+              // 区分正常完成和被中止（中止时 finishReason 为 other 或 error）
+              const isAborted = finishReason === "other" || finishReason === "error";
               if (isAborted) {
                 console.log(
                   `\n⏹️ Stream被中止 | 原因: ${finishReason} | 总步数: ${steps.length} | 总tokens: ${usage?.totalTokens || 0}`

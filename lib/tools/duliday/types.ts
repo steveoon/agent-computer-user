@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod/v3';
 
 /**
  * 岗位列表项 Schema

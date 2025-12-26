@@ -5,14 +5,12 @@ import { getDesktop, withTimeout } from "./utils";
 import { mapKeySequence } from "../utils";
 import { diagnoseE2BEnvironment } from "./diagnostic";
 import { compressImageServerV2 } from "../image-optimized";
-import { loadZhipinData, generateSmartReplyWithLLM } from "../loaders/zhipin-data.loader";
+import { loadZhipinData } from "../loaders/zhipin-data.loader";
+import { generateSmartReply } from "@/lib/agents";
 import { activeConfig } from "./display-config";
 import type { Store } from "../../types/zhipin";
 import type { ModelConfig } from "../config/models";
 import type { ZhipinData, ReplyPromptsConfig } from "@/types";
-
-// 定义工具执行的返回类型
-type E2BToolResult = { type: "image"; data: string } | { type: "text"; text: string } | string;
 
 const wait = async (seconds: number) => {
   await new Promise(resolve => setTimeout(resolve, seconds * 1000));
@@ -326,30 +324,34 @@ export const computerTool35 = (sandboxId: string) =>
           throw new Error(`Unsupported action: ${action}`);
       }
     },
-    toModelOutput(result: E2BToolResult) {
+    toModelOutput(
+      {
+        output
+      }
+    ) {
       // AI SDK v5 格式：返回带有 type: 'content' 的对象
-      if (typeof result === "string") {
+      if (typeof output === "string") {
         return {
           type: "content" as const,
-          value: [{ type: "text" as const, text: result }],
+          value: [{ type: "text" as const, text: output }],
         };
       }
-      if (result.type === "image" && result.data) {
+      if (output.type === "image" && output.data) {
         return {
           type: "content" as const,
           value: [
             {
               type: "media" as const,
-              data: result.data,
+              data: output.data,
               mediaType: "image/jpeg",
             },
           ],
         };
       }
-      if (result.type === "text" && result.text) {
+      if (output.type === "text" && output.text) {
         return {
           type: "content" as const,
-          value: [{ type: "text" as const, text: result.text }],
+          value: [{ type: "text" as const, text: output.text }],
         };
       }
       throw new Error("Invalid result format");
@@ -466,30 +468,34 @@ export const anthropicComputerTool = (sandboxId: string) =>
           throw new Error(`Unsupported action: ${action}`);
       }
     },
-    toModelOutput(result: E2BToolResult) {
+    toModelOutput(
+      {
+        output
+      }
+    ) {
       // AI SDK v5 格式：返回带有 type: 'content' 的对象
-      if (typeof result === "string") {
+      if (typeof output === "string") {
         return {
           type: "content" as const,
-          value: [{ type: "text" as const, text: result }],
+          value: [{ type: "text" as const, text: output }],
         };
       }
-      if (result.type === "image" && result.data) {
+      if (output.type === "image" && output.data) {
         return {
           type: "content" as const,
           value: [
             {
               type: "media" as const,
-              data: result.data,
+              data: output.data,
               mediaType: "image/jpeg",
             },
           ],
         };
       }
-      if (result.type === "text" && result.text) {
+      if (output.type === "text" && output.text) {
         return {
           type: "content" as const,
-          value: [{ type: "text" as const, text: result.text }],
+          value: [{ type: "text" as const, text: output.text }],
         };
       }
       throw new Error("Invalid result format");
@@ -1115,21 +1121,19 @@ export const computerTool = (
               }
             }
 
-            // 生成回复 - 优先使用传入的配置数据
-            const replyResult = await generateSmartReplyWithLLM(
-              candidate_message || "",
-              processedHistory,
+            // 生成回复 - 使用新的 Agent-based 智能回复
+            const replyResult = await generateSmartReply({
+              candidateMessage: candidate_message || "",
+              conversationHistory: processedHistory,
               preferredBrand,
-              undefined, // toolBrand - 在此上下文中不可用
               modelConfig,
-              configData, // 传递配置数据
-              replyPrompts, // 传递回复指令
-              undefined, // candidateInfo - 在此上下文中不可用
-              defaultWechatId // 传递默认微信号
-            );
+              configData: configData!, // 配置数据
+              replyPrompts, // 回复指令
+              defaultWechatId, // 默认微信号
+            });
 
-            console.log(`📝 生成的回复内容: ${replyResult.text}`);
-            console.log(`🎯 回复类型: ${replyResult.replyType}`);
+            console.log(`📝 生成的回复内容: ${replyResult.suggestedReply}`);
+            console.log(`🎯 回复类型: ${replyResult.classification.replyType}`);
             console.log(`💬 候选人消息: ${candidate_message}`);
             console.log(`📝 对话历史: ${processedHistory.length}条消息`);
             console.log(`⚙️ 自动输入: ${auto_input ? "是" : "否"}`);
@@ -1138,10 +1142,10 @@ export const computerTool = (
             const storeDatabase = configData || (await loadZhipinData());
 
             let resultText = `✅ Boss直聘回复已生成：\n\n"${
-              replyResult.text
+              replyResult.suggestedReply
             }"\n\n📊 生成详情:\n• 候选人消息: ${
               candidate_message || "无"
-            }\n• 回复类型: ${replyResult.replyType}\n• 对话历史: ${
+            }\n• 回复类型: ${replyResult.classification.replyType}\n• 对话历史: ${
               processedHistory.length
             }条消息\n• 使用数据: ${
               storeDatabase.stores.length
@@ -1156,7 +1160,7 @@ export const computerTool = (
                 resultText += "\n\n🚀 正在自动输入回复内容...";
 
                 // 自动输入生成的回复
-                const inputResult = await handleChineseInput(desktop, replyResult.text);
+                const inputResult = await handleChineseInput(desktop, replyResult.suggestedReply);
                 resultText += `\n✅ 自动输入完成: ${inputResult}`;
                 resultText += "\n\n💡 提示: 现在可以按回车键发送消息，或手动检查后发送";
               } catch (inputError) {
@@ -1164,10 +1168,10 @@ export const computerTool = (
                 resultText += `\n❌ 自动输入失败: ${
                   inputError instanceof Error ? inputError.message : "未知错误"
                 }`;
-                resultText += `\n🔄 请手动使用 type 操作输入以下内容: "${replyResult.text}"`;
+                resultText += `\n🔄 请手动使用 type 操作输入以下内容: "${replyResult.suggestedReply}"`;
               }
             } else {
-              resultText += `\n\n🚀 下一步操作: 请使用 type 动作输入以下回复内容：\n"${replyResult.text}"\n\n💡 建议流程: 1. 执行 type 操作输入回复 → 2. 按回车发送`;
+              resultText += `\n\n🚀 下一步操作: 请使用 type 动作输入以下回复内容：\n"${replyResult.suggestedReply}"\n\n💡 建议流程: 1. 执行 type 操作输入回复 → 2. 按回车发送`;
             }
 
             return {
@@ -1186,30 +1190,34 @@ export const computerTool = (
           throw new Error(`Unsupported action: ${action}`);
       }
     },
-    toModelOutput(result: E2BToolResult) {
+    toModelOutput(
+      {
+        output
+      }
+    ) {
       // AI SDK v5 格式：返回带有 type: 'content' 的对象
-      if (typeof result === "string") {
+      if (typeof output === "string") {
         return {
           type: "content" as const,
-          value: [{ type: "text" as const, text: result }],
+          value: [{ type: "text" as const, text: output }],
         };
       }
-      if (result.type === "image" && result.data) {
+      if (output.type === "image" && output.data) {
         return {
           type: "content" as const,
           value: [
             {
               type: "media" as const,
-              data: result.data,
+              data: output.data,
               mediaType: "image/jpeg",
             },
           ],
         };
       }
-      if (result.type === "text" && result.text) {
+      if (output.type === "text" && output.text) {
         return {
           type: "content" as const,
-          value: [{ type: "text" as const, text: result.text }],
+          value: [{ type: "text" as const, text: output.text }],
         };
       }
       throw new Error("Invalid result format");

@@ -4,7 +4,7 @@
  * 统计聚合模块的类型定义
  */
 
-import { z } from "zod";
+import { z } from 'zod/v3';
 
 /**
  * 聚合维度枚举

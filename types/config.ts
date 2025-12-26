@@ -3,7 +3,7 @@
  * 用于 localforage 存储的品牌数据和提示词配置
  */
 
-import { z } from "zod";
+import { z } from 'zod/v3';
 import {
   // 从zhipin导入所需类型
   ZhipinDataSchema,

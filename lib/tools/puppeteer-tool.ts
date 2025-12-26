@@ -1,5 +1,5 @@
 import { tool } from "ai";
-import { z } from "zod";
+import { z } from 'zod/v3';
 import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
 import {
   PuppeteerResult,
@@ -320,20 +320,24 @@ export const puppeteerTool = () =>
         return PuppeteerResultSchema.parse(errorResult);
       }
     },
-    toModelOutput(result) {
+    toModelOutput(
+      {
+        output
+      }
+    ) {
       try {
         // 如果result是字符串，将其包装为text类型的结果
-        if (typeof result === "string") {
+        if (typeof output === "string") {
           console.warn("⚠️ Puppeteer工具返回了字符串而非对象，自动包装为text类型");
           // AI SDK v5 格式
           return {
             type: "content" as const,
-            value: [{ type: "text" as const, text: result }],
+            value: [{ type: "text" as const, text: output }],
           };
         }
 
         // 验证结果类型
-        const validatedResult = PuppeteerResultSchema.parse(result);
+        const validatedResult = PuppeteerResultSchema.parse(output);
 
         if (isPuppeteerTextResult(validatedResult)) {
           // AI SDK v5 格式
@@ -390,7 +394,7 @@ export const puppeteerTool = () =>
         // 降级处理：无论如何都返回一个文本结果
         const errorText = error instanceof Error ? error.message : String(error);
         const fallbackText =
-          typeof result === "string" ? result : `Puppeteer操作完成，但结果格式异常: ${errorText}`;
+          typeof output === "string" ? output : `Puppeteer操作完成，但结果格式异常: ${errorText}`;
 
         // AI SDK v5 格式
         return {

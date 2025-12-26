@@ -6,7 +6,7 @@ import {
   formatHttpError,
 } from "@/lib/utils/duliday-error-formatter";
 import { getBrandNameByOrgId } from "@/actions/brand-mapping";
-import { z } from "zod";
+import { z } from 'zod/v3';
 // 注意：服务器端不使用 configService，数据保存逻辑在客户端处理
 
 /**
