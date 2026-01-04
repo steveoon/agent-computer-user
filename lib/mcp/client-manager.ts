@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter } from "events";
-import { experimental_createMCPClient } from "@ai-sdk/mcp";
-import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
+import { createMCPClient } from "@ai-sdk/mcp";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import {
   MCPClientConfig,
   MCPManagerStatus,
@@ -140,14 +140,14 @@ class MCPClientManager {
         : {};
 
       // 创建传输层
-      const transport = new Experimental_StdioMCPTransport({
+      const transport = new StdioClientTransport({
         command: config.command,
         args: config.args,
         env: filteredEnv,
       });
 
       // 创建MCP客户端
-      const client = await experimental_createMCPClient({
+      const client = await createMCPClient({
         transport,
       });
 
