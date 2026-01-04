@@ -2,6 +2,14 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.23.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.22.0...v1.23.0-develop.1) (2026-01-04)
+
+
+### Features
+
+* add Model Context Protocol SDK and integrate into client manager ([94ccef8](https://github.com/steveoon/agent-computer-user/commit/94ccef8e7fa986ca20727e7c4cca11695c237155))
+* **ai:** add unified structured output error handling with tool-based pattern ([b3d6b80](https://github.com/steveoon/agent-computer-user/commit/b3d6b80ebb4803e36c0a5dceb96a0df89aa4a7a0))
+
 # [1.22.0](https://github.com/steveoon/agent-computer-user/compare/v1.21.2...v1.22.0) (2025-12-26)
 
 
