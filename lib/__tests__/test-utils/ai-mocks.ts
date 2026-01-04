@@ -216,21 +216,34 @@ export function createMockErrorStream(error: Error): MockLanguageModelV3 {
 }
 
 /**
+ * 内部工具名称常量，与 safeGenerateObject 保持一致
+ */
+const SUBMIT_OBJECT_TOOL_NAME = "submit_structured_output";
+
+/**
  * 创建对象生成 Mock
- * 用于测试 generateObject 场景（如分类）
+ * 用于测试 safeGenerateObject 场景（如分类）
+ *
+ * 注意：safeGenerateObject 使用 tool-based pattern，
+ * 所以 mock 需要返回一个工具调用而不是纯文本
  */
 export function createMockObjectGeneration<T extends Record<string, unknown>>(
   object: T
 ): MockLanguageModelV3 {
-  const textContent: LanguageModelV3Text = {
-    type: "text",
-    text: JSON.stringify(object),
+  const toolCallId = mockId({ prefix: "call" })();
+
+  // AI SDK v6: 返回工具调用结果
+  const toolCall: LanguageModelV3ToolCall = {
+    type: "tool-call",
+    toolCallId,
+    toolName: SUBMIT_OBJECT_TOOL_NAME,
+    input: JSON.stringify(object),
   };
 
   const generateResult: LanguageModelV3GenerateResult = {
-    finishReason: createFinishReason("stop"),
+    finishReason: createFinishReason("tool-calls"),
     usage: createUsage(50, 20),
-    content: [textContent],
+    content: [toolCall],
     warnings: emptyWarnings,
   };
 

@@ -1,8 +1,8 @@
 import { tool } from "ai";
-import { z } from 'zod/v3';
-import { generateObject } from "ai";
+import { z } from "zod/v3";
 import { getDynamicRegistry } from "@/lib/model-registry/dynamic-registry";
 import { DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
+import { safeGenerateObject } from "@/lib/ai";
 import type { Store, Position, ZhipinData } from "@/types/zhipin";
 
 // 岗位类型枚举 - 包含常见的零售和餐饮岗位
@@ -98,16 +98,24 @@ export const jobPostingGeneratorTool = (preferredBrand?: string, configData?: Zh
         const baseSalary = displayStores[0]?.position.salary.base || 24;
         const salaryMemo = displayStores[0]?.position.salary.memo || "";
 
+        // 默认薪资信息
+        const defaultStepSalary: z.infer<typeof stepSalarySchema> = {
+          step40Hours: "超40小时的部分",
+          step40Salary: baseSalary + 2,
+          step80Hours: "超80小时的部分",
+          step80Salary: baseSalary + 4,
+        };
+
         // 使用 AI 解析阶梯薪资信息
-        let stepSalaryInfo: z.infer<typeof stepSalarySchema> | null = null;
+        let stepSalaryInfo: z.infer<typeof stepSalarySchema> = defaultStepSalary;
 
         if (salaryMemo) {
-          try {
-            const dynamicRegistry = getDynamicRegistry(DEFAULT_PROVIDER_CONFIGS);
-            const { object } = await generateObject({
-              model: dynamicRegistry.languageModel("openai/gpt-4o"),
-              schema: stepSalarySchema,
-              prompt: `请从以下薪资备注信息中提取阶梯工时薪资信息：
+          const dynamicRegistry = getDynamicRegistry(DEFAULT_PROVIDER_CONFIGS);
+          const salaryResult = await safeGenerateObject({
+            model: dynamicRegistry.languageModel("deepseek/deepseek-chat"),
+            schema: stepSalarySchema,
+            schemaName: "StepSalary",
+            prompt: `请从以下薪资备注信息中提取阶梯工时薪资信息：
 
               ${salaryMemo}
 
@@ -115,26 +123,19 @@ export const jobPostingGeneratorTool = (preferredBrand?: string, configData?: Zh
               1. 识别超过40小时和超过80小时的阶梯薪资
               2. 提取对应的时薪数字
               3. 保持原文中的描述方式`,
-            });
-            stepSalaryInfo = object;
-          } catch (error) {
-            console.error("解析薪资信息失败:", error);
-            // 使用默认值
-            stepSalaryInfo = {
-              step40Hours: "超40小时的部分",
-              step40Salary: baseSalary + 2,
-              step80Hours: "超80小时的部分",
-              step80Salary: baseSalary + 4,
-            };
+            onError: (error, rawText) => {
+              // 如果是 markdown 格式，记录更详细的信息
+              const details = error.details as Record<string, unknown> | undefined;
+              if (details?.isMarkdownFormat) {
+                console.warn("LLM returned markdown instead of JSON. Raw text:", rawText?.slice(0, 200));
+              }
+            },
+          });
+
+          if (salaryResult.success) {
+            stepSalaryInfo = salaryResult.data;
           }
-        } else {
-          // 使用默认值
-          stepSalaryInfo = {
-            step40Hours: "超40小时的部分",
-            step40Salary: baseSalary + 2,
-            step80Hours: "超80小时的部分",
-            step80Salary: baseSalary + 4,
-          };
+          // 失败时使用 defaultStepSalary（已在初始化时设置）
         }
 
         // 构建消息内容

@@ -1,11 +1,11 @@
 /**
  * Classification Agent
  *
- * 使用 AI SDK v6 的 generateObject 实现消息分类
+ * 使用 AI SDK v6 的 generateText 实现消息分类
  * 替代原有的 classifyUserMessage() 函数
  *
  * 核心价值:
- * - generateObject 自动将 Zod enum 转换为 JSON Schema 约束
+ * - generateText 自动将 Zod enum 转换为 JSON Schema 约束
  * - 支持不具备 structuredOutputs 的模型（如 DeepSeek）
  * - 与原有 zhipin-data.loader.ts 中的分类逻辑行为一致
  *
@@ -13,12 +13,12 @@
  * structuredOutputs 时，Output.object() 不会将 enum 约束传递给模型
  */
 
-import { generateObject } from "ai";
 import { z } from "zod/v3";
 import { getDynamicRegistry } from "@/lib/model-registry/dynamic-registry";
 import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS, type ModelId } from "@/lib/config/models";
 import { ClassificationPromptBuilder } from "@/lib/prompt-engineering";
 import { ReplyContextSchema, MessageClassificationSchema } from "@/types/zhipin";
+import { safeGenerateObject } from "@/lib/ai";
 import {
   ClassificationOptionsSchema,
   BrandDataSchema,
@@ -33,7 +33,7 @@ import {
  * 与现有 MessageClassificationSchema 对齐
  *
  * 使用 ReplyContextSchema (z.enum) 确保 replyType 只能是 16 种有效值之一
- * generateObject 会自动将此 enum 转换为 JSON Schema 约束传递给模型
+ * generateText 会自动将此 enum 转换为 JSON Schema 约束传递给模型
  *
  * 注意：使用 .nullable() 而非 .optional()
  * OpenAI structuredOutputs 严格模式要求所有属性都在 required 数组中
@@ -79,8 +79,7 @@ const ClassificationOutputSchema = z.object({
 /**
  * 执行消息分类
  *
- * 使用 generateObject 直接调用模型进行分类
- * generateObject 会自动将 Zod schema (包括 z.enum) 转换为 JSON Schema
+ * generateText 会自动将 Zod schema (包括 z.enum) 转换为 JSON Schema
  * 传递给模型，确保返回值符合约束
  *
  * @param message - 候选人消息
@@ -123,17 +122,20 @@ export async function classifyMessage(
     brandData,
   });
 
-  // 使用 generateObject 进行分类
-  // generateObject 会自动将 ReplyContextSchema (z.enum) 转换为 JSON Schema
-  // 模型会收到包含所有 16 种有效值的 enum 约束
-  const { object: classification } = await generateObject({
+  const result = await safeGenerateObject({
     model: registry.languageModel(classifyModel),
     schema: ClassificationOutputSchema,
+    schemaName: "ClassificationOutput",
     system: prompts.system,
     prompt: prompts.prompt,
   });
 
-  return classification;
+  if (!result.success) {
+    // 抛出带有完整上下文的 AppError
+    throw result.error;
+  }
+
+  return result.data;
 }
 
 // ========== 类型导出 ==========

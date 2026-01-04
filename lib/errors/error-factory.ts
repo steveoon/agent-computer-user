@@ -10,11 +10,28 @@ import { ErrorCode } from "./error-codes";
 /**
  * LLM 错误上下文
  */
-interface LLMErrorContext {
+export interface LLMErrorContext {
   model?: string;
   provider?: string;
   statusCode?: number;
   responseBody?: string;
+}
+
+/**
+ * 结构化输出错误上下文
+ * 专门用于 NoObjectGeneratedError 的详细信息
+ */
+export interface StructuredOutputErrorContext extends LLMErrorContext {
+  /** 模型生成的原始文本（可能是 markdown 或其他非 JSON 格式） */
+  rawText?: string;
+  /** 是否检测到 markdown 格式 */
+  isMarkdownFormat?: boolean;
+  /** JSON 解析错误的详细信息 */
+  parseErrorMessage?: string;
+  /** Schema 名称（用于日志） */
+  schemaName?: string;
+  /** Token 使用量（AI SDK v6 的 LanguageModelUsage 类型） */
+  usage?: unknown;
 }
 
 /**
@@ -211,5 +228,41 @@ export function createSystemError(
     message,
     cause,
     details,
+  });
+}
+
+/**
+ * 创建结构化输出解析错误
+ *
+ * 专门用于 NoObjectGeneratedError，保留完整调试信息
+ *
+ * @example
+ * throw createStructuredOutputError(
+ *   ErrorCode.LLM_RESPONSE_PARSE_ERROR,
+ *   originalError,
+ *   { rawText: error.text, isMarkdownFormat: true, schemaName: 'ClassificationOutput' }
+ * );
+ */
+export function createStructuredOutputError(
+  code: typeof ErrorCode.LLM_RESPONSE_PARSE_ERROR,
+  cause: Error,
+  context: StructuredOutputErrorContext
+): AppError {
+  const formatInfo = context.isMarkdownFormat ? " (detected markdown format)" : "";
+  const schemaInfo = context.schemaName ? ` for schema "${context.schemaName}"` : "";
+
+  return new AppError({
+    code,
+    message: `Failed to parse structured output${schemaInfo}${formatInfo}`,
+    cause,
+    details: {
+      rawText: context.rawText,
+      isMarkdownFormat: context.isMarkdownFormat,
+      parseErrorMessage: context.parseErrorMessage,
+      model: context.model,
+      provider: context.provider,
+      schemaName: context.schemaName,
+      usage: context.usage,
+    },
   });
 }

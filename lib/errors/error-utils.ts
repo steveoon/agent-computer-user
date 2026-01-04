@@ -4,9 +4,10 @@
  * 提供错误包装、解析和转换的工具函数
  */
 
+import { NoObjectGeneratedError } from "ai";
 import { AppError, isAppError } from "./app-error";
 import { ErrorCode, ErrorCategory } from "./error-codes";
-import { createLLMError, createNetworkError } from "./error-factory";
+import { createLLMError, createNetworkError, createStructuredOutputError } from "./error-factory";
 
 /**
  * AI SDK 错误解析结果
@@ -30,6 +31,29 @@ interface AISDKErrorInfo {
   originalMessage?: string;
   /** 响应体内容 */
   responseBody?: string;
+}
+
+/**
+ * NoObjectGeneratedError 解析结果
+ * 用于处理 AI SDK v6 结构化输出生成失败的情况
+ */
+export interface NoObjectGeneratedErrorInfo {
+  /** 是否为 NoObjectGeneratedError */
+  isNoObjectGeneratedError: boolean;
+  /** 模型生成的原始文本 */
+  rawText?: string;
+  /** 是否检测到 markdown 格式 */
+  isMarkdownFormat: boolean;
+  /** 解析失败的原因 */
+  cause?: Error;
+  /** 响应元数据 */
+  response?: {
+    id?: string;
+    timestamp?: Date;
+    modelId?: string;
+  };
+  /** Token 使用量（AI SDK v6 的 LanguageModelUsage 类型） */
+  usage?: unknown;
 }
 
 /**
@@ -114,6 +138,84 @@ export function parseAISDKError(error: unknown): AISDKErrorInfo | null {
 }
 
 /**
+ * 检测文本是否为 markdown 格式
+ *
+ * 用于识别 LLM 返回的是 markdown 而非纯 JSON 的情况
+ */
+function detectMarkdownFormat(text: string): boolean {
+  const markdownPatterns = [
+    /^```/m, // 代码块开始
+    /^#{1,6}\s/m, // 标题 (# ## ### 等)
+    /^\s*[-*+]\s/m, // 无序列表项
+    /^\s*\d+\.\s/m, // 有序列表项
+    /\[.+\]\(.+\)/, // 链接
+    /^\s*>/m, // 引用块
+  ];
+  return markdownPatterns.some((pattern) => pattern.test(text));
+}
+
+/**
+ * 解析 AI SDK v6 的 NoObjectGeneratedError
+ *
+ * 从结构化输出生成失败错误中提取调试信息
+ *
+ * @param error - 可能是 NoObjectGeneratedError 的错误
+ * @returns 解析结果，如果不是 NoObjectGeneratedError 则返回 null
+ *
+ * @example
+ * const info = parseNoObjectGeneratedError(error);
+ * if (info?.isNoObjectGeneratedError) {
+ *   console.log('Raw text:', info.rawText);
+ *   console.log('Is markdown:', info.isMarkdownFormat);
+ * }
+ */
+export function parseNoObjectGeneratedError(error: unknown): NoObjectGeneratedErrorInfo | null {
+  // 安全检查：使用 try-catch 处理测试环境中 mock 导致的问题
+  try {
+    if (
+      typeof NoObjectGeneratedError === "undefined" ||
+      typeof NoObjectGeneratedError.isInstance !== "function"
+    ) {
+      return null;
+    }
+
+    if (!NoObjectGeneratedError.isInstance(error)) {
+      return null;
+    }
+  } catch {
+    // 在测试环境中，如果 NoObjectGeneratedError 被 mock 但没有正确导出，会抛出错误
+    return null;
+  }
+
+  const rawText = error.text;
+  const isMarkdownFormat = rawText ? detectMarkdownFormat(rawText) : false;
+
+  // 提取 cause
+  const cause = error.cause instanceof Error ? error.cause : undefined;
+
+  // 提取 response 元数据
+  const response = error.response
+    ? {
+        id: error.response.id,
+        timestamp: error.response.timestamp,
+        modelId: error.response.modelId,
+      }
+    : undefined;
+
+  // 直接保留 usage 对象（AI SDK v6 的 LanguageModelUsage 类型）
+  const usage = error.usage ?? undefined;
+
+  return {
+    isNoObjectGeneratedError: true,
+    rawText,
+    isMarkdownFormat,
+    cause,
+    response,
+    usage,
+  };
+}
+
+/**
  * 将任意错误包装为 AppError
  *
  * 智能检测错误类型并选择合适的错误代码
@@ -179,6 +281,17 @@ export function wrapError(
 
     // 其他 AI SDK 错误
     return createLLMError(ErrorCode.LLM_GENERATION_FAILED, originalError, context);
+  }
+
+  // 检查 NoObjectGeneratedError（结构化输出生成失败）
+  const noObjectInfo = parseNoObjectGeneratedError(error);
+  if (noObjectInfo) {
+    return createStructuredOutputError(ErrorCode.LLM_RESPONSE_PARSE_ERROR, originalError, {
+      rawText: noObjectInfo.rawText,
+      isMarkdownFormat: noObjectInfo.isMarkdownFormat,
+      parseErrorMessage: noObjectInfo.cause?.message,
+      usage: noObjectInfo.usage,
+    });
   }
 
   // 检查网络错误
