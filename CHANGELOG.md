@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.23.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.23.0-develop.2...v1.23.0-develop.3) (2026-01-06)
+
+
+### Features
+
+* **mcp:** add CHROME_HOST env var for Docker deployment ([5fb1380](https://github.com/steveoon/agent-computer-user/commit/5fb1380ac2fce4cb8b2c32a327bac12ed4ba04d3))
+
 # [1.23.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.23.0-develop.1...v1.23.0-develop.2) (2026-01-06)
 
 
