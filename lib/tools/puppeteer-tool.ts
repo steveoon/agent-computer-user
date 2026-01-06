@@ -233,16 +233,18 @@ export const puppeteerTool = () =>
                 const imageResult: PuppeteerResult = {
                   type: "image",
                   url: imageUrl,
-                  // 不设置 data 字段，避免图片字节进入模型上下文
+                  // displayData 用于 UI 显示，不会发送给 LLM（toModelOutput 只返回文本）
+                  displayData: compressedData,
                 };
                 return PuppeteerResultSchema.parse(imageResult);
               } catch (uploadError) {
                 console.error("❌ 截图上传失败，降级为本地处理:", uploadError);
 
-                // 降级：仍然返回压缩后的图片数据（但会有 prompt too long 风险）
+                // 降级：仍然返回压缩后的图片数据
                 const imageResult: PuppeteerResult = {
                   type: "image",
                   data: compressedData,
+                  displayData: compressedData,
                 };
                 return PuppeteerResultSchema.parse(imageResult);
               }

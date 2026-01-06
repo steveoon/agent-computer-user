@@ -84,6 +84,7 @@ export interface AutomationResult<T = unknown> {
   data?: T;
   error?: string;
   screenshot?: string;
+  mcpBackend?: "playwright" | "puppeteer";
 }
 
 export interface WaitOptions {

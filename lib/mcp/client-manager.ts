@@ -63,15 +63,18 @@ class MCPClientManager {
    * 初始化客户端配置
    */
   private initializeClientConfigs(): void {
-    // Playwright MCP 配置 - 更适合 Docker 环境
+    // Playwright MCP 配置 - 支持连接现有浏览器实例
+    // --extension: 通过浏览器扩展连接已运行的 Chrome/Edge，保留登录状态和 cookies
+    // --image-responses=allow: 允许返回图片数据（用于截图功能）
+    // 支持 Tab 管理：browser_tabs 工具可列出、选择、关闭标签页
     const playwrightConfig = validateMCPClientConfig({
       name: "playwright",
       command: "npx",
-      args: ["-y", "@playwright/mcp@latest", "--isolated"],
+      args: ["-y", "@playwright/mcp@latest", "--extension", "--image-responses=allow"],
       env: {
         NODE_ENV: process.env.NODE_ENV || "production",
       },
-      description: "Playwright 浏览器自动化服务（Docker 友好）",
+      description: "Playwright 浏览器自动化服务（支持 Tab 管理和截图）",
       enabled: true,
     });
     this.clientConfigs.set("playwright", playwrightConfig);

@@ -1,8 +1,17 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
-import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
+import { getPuppeteerMCPClient, getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
 import { wrapAntiDetectionScript, randomDelay } from "./anti-detection-utils";
 import type { AutomationResult } from "./types";
+import {
+  selectZhipinTab,
+  parsePlaywrightResult,
+  wrapPlaywrightScript,
+  type TabSelectionResult,
+} from "@/lib/tools/shared/playwright-utils";
+
+// Feature flag: 使用 Playwright MCP 而非 Puppeteer MCP
+const USE_PLAYWRIGHT_MCP = process.env.USE_PLAYWRIGHT_MCP === "true";
 
 /**
  * Boss直聘候选人卡片信息
@@ -62,14 +71,15 @@ function parseEvaluateResult(result: unknown): unknown {
 export const zhipinGetCandidateListTool = () =>
   tool({
     description: `Boss直聘获取候选人列表功能
-    
+
     功能：
     - 获取候选人推荐页面的所有候选人信息
     - 提取姓名、年龄、经验、学历、工作状态、公司职位等信息
     - 提取期望地点和职位信息
     - 提取技能标签信息
     - 支持限制返回数量
-    
+    ${USE_PLAYWRIGHT_MCP ? "- [Playwright] 支持自动切换到BOSS直聘标签页" : ""}
+
     注意：
     - 需要先打开Boss直聘的候选人推荐页面
     - 页面URL通常为类似 zhipin.com/web/geek/recommend 的形式`,
@@ -81,11 +91,17 @@ export const zhipinGetCandidateListTool = () =>
         .optional()
         .default(false)
         .describe("是否包含没有打招呼按钮的候选人"),
+      autoSwitchTab: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe("是否自动切换到BOSS直聘标签页（仅 Playwright 模式有效）"),
     }),
 
     execute: async ({
       maxResults,
       includeNoGreetButton = false,
+      autoSwitchTab = true,
     }): Promise<
       AutomationResult<{
         candidates: ZhipinCandidateCard[];
@@ -93,27 +109,60 @@ export const zhipinGetCandidateListTool = () =>
       }>
     > => {
       try {
-        const client = await getPuppeteerMCPClient();
-        const tools = await client.tools();
+        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
 
-        // 检查必需的工具
-        if (!tools.puppeteer_evaluate) {
-          throw new Error("MCP tool puppeteer_evaluate not available");
+        // Playwright 模式: 自动切换到BOSS直聘标签页
+        if (USE_PLAYWRIGHT_MCP && autoSwitchTab) {
+          console.log("[Playwright] 正在切换到BOSS直聘标签页...");
+          const tabResult: TabSelectionResult = await selectZhipinTab();
+
+          if (!tabResult.success) {
+            return {
+              success: false,
+              error: `无法切换到BOSS直聘标签页: ${tabResult.error}`,
+              mcpBackend,
+            };
+          }
+
+          console.log(`[Playwright] 已切换到: ${tabResult.tab?.title} (${tabResult.tab?.url})`);
         }
 
-        const puppeteerEvaluate = tools.puppeteer_evaluate;
+        // 获取适当的 MCP 客户端
+        const client = USE_PLAYWRIGHT_MCP
+          ? await getPlaywrightMCPClient()
+          : await getPuppeteerMCPClient();
 
-        // 初始延迟
-        await randomDelay(300, 500);
+        const tools = await client.tools();
 
-        // 获取所有候选人信息
-        const getCandidatesScript = wrapAntiDetectionScript(`
+        // 根据 MCP 类型选择工具名称
+        const toolName = USE_PLAYWRIGHT_MCP ? "browser_evaluate" : "puppeteer_evaluate";
+
+        // 检查必需的工具
+        if (!tools[toolName]) {
+          throw new Error(
+            `MCP tool ${toolName} not available. ${
+              USE_PLAYWRIGHT_MCP
+                ? "请确保 Playwright MCP 正在运行且已连接浏览器。"
+                : "请确保 Puppeteer MCP 正在运行。"
+            }`
+          );
+        }
+
+        const mcpTool = tools[toolName];
+
+        // 初始延迟 (仅 Puppeteer 模式)
+        if (!USE_PLAYWRIGHT_MCP) {
+          await randomDelay(300, 500);
+        }
+
+        // 脚本内容（两个后端共用）
+        const scriptContent = `
           const candidates = [];
-          
+
           // 首先尝试获取iframe
           let doc = document;
           const iframe = document.querySelector('iframe[name="recommendFrame"]');
-          
+
           if (iframe) {
             try {
               // 获取iframe的文档
@@ -129,17 +178,17 @@ export const zhipinGetCandidateListTool = () =>
               // 如果跨域，继续使用主文档
             }
           }
-          
+
           // 查找所有候选人卡片 - 兼容新旧两种结构
           let cardItems = [];
-          
+
           // Boss直聘有两种布局结构：
           // 旧版（两列布局）：li.card-item > div.row > 两个 geek-card-small.candidate-card-wrap > card-inner
           // 新版（单列布局）：li.card-item > candidate-card-wrap > card-inner
-          
+
           // 策略1：直接查找所有有data-geek属性的card-inner（最可靠）
           cardItems = Array.from(doc.querySelectorAll('.card-inner[data-geek]'));
-          
+
           if (cardItems.length === 0) {
             // 策略2：尝试各种可能的选择器组合
             const selectors = [
@@ -147,7 +196,7 @@ export const zhipinGetCandidateListTool = () =>
               'li.card-item .candidate-card-wrap .card-inner',
               'li.card-item > .candidate-card-wrap .card-inner',
               '.candidate-card-wrap .card-inner.common-wrap',
-              // 旧版结构选择器  
+              // 旧版结构选择器
               '.geek-card-small.candidate-card-wrap .card-inner',
               '.geek-card-small .card-inner.common-wrap',
               'li.card-item .row .card-inner',
@@ -155,15 +204,15 @@ export const zhipinGetCandidateListTool = () =>
               '.card-inner.common-wrap',
               '.card-inner'
             ];
-            
+
             for (const selector of selectors) {
               const found = doc.querySelectorAll(selector);
               if (found.length > 0) {
                 // 过滤确保每个元素都有data-geek或者是有效的候选人卡片
                 const validCards = Array.from(found).filter(el => {
                   // 检查是否有data-geek属性或者是否在候选人卡片容器内
-                  return el.getAttribute('data-geek') || 
-                         el.closest('.candidate-card-wrap') || 
+                  return el.getAttribute('data-geek') ||
+                         el.closest('.candidate-card-wrap') ||
                          el.closest('.geek-card-small');
                 });
                 if (validCards.length > 0) {
@@ -176,10 +225,10 @@ export const zhipinGetCandidateListTool = () =>
           } else {
             console.log('直接通过data-geek属性找到候选人卡片, 数量: ' + cardItems.length);
           }
-          
+
           if (cardItems.length === 0) {
-            return { 
-              error: '未找到候选人卡片列表', 
+            return {
+              error: '未找到候选人卡片列表',
               candidates: [],
               pageInfo: {
                 hasIframe: !!iframe,
@@ -192,48 +241,48 @@ export const zhipinGetCandidateListTool = () =>
               }
             };
           }
-          
+
           cardItems.forEach((card, index) => {
             try {
               const candidate = { index };
-              
+
               // 根据不同的结构找到正确的容器
               let cardContainer = card;
               let cardInner = card;
-              
+
               // 如果当前元素是card-inner，找到外层容器
               if (card.classList.contains('card-inner')) {
                 // 尝试找到外层的候选人卡片容器
-                const wrapper = card.closest('.candidate-card-wrap') || 
+                const wrapper = card.closest('.candidate-card-wrap') ||
                                card.closest('.geek-card-small') ||
                                card.parentElement;
                 if (wrapper) {
                   cardContainer = wrapper;
                 }
               }
-              
+
               // 获取候选人ID
-              candidate.candidateId = cardInner.getAttribute('data-geek') || 
+              candidate.candidateId = cardInner.getAttribute('data-geek') ||
                                      cardInner.getAttribute('data-geekid');
-              
+
               // 获取姓名
               const nameEl = cardContainer.querySelector('.name');
               if (nameEl) {
                 candidate.name = nameEl.textContent?.trim();
               }
-              
+
               // 获取在线状态 - 通过online-marker图标判断
               const onlineMarker = cardContainer.querySelector('.online-marker');
               if (onlineMarker) {
                 candidate.activeTime = '在线';
               }
-              
+
               // 获取薪资范围
               const salaryEl = cardContainer.querySelector('.salary-wrap');
               if (salaryEl) {
                 candidate.expectedSalary = salaryEl.textContent?.trim();
               }
-              
+
               // 获取基本信息（年龄、经验、学历、工作状态）
               const baseInfoEl = cardContainer.querySelector('.base-info.join-text-wrap');
               if (baseInfoEl) {
@@ -247,7 +296,7 @@ export const zhipinGetCandidateListTool = () =>
                   if (parts.length >= 4) candidate.workStatus = parts[3];
                 }
               }
-              
+
               // 获取工作经历（当前公司和职位）- 兼容新旧两种结构
               // 旧版：.timeline-wrap.work-exps .content
               // 新版：.timeline-wrap.work-exps .timeline-item:first-child .content
@@ -262,7 +311,7 @@ export const zhipinGetCandidateListTool = () =>
               if (!workExpEl) {
                 workExpEl = cardContainer.querySelector('.timeline-wrap.work-exps .content');
               }
-              
+
               if (workExpEl) {
                 const workText = workExpEl.textContent?.trim();
                 if (workText) {
@@ -270,14 +319,14 @@ export const zhipinGetCandidateListTool = () =>
                   const workParts = workText.split('·').map(s => s.trim());
                   if (workParts.length >= 1) candidate.currentCompany = workParts[0];
                   if (workParts.length >= 2) candidate.currentPosition = workParts[1];
-                  
+
                   // 如果没有分隔符，整个作为工作描述
                   if (workParts.length === 1) {
                     candidate.currentPosition = workText;
                   }
                 }
               }
-              
+
               // 获取期望信息（期望地点和职位）- 兼容新旧两种结构
               // 新版：在row中查找"期望："标签对应的内容
               let expectEl = null;
@@ -288,7 +337,7 @@ export const zhipinGetCandidateListTool = () =>
                   expectEl = expectRow.querySelector('.content');
                 }
               }
-              
+
               // 旧版：.timeline-wrap.expect .content
               if (!expectEl) {
                 expectEl = cardContainer.querySelector('.timeline-wrap.expect .content.join-text-wrap');
@@ -296,7 +345,7 @@ export const zhipinGetCandidateListTool = () =>
               if (!expectEl) {
                 expectEl = cardContainer.querySelector('.timeline-wrap.expect .content');
               }
-              
+
               if (expectEl) {
                 const expectText = expectEl.textContent?.trim();
                 if (expectText) {
@@ -304,46 +353,71 @@ export const zhipinGetCandidateListTool = () =>
                   const expectParts = expectText.split('·').map(s => s.trim());
                   if (expectParts.length >= 1) candidate.expectedLocation = expectParts[0];
                   if (expectParts.length >= 2) candidate.expectedPosition = expectParts[1];
-                  
+
                   // 如果没有分隔符，整个作为期望职位
                   if (expectParts.length === 1) {
                     candidate.expectedPosition = expectText;
                   }
                 }
               }
-              
+
               // 获取技能标签
               const tagEls = cardContainer.querySelectorAll('.tags-wrap .tag-item');
               if (tagEls.length > 0) {
                 candidate.tags = Array.from(tagEls).map(el => el.textContent?.trim()).filter(Boolean);
               }
-              
+
               // 获取打招呼按钮文本
               const greetBtn = cardContainer.querySelector('button.btn.btn-greet');
               if (greetBtn) {
                 candidate.buttonText = greetBtn.textContent?.trim();
               }
-              
+
               candidates.push(candidate);
             } catch (e) {
               console.error('Error parsing candidate card:', e);
             }
           });
-          
-          return { candidates, total: candidates.length };
-        `);
 
-        const candidatesResult = await puppeteerEvaluate.execute({ script: getCandidatesScript });
-        const result = parseEvaluateResult(candidatesResult) as {
+          return { candidates, total: candidates.length };
+        `;
+
+        // 根据 MCP 类型生成不同的脚本包装
+        const getCandidatesScript = USE_PLAYWRIGHT_MCP
+          ? wrapPlaywrightScript(scriptContent)
+          : wrapAntiDetectionScript(scriptContent);
+
+        // 执行脚本
+        console.log(`[${USE_PLAYWRIGHT_MCP ? "Playwright" : "Puppeteer"}] 正在执行脚本...`);
+        const executeParams = USE_PLAYWRIGHT_MCP
+          ? { function: getCandidatesScript }
+          : { script: getCandidatesScript };
+        const candidatesResult = await mcpTool.execute(executeParams);
+
+        // 定义结果类型
+        type ParsedResult = {
           candidates: ZhipinCandidateCard[];
           total: number;
           error?: string;
-        } | null;
+        };
+
+        // 根据 MCP 类型解析结果
+        let result: ParsedResult | null = null;
+
+        if (USE_PLAYWRIGHT_MCP) {
+          const parsedResult = parsePlaywrightResult(candidatesResult);
+          if (parsedResult && typeof parsedResult === "object") {
+            result = parsedResult as ParsedResult;
+          }
+        } else {
+          result = parseEvaluateResult(candidatesResult) as ParsedResult | null;
+        }
 
         if (!result) {
           return {
             success: false,
             error: "获取候选人列表数据解析失败",
+            mcpBackend,
           };
         }
 
@@ -351,6 +425,7 @@ export const zhipinGetCandidateListTool = () =>
           return {
             success: false,
             error: result.error,
+            mcpBackend,
           };
         }
 
@@ -358,6 +433,7 @@ export const zhipinGetCandidateListTool = () =>
           return {
             success: false,
             error: "未找到候选人列表，请确保已打开Boss直聘的候选人推荐页面",
+            mcpBackend,
           };
         }
 
@@ -379,11 +455,14 @@ export const zhipinGetCandidateListTool = () =>
             candidates: filteredCandidates,
             total: result.total,
           },
+          mcpBackend,
         };
       } catch (error) {
+        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
         return {
           success: false,
           error: error instanceof Error ? error.message : "Unknown error occurred",
+          mcpBackend,
         };
       }
     },

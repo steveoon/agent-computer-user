@@ -612,11 +612,21 @@ cmd_stop() {
         if ps -p "$chrome_pid" > /dev/null 2>&1; then
             log_step "停止 Chrome (PID: $chrome_pid)..."
 
-            # 步骤1: 尝试通过 DevTools Protocol 优雅关闭 (给 IndexedDB 时间刷盘)
+            # 步骤1: 通过 DevTools Protocol 关闭所有标签页 (触发 IndexedDB 刷盘)
             if [[ -n "$chrome_port" && "$chrome_port" != "null" ]]; then
-                log_info "  尝试通过 DevTools Protocol 优雅关闭..."
-                curl -s "http://localhost:$chrome_port/json/close" > /dev/null 2>&1 || true
-                sleep 1
+                log_info "  关闭所有标签页以触发 IndexedDB 刷盘..."
+                local targets=$(curl -s "http://localhost:$chrome_port/json" 2>/dev/null || echo "[]")
+                local target_count=$(echo "$targets" | jq -r 'length' 2>/dev/null || echo "0")
+
+                if [[ "$target_count" -gt 0 ]]; then
+                    log_info "  发现 $target_count 个标签页，逐个关闭..."
+                    for target_id in $(echo "$targets" | jq -r '.[].id' 2>/dev/null); do
+                        curl -s "http://localhost:$chrome_port/json/close/$target_id" > /dev/null 2>&1 || true
+                    done
+                    # 等待 IndexedDB 完成刷盘
+                    log_info "  等待 IndexedDB 刷盘完成..."
+                    sleep 2
+                fi
             fi
 
             # 步骤2: 发送 SIGTERM 信号 (允许进程清理)

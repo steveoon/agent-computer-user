@@ -90,15 +90,10 @@ export function ComputerToolMessage(props: ToolMessageProps) {
   if (action === "screenshot") {
     return (
       <ScreenshotToolMessage
+        {...props}
         icon={Icon}
         label={label}
         theme={themes.zinc}
-        state={state}
-        output={output}
-        isLatestMessage={isLatestMessage}
-        status={status}
-        messageId={messageId}
-        partIndex={partIndex}
         imageFormat="jpeg"
         maxHeight="600px"
       />

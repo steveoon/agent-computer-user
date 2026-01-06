@@ -1,8 +1,17 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
-import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
+import { getPuppeteerMCPClient, getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
 import { wrapAntiDetectionScript } from "../zhipin/anti-detection-utils";
 import { createDynamicClassSelector, generateFindElementScript } from "./dynamic-selector-utils";
+import {
+  selectYupaoTab,
+  parsePlaywrightResult,
+  wrapPlaywrightScript,
+  type TabSelectionResult,
+} from "@/lib/tools/shared/playwright-utils";
+
+// Feature flag: 使用 Playwright MCP 而非 Puppeteer MCP
+const USE_PLAYWRIGHT_MCP = process.env.USE_PLAYWRIGHT_MCP === "true";
 
 /**
  * 获取聊天详情工具
@@ -16,13 +25,14 @@ import { createDynamicClassSelector, generateFindElementScript } from "./dynamic
 export const yupaoChatDetailsTool = () =>
   tool({
     description: `获取Yupao聊天窗口的候选人信息和聊天记录
-    
+
     功能：
     - 提取候选人基本信息（从岗位信息中提取）
     - 获取完整的聊天历史记录
     - 自动识别消息发送者
     - 包含消息时间戳
-    
+    ${USE_PLAYWRIGHT_MCP ? "- [Playwright] 支持自动切换到鱼泡标签页" : ""}
+
     注意：
     - 需要先打开候选人聊天窗口
     - 返回结构化的候选人信息和聊天记录`,
@@ -35,20 +45,59 @@ export const yupaoChatDetailsTool = () =>
         .optional()
         .default(300)
         .describe("返回数据的最大大小（KB），默认300KB"),
+      autoSwitchTab: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe("是否自动切换到鱼泡标签页（仅 Playwright 模式有效）"),
     }),
 
-    execute: async ({ includeHtml = false, maxMessages = 100, maxDataSizeKB = 300 }) => {
+    execute: async ({ includeHtml = false, maxMessages = 100, maxDataSizeKB = 300, autoSwitchTab = true }) => {
       try {
-        const client = await getPuppeteerMCPClient();
-        const tools = await client.tools();
+        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
 
-        if (!tools.puppeteer_evaluate) {
-          throw new Error("MCP tool puppeteer_evaluate not available");
+        // Playwright 模式: 自动切换到鱼泡标签页
+        if (USE_PLAYWRIGHT_MCP && autoSwitchTab) {
+          console.log("[Playwright] 正在切换到鱼泡标签页...");
+          const tabResult: TabSelectionResult = await selectYupaoTab();
+
+          if (!tabResult.success) {
+            return {
+              success: false,
+              error: `无法切换到鱼泡标签页: ${tabResult.error}`,
+              message: "请确保已在浏览器中打开鱼泡网页面",
+              mcpBackend,
+            };
+          }
+
+          console.log(`[Playwright] 已切换到: ${tabResult.tab?.title} (${tabResult.tab?.url})`);
         }
 
-        // 添加滚轮事件以模拟用户行为
+        // 获取适当的 MCP 客户端
+        const client = USE_PLAYWRIGHT_MCP
+          ? await getPlaywrightMCPClient()
+          : await getPuppeteerMCPClient();
+
+        const tools = await client.tools();
+
+        // 根据 MCP 类型选择工具名称
+        const toolName = USE_PLAYWRIGHT_MCP ? "browser_evaluate" : "puppeteer_evaluate";
+
+        if (!tools[toolName]) {
+          throw new Error(
+            `MCP tool ${toolName} not available. ${
+              USE_PLAYWRIGHT_MCP
+                ? "请确保 Playwright MCP 正在运行且已连接浏览器。"
+                : "请确保 Puppeteer MCP 正在运行。"
+            }`
+          );
+        }
+
+        const mcpTool = tools[toolName];
+
+        // 添加滚轮事件以模拟用户行为 (仅 Puppeteer 模式)
         const addScrollBehavior = async () => {
-          if (tools.puppeteer_evaluate) {
+          if (!USE_PLAYWRIGHT_MCP && tools.puppeteer_evaluate) {
             const scrollScript = wrapAntiDetectionScript(`
               // 模拟轻微的滚动
               const scrollY = window.scrollY;
@@ -64,8 +113,8 @@ export const yupaoChatDetailsTool = () =>
           }
         };
 
-        // 创建获取聊天详情的脚本
-        const script = wrapAntiDetectionScript(`
+        // 脚本内容（两个后端共用）
+        const scriptContent = `
           ${generateFindElementScript()}
           
           // 定义动态选择器
@@ -668,89 +717,102 @@ export const yupaoChatDetailsTool = () =>
           }
           
           return resultData;
-        `);
+        `;
+
+        // 根据 MCP 类型生成不同的脚本包装
+        const script = USE_PLAYWRIGHT_MCP
+          ? wrapPlaywrightScript(scriptContent)
+          : wrapAntiDetectionScript(scriptContent);
 
         // 在执行前添加初始滚动行为
         await addScrollBehavior();
 
         // 执行脚本
-        const result = await tools.puppeteer_evaluate.execute({ script });
+        const executeParams = USE_PLAYWRIGHT_MCP ? { function: script } : { script };
+        const result = await mcpTool.execute(executeParams);
 
-        // 解析结果
-        const mcpResult = result as { content?: Array<{ text?: string }> };
-        if (mcpResult?.content?.[0]?.text) {
-          const resultText = mcpResult.content[0].text;
+        // 根据 MCP 类型解析结果
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let parsedResult: any = null;
 
-          try {
-            const executionMatch = resultText.match(
-              /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
-            );
+        if (USE_PLAYWRIGHT_MCP) {
+          // Playwright MCP 结果解析
+          parsedResult = parsePlaywrightResult(result);
+        } else {
+          // Puppeteer MCP 结果解析
+          const mcpResult = result as { content?: Array<{ text?: string }> };
+          if (mcpResult?.content?.[0]?.text) {
+            const resultText = mcpResult.content[0].text;
 
-            if (executionMatch && executionMatch[1].trim() !== "undefined") {
-              const jsonResult = executionMatch[1].trim();
-              const parsedResult = JSON.parse(jsonResult);
+            try {
+              const executionMatch = resultText.match(
+                /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
+              );
 
-              if (parsedResult.candidateInfoFound || parsedResult.chatContainerFound) {
-                return {
-                  success: true,
-                  message: "成功获取聊天详情",
-                  data: parsedResult,
-                  summary: {
-                    candidateName: parsedResult.candidateInfo?.name || "未知",
-                    // 2025-12-09: candidatePosition 改为候选人期望职位，而不是沟通职位
-                    candidatePosition: parsedResult.candidateInfo?.expectedPosition || parsedResult.candidateInfo?.position || "未知职位",
-                    candidateGender: parsedResult.candidateInfo?.gender || "",
-                    candidateAge: parsedResult.candidateInfo?.age || "",
-                    // 2025-12-05: 新增学历字段
-                    candidateEducation: parsedResult.candidateInfo?.education || "",
-                    candidateExpectedSalary: parsedResult.candidateInfo?.expectedSalary || "",
-                    candidateExpectedLocation: parsedResult.candidateInfo?.expectedLocation || "",
-                    // 🆕 岗位地址（从岗位信息卡片提取，如"上海 徐汇区 龙华"）
-                    jobAddress: parsedResult.candidateInfo?.jobAddress || "",
-                    // 沟通职位（待招岗位，如"肯德基-长期兼职服务员"）
-                    communicationPosition: parsedResult.candidateInfo?.communicationPosition || "",
-                    totalMessages: parsedResult.stats?.totalMessages || 0,
-                    lastMessageTime:
-                      parsedResult.chatMessages?.[parsedResult.chatMessages.length - 1]?.time ||
-                      "无",
-                    phoneNumbers: parsedResult.stats?.phoneNumbers || [],
-                    wechatIds: parsedResult.stats?.wechatIds || [],
-                    phoneExchangeCount: parsedResult.stats?.phoneExchangeCount || 0,
-                    wechatExchangeCount: parsedResult.stats?.wechatExchangeCount || 0,
-                  },
-                  formattedHistory: parsedResult.formattedHistory || [],
-                };
-              } else {
-                return {
-                  success: false,
-                  error: "未找到聊天窗口或候选人信息",
-                  message: "请确保已打开候选人聊天窗口",
-                };
+              if (executionMatch && executionMatch[1].trim() !== "undefined") {
+                const jsonResult = executionMatch[1].trim();
+                parsedResult = JSON.parse(jsonResult);
               }
+            } catch {
+              // 静默处理解析错误
+              return {
+                success: false,
+                error: "Failed to parse chat details",
+                rawResult: includeHtml ? resultText : undefined,
+                mcpBackend,
+              };
             }
-          } catch {
-            // 静默处理解析错误
           }
-
-          return {
-            success: false,
-            error: "Failed to parse chat details",
-            rawResult: includeHtml ? resultText : undefined,
-          };
         }
 
-        return {
-          success: false,
-          error: "Unexpected result format",
-          message: "获取聊天详情时出现未知错误",
-        };
+        if (parsedResult && (parsedResult.candidateInfoFound || parsedResult.chatContainerFound)) {
+          return {
+            success: true,
+            message: "成功获取聊天详情",
+            data: parsedResult,
+            summary: {
+              candidateName: parsedResult.candidateInfo?.name || "未知",
+              // 2025-12-09: candidatePosition 改为候选人期望职位，而不是沟通职位
+              candidatePosition: parsedResult.candidateInfo?.expectedPosition || parsedResult.candidateInfo?.position || "未知职位",
+              candidateGender: parsedResult.candidateInfo?.gender || "",
+              candidateAge: parsedResult.candidateInfo?.age || "",
+              // 2025-12-05: 新增学历字段
+              candidateEducation: parsedResult.candidateInfo?.education || "",
+              candidateExpectedSalary: parsedResult.candidateInfo?.expectedSalary || "",
+              candidateExpectedLocation: parsedResult.candidateInfo?.expectedLocation || "",
+              // 岗位地址（从岗位信息卡片提取，如"上海 徐汇区 龙华"）
+              jobAddress: parsedResult.candidateInfo?.jobAddress || "",
+              // 沟通职位（待招岗位，如"肯德基-长期兼职服务员"）
+              communicationPosition: parsedResult.candidateInfo?.communicationPosition || "",
+              totalMessages: parsedResult.stats?.totalMessages || 0,
+              lastMessageTime:
+                parsedResult.chatMessages?.[parsedResult.chatMessages.length - 1]?.time ||
+                "无",
+              phoneNumbers: parsedResult.stats?.phoneNumbers || [],
+              wechatIds: parsedResult.stats?.wechatIds || [],
+              phoneExchangeCount: parsedResult.stats?.phoneExchangeCount || 0,
+              wechatExchangeCount: parsedResult.stats?.wechatExchangeCount || 0,
+            },
+            formattedHistory: parsedResult.formattedHistory || [],
+            mcpBackend,
+          };
+        } else {
+          return {
+            success: false,
+            error: "未找到聊天窗口或候选人信息",
+            message: "请确保已打开候选人聊天窗口",
+            mcpBackend,
+          };
+        }
       } catch (error) {
         // 静默处理错误
+        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
 
         return {
           success: false,
           error: error instanceof Error ? error.message : "Unknown error occurred",
           message: "获取聊天详情时发生错误",
+          mcpBackend,
         };
       }
     },
