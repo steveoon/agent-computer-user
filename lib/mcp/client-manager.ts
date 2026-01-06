@@ -126,14 +126,20 @@ class MCPClientManager {
   /**
    * 动态生成 Playwright MCP 参数
    * 根据运行时环境变量决定使用 CDP 或 Extension 模式
+   *
+   * 环境变量：
+   * - CHROME_REMOTE_DEBUGGING_PORT: Chrome 远程调试端口（设置后启用 CDP 模式）
+   * - CHROME_HOST: Chrome 所在主机（默认 localhost，Docker 部署时设为 host.docker.internal）
    */
   private getPlaywrightArgs(): { args: string[]; mode: string } {
     const chromePort = process.env.CHROME_REMOTE_DEBUGGING_PORT;
+    const chromeHost = process.env.CHROME_HOST || "localhost";
 
     if (chromePort) {
+      const cdpEndpoint = `http://${chromeHost}:${chromePort}`;
       return {
-        args: ["-y", "@playwright/mcp@latest", "--cdp-endpoint", `http://localhost:${chromePort}`, "--image-responses=allow"],
-        mode: `CDP (port: ${chromePort})`,
+        args: ["-y", "@playwright/mcp@latest", "--cdp-endpoint", cdpEndpoint, "--image-responses=allow"],
+        mode: `CDP (${cdpEndpoint})`,
       };
     }
 
