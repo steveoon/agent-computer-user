@@ -2,6 +2,14 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.23.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.23.0-develop.1...v1.23.0-develop.2) (2026-01-06)
+
+
+### Features
+
+* **mcp:** add Playwright CDP mode for multi-agent support ([8899f7b](https://github.com/steveoon/agent-computer-user/commit/8899f7bc6f6a03a8341b4747488a418256119389))
+* **mcp:** add Playwright MCP support with dual-backend screenshot tool ([874d57e](https://github.com/steveoon/agent-computer-user/commit/874d57e687cb497bfdad668b9c5af800fc147acb))
+
 # [1.23.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.22.0...v1.23.0-develop.1) (2026-01-04)
 
 
