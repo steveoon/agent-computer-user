@@ -56,7 +56,7 @@ export async function listBrowserTabs(): Promise<PlaywrightTabInfo[]> {
 
   if (!tools.browser_tabs) {
     throw new Error(
-      "browser_tabs tool not available. Ensure Playwright MCP is running with --extension flag."
+      "browser_tabs tool not available. Ensure Playwright MCP is properly connected (via --extension or --cdp-endpoint)."
     );
   }
 
@@ -87,7 +87,7 @@ export async function selectTabByUrl(
       return {
         success: false,
         error:
-          "browser_tabs tool not available. Ensure Playwright MCP is running with --extension flag.",
+          "browser_tabs tool not available. Ensure Playwright MCP is properly connected (via --extension or --cdp-endpoint).",
       };
     }
 

@@ -90,7 +90,6 @@ const MonitorConfigSchema = z.object({
   browserWSEndpoint: z.string().optional(),
   /** 浏览器 CDP URL（连接到已有浏览器，优先级低于 browserWSEndpoint） */
   browserURL: z.string().optional().default("http://localhost:9222"),
-
 });
 
 type MonitorConfig = z.infer<typeof MonitorConfigSchema>;
@@ -102,10 +101,8 @@ const DEFAULT_CONFIG: MonitorConfig = {
   enabledBrands: ["boss-zhipin"],
   autoSubmit: false, // 默认只填充，不自动提交
   browserURL: "http://localhost:9222", // 默认连接到 multi-agent.sh 启动的 Chrome
-
 };
 
-const BROWSER_VIEWPORT = { width: 1440, height: 900 } as const;
 const LOGIN_WAIT_DURATION_MS = 60000; // 间隔60秒后开始监听
 const AGENT_PROCESS_WAIT_MS = 60000; // 等待1分钟让Agent处理完成
 const INITIAL_CONNECT_WAIT_MS = 30000; // 等待30秒让Agent完成初始化连接
@@ -622,8 +619,6 @@ class UnreadMonitor {
       logger.info(`  - 下次检测：${secondsLeft} 秒后`);
     }
 
-
-
     logger.info("");
   }
 
@@ -732,7 +727,8 @@ class UnreadMonitor {
     logger.warn("⚠️  聊天页面已被关闭，正在重新打开...");
     try {
       this.chatPage = await this.browser.newPage();
-      await this.chatPage.setViewport(BROWSER_VIEWPORT);
+      // 禁用虚拟视口，使用实际浏览器窗口尺寸
+      await this.chatPage.setViewport(null);
       await this.chatPage.goto(this.config.chatPageUrl, WAIT_UNTIL_OPTIONS);
       logger.success(`已重新打开聊天页面: ${this.config.chatPageUrl}`);
       return true;
@@ -803,7 +799,8 @@ class UnreadMonitor {
       for (const page of existingPages) {
         const url = page.url();
         if (url.includes(targetHost)) {
-          await page.setViewport(BROWSER_VIEWPORT); // 确保 viewport 正确
+          // 禁用虚拟视口，使用实际浏览器窗口尺寸
+          await page.setViewport(null);
           this.brandPages.set(brand, page);
           brandPageFound = true;
           logger.success(`复用已有 ${handler.displayName} 页面: ${url}`);
@@ -814,7 +811,8 @@ class UnreadMonitor {
       // 如果没有找到，创建新页面
       if (!brandPageFound) {
         const brandPage = await this.browser.newPage();
-        await brandPage.setViewport(BROWSER_VIEWPORT);
+        // 禁用虚拟视口，使用实际浏览器窗口尺寸
+        await brandPage.setViewport(null);
         this.brandPages.set(brand, brandPage);
         await brandPage.goto(handler.startUrl, WAIT_UNTIL_OPTIONS);
         logger.info(handler.loginMessage);
@@ -828,7 +826,8 @@ class UnreadMonitor {
       const url = page.url();
       if (url.includes(new URL(this.config.chatPageUrl).host)) {
         this.chatPage = page;
-        await this.chatPage.setViewport(BROWSER_VIEWPORT); // 确保 viewport 正确
+        // 禁用虚拟视口，使用实际浏览器窗口尺寸
+        await this.chatPage.setViewport(null);
         chatPageFound = true;
         logger.success(`复用已有聊天页面: ${url}`);
         break;
@@ -837,7 +836,8 @@ class UnreadMonitor {
 
     if (!chatPageFound) {
       this.chatPage = await this.browser.newPage();
-      await this.chatPage.setViewport(BROWSER_VIEWPORT);
+      // 禁用虚拟视口，使用实际浏览器窗口尺寸
+      await this.chatPage.setViewport(null);
       await this.chatPage.goto(this.config.chatPageUrl, WAIT_UNTIL_OPTIONS);
       logger.success(`已打开聊天页面: ${this.config.chatPageUrl}`);
     }
@@ -859,11 +859,16 @@ class UnreadMonitor {
       logger.success("所有页面已复用，跳过登录等待");
     }
 
-    // 自动填入连接提示词
-    if (this.chatPage) {
+    // 初始化提示词逻辑
+    // 默认使用 Playwright MCP (CDP 模式): 不需要显式连接，工具会自动连接到浏览器
+    // 可选 Puppeteer MCP (设置 USE_PUPPETEER_MCP=true): 需要先连接到浏览器端口
+    const usePuppeteerMCP = process.env.USE_PUPPETEER_MCP === "true";
+
+    if (this.chatPage && usePuppeteerMCP) {
+      // Puppeteer MCP 模式（备选）：需要先发送连接指令
       try {
         const port = new URL(this.config.browserURL).port || "9222";
-        
+
         // 确定目标 URL 关键词
         let targetUrlKeyword = "";
         if (this.config.enabledBrands.includes("yupao")) {
@@ -872,13 +877,13 @@ class UnreadMonitor {
           targetUrlKeyword = "zhipin.com";
         }
 
-        // 构建更明确的提示词
-        const connectPrompt = targetUrlKeyword 
+        // 构建连接提示词（仅 Puppeteer MCP 需要）
+        const connectPrompt = targetUrlKeyword
           ? `连接到浏览器端口 ${port}，并切换到包含 "${targetUrlKeyword}" 的标签页`
           : `连接到浏览器,端口 ${port}`;
 
-        logger.info(`正在填入初始化指令: "${connectPrompt}"`);
-        
+        logger.info(`[Puppeteer MCP] 正在填入初始化指令: "${connectPrompt}"`);
+
         await this.chatPage.bringToFront();
         await fillChatInput(this.chatPage, null, this.config.autoSubmit, connectPrompt);
 
@@ -889,6 +894,9 @@ class UnreadMonitor {
       } catch (error) {
         logger.warn(`填入初始化指令失败: ${error}`);
       }
+    } else {
+      // Playwright MCP 模式（默认）：无需连接指令，工具会自动通过 CDP 连接
+      logger.info("🎭 [Playwright MCP] 工具会自动连接到浏览器，跳过初始化连接指令");
     }
 
     // 设置键盘快捷键
@@ -975,8 +983,6 @@ class UnreadMonitor {
 
       logger.info("本轮检测完成");
 
-
-
       // 如果有触发处理且启用了自动提交，等待 Agent 处理完成
       // 但如果是立即检测请求，跳过等待
       if (hasTriggered && this.config.autoSubmit && !isImmediateCheck) {
@@ -1060,10 +1066,12 @@ async function main() {
       browserWSEndpoint: process.env.BROWSER_WS_ENDPOINT,
     };
 
+    const mcpMode = process.env.USE_PUPPETEER_MCP === "true" ? "Puppeteer MCP" : "Playwright MCP (CDP)";
     logger.info(`📍 监听配置:`);
     logger.info(`  - 浏览器端口: ${agentConfig.chromePort}`);
     logger.info(`  - Agent 端口: ${agentConfig.appPort}`);
     logger.info(`  - 监听品牌: ${config.enabledBrands.join(", ")}`);
+    logger.info(`  - MCP 模式: ${mcpMode}`);
 
   } else {
     logger.info("🔧 使用环境变量配置");
