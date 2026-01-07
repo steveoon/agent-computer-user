@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.23.0-develop.4](https://github.com/steveoon/agent-computer-user/compare/v1.23.0-develop.3...v1.23.0-develop.4) (2026-01-07)
+
+
+### Bug Fixes
+
+* **stats:** resolve timezone issues and prevent duplicate records ([4239a7e](https://github.com/steveoon/agent-computer-user/commit/4239a7e48bf4b7265717d6424adf157ab9cf02c2))
+
 # [1.23.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.23.0-develop.2...v1.23.0-develop.3) (2026-01-06)
 
 
