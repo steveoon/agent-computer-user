@@ -58,16 +58,20 @@ export {
   createValidationError,
   createBusinessError,
   createSystemError,
+  createStructuredOutputError,
 } from "./error-factory";
+
+export type { LLMErrorContext, StructuredOutputErrorContext } from "./error-factory";
 
 // 错误工具函数
 export {
   wrapError,
   toError,
   parseAISDKError,
+  parseNoObjectGeneratedError,
   extractErrorContext,
   getUserMessage,
   logError,
 } from "./error-utils";
 
-export type { ErrorContext } from "./error-utils";
+export type { ErrorContext, NoObjectGeneratedErrorInfo } from "./error-utils";

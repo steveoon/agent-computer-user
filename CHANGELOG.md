@@ -2,6 +2,36 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.23.0-develop.4](https://github.com/steveoon/agent-computer-user/compare/v1.23.0-develop.3...v1.23.0-develop.4) (2026-01-07)
+
+
+### Bug Fixes
+
+* **stats:** resolve timezone issues and prevent duplicate records ([4239a7e](https://github.com/steveoon/agent-computer-user/commit/4239a7e48bf4b7265717d6424adf157ab9cf02c2))
+
+# [1.23.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.23.0-develop.2...v1.23.0-develop.3) (2026-01-06)
+
+
+### Features
+
+* **mcp:** add CHROME_HOST env var for Docker deployment ([5fb1380](https://github.com/steveoon/agent-computer-user/commit/5fb1380ac2fce4cb8b2c32a327bac12ed4ba04d3))
+
+# [1.23.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.23.0-develop.1...v1.23.0-develop.2) (2026-01-06)
+
+
+### Features
+
+* **mcp:** add Playwright CDP mode for multi-agent support ([8899f7b](https://github.com/steveoon/agent-computer-user/commit/8899f7bc6f6a03a8341b4747488a418256119389))
+* **mcp:** add Playwright MCP support with dual-backend screenshot tool ([874d57e](https://github.com/steveoon/agent-computer-user/commit/874d57e687cb497bfdad668b9c5af800fc147acb))
+
+# [1.23.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.22.0...v1.23.0-develop.1) (2026-01-04)
+
+
+### Features
+
+* add Model Context Protocol SDK and integrate into client manager ([94ccef8](https://github.com/steveoon/agent-computer-user/commit/94ccef8e7fa986ca20727e7c4cca11695c237155))
+* **ai:** add unified structured output error handling with tool-based pattern ([b3d6b80](https://github.com/steveoon/agent-computer-user/commit/b3d6b80ebb4803e36c0a5dceb96a0df89aa4a7a0))
+
 # [1.22.0](https://github.com/steveoon/agent-computer-user/compare/v1.21.2...v1.22.0) (2025-12-26)
 
 

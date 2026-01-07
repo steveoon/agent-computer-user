@@ -3,6 +3,11 @@
 import { queryService } from "@/lib/services/recruitment-stats/query.service";
 import { aggregationService } from "@/lib/services/recruitment-stats/aggregation.service";
 import { schedulerService } from "@/lib/services/recruitment-stats";
+import {
+  toBeijingMidnight,
+  toBeijingDayEnd,
+  parseBeijingDateString,
+} from "@/lib/utils/beijing-timezone";
 import type {
   DashboardFilters,
   DashboardData,
@@ -22,6 +27,8 @@ const LOG_PREFIX = "[RecruitmentStats][Action]";
 
 /**
  * 计算日期范围（根据 preset 或自定义日期）
+ *
+ * 使用北京时区计算日期边界，确保与数据库存储的 stat_date 一致
  */
 function calculateDateRange(filters: DashboardFilters): {
   startDate: Date;
@@ -35,55 +42,47 @@ function calculateDateRange(filters: DashboardFilters): {
 
   switch (filters.preset) {
     case "today":
-      startDate = new Date(now);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
+      startDate = toBeijingMidnight(now);
+      endDate = toBeijingDayEnd(now);
       days = 1;
       break;
 
-    case "yesterday":
-      startDate = new Date(now);
-      startDate.setDate(startDate.getDate() - 1);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(startDate);
-      endDate.setHours(23, 59, 59, 999);
+    case "yesterday": {
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      startDate = toBeijingMidnight(yesterday);
+      endDate = toBeijingDayEnd(yesterday);
       days = 1;
       break;
+    }
 
-    case "last7days":
-      endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
-      startDate = new Date(now);
-      startDate.setDate(startDate.getDate() - 6);
-      startDate.setHours(0, 0, 0, 0);
+    case "last7days": {
+      endDate = toBeijingDayEnd(now);
+      const start = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+      startDate = toBeijingMidnight(start);
       days = 7;
       break;
+    }
 
-    case "last14days":
-      endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
-      startDate = new Date(now);
-      startDate.setDate(startDate.getDate() - 13);
-      startDate.setHours(0, 0, 0, 0);
+    case "last14days": {
+      endDate = toBeijingDayEnd(now);
+      const start = new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000);
+      startDate = toBeijingMidnight(start);
       days = 14;
       break;
+    }
 
-    case "last30days":
-      endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
-      startDate = new Date(now);
-      startDate.setDate(startDate.getDate() - 29);
-      startDate.setHours(0, 0, 0, 0);
+    case "last30days": {
+      endDate = toBeijingDayEnd(now);
+      const start = new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000);
+      startDate = toBeijingMidnight(start);
       days = 30;
       break;
+    }
 
     default:
-      // 自定义日期范围
-      startDate = new Date(filters.startDate);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(filters.endDate);
-      endDate.setHours(23, 59, 59, 999);
+      // 自定义日期范围 - 解析北京时间日期字符串
+      startDate = parseBeijingDateString(filters.startDate);
+      endDate = toBeijingDayEnd(parseBeijingDateString(filters.endDate));
       days = Math.ceil(
         (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
       );

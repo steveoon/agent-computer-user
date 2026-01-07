@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { getDashboardData, getFilterOptions } from "@/actions/recruitment-stats";
+import { toBeijingDateString } from "@/lib/utils/beijing-timezone";
 import type { AgentOption, BrandOption } from "@/actions/recruitment-stats";
 import type {
   DashboardFilters,
@@ -16,13 +17,11 @@ import type {
  */
 
 /**
- * 初始筛选参数（默认最近 7 天）
+ * 初始筛选参数（默认最近 7 天，使用北京时间）
  */
 const initialFilters: DashboardFilters = {
-  startDate: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split("T")[0],
-  endDate: new Date().toISOString().split("T")[0],
+  startDate: toBeijingDateString(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000)),
+  endDate: toBeijingDateString(new Date()),
   preset: "last7days",
 };
 
@@ -160,7 +159,7 @@ export const useDashboardStatsStore = create<DashboardStatsState>()(
       setPreset: (preset) => {
         const now = new Date();
         let startDate: string;
-        let endDate: string = now.toISOString().split("T")[0];
+        let endDate: string = toBeijingDateString(now);
 
         switch (preset) {
           case "today":
@@ -169,26 +168,26 @@ export const useDashboardStatsStore = create<DashboardStatsState>()(
           case "yesterday": {
             const yesterday = new Date(now);
             yesterday.setDate(yesterday.getDate() - 1);
-            startDate = yesterday.toISOString().split("T")[0];
+            startDate = toBeijingDateString(yesterday);
             endDate = startDate;
             break;
           }
           case "last7days": {
             const start = new Date(now);
             start.setDate(start.getDate() - 6);
-            startDate = start.toISOString().split("T")[0];
+            startDate = toBeijingDateString(start);
             break;
           }
           case "last14days": {
             const start = new Date(now);
             start.setDate(start.getDate() - 13);
-            startDate = start.toISOString().split("T")[0];
+            startDate = toBeijingDateString(start);
             break;
           }
           case "last30days": {
             const start = new Date(now);
             start.setDate(start.getDate() - 29);
-            startDate = start.toISOString().split("T")[0];
+            startDate = toBeijingDateString(start);
             break;
           }
           default:

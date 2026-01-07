@@ -10,7 +10,6 @@ export * from "./types";
 // Repository
 export {
   recruitmentStatsRepository,
-  normalizeToStartOfDay,
   calculateRate,
   type DrizzleInsertStats,
   type DrizzleSelectStats,

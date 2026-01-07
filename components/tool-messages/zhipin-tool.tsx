@@ -11,6 +11,21 @@ import {
 import { BaseToolMessage } from "./base-tool-message";
 import { themes, type ToolMessageProps } from "./types";
 
+// MCP 后端类型
+type MCPBackend = "puppeteer" | "playwright";
+
+// MCP 后端标签配置
+const MCP_BACKEND_STYLES: Record<MCPBackend, { label: string; className: string }> = {
+  puppeteer: {
+    label: "Puppeteer",
+    className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  },
+  playwright: {
+    label: "Playwright",
+    className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  },
+};
+
 // 定义各个工具的图标映射
 const toolIcons: Record<string, LucideIcon> = {
   zhipin_get_unread_candidates_improved: ListChecks,
@@ -79,6 +94,9 @@ export function ZhipinToolMessage(props: ToolMessageProps) {
     detail = details.join(" · ");
   }
 
+  // 提取 MCP 后端信息
+  let mcpBackend: MCPBackend | undefined;
+
   // 对于输出，更新detail以包含结果信息
   if (state === "output-available" && output) {
     const result = output as {
@@ -91,7 +109,21 @@ export function ZhipinToolMessage(props: ToolMessageProps) {
           failed: number;
         };
       };
+      // MCP 后端标识
+      mcpBackend?: MCPBackend;
+      // 直接在顶层的字段（get_unread_candidates_improved 的返回格式）
+      candidates?: unknown[];
+      count?: number;
+      stats?: {
+        total: number;
+        withName: number;
+        withUnread: number;
+        returned: number;
+      };
     };
+
+    // 提取 mcpBackend
+    mcpBackend = result.mcpBackend;
 
     if (toolName === "zhipin_get_candidate_list" && result.data?.candidates) {
       const candidates = result.data.candidates;
@@ -102,14 +134,34 @@ export function ZhipinToolMessage(props: ToolMessageProps) {
     } else if (toolName === "zhipin_say_hello" && result.data?.summary) {
       const summary = result.data.summary;
       detail = `总计: ${summary.total} 个 · 成功: ${summary.success} 个 · 失败: ${summary.failed} 个`;
+    } else if (toolName === "zhipin_get_unread_candidates_improved" && result.stats) {
+      // 显示 get_unread_candidates_improved 的统计信息
+      detail = `返回 ${result.count} 个 · 总计 ${result.stats.total} · 未读 ${result.stats.withUnread}`;
     }
   }
+
+  // 生成 MCP 后端徽章
+  const backendBadge = mcpBackend && MCP_BACKEND_STYLES[mcpBackend] ? (
+    <span
+      className={`ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded ${MCP_BACKEND_STYLES[mcpBackend].className}`}
+    >
+      {MCP_BACKEND_STYLES[mcpBackend].label}
+    </span>
+  ) : null;
+
+  // 组合 detail 和后端徽章
+  const detailWithBadge = (
+    <>
+      {detail}
+      {backendBadge}
+    </>
+  );
 
   return (
     <BaseToolMessage
       icon={Icon}
       label={label}
-      detail={detail}
+      detail={detailWithBadge}
       theme={themes.blue}
       state={state}
       output={output}

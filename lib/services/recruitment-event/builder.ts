@@ -22,6 +22,7 @@ import {
   type RecruitmentEventTypeValue,
   type SourcePlatformValue,
   type EventDetails,
+  type WechatExchangeTypeValue,
 } from "@/db/types";
 import { recruitmentContext } from "./context";
 import type { DrizzleInsertEvent } from "./repository";
@@ -176,14 +177,19 @@ export class RecruitmentEventBuilder {
    * Create a WECHAT_EXCHANGED event
    *
    * @param wechatNumber - Optional WeChat number if captured
+   * @param exchangeType - Exchange type: requested/accepted/completed
+   *   - requested: 我方发起请求，等待对方同意
+   *   - accepted: 我方同意对方请求，立即成功
+   *   - completed: 从聊天记录检测到已完成
    * @returns Complete event ready for insertion
    */
-  wechatExchanged(wechatNumber?: string): DrizzleInsertEvent {
+  wechatExchanged(wechatNumber?: string, exchangeType?: WechatExchangeTypeValue): DrizzleInsertEvent {
     return this.finalize({
       eventType: RecruitmentEventType.WECHAT_EXCHANGED,
       eventDetails: {
         type: "wechat_exchanged",
         wechatNumber,
+        exchangeType,
       },
     });
   }

@@ -9,8 +9,9 @@ import { eq, and, gte, lte, sql, count, countDistinct } from "drizzle-orm";
 import { getDb } from "@/db";
 import { recruitmentEvents } from "@/db/schema";
 import { RecruitmentEventType } from "@/db/types";
-import { recruitmentStatsRepository, normalizeToStartOfDay, calculateRate } from "./repository";
+import { recruitmentStatsRepository, calculateRate } from "./repository";
 import { recruitmentEventsRepository } from "@/lib/services/recruitment-event/repository";
+import { toBeijingMidnight } from "@/lib/utils/beijing-timezone";
 import type { DirtyRecord, AggregationResult, DailyStatsRecord } from "./types";
 
 const LOG_PREFIX = "[RecruitmentStats][Aggregation]";
@@ -71,10 +72,10 @@ class AggregationService {
     const db = getDb();
     const { agentId, statDate, brandId, jobId } = record;
 
-    // 计算当天的时间范围
-    const dayStart = normalizeToStartOfDay(statDate);
-    const dayEnd = new Date(dayStart);
-    dayEnd.setUTCHours(23, 59, 59, 999);
+    // 计算当天的时间范围（北京时间边界）
+    const dayStart = toBeijingMidnight(statDate);
+    // dayEnd = dayStart + 24小时 - 1毫秒（避免依赖服务器时区）
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
 
     // 构建 WHERE 条件
     const conditions = [
@@ -116,8 +117,24 @@ class AggregationService {
         // === 出站漏斗指标 ===
         // Proactive Outreach: 主动打招呼候选人数 = COUNT DISTINCT candidate_key WHERE type=CANDIDATE_CONTACTED
         proactiveOutreach: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.CANDIDATE_CONTACTED})`,
-        // WeChat: 获取微信的候选人数
-        wechatExchanged: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.WECHAT_EXCHANGED})`,
+        // WeChat: 获取微信的候选人数（只统计成功的交换）
+        // 成功条件：
+        // 1. exchangeType = 'accepted'（我方同意对方请求）
+        // 2. exchangeType = 'completed'（从聊天检测到已完成）
+        // 3. 兼容历史数据：exchangeType 为空但 wechatNumber 不为空
+        // [2026-01-07] 新增 exchangeType 过滤逻辑
+        wechatExchanged: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (
+          WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.WECHAT_EXCHANGED}
+          AND (
+            ${recruitmentEvents.eventDetails}->>'exchangeType' = 'accepted'
+            OR ${recruitmentEvents.eventDetails}->>'exchangeType' = 'completed'
+            OR (
+              ${recruitmentEvents.eventDetails}->>'exchangeType' IS NULL
+              AND ${recruitmentEvents.eventDetails}->>'wechatNumber' IS NOT NULL
+              AND ${recruitmentEvents.eventDetails}->>'wechatNumber' != ''
+            )
+          )
+        )`,
         // Interview: 预约面试的候选人数
         interviewsBooked: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.INTERVIEW_BOOKED})`,
         // Hired: 入职的候选人数
@@ -397,8 +414,8 @@ class AggregationService {
     );
 
     // 遍历日期范围
-    const currentDate = normalizeToStartOfDay(startDate);
-    const endDateNormalized = normalizeToStartOfDay(endDate);
+    const currentDate = toBeijingMidnight(startDate);
+    const endDateNormalized = toBeijingMidnight(endDate);
 
     while (currentDate <= endDateNormalized) {
       try {

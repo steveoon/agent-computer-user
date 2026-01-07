@@ -75,6 +75,9 @@ export const CHAT_SELECTORS = {
 
   // 发送相关的选择器 - 基于用户提供的路径
   conversationEditor: ".conversation-editor",
+  // 发送按钮内部的 .submit 才是真正的点击目标
+  submitButton: ".submit-content .submit",
+  submitButtonActive: ".submit-content .submit.active",
   submitContent: ".submit-content",
   sendButtonPath:
     "#container > div:nth-child(1) > div > div.chat-box > div.chat-container > div.chat-conversation > div.conversation-box > div.conversation-operate > div.conversation-editor > div.submit-content",

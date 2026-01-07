@@ -7,6 +7,7 @@ import { bashTool, computerTool } from "@/lib/e2b/tool";
 import { feishuBotTool } from "./feishu-bot-tool";
 import { puppeteerTool } from "./puppeteer-tool";
 import { analyzeScreenshotTool } from "./analyze-screenshot.tool";
+import { screenshotTool } from "./screenshot.tool";
 import { weChatBotTool } from "./wechat-bot-tool";
 import { jobPostingGeneratorTool } from "./job-posting-generator-tool";
 import { zhipinReplyTool } from "./zhipin-reply-tool";
@@ -129,6 +130,14 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     category: "automation",
     requiresSandbox: false,
     create: () => analyzeScreenshotTool(),
+  }),
+
+  screenshot: createToolDefinition({
+    name: "screenshot",
+    description: "统一截图工具，支持Puppeteer和Playwright双后端",
+    category: "automation",
+    requiresSandbox: false,
+    create: () => screenshotTool(),
   }),
 
   // ===== Zhipin 自动化工具 =====
@@ -373,6 +382,7 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "wechat",
     // 自动化工具
     "puppeteer",
+    "screenshot",
     "analyze_screenshot",
     // 业务工具
     "job_posting_generator",
@@ -415,6 +425,7 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "computer",
     // 自动化工具
     "puppeteer",
+    "screenshot",
     "analyze_screenshot",
   ],
 };

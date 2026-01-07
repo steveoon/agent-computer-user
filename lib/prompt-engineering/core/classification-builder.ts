@@ -265,12 +265,12 @@ export class ClassificationPromptBuilder extends BasePromptBuilder {
       outputFormat: {
         language: "中文",
         length: { min: 50, max: 200 },
-        format: "structured_json",
+        format: "structured",
         restrictions: [
           "必须包含replyType字段",
           "必须包含extractedInfo字段",
           "必须包含reasoningText字段",
-          "输出合法JSON格式",
+          // 注意：不需要添加"输出JSON格式"等指令，tool-based pattern 通过 tool calling 自动处理
         ],
       },
     };

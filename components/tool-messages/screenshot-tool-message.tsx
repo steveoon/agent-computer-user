@@ -12,46 +12,70 @@ import {
 } from "lucide-react";
 import { ABORTED } from "@/lib/utils";
 import Image from "next/image";
-import type { ToolTheme } from "./types";
-import type { ToolPartState } from "@/types/tool-common";
+import { themes, type ToolMessageProps, type ToolTheme } from "./types";
 
-interface ScreenshotToolMessageProps {
-  icon: LucideIcon;
-  label: string;
-  theme: ToolTheme;
-  state: ToolPartState;
-  input?: Record<string, unknown>;
-  output?: unknown;
-  errorText?: string;
-  isLatestMessage?: boolean;
-  status?: string;
-  messageId: string;
-  partIndex: number;
+// MCP 后端类型
+type MCPBackend = "puppeteer" | "playwright";
+
+// MCP 后端标签配置
+const MCP_BACKEND_STYLES: Record<MCPBackend, { label: string; className: string }> = {
+  puppeteer: {
+    label: "Puppeteer",
+    className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  },
+  playwright: {
+    label: "Playwright",
+    className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  },
+};
+
+// 扩展 props 以支持来自父组件的自定义参数
+interface ScreenshotToolMessageProps extends ToolMessageProps {
+  icon?: LucideIcon;
+  label?: string;
+  theme?: ToolTheme;
   imageFormat?: "png" | "jpeg";
   maxHeight?: string;
 }
 
-export function ScreenshotToolMessage({
-  icon: Icon,
-  label,
-  theme,
-  state,
-  output,
-  errorText: _errorText,
-  isLatestMessage,
-  status,
-  messageId,
-  partIndex,
-  imageFormat = "png",
-  maxHeight = "500px",
-}: ScreenshotToolMessageProps) {
-  // 检查 output 是否是图片类型（支持 base64 data 或 URL）
+export function ScreenshotToolMessage(props: ScreenshotToolMessageProps) {
+  const {
+    state,
+    output,
+    isLatestMessage,
+    status,
+    messageId,
+    partIndex,
+    input,
+    // 可选的自定义参数，优先使用传入的值
+    icon: customIcon,
+    label: customLabel,
+    theme: customTheme,
+    imageFormat: customImageFormat,
+    maxHeight: customMaxHeight,
+  } = props;
+
+  // 使用自定义值或默认值
+  const Icon = customIcon || Camera;
+  const theme = customTheme || themes.zinc;
+  const imageFormat = customImageFormat || (input?.type as "png" | "jpeg") || "jpeg";
+  const maxHeight = customMaxHeight || "500px";
+
+  // 提取 MCP 后端信息
+  let mcpBackend: MCPBackend | undefined;
+  if (output && typeof output === "object" && "mcpBackend" in output) {
+    mcpBackend = (output as { mcpBackend?: MCPBackend }).mcpBackend;
+  }
+
+  // 使用自定义标签或默认标签
+  const label = customLabel || "截图";
+  // 检查 output 是否是图片类型（支持 base64 data、displayData 或 URL）
   const isImageResult =
     output &&
     typeof output === "object" &&
     "type" in output &&
     output.type === "image" &&
-    ("data" in output || "url" in output);
+    ("data" in output || "url" in output || "displayData" in output);
 
   // 判断是否是 OSS URL
   const isOssUrl =
@@ -60,6 +84,11 @@ export function ScreenshotToolMessage({
   // 获取图片源
   const getImageSrc = () => {
     if (!isImageResult) return null;
+
+    // 优先使用 displayData（专门用于 UI 显示的压缩后 base64）
+    if ("displayData" in output && output.displayData) {
+      return `data:image/${imageFormat};base64,${output.displayData}`;
+    }
 
     // 如果有 base64 data，使用 data URL
     if ("data" in output && output.data) {
@@ -138,7 +167,16 @@ export function ScreenshotToolMessage({
         >
           <Icon className={`w-4 h-4 ${theme.iconColor}`} />
         </div>
-        <span className={`font-medium ${theme.textColor} leading-5`}>{label}</span>
+        <span className={`font-medium ${theme.textColor} leading-5`}>
+          {label}
+          {mcpBackend && MCP_BACKEND_STYLES[mcpBackend] && (
+            <span
+              className={`ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded ${MCP_BACKEND_STYLES[mcpBackend].className}`}
+            >
+              {MCP_BACKEND_STYLES[mcpBackend].label}
+            </span>
+          )}
+        </span>
         <div className="ml-auto w-4 h-4 flex items-center justify-center">
           {state === "input-streaming" || state === "input-available" ? (
             isLatestMessage && status !== "ready" ? (

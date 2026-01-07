@@ -11,6 +11,7 @@
 import {
   SourcePlatform,
   RecruitmentEventType,
+  WechatExchangeType,
   type SourcePlatformValue,
   generateCandidateKey,
   generateSessionId,
@@ -294,7 +295,8 @@ export async function handleChatDetailsWechatExchange(
       builder.forBrand(brandId);
     }
 
-    const event = builder.wechatExchanged(wechatNumber);
+    // 从聊天记录检测到的交换 → COMPLETED（已确认成功）
+    const event = builder.wechatExchanged(wechatNumber, WechatExchangeType.COMPLETED);
     recruitmentEventService.recordAsync(event);
   } catch (error) {
     // Silent fail - don't affect main flow

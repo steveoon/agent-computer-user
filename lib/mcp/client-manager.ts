@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter } from "events";
-import { experimental_createMCPClient } from "@ai-sdk/mcp";
-import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
+import { createMCPClient } from "@ai-sdk/mcp";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import {
   MCPClientConfig,
   MCPManagerStatus,
@@ -63,15 +63,32 @@ class MCPClientManager {
    * 初始化客户端配置
    */
   private initializeClientConfigs(): void {
-    // Playwright MCP 配置 - 更适合 Docker 环境
+    // Playwright MCP 配置（默认）
+    //
+    // 支持两种连接模式：
+    // 1. CDP 模式 (多 Agent 场景) - 当 CHROME_REMOTE_DEBUGGING_PORT 设置时自动启用
+    //    - 参数: --cdp-endpoint http://localhost:PORT
+    //    - 适用: multi-agent.sh 启动的多 Agent 实例
+    //    - 优势: 每个 Agent 连接独立的 Chrome 实例，无冲突，无需安装浏览器插件
+    //
+    // 2. Extension 模式 (单 Agent 开发) - 当 CHROME_REMOTE_DEBUGGING_PORT 未设置时
+    //    - 参数: --extension
+    //    - 适用: 本地开发，手动选择要控制的 Tab
+    //    - 限制: 同一浏览器只能有一个 MCP 连接，需要安装 Playwright MCP Bridge 插件
+    //
+    // 如需使用 Puppeteer MCP，设置 USE_PUPPETEER_MCP=true
+    //
+    // Playwright MCP 配置使用动态参数生成器
+    // 实际参数在 getMCPClient 时根据当时的环境变量决定
+    // 这样支持运行时动态切换 CDP/Extension 模式
     const playwrightConfig = validateMCPClientConfig({
       name: "playwright",
       command: "npx",
-      args: ["-y", "@playwright/mcp@latest", "--isolated"],
+      args: [], // 占位，实际参数在 getMCPClient 中动态生成
       env: {
         NODE_ENV: process.env.NODE_ENV || "production",
       },
-      description: "Playwright 浏览器自动化服务（Docker 友好）",
+      description: "Playwright 浏览器自动化服务",
       enabled: true,
     });
     this.clientConfigs.set("playwright", playwrightConfig);
@@ -107,6 +124,32 @@ class MCPClientManager {
   }
 
   /**
+   * 动态生成 Playwright MCP 参数
+   * 根据运行时环境变量决定使用 CDP 或 Extension 模式
+   *
+   * 环境变量：
+   * - CHROME_REMOTE_DEBUGGING_PORT: Chrome 远程调试端口（设置后启用 CDP 模式）
+   * - CHROME_HOST: Chrome 所在主机（默认 localhost，Docker 部署时设为 host.docker.internal）
+   */
+  private getPlaywrightArgs(): { args: string[]; mode: string } {
+    const chromePort = process.env.CHROME_REMOTE_DEBUGGING_PORT;
+    const chromeHost = process.env.CHROME_HOST || "localhost";
+
+    if (chromePort) {
+      const cdpEndpoint = `http://${chromeHost}:${chromePort}`;
+      return {
+        args: ["-y", "@playwright/mcp@latest", "--cdp-endpoint", cdpEndpoint, "--image-responses=allow"],
+        mode: `CDP (${cdpEndpoint})`,
+      };
+    }
+
+    return {
+      args: ["-y", "@playwright/mcp@latest", "--extension", "--image-responses=allow"],
+      mode: "Extension",
+    };
+  }
+
+  /**
    * 获取MCP客户端
    * @param clientName 客户端名称
    * @returns MCP客户端实例
@@ -123,7 +166,18 @@ class MCPClientManager {
       throw new Error(`未知的MCP客户端: ${clientName}`);
     }
 
-    console.log(`🚀 正在初始化 ${config.description} (${clientName})...`);
+    // Playwright 使用动态参数
+    let args = config.args;
+    let description = config.description;
+
+    if (clientName === "playwright") {
+      const playwrightConfig = this.getPlaywrightArgs();
+      args = playwrightConfig.args;
+      description = `Playwright 浏览器自动化服务（${playwrightConfig.mode} 模式）`;
+      console.log(`🎭 Playwright MCP 模式: ${playwrightConfig.mode}`);
+    }
+
+    console.log(`🚀 正在初始化 ${description} (${clientName})...`);
 
     try {
       // 过滤掉空的环境变量
@@ -140,24 +194,24 @@ class MCPClientManager {
         : {};
 
       // 创建传输层
-      const transport = new Experimental_StdioMCPTransport({
+      const transport = new StdioClientTransport({
         command: config.command,
-        args: config.args,
+        args: args,
         env: filteredEnv,
       });
 
       // 创建MCP客户端
-      const client = await experimental_createMCPClient({
+      const client = await createMCPClient({
         transport,
       });
 
       // 缓存客户端
       this.mcpClients.set(clientName, client);
-      console.log(`✅ ${config.description} 初始化成功`);
+      console.log(`✅ ${description} 初始化成功`);
 
       return client;
     } catch (error) {
-      console.error(`❌ ${config.description} 初始化失败:`, error);
+      console.error(`❌ ${description} 初始化失败:`, error);
       throw error;
     }
   }

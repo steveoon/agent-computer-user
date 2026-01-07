@@ -353,11 +353,29 @@ export const messageReceivedDetailsSchema = z.object({
 export type MessageReceivedDetails = z.infer<typeof messageReceivedDetailsSchema>;
 
 /**
+ * 微信交换类型枚举
+ *
+ * 用于区分交换发起方和状态：
+ * - requested: 我方发起请求，等待对方同意
+ * - accepted: 我方同意对方请求，立即成功
+ * - completed: 从聊天记录检测到已完成的交换
+ */
+export const WechatExchangeType = {
+  REQUESTED: "requested",
+  ACCEPTED: "accepted",
+  COMPLETED: "completed",
+} as const;
+
+export type WechatExchangeTypeValue = (typeof WechatExchangeType)[keyof typeof WechatExchangeType];
+
+/**
  * 微信交换事件详情
  */
 export const wechatExchangedDetailsSchema = z.object({
   type: z.literal("wechat_exchanged"),
   wechatNumber: z.string().optional(),
+  /** 交换类型：requested-我方发起/accepted-同意对方/completed-检测到已完成 */
+  exchangeType: z.enum(["requested", "accepted", "completed"]).optional(),
 });
 
 export type WechatExchangedDetails = z.infer<typeof wechatExchangedDetailsSchema>;

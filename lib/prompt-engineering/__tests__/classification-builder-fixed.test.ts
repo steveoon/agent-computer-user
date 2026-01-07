@@ -22,7 +22,7 @@ describe("ClassificationPromptBuilder - 实际实现测试", () => {
         expect(atomicPrompt.task).toBe("准确分析求职者消息的意图并提取关键信息");
         expect(atomicPrompt.constraints).toContain("基于消息内容和对话历史综合判断意图");
         expect(atomicPrompt.constraints).toContain("优先识别最具体、最明确的意图类型");
-        expect(atomicPrompt.outputFormat.format).toBe("structured_json");
+        expect(atomicPrompt.outputFormat.format).toBe("structured");
       });
 
       it("应该包含所有必要的约束条件", () => {
@@ -44,7 +44,7 @@ describe("ClassificationPromptBuilder - 实际实现测试", () => {
         expect(atomicPrompt.outputFormat.restrictions).toContain("必须包含replyType字段");
         expect(atomicPrompt.outputFormat.restrictions).toContain("必须包含extractedInfo字段");
         expect(atomicPrompt.outputFormat.restrictions).toContain("必须包含reasoningText字段");
-        expect(atomicPrompt.outputFormat.restrictions).toContain("输出合法JSON格式");
+        // 注意：不再检查"输出合法JSON格式"，因为 Output.object() 会自动处理
       });
     });
 

@@ -101,8 +101,9 @@ const PuppeteerImageResultSchema = z
     type: z.literal("image"),
     data: z.string().optional().describe("Base64编码的图片数据（可选）"),
     url: z.string().optional().describe("图片的公网URL（可选）"),
+    displayData: z.string().optional().describe("用于UI显示的压缩后Base64数据（不发送给LLM）"),
   })
-  .refine(data => data.data || data.url, { message: "图片结果必须包含 data 或 url 其中之一" });
+  .refine(data => data.data || data.url || data.displayData, { message: "图片结果必须包含 data、url 或 displayData 其中之一" });
 
 export const PuppeteerResultSchema = z.union([PuppeteerTextResultSchema, PuppeteerImageResultSchema]);
 
@@ -402,7 +403,7 @@ export function isPuppeteerTextResult(result: unknown): result is { type: "text"
  */
 export function isPuppeteerImageResult(
   result: unknown
-): result is { type: "image"; data?: string; url?: string } {
+): result is { type: "image"; data?: string; url?: string; displayData?: string } {
   const parsed = PuppeteerResultSchema.safeParse(result);
   return parsed.success && parsed.data.type === "image";
 }
@@ -420,3 +421,140 @@ export function validatePuppeteerParams(params: unknown): PuppeteerParams {
 export function validateMCPClientConfig(config: unknown): MCPClientConfig {
   return MCPClientConfigSchema.parse(config);
 }
+
+// ========== Playwright MCP 类型定义 ==========
+
+/**
+ * Playwright Tab 信息
+ */
+export const PlaywrightTabInfoSchema = z.object({
+  index: z.number().describe("标签页索引"),
+  url: z.string().describe("标签页 URL"),
+  title: z.string().describe("标签页标题"),
+  active: z.boolean().optional().describe("是否为当前激活的标签页"),
+});
+
+export type PlaywrightTabInfo = z.infer<typeof PlaywrightTabInfoSchema>;
+
+/**
+ * Playwright MCP 工具名称
+ */
+export const PlaywrightMCPToolNamesSchema = z.enum([
+  "browser_tabs",
+  "browser_navigate",
+  "browser_click",
+  "browser_type",
+  "browser_evaluate",
+  "browser_snapshot",
+  "browser_take_screenshot",
+  "browser_select_option",
+  "browser_hover",
+  "browser_press_key",
+  "browser_handle_dialog",
+  "browser_file_upload",
+  "browser_navigate_back",
+  "browser_navigate_forward",
+  "browser_wait_for",
+]);
+
+export type PlaywrightMCPToolNames = z.infer<typeof PlaywrightMCPToolNamesSchema>;
+
+/**
+ * Playwright MCP 客户端接口定义
+ */
+export interface PlaywrightMCPClient {
+  /**
+   * 获取客户端可用的工具集合
+   */
+  tools(): Promise<{
+    // Tab 管理
+    browser_tabs?: {
+      execute(params: {
+        action: "list" | "select" | "close" | "new";
+        index?: number;
+        url?: string;
+      }): Promise<unknown>;
+    };
+
+    // 脚本执行 (注意: Playwright MCP 使用 "function" 参数名)
+    browser_evaluate?: {
+      execute(params: { function: string }): Promise<unknown>;
+    };
+
+    // 导航
+    browser_navigate?: {
+      execute(params: { url: string }): Promise<unknown>;
+    };
+
+    // 点击（基于 accessibility ref）
+    browser_click?: {
+      execute(params: {
+        element: string;
+        ref: string;
+        doubleClick?: boolean;
+      }): Promise<unknown>;
+    };
+
+    // 输入文本
+    browser_type?: {
+      execute(params: {
+        element: string;
+        ref: string;
+        text: string;
+        submit?: boolean;
+        slowly?: boolean;
+      }): Promise<unknown>;
+    };
+
+    // 截图
+    browser_take_screenshot?: {
+      execute(params?: { filename?: string }): Promise<unknown>;
+    };
+
+    // 页面快照（accessibility tree）
+    browser_snapshot?: {
+      execute(params?: Record<string, never>): Promise<unknown>;
+    };
+
+    // 选择下拉选项
+    browser_select_option?: {
+      execute(params: {
+        element: string;
+        ref: string;
+        value?: string;
+        label?: string;
+      }): Promise<unknown>;
+    };
+
+    // 悬停
+    browser_hover?: {
+      execute(params: { element: string; ref: string }): Promise<unknown>;
+    };
+
+    // 按键
+    browser_press_key?: {
+      execute(params: { key: string }): Promise<unknown>;
+    };
+
+    // 处理对话框
+    browser_handle_dialog?: {
+      execute(params: { accept: boolean; text?: string }): Promise<unknown>;
+    };
+
+    // 等待
+    browser_wait_for?: {
+      execute(params: {
+        selector?: string;
+        url?: string;
+        timeout?: number;
+      }): Promise<unknown>;
+    };
+
+    [key: string]: unknown;
+  }>;
+}
+
+/**
+ * 任意 MCP 客户端类型（Puppeteer 或 Playwright）
+ */
+export type AnyMCPClient = MCPClient | PlaywrightMCPClient;

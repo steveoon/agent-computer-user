@@ -1,22 +1,32 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
-import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
+import { getPuppeteerMCPClient, getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
 import { getAdaptiveSelectors, generateFindElementScript } from "./dynamic-selector-utils";
 import {
   wrapAntiDetectionScript,
   clickWithMouseTrajectory,
   performRandomScroll,
 } from "../zhipin/anti-detection-utils";
+import {
+  selectYupaoTab,
+  parsePlaywrightResult,
+  wrapPlaywrightScript,
+  type TabSelectionResult,
+} from "@/lib/tools/shared/playwright-utils";
+
+// Feature flag: 使用 Playwright MCP 而非 Puppeteer MCP
+const USE_PLAYWRIGHT_MCP = process.env.USE_PLAYWRIGHT_MCP === "true";
 
 export const openCandidateChatTool = tool({
   description: `打开指定候选人的聊天窗口
-  
+
   功能特性：
   - 支持按候选人姓名查找并点击
   - 支持按索引点击（第N个候选人）
   - 自动检测未读状态
   - 返回详细的候选人信息
   - 使用防检测机制和鼠标轨迹模拟
+  ${USE_PLAYWRIGHT_MCP ? "- [Playwright] 支持自动切换到鱼泡标签页" : ""}
   `,
 
   inputSchema: z.object({
@@ -27,11 +37,39 @@ export const openCandidateChatTool = tool({
     preferUnread: z.boolean().optional().default(true).describe("是否优先选择有未读消息的候选人"),
 
     listOnly: z.boolean().optional().default(false).describe("仅列出候选人，不执行点击操作"),
+
+    autoSwitchTab: z
+      .boolean()
+      .optional()
+      .default(true)
+      .describe("是否自动切换到鱼泡标签页（仅 Playwright 模式有效）"),
   }),
 
-  execute: async ({ candidateName, index, preferUnread = true, listOnly = false }) => {
+  execute: async ({ candidateName, index, preferUnread = true, listOnly = false, autoSwitchTab = true }) => {
     try {
-      const client = await getPuppeteerMCPClient();
+      const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
+
+      // Playwright 模式: 自动切换到鱼泡标签页
+      if (USE_PLAYWRIGHT_MCP && autoSwitchTab) {
+        console.log("[Playwright] 正在切换到鱼泡标签页...");
+        const tabResult: TabSelectionResult = await selectYupaoTab();
+
+        if (!tabResult.success) {
+          return {
+            success: false,
+            error: `无法切换到鱼泡标签页: ${tabResult.error}`,
+            message: "请确保已在浏览器中打开鱼泡网页面",
+            mcpBackend,
+          };
+        }
+
+        console.log(`[Playwright] 已切换到: ${tabResult.tab?.title} (${tabResult.tab?.url})`);
+      }
+
+      // 获取适当的 MCP 客户端
+      const client = USE_PLAYWRIGHT_MCP
+        ? await getPlaywrightMCPClient()
+        : await getPuppeteerMCPClient();
 
       // 创建脚本
       const script = `
@@ -271,172 +309,238 @@ export const openCandidateChatTool = tool({
           }
       `;
 
-      // 使用防检测包装
-      const wrappedScript = wrapAntiDetectionScript(script);
+      // 根据 MCP 类型生成不同的脚本包装
+      const wrappedScript = USE_PLAYWRIGHT_MCP
+        ? wrapPlaywrightScript(script)
+        : wrapAntiDetectionScript(script);
 
       // 执行脚本
       const tools = await client.tools();
-      const toolName = "puppeteer_evaluate";
+      const toolName = USE_PLAYWRIGHT_MCP ? "browser_evaluate" : "puppeteer_evaluate";
 
       if (!tools[toolName]) {
-        throw new Error(`MCP tool ${toolName} not available`);
+        throw new Error(
+          `MCP tool ${toolName} not available. ${
+            USE_PLAYWRIGHT_MCP
+              ? "请确保 Playwright MCP 正在运行且已连接浏览器。"
+              : "请确保 Puppeteer MCP 正在运行。"
+          }`
+        );
       }
 
-      const tool = tools[toolName];
-      const result = await tool.execute({ script: wrappedScript });
+      const mcpTool = tools[toolName];
+      const executeParams = USE_PLAYWRIGHT_MCP ? { function: wrappedScript } : { script: wrappedScript };
+      const result = await mcpTool.execute(executeParams);
 
-      // 解析结果
-      const mcpResult = result as { content?: Array<{ text?: string }> };
-      if (mcpResult?.content?.[0]?.text) {
-        const resultText = mcpResult.content[0].text;
+      // 根据 MCP 类型解析结果
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let parsedResult: any = null;
+
+      if (USE_PLAYWRIGHT_MCP) {
+        // Playwright MCP 结果解析
+        parsedResult = parsePlaywrightResult(result);
+      } else {
+        // Puppeteer MCP 结果解析
+        const mcpResult = result as { content?: Array<{ text?: string }> };
+        if (mcpResult?.content?.[0]?.text) {
+          const resultText = mcpResult.content[0].text;
+
+          try {
+            const executionMatch = resultText.match(
+              /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
+            );
+
+            if (executionMatch && executionMatch[1].trim() !== "undefined") {
+              const jsonResult = executionMatch[1].trim();
+              parsedResult = JSON.parse(jsonResult);
+            }
+          } catch (e) {
+            console.error("Failed to parse result:", e);
+            return {
+              success: false,
+              error: "Failed to parse script result",
+              rawResult: resultText,
+              mcpBackend,
+            };
+          }
+        }
+      }
+
+      if (!parsedResult) {
+        return {
+          success: false,
+          error: "Script execution returned undefined",
+          mcpBackend,
+        };
+      }
+
+      // 如果找到了点击目标，使用更可靠的方法执行点击
+      if (
+        parsedResult.success &&
+        parsedResult.action === "found" &&
+        parsedResult.clickTarget
+      ) {
+        const { selector, index, name } = parsedResult.clickTarget;
 
         try {
-          // 尝试从 "Execution result:" 后面提取实际结果
-          const executionMatch = resultText.match(
-            /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
-          );
+          // 添加随机延迟模拟人类行为
+          const delay = 50 + Math.random() * 100;
+          await new Promise(resolve => setTimeout(resolve, delay));
 
-          if (executionMatch && executionMatch[1].trim() !== "undefined") {
-            const jsonResult = executionMatch[1].trim();
-            const parsedResult = JSON.parse(jsonResult);
-
-            // 如果找到了点击目标，使用更可靠的方法执行点击
-            if (
-              parsedResult.success &&
-              parsedResult.action === "found" &&
-              parsedResult.clickTarget
-            ) {
-              const { selector, index, name } = parsedResult.clickTarget;
-
-              try {
-                // 添加随机延迟模拟人类行为
-                const delay = 50 + Math.random() * 100;
-                await new Promise(resolve => setTimeout(resolve, delay));
-
-                // 在点击前执行随机滚动
-                await performRandomScroll(client, {
-                  minDistance: 20,
-                  maxDistance: 80,
-                  probability: 0.3,
-                  direction: "both",
-                });
-
-                // 使用临时属性标记目标元素，避免选择器问题
-                const markScript = wrapAntiDetectionScript(`
-                  ${generateFindElementScript()}
-                  
-                  const nameSelectors = ${JSON.stringify(getAdaptiveSelectors("candidateName"))};
-                  
-                  const items = document.querySelectorAll('${selector}');
-                  if (items[${index}]) {
-                    // 先清理可能存在的旧标记
-                    document.querySelectorAll('[data-temp-click-target]').forEach(el => {
-                      el.removeAttribute('data-temp-click-target');
-                    });
-                    
-                    // 标记目标元素
-                    items[${index}].setAttribute('data-temp-click-target', 'true');
-                    
-                    // 验证标记的元素确实是我们要的候选人
-                    const nameEl = findElement(items[${index}], nameSelectors);
-                    const actualName = nameEl ? nameEl.textContent.trim() : '';
-                    
-                    return { 
-                      success: true, 
-                      marked: true,
-                      actualName: actualName,
-                      expectedName: '${name}',
-                      nameMatch: actualName === '${name}'
-                    };
-                  }
-                  return { success: false, error: '无法找到目标元素' };
-                `);
-
-                const markResult = await tools.puppeteer_evaluate.execute({ script: markScript });
-                const markData = parseEvaluateResult(markResult);
-
-                if (
-                  markData &&
-                  typeof markData === "object" &&
-                  "success" in markData &&
-                  markData.success
-                ) {
-                  // 使用临时属性选择器点击
-                  const tempSelector = `${selector}[data-temp-click-target="true"]`;
-
-                  // 使用带鼠标轨迹的点击
-                  await clickWithMouseTrajectory(client, tempSelector, {
-                    preClickDelay: 200,
-                    moveSteps: 18,
-                  });
-
-                  // 清理临时属性
-                  const cleanupScript = wrapAntiDetectionScript(`
-                    const el = document.querySelector('[data-temp-click-target]');
-                    if (el) el.removeAttribute('data-temp-click-target');
-                  `);
-                  await tools.puppeteer_evaluate.execute({ script: cleanupScript });
-
-                  return {
-                    success: true,
-                    action: "clicked",
-                    clickedCandidate: parsedResult.candidateInfo,
-                    totalCandidates: parsedResult.totalCandidates,
-                    message:
-                      "成功点击候选人" +
-                      (parsedResult.byIndex ? "（通过索引）" : "") +
-                      ": " +
-                      parsedResult.candidateInfo.name,
-                  };
-                } else {
-                  return {
-                    success: false,
-                    error: "无法标记目标元素",
-                    details: markData,
-                    candidateInfo: parsedResult.candidateInfo,
-                  };
-                }
-              } catch (clickError) {
-                return {
-                  success: false,
-                  error: "点击操作失败",
-                  details: clickError instanceof Error ? clickError.message : "未知错误",
-                  candidateInfo: parsedResult.candidateInfo,
-                };
-              }
-            }
-
-            return parsedResult;
+          // 在点击前执行随机滚动 (仅 Puppeteer 模式)
+          if (!USE_PLAYWRIGHT_MCP) {
+            await performRandomScroll(client, {
+              minDistance: 20,
+              maxDistance: 80,
+              probability: 0.3,
+              direction: "both",
+            });
           }
 
-          // 如果执行结果是 undefined，可能是脚本执行有问题
-          console.error("Script execution returned undefined");
+          // 标记和点击脚本
+          const markScriptContent = `
+            ${generateFindElementScript()}
+
+            const nameSelectors = ${JSON.stringify(getAdaptiveSelectors("candidateName"))};
+
+            const items = document.querySelectorAll('${selector}');
+            if (items[${index}]) {
+              // 先清理可能存在的旧标记
+              document.querySelectorAll('[data-temp-click-target]').forEach(el => {
+                el.removeAttribute('data-temp-click-target');
+              });
+
+              // 标记目标元素
+              items[${index}].setAttribute('data-temp-click-target', 'true');
+
+              // 验证标记的元素确实是我们要的候选人
+              const nameEl = findElement(items[${index}], nameSelectors);
+              const actualName = nameEl ? nameEl.textContent.trim() : '';
+
+              return {
+                success: true,
+                marked: true,
+                actualName: actualName,
+                expectedName: '${name}',
+                nameMatch: actualName === '${name}'
+              };
+            }
+            return { success: false, error: '无法找到目标元素' };
+          `;
+
+          const markScript = USE_PLAYWRIGHT_MCP
+            ? wrapPlaywrightScript(markScriptContent)
+            : wrapAntiDetectionScript(markScriptContent);
+
+          const markExecuteParams = USE_PLAYWRIGHT_MCP
+            ? { function: markScript }
+            : { script: markScript };
+          const markResult = await mcpTool.execute(markExecuteParams);
+
+          const markData = USE_PLAYWRIGHT_MCP
+            ? parsePlaywrightResult(markResult)
+            : parseEvaluateResult(markResult);
+
+          if (
+            markData &&
+            typeof markData === "object" &&
+            "success" in markData &&
+            markData.success
+          ) {
+            // 使用临时属性选择器点击
+            const tempSelector = `${selector}[data-temp-click-target="true"]`;
+
+            if (USE_PLAYWRIGHT_MCP) {
+              // Playwright: 使用 browser_evaluate 执行点击
+              // 注意: browser_click 需要 accessibility ref，不支持 CSS 选择器
+              const clickScript = wrapPlaywrightScript(`
+                const el = document.querySelector('${tempSelector}');
+                if (el) {
+                  el.click();
+                  return { success: true, clicked: true, selector: '${tempSelector}' };
+                }
+                return { success: false, error: '元素未找到', selector: '${tempSelector}' };
+              `);
+              const clickResult = await mcpTool.execute({ function: clickScript });
+              const parsedClickResult = parsePlaywrightResult(clickResult);
+
+              // 检查点击是否成功
+              if (parsedClickResult && typeof parsedClickResult === 'object' && 'success' in parsedClickResult) {
+                if (!parsedClickResult.success) {
+                  console.error(`[${mcpBackend}] 点击失败:`, parsedClickResult);
+                  return {
+                    success: false,
+                    error: "点击元素失败",
+                    details: parsedClickResult,
+                    candidateInfo: parsedResult.candidateInfo,
+                    mcpBackend,
+                  };
+                }
+              }
+            } else {
+              // Puppeteer: 使用带鼠标轨迹的点击
+              await clickWithMouseTrajectory(client, tempSelector, {
+                preClickDelay: 200,
+                moveSteps: 18,
+              });
+            }
+
+            // 清理临时属性
+            const cleanupScriptContent = `
+              const el = document.querySelector('[data-temp-click-target]');
+              if (el) el.removeAttribute('data-temp-click-target');
+              return { cleaned: true };
+            `;
+            const cleanupScript = USE_PLAYWRIGHT_MCP
+              ? wrapPlaywrightScript(cleanupScriptContent)
+              : wrapAntiDetectionScript(cleanupScriptContent);
+            const cleanupParams = USE_PLAYWRIGHT_MCP
+              ? { function: cleanupScript }
+              : { script: cleanupScript };
+            await mcpTool.execute(cleanupParams);
+
+            return {
+              success: true,
+              action: "clicked",
+              clickedCandidate: parsedResult.candidateInfo,
+              totalCandidates: parsedResult.totalCandidates,
+              message:
+                "成功点击候选人" +
+                (parsedResult.byIndex ? "（通过索引）" : "") +
+                ": " +
+                parsedResult.candidateInfo.name,
+              mcpBackend,
+            };
+          } else {
+            return {
+              success: false,
+              error: "无法标记目标元素",
+              details: markData,
+              candidateInfo: parsedResult.candidateInfo,
+              mcpBackend,
+            };
+          }
+        } catch (clickError) {
+          console.error("Failed to click candidate:", clickError);
           return {
             success: false,
-            error: "Script execution returned undefined",
-            rawResult: resultText,
-          };
-        } catch (e) {
-          console.error("Failed to parse result:", e);
-          return {
-            success: false,
-            error: "Failed to parse script result",
-            rawResult: resultText,
+            error: "点击操作失败",
+            details: clickError instanceof Error ? clickError.message : "未知错误",
+            candidateInfo: parsedResult.candidateInfo,
+            mcpBackend,
           };
         }
       }
 
-      return {
-        success: false,
-        error: "Unexpected result format",
-        rawResult: result,
-      };
+      return { ...parsedResult, mcpBackend };
     } catch (error) {
       console.error("Failed to open candidate chat:", error);
+      const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
         message: "打开候选人聊天失败",
+        mcpBackend,
       };
     }
   },

@@ -86,16 +86,10 @@ export function PuppeteerToolMessage(props: ToolMessageProps) {
   if (action === "screenshot") {
     return (
       <ScreenshotToolMessage
+        {...props}
         icon={Icon}
         label={label}
         theme={themes.purple}
-        state={state}
-        input={input}
-        output={output}
-        isLatestMessage={isLatestMessage}
-        status={status}
-        messageId={messageId}
-        partIndex={partIndex}
         imageFormat="png"
       />
     );

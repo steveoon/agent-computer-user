@@ -5,11 +5,11 @@
  *
  * 架构说明:
  * 这是一个确定性的顺序管道，不是代理工作流：
- *   分类 (generateObject) → 构建上下文 → 生成回复 (generateText)
+ *   分类 → 构建上下文 → 生成回复 (generateText)
  *
  * 不使用 ToolLoopAgent，因为：
  * 1. 流程是确定的，不需要 LLM 决定调用哪个工具
- * 2. generateObject 对结构化输出支持更好（自动传递 enum 约束）
+ * 2. generateText 对结构化输出支持更好（自动传递 enum 约束）
  * 3. 简单的函数组合比 Agent 抽象更易于调试
  *
  * 核心价值:
@@ -102,7 +102,7 @@ export async function generateSmartReply(
 
   const providerConfigs = modelConfig?.providerConfigs || DEFAULT_PROVIDER_CONFIGS;
 
-  // Step 1: 分类（使用 generateObject）
+  // Step 1: 分类
   const brandData = {
     city: configData.city,
     defaultBrand: configData.defaultBrand || Object.keys(configData.brands)[0] || "",

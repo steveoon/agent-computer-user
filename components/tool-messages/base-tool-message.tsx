@@ -16,7 +16,7 @@ import type { ToolPartState } from "@/types/tool-common";
 interface BaseToolMessageProps {
   icon: LucideIcon;
   label: string;
-  detail?: string;
+  detail?: React.ReactNode;
   theme: ToolTheme;
   state: ToolPartState;
   output?: unknown;

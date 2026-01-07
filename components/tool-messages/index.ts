@@ -41,6 +41,7 @@ import { DulidayInterviewBookingToolMessage } from "./duliday-interview-booking-
 import { DulidayBiReportToolMessage } from "./duliday-bi-report-tool";
 import { DulidayBiRefreshTool } from "./duliday-bi-refresh-tool";
 import { AnalyzeScreenshotToolMessage } from "./analyze-screenshot-tool";
+import { ScreenshotToolMessage } from "./screenshot-tool-message";
 import { themes, type ToolConfig } from "./types";
 
 // 工具注册表
@@ -198,6 +199,11 @@ export const toolRegistry: Record<string, ToolConfig> = {
     icon: Eye,
     defaultTheme: themes.purple,
     render: AnalyzeScreenshotToolMessage,
+  },
+  screenshot: {
+    icon: Camera,
+    defaultTheme: themes.zinc,
+    render: ScreenshotToolMessage,
   },
 };
 

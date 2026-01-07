@@ -401,12 +401,33 @@ start_chrome() {
     )
 
     # 启动 Chrome
+    # 使用 open -a 命令启动（macOS 原生方式）
+    # 这样可以保留原生 UI 功能（如文件选择对话框）
     log_step "启动 Chrome (端口: $chrome_port)..."
-    "$chrome_exec" "${chrome_args[@]}" > "$LOGS_DIR/${agent_id}-chrome.log" 2>&1 &
-    local chrome_pid=$!
+    local chrome_pid=""
 
-    # 保存 Chrome PID
-    echo "$chrome_pid" > "$PIDS_DIR/${agent_id}-chrome.pid"
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS: 使用 open 命令，保留原生 UI 功能
+        open -na "Google Chrome" --args "${chrome_args[@]}"
+
+        # open 命令立即返回，需要等待并查找 Chrome 进程
+        sleep 2
+        # 通过 user-data-dir 参数查找对应的 Chrome 进程
+        chrome_pid=$(pgrep -f "user-data-dir=$user_data_dir" | head -1)
+
+        if [[ -z "$chrome_pid" ]]; then
+            log_warn "无法获取 Chrome PID，使用端口检测替代"
+        fi
+    else
+        # Linux/其他: 直接启动
+        "$chrome_exec" "${chrome_args[@]}" > "$LOGS_DIR/${agent_id}-chrome.log" 2>&1 &
+        chrome_pid=$!
+    fi
+
+    # 保存 Chrome PID（如果获取到）
+    if [[ -n "$chrome_pid" ]]; then
+        echo "$chrome_pid" > "$PIDS_DIR/${agent_id}-chrome.pid"
+    fi
 
     # 等待 Chrome 就绪
     local timeout=$CHROME_STARTUP_TIMEOUT
@@ -420,7 +441,11 @@ start_chrome() {
         fi
     done
 
-    log_success "Chrome 已就绪 (PID: $chrome_pid)"
+    if [[ -n "$chrome_pid" ]]; then
+        log_success "Chrome 已就绪 (PID: $chrome_pid)"
+    else
+        log_success "Chrome 已就绪 (端口: $chrome_port)"
+    fi
     return 0
 }
 
@@ -603,55 +628,82 @@ cmd_stop() {
     fi
 
     # 停止 Chrome (优雅关闭以保护 IndexedDB)
+    local agent=$(jq -c ".agents[] | select(.id == \"$target_id\")" "$CONFIG_FILE" 2>/dev/null)
+    local chrome_port=$(echo "$agent" | jq -r '.chromePort' 2>/dev/null)
+    local user_data_dir=$(echo "$agent" | jq -r '.userDataDir' 2>/dev/null)
+
+    # 尝试从 PID 文件获取 Chrome PID
+    local chrome_pid=""
     if [[ -f "$PIDS_DIR/${target_id}-chrome.pid" ]]; then
-        local chrome_pid=$(cat "$PIDS_DIR/${target_id}-chrome.pid")
-        local agent=$(jq -c ".agents[] | select(.id == \"$target_id\")" "$CONFIG_FILE" 2>/dev/null)
-        local chrome_port=$(echo "$agent" | jq -r '.chromePort' 2>/dev/null)
-        local user_data_dir=$(echo "$agent" | jq -r '.userDataDir' 2>/dev/null)
-
-        if ps -p "$chrome_pid" > /dev/null 2>&1; then
-            log_step "停止 Chrome (PID: $chrome_pid)..."
-
-            # 步骤1: 尝试通过 DevTools Protocol 优雅关闭 (给 IndexedDB 时间刷盘)
-            if [[ -n "$chrome_port" && "$chrome_port" != "null" ]]; then
-                log_info "  尝试通过 DevTools Protocol 优雅关闭..."
-                curl -s "http://localhost:$chrome_port/json/close" > /dev/null 2>&1 || true
-                sleep 1
-            fi
-
-            # 步骤2: 发送 SIGTERM 信号 (允许进程清理)
-            kill -TERM "$chrome_pid" 2>/dev/null || true
-
-            # 步骤3: 等待更长时间让 Chrome 完成 IndexedDB 写入
-            local wait_count=0
-            while ps -p "$chrome_pid" > /dev/null 2>&1 && (( wait_count < CHROME_GRACEFUL_WAIT_TIME )); do
-                sleep 1
-                ((wait_count++))
-                log_info "  等待 Chrome 优雅关闭... ($wait_count/$CHROME_GRACEFUL_WAIT_TIME)"
-            done
-
-            # 步骤4: 如果还活着，强制终止所有相关进程
-            if ps -p "$chrome_pid" > /dev/null 2>&1; then
-                log_warn "  Chrome 未响应 SIGTERM，强制终止..."
-                # 杀死主进程及其所有子进程
-                pkill -9 -P "$chrome_pid" 2>/dev/null || true
-                kill -9 "$chrome_pid" 2>/dev/null || true
-            fi
-
-            # 步骤5: 清理可能残留的 Chrome 进程 (使用 user-data-dir 匹配)
-            if [[ -n "$user_data_dir" && "$user_data_dir" != "null" ]]; then
-                local stale_pids=$(pgrep -f "user-data-dir=$user_data_dir" 2>/dev/null || true)
-                if [[ -n "$stale_pids" ]]; then
-                    log_warn "  清理残留 Chrome 进程: $stale_pids"
-                    echo "$stale_pids" | xargs kill -9 2>/dev/null || true
-                fi
-            fi
-
-            # 步骤6: 等待文件锁完全释放
-            sleep "$CHROME_FORCE_WAIT_TIME"
-        fi
-        rm -f "$PIDS_DIR/${target_id}-chrome.pid"
+        chrome_pid=$(cat "$PIDS_DIR/${target_id}-chrome.pid")
     fi
+
+    # 如果 PID 无效，尝试通过 user-data-dir 查找
+    local need_find_chrome=false
+    if [[ -z "$chrome_pid" ]]; then
+        need_find_chrome=true
+    elif ! ps -p "$chrome_pid" > /dev/null 2>&1; then
+        need_find_chrome=true
+    fi
+
+    if [[ "$need_find_chrome" == "true" ]] && [[ -n "$user_data_dir" && "$user_data_dir" != "null" ]]; then
+        chrome_pid=$(pgrep -f "user-data-dir=$user_data_dir" 2>/dev/null | head -1 || true)
+    fi
+
+    if [[ -n "$chrome_pid" ]] && ps -p "$chrome_pid" > /dev/null 2>&1; then
+        log_step "停止 Chrome (PID: $chrome_pid)..."
+
+        # 步骤1: 通过 DevTools Protocol 关闭所有标签页 (触发 IndexedDB 刷盘)
+        if [[ -n "$chrome_port" && "$chrome_port" != "null" ]]; then
+            log_info "  关闭所有标签页以触发 IndexedDB 刷盘..."
+            local targets=$(curl -s "http://localhost:$chrome_port/json" 2>/dev/null || echo "[]")
+            local target_count=$(echo "$targets" | jq -r 'length' 2>/dev/null || echo "0")
+
+            if [[ "$target_count" -gt 0 ]]; then
+                log_info "  发现 $target_count 个标签页，逐个关闭..."
+                for tab_id in $(echo "$targets" | jq -r '.[].id' 2>/dev/null); do
+                    curl -s "http://localhost:$chrome_port/json/close/$tab_id" > /dev/null 2>&1 || true
+                done
+                # 等待 IndexedDB 完成刷盘
+                log_info "  等待 IndexedDB 刷盘完成..."
+                sleep 2
+            fi
+        fi
+
+        # 步骤2: 发送 SIGTERM 信号 (允许进程清理)
+        kill -TERM "$chrome_pid" 2>/dev/null || true
+
+        # 步骤3: 等待更长时间让 Chrome 完成 IndexedDB 写入
+        local wait_count=0
+        while ps -p "$chrome_pid" > /dev/null 2>&1 && (( wait_count < CHROME_GRACEFUL_WAIT_TIME )); do
+            sleep 1
+            ((wait_count++))
+            log_info "  等待 Chrome 优雅关闭... ($wait_count/$CHROME_GRACEFUL_WAIT_TIME)"
+        done
+
+        # 步骤4: 如果还活着，强制终止所有相关进程
+        if ps -p "$chrome_pid" > /dev/null 2>&1; then
+            log_warn "  Chrome 未响应 SIGTERM，强制终止..."
+            # 杀死主进程及其所有子进程
+            pkill -9 -P "$chrome_pid" 2>/dev/null || true
+            kill -9 "$chrome_pid" 2>/dev/null || true
+        fi
+
+        # 步骤5: 清理可能残留的 Chrome 进程 (使用 user-data-dir 匹配)
+        if [[ -n "$user_data_dir" && "$user_data_dir" != "null" ]]; then
+            local stale_pids=$(pgrep -f "user-data-dir=$user_data_dir" 2>/dev/null || true)
+            if [[ -n "$stale_pids" ]]; then
+                log_warn "  清理残留 Chrome 进程: $stale_pids"
+                echo "$stale_pids" | xargs kill -9 2>/dev/null || true
+            fi
+        fi
+
+        # 步骤6: 等待文件锁完全释放
+        sleep "$CHROME_FORCE_WAIT_TIME"
+    fi
+
+    # 清理 PID 文件
+    rm -f "$PIDS_DIR/${target_id}-chrome.pid"
 
     log_success "Agent $target_id 已停止"
 }

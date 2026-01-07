@@ -1,22 +1,34 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
 import { UNREAD_SELECTORS } from "./constants";
-import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
+import { getPuppeteerMCPClient, getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
 import {
   generateBatchProcessingScript,
   wrapAntiDetectionScript,
   performInitialScrollPattern,
   performRandomScroll,
 } from "./anti-detection-utils";
+import {
+  selectZhipinTab,
+  parsePlaywrightResult,
+  wrapPlaywrightScript,
+  generatePlaywrightBatchScript,
+  type TabSelectionResult,
+} from "@/lib/tools/shared/playwright-utils";
+
+// Feature flag: 使用 Playwright MCP 而非 Puppeteer MCP
+// 设置环境变量 USE_PLAYWRIGHT_MCP=true 启用
+const USE_PLAYWRIGHT_MCP = process.env.USE_PLAYWRIGHT_MCP === "true";
 
 export const getUnreadCandidatesImprovedTool = tool({
   description: `获取当前聊天列表中所有未读候选人的改进版
-  
+
   改进特性：
   - 使用更精确的选择器查找名字元素
   - 更准确的未读状态检测
   - 返回更详细的候选人信息
   - 支持过滤和排序选项
+  ${USE_PLAYWRIGHT_MCP ? "- [Playwright] 支持自动切换到直聘标签页" : ""}
   `,
 
   inputSchema: z.object({
@@ -31,6 +43,13 @@ export const getUnreadCandidatesImprovedTool = tool({
     onlyUnread: z.boolean().optional().default(false).describe("是否只返回有未读消息的候选人"),
 
     sortBy: z.enum(["time", "unreadCount", "name"]).optional().default("time").describe("排序方式"),
+
+    // Playwright 专属参数
+    autoSwitchTab: z
+      .boolean()
+      .optional()
+      .default(true)
+      .describe("是否自动切换到直聘标签页（仅 Playwright 模式有效）"),
   }),
 
   execute: async ({
@@ -38,9 +57,33 @@ export const getUnreadCandidatesImprovedTool = tool({
     max,
     onlyUnread = false,
     sortBy = "time",
+    autoSwitchTab = true,
   }) => {
     try {
-      const client = await getPuppeteerMCPClient();
+      // Playwright 模式: 自动切换到直聘标签页
+      if (USE_PLAYWRIGHT_MCP && autoSwitchTab) {
+        console.log("[Playwright] 正在切换到直聘标签页...");
+        const tabResult: TabSelectionResult = await selectZhipinTab();
+
+        if (!tabResult.success) {
+          return {
+            success: false,
+            candidates: [],
+            count: 0,
+            error: `无法切换到直聘标签页: ${tabResult.error}`,
+            availableTabs: tabResult.availableTabs,
+            message: "请确保已在浏览器中打开 BOSS 直聘页面",
+            mcpBackend: "playwright" as const,
+          };
+        }
+
+        console.log(`[Playwright] 已切换到: ${tabResult.tab?.title} (${tabResult.tab?.url})`);
+      }
+
+      // 获取适当的 MCP 客户端
+      const client = USE_PLAYWRIGHT_MCP
+        ? await getPlaywrightMCPClient()
+        : await getPuppeteerMCPClient();
 
       // 在获取候选人列表前执行初始滚动模式
       await performInitialScrollPattern(client);
@@ -116,65 +159,130 @@ export const getUnreadCandidatesImprovedTool = tool({
         }
       `;
 
-      const script = wrapAntiDetectionScript(`
-        const selector = '${selector}';
-        const max = ${max || "null"};
-        const onlyUnread = ${onlyUnread};
-        const sortBy = '${sortBy}';
-        
-        // 获取所有候选人项
-        const elements = Array.from(document.querySelectorAll(selector));
-        
-        ${generateBatchProcessingScript(processingLogic, 5)}
-        
-        // 执行分批处理
-        const candidates = await processAllBatches(elements);
-        
-        // 排序
-        if (sortBy === 'unreadCount') {
-          candidates.sort((a, b) => b.unreadCount - a.unreadCount);
-        } else if (sortBy === 'name') {
-          candidates.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
-        }
-        
-        // 限制数量
-        const finalCandidates = max ? candidates.slice(0, max) : candidates;
-        
-        // 统计信息
-        const stats = {
-          total: elements.length,
-          withName: candidates.length,
-          withUnread: candidates.filter(c => c.hasUnread).length,
-          returned: finalCandidates.length
-        };
-        
-        // 返回结果对象
-        return {
-          success: true,
-          candidates: finalCandidates,
-          count: finalCandidates.length,
-          stats: stats,
-          selector: selector,
-          filters: {
-            onlyUnread: onlyUnread,
-            sortBy: sortBy,
-            max: max
+      // 根据 MCP 类型生成不同的脚本
+      // Playwright MCP 对脚本序列化有严格要求，需要使用简化版本
+      const script = USE_PLAYWRIGHT_MCP
+        ? wrapPlaywrightScript(`
+          const selector = '${selector}';
+          const max = ${max || "null"};
+          const onlyUnread = ${onlyUnread};
+          const sortBy = '${sortBy}';
+
+          // 获取所有候选人项
+          const elements = Array.from(document.querySelectorAll(selector));
+
+          ${generatePlaywrightBatchScript(processingLogic)}
+
+          // 同步执行处理
+          const candidates = processAllElements(elements);
+
+          // 排序
+          if (sortBy === 'unreadCount') {
+            candidates.sort((a, b) => b.unreadCount - a.unreadCount);
+          } else if (sortBy === 'name') {
+            candidates.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+          } else if (sortBy === 'time') {
+            candidates.sort((a, b) => {
+              const timeA = a.time.replace(':', '');
+              const timeB = b.time.replace(':', '');
+              return timeB.localeCompare(timeA);
+            });
           }
-        };
-      `);
+
+          const finalCandidates = max ? candidates.slice(0, max) : candidates;
+
+          const stats = {
+            total: elements.length,
+            withName: candidates.length,
+            withUnread: candidates.filter(c => c.hasUnread).length,
+            returned: finalCandidates.length
+          };
+
+          return {
+            success: true,
+            candidates: finalCandidates,
+            count: finalCandidates.length,
+            stats: stats,
+            selector: selector,
+            filters: { onlyUnread, sortBy, max }
+          };
+        `)
+        : wrapAntiDetectionScript(`
+          const selector = '${selector}';
+          const max = ${max || "null"};
+          const onlyUnread = ${onlyUnread};
+          const sortBy = '${sortBy}';
+
+          // 获取所有候选人项
+          const elements = Array.from(document.querySelectorAll(selector));
+
+          ${generateBatchProcessingScript(processingLogic, 5)}
+
+          // 执行分批处理
+          const candidates = await processAllBatches(elements);
+
+          // 排序
+          if (sortBy === 'unreadCount') {
+            candidates.sort((a, b) => b.unreadCount - a.unreadCount);
+          } else if (sortBy === 'name') {
+            candidates.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+          }
+
+          // 限制数量
+          const finalCandidates = max ? candidates.slice(0, max) : candidates;
+
+          // 统计信息
+          const stats = {
+            total: elements.length,
+            withName: candidates.length,
+            withUnread: candidates.filter(c => c.hasUnread).length,
+            returned: finalCandidates.length
+          };
+
+          // 返回结果对象
+          return {
+            success: true,
+            candidates: finalCandidates,
+            count: finalCandidates.length,
+            stats: stats,
+            selector: selector,
+            filters: {
+              onlyUnread: onlyUnread,
+              sortBy: sortBy,
+              max: max
+            }
+          };
+        `);
 
       // 执行脚本
       const tools = await client.tools();
-      const toolName = "puppeteer_evaluate";
+
+      // 根据 MCP 类型选择工具名称
+      const toolName = USE_PLAYWRIGHT_MCP ? "browser_evaluate" : "puppeteer_evaluate";
 
       if (!tools[toolName]) {
-        throw new Error(`MCP tool ${toolName} not available`);
+        throw new Error(
+          `MCP tool ${toolName} not available. ${
+            USE_PLAYWRIGHT_MCP
+              ? "请确保 Playwright MCP 正在运行且已连接浏览器。"
+              : "请确保 Puppeteer MCP 正在运行。"
+          }`
+        );
       }
 
-      const tool = tools[toolName];
+      const mcpTool = tools[toolName];
 
       // 执行脚本
-      const result = await tool.execute({ script });
+      console.log(`[${USE_PLAYWRIGHT_MCP ? "Playwright" : "Puppeteer"}] 正在执行脚本...`);
+      // Playwright MCP 使用 "function" 参数名，Puppeteer MCP 使用 "script" 参数名
+      const executeParams = USE_PLAYWRIGHT_MCP ? { function: script } : { script };
+      const result = await mcpTool.execute(executeParams);
+
+            // 调试日志：查看脚本执行结果
+
+            // console.log(`[${USE_PLAYWRIGHT_MCP ? "Playwright" : "Puppeteer"}] 脚本 执行结果:`, JSON.stringify(result, null, 2));
+
+            console.log(`[${USE_PLAYWRIGHT_MCP ? "Playwright" : "Puppeteer"}] 脚本执行完成`);
 
       // 在获取结果后再执行一次随机滚动
       await performRandomScroll(client, {
@@ -184,7 +292,35 @@ export const getUnreadCandidatesImprovedTool = tool({
         direction: "both",
       });
 
-      // 解析结果
+      // 根据 MCP 类型解析结果
+      if (USE_PLAYWRIGHT_MCP) {
+        // Playwright MCP 结果解析
+        const parsedResult = parsePlaywrightResult(result);
+
+        if (parsedResult && typeof parsedResult === "object") {
+          const resultObj = parsedResult as Record<string, unknown>;
+          if (resultObj.success !== undefined) {
+            return {
+              ...resultObj,
+              message: resultObj.success
+                ? `成功获取 ${resultObj.count} 个候选人 (Playwright)`
+                : "获取候选人失败",
+              mcpBackend: "playwright",
+            };
+          }
+        }
+
+        return {
+          success: false,
+          candidates: [],
+          count: 0,
+          error: "Playwright result parsing failed",
+          rawResult: parsedResult,
+          mcpBackend: "playwright",
+        };
+      }
+
+      // Puppeteer MCP 结果解析（保持原有逻辑）
       const mcpResult = result as { content?: Array<{ text?: string }> };
       if (mcpResult?.content?.[0]?.text) {
         const resultText = mcpResult.content[0].text;
@@ -205,6 +341,7 @@ export const getUnreadCandidatesImprovedTool = tool({
               message: parsedResult.success
                 ? `成功获取 ${parsedResult.count} 个候选人 (总计: ${parsedResult.stats.total}, 有名字: ${parsedResult.stats.withName}, 未读: ${parsedResult.stats.withUnread})`
                 : "获取候选人失败",
+              mcpBackend: "puppeteer",
             };
           }
 
@@ -216,6 +353,7 @@ export const getUnreadCandidatesImprovedTool = tool({
             count: 0,
             error: "Script execution returned undefined",
             rawResult: resultText,
+            mcpBackend: "puppeteer",
           };
         } catch (e) {
           console.error("Failed to parse script result:", e);
@@ -230,6 +368,7 @@ export const getUnreadCandidatesImprovedTool = tool({
                 message: parsedResult.success
                   ? `成功获取 ${parsedResult.count} 个候选人`
                   : "获取候选人失败",
+                mcpBackend: "puppeteer",
               };
             }
           } catch {
@@ -242,6 +381,7 @@ export const getUnreadCandidatesImprovedTool = tool({
             count: 0,
             error: "Failed to parse result: " + e,
             rawResult: resultText,
+            mcpBackend: "puppeteer",
           };
         }
       }
@@ -251,6 +391,7 @@ export const getUnreadCandidatesImprovedTool = tool({
         candidates: [],
         count: 0,
         error: "Unexpected result format",
+        mcpBackend: USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer",
       };
     } catch (error) {
       console.error("Failed to get unread candidates:", error);
@@ -261,6 +402,7 @@ export const getUnreadCandidatesImprovedTool = tool({
         count: 0,
         error: error instanceof Error ? error.message : "Unknown error occurred",
         message: "获取未读候选人时发生错误",
+        mcpBackend: USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer",
       };
     }
   },
