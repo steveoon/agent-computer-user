@@ -10,6 +10,7 @@ import { getDb } from "@/db";
 import { recruitmentEvents } from "@/db/schema";
 import type { RecruitmentEventTypeValue } from "@/db/types";
 import { recruitmentStatsRepository } from "@/lib/services/recruitment-stats";
+import { toBeijingMidnight, toBeijingDayEnd } from "@/lib/utils/beijing-timezone";
 
 /**
  * Use Drizzle's native type inference for database operations
@@ -268,15 +269,20 @@ class RecruitmentEventsRepository {
   async getDistinctEventDates(agentId: string): Promise<Date[]> {
     const result = await withRetry(async () => {
       const db = getDb();
+      // 使用 date_trunc 获取北京时间当天0点对应的 UTC 时间
+      // PostgreSQL 数据库时区已设为 Asia/Shanghai
+      // 注意：ORDER BY 表达式必须和 SELECT DISTINCT 完全一致
+      const dateExpr = sql<Date>`date_trunc('day', ${recruitmentEvents.eventTime} AT TIME ZONE 'Asia/Shanghai') AT TIME ZONE 'Asia/Shanghai'`;
       return db
         .selectDistinct({
-          date: sql<Date>`DATE(${recruitmentEvents.eventTime})`,
+          date: dateExpr,
         })
         .from(recruitmentEvents)
         .where(eq(recruitmentEvents.agentId, agentId))
-        .orderBy(sql`DATE(${recruitmentEvents.eventTime})`);
+        .orderBy(dateExpr);
     }, "getDistinctEventDates");
 
+    // 结果已经是正确的 UTC 时间戳（北京时间0点对应的UTC时间）
     return result?.map(r => new Date(r.date)) ?? [];
   }
 
@@ -289,10 +295,9 @@ class RecruitmentEventsRepository {
     agentId: string,
     date: Date
   ): Promise<{ brandId: number | null; jobId: number | null }[]> {
-    const dayStart = new Date(date);
-    dayStart.setUTCHours(0, 0, 0, 0);
-    const dayEnd = new Date(dayStart);
-    dayEnd.setUTCHours(23, 59, 59, 999);
+    // 使用北京时间边界
+    const dayStart = toBeijingMidnight(date);
+    const dayEnd = toBeijingDayEnd(dayStart);
 
     const result = await withRetry(async () => {
       const db = getDb();

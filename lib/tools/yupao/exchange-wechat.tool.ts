@@ -9,7 +9,7 @@ import {
 } from "../zhipin/anti-detection-utils";
 import { createDynamicClassSelector } from "./dynamic-selector-utils";
 import { parseEvaluateResult } from "../shared/puppeteer-utils";
-import { SourcePlatform } from "@/db/types";
+import { SourcePlatform, WechatExchangeType } from "@/db/types";
 import { recordWechatExchangedEvent } from "@/lib/services/recruitment-event";
 import {
   selectYupaoTab,
@@ -256,7 +256,7 @@ export const yupaoExchangeWechatTool = () =>
             // 静默处理错误
           }
 
-          // 📊 埋点：记录微信交换事件（同意对方请求的情况）
+          // 📊 埋点：记录微信交换事件（同意对方请求的情况 → ACCEPTED，立即成功）
           if (candidateName) {
             recordWechatExchangedEvent({
               platform: SourcePlatform.YUPAO,
@@ -270,6 +270,7 @@ export const yupaoExchangeWechatTool = () =>
               },
               jobInfo: { jobId, jobName },
               wechatNumber,
+              exchangeType: WechatExchangeType.ACCEPTED,
             });
           } else {
             console.warn(
@@ -706,7 +707,7 @@ export const yupaoExchangeWechatTool = () =>
           // 静默处理错误，微信号提取失败不影响主流程
         }
 
-        // 📊 埋点：记录微信交换事件（fire-and-forget）
+        // 📊 埋点：记录微信交换事件（主动发起请求 → REQUESTED，对方可能不同意）
         if (candidateName) {
           recordWechatExchangedEvent({
             platform: SourcePlatform.YUPAO,
@@ -720,6 +721,7 @@ export const yupaoExchangeWechatTool = () =>
             },
             jobInfo: { jobId, jobName },
             wechatNumber,
+            exchangeType: WechatExchangeType.REQUESTED,
           });
         } else {
           console.warn(

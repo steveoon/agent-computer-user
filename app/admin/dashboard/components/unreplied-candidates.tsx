@@ -184,9 +184,10 @@ export function UnrepliedCandidates() {
             ref={contentRef}
             className="flex items-center gap-2"
             style={{
-              animation: needsMarquee
-                ? `marquee ${animationDuration}s linear infinite`
-                : "none",
+              animationName: needsMarquee ? "marquee" : "none",
+              animationDuration: needsMarquee ? `${animationDuration}s` : undefined,
+              animationTimingFunction: needsMarquee ? "linear" : undefined,
+              animationIterationCount: needsMarquee ? "infinite" : undefined,
               animationPlayState: isPaused ? "paused" : "running",
               width: needsMarquee ? "max-content" : "auto",
             }}

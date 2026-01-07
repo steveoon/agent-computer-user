@@ -25,6 +25,7 @@ import {
   generateCandidateKey,
   generateSessionId,
   type SourcePlatformValue,
+  type WechatExchangeTypeValue,
 } from "@/db/types";
 import { recruitmentEventService } from "./service";
 import { recruitmentContext } from "./context";
@@ -76,6 +77,8 @@ export interface RecordWechatExchangedParams {
   jobInfo?: JobInfo;
   /** WeChat number if captured */
   wechatNumber?: string;
+  /** Exchange type: requested/accepted/completed */
+  exchangeType?: WechatExchangeTypeValue;
 }
 
 /**
@@ -172,7 +175,7 @@ export async function recordMessageSentEvent(
 export async function recordWechatExchangedEvent(
   params: RecordWechatExchangedParams
 ): Promise<void> {
-  const { platform, candidate, jobInfo, wechatNumber } = params;
+  const { platform, candidate, jobInfo, wechatNumber, exchangeType } = params;
 
   const ctx = recruitmentContext.getContext();
   if (!ctx || !candidate.name) {
@@ -208,11 +211,11 @@ export async function recordWechatExchangedEvent(
     }
 
     // Record event (fire-and-forget)
-    const event = builder.wechatExchanged(wechatNumber);
+    const event = builder.wechatExchanged(wechatNumber, exchangeType);
     recruitmentEventService.recordAsync(event);
 
     console.log(
-      `${LOG_PREFIX} Recorded wechat_exchanged for: ${candidate.name} (${platform})${wechatNumber ? `, wechat: ${wechatNumber}` : ""}`
+      `${LOG_PREFIX} Recorded wechat_exchanged for: ${candidate.name} (${platform}, type: ${exchangeType || "unknown"})${wechatNumber ? `, wechat: ${wechatNumber}` : ""}`
     );
   } catch (error) {
     console.error(`${LOG_PREFIX} Failed to record wechat_exchanged:`, error);

@@ -8,6 +8,7 @@
 import { eq, and, gte, lte, sql, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { recruitmentDailyStats } from "@/db/schema";
+import { toBeijingMidnight } from "@/lib/utils/beijing-timezone";
 import type { DirtyRecord, DailyStatsRecord } from "./types";
 
 const LOG_PREFIX = "[RecruitmentStats][Repository]";
@@ -57,14 +58,6 @@ async function withRetry<T>(operation: () => Promise<T>, operationName: string):
   return null;
 }
 
-/**
- * 将日期标准化为当天 0 点（UTC）
- */
-function normalizeToStartOfDay(date: Date): Date {
-  const normalized = new Date(date);
-  normalized.setUTCHours(0, 0, 0, 0);
-  return normalized;
-}
 
 /**
  * 计算百分比率（结果 * 100，如 85.5% = 8550）
@@ -72,29 +65,6 @@ function normalizeToStartOfDay(date: Date): Date {
 function calculateRate(numerator: number, denominator: number): number | null {
   if (denominator === 0) return null;
   return Math.round((numerator / denominator) * 10000);
-}
-
-/**
- * 构建维度查询条件（正确处理 NULL）
- *
- * PostgreSQL 中 NULL ≠ NULL，需要使用 IS NULL 来比较
- */
-function buildDimensionConditions(
-  agentId: string,
-  statDate: Date,
-  brandId: number | null | undefined,
-  jobId: number | null | undefined
-) {
-  return [
-    eq(recruitmentDailyStats.agentId, agentId),
-    eq(recruitmentDailyStats.statDate, statDate),
-    brandId === null || brandId === undefined
-      ? isNull(recruitmentDailyStats.brandId)
-      : eq(recruitmentDailyStats.brandId, brandId),
-    jobId === null || jobId === undefined
-      ? isNull(recruitmentDailyStats.jobId)
-      : eq(recruitmentDailyStats.jobId, jobId),
-  ];
 }
 
 class RecruitmentStatsRepository {
@@ -138,57 +108,43 @@ class RecruitmentStatsRepository {
     brandId?: number | null,
     jobId?: number | null
   ): Promise<void> {
-    const statDate = normalizeToStartOfDay(date);
+    const statDate = toBeijingMidnight(date);
     const normalizedBrandId = brandId ?? null;
     const normalizedJobId = jobId ?? null;
 
     await withRetry(async () => {
       const db = getDb();
+      // 转换 Date 为 ISO 字符串，避免原生 SQL 参数类型错误
+      const statDateStr = statDate.toISOString();
+      const nowStr = new Date().toISOString();
 
-      await db.transaction(async tx => {
-        // 1. 查找现有记录（正确处理 NULL）
-        const existing = await tx
-          .select({ id: recruitmentDailyStats.id })
-          .from(recruitmentDailyStats)
-          .where(
-            and(...buildDimensionConditions(agentId, statDate, normalizedBrandId, normalizedJobId))
-          )
-          .limit(1);
-
-        if (existing.length > 0) {
-          // 2a. 更新现有记录
-          await tx
-            .update(recruitmentDailyStats)
-            .set({ isDirty: true, updatedAt: new Date() })
-            .where(eq(recruitmentDailyStats.id, existing[0].id));
-        } else {
-          // 2b. 插入新记录
-          await tx.insert(recruitmentDailyStats).values({
-            agentId,
-            statDate,
-            brandId: normalizedBrandId,
-            jobId: normalizedJobId,
-            isDirty: true,
-            // 初始化为 0，等待聚合填充
-            totalEvents: 0,
-            uniqueCandidates: 0,
-            uniqueSessions: 0,
-            // 入站漏斗
-            messagesSent: 0,
-            messagesReceived: 0,
-            inboundCandidates: 0,
-            candidatesReplied: 0,
-            unreadReplied: 0,
-            // 出站漏斗
-            proactiveOutreach: 0,
-            proactiveResponded: 0,
-            // 转化指标
-            wechatExchanged: 0,
-            interviewsBooked: 0,
-            candidatesHired: 0,
-          });
-        }
-      });
+      // 使用原生 SQL 实现 ON CONFLICT DO UPDATE
+      // 如果记录存在则标记为脏，否则插入新记录（初始化为 0）
+      await db.execute(sql`
+        INSERT INTO app_huajune.recruitment_daily_stats (
+          agent_id, stat_date, brand_id, job_id,
+          is_dirty,
+          total_events, unique_candidates, unique_sessions,
+          messages_sent, messages_received, inbound_candidates,
+          candidates_replied, unread_replied,
+          proactive_outreach, proactive_responded,
+          wechat_exchanged, interviews_booked, candidates_hired,
+          created_at, updated_at
+        ) VALUES (
+          ${agentId}, ${statDateStr}::timestamptz, ${normalizedBrandId}, ${normalizedJobId},
+          true,
+          0, 0, 0,
+          0, 0, 0,
+          0, 0,
+          0, 0,
+          0, 0, 0,
+          ${nowStr}::timestamp, ${nowStr}::timestamp
+        )
+        ON CONFLICT (agent_id, stat_date, COALESCE(brand_id, -1), COALESCE(job_id, -1))
+        DO UPDATE SET
+          is_dirty = true,
+          updated_at = EXCLUDED.updated_at
+      `);
 
       console.log(
         `${LOG_PREFIX} Marked dirty: ${agentId} @ ${statDate.toISOString().split("T")[0]}`
@@ -199,88 +155,62 @@ class RecruitmentStatsRepository {
   /**
    * 更新/插入聚合统计
    *
-   * 使用显式 SELECT + UPDATE/INSERT 模式，正确处理 NULL 值比较
+   * 使用 PostgreSQL ON CONFLICT DO UPDATE 实现原子 upsert
+   * 依赖表达式索引: unique_daily_stats_v2 (agent_id, stat_date, COALESCE(brand_id, -1), COALESCE(job_id, -1))
    *
    * @param stats - 统计数据
    */
   async upsertStats(stats: DailyStatsRecord): Promise<void> {
     await withRetry(async () => {
       const db = getDb();
+      // 转换 Date 为 ISO 字符串，避免原生 SQL 参数类型错误
+      const statDateStr = stats.statDate.toISOString();
+      const nowStr = new Date().toISOString();
 
-      await db.transaction(async tx => {
-        // 1. 查找现有记录（正确处理 NULL）
-        const existing = await tx
-          .select({ id: recruitmentDailyStats.id })
-          .from(recruitmentDailyStats)
-          .where(
-            and(
-              ...buildDimensionConditions(stats.agentId, stats.statDate, stats.brandId, stats.jobId)
-            )
-          )
-          .limit(1);
-
-        const now = new Date();
-
-        if (existing.length > 0) {
-          // 2a. 更新现有记录
-          await tx
-            .update(recruitmentDailyStats)
-            .set({
-              totalEvents: stats.totalEvents,
-              uniqueCandidates: stats.uniqueCandidates,
-              uniqueSessions: stats.uniqueSessions,
-              // 入站漏斗
-              messagesSent: stats.messagesSent,
-              messagesReceived: stats.messagesReceived,
-              inboundCandidates: stats.inboundCandidates,
-              candidatesReplied: stats.candidatesReplied,
-              unreadReplied: stats.unreadReplied,
-              // 出站漏斗
-              proactiveOutreach: stats.proactiveOutreach,
-              proactiveResponded: stats.proactiveResponded,
-              // 转化指标
-              wechatExchanged: stats.wechatExchanged,
-              interviewsBooked: stats.interviewsBooked,
-              candidatesHired: stats.candidatesHired,
-              replyRate: stats.replyRate,
-              wechatRate: stats.wechatRate,
-              interviewRate: stats.interviewRate,
-              isDirty: false,
-              aggregatedAt: now,
-              updatedAt: now,
-            })
-            .where(eq(recruitmentDailyStats.id, existing[0].id));
-        } else {
-          // 2b. 插入新记录
-          await tx.insert(recruitmentDailyStats).values({
-            agentId: stats.agentId,
-            statDate: stats.statDate,
-            brandId: stats.brandId,
-            jobId: stats.jobId,
-            totalEvents: stats.totalEvents,
-            uniqueCandidates: stats.uniqueCandidates,
-            uniqueSessions: stats.uniqueSessions,
-            // 入站漏斗
-            messagesSent: stats.messagesSent,
-            messagesReceived: stats.messagesReceived,
-            inboundCandidates: stats.inboundCandidates,
-            candidatesReplied: stats.candidatesReplied,
-            unreadReplied: stats.unreadReplied,
-            // 出站漏斗
-            proactiveOutreach: stats.proactiveOutreach,
-            proactiveResponded: stats.proactiveResponded,
-            // 转化指标
-            wechatExchanged: stats.wechatExchanged,
-            interviewsBooked: stats.interviewsBooked,
-            candidatesHired: stats.candidatesHired,
-            replyRate: stats.replyRate,
-            wechatRate: stats.wechatRate,
-            interviewRate: stats.interviewRate,
-            isDirty: false,
-            aggregatedAt: now,
-          });
-        }
-      });
+      // 使用原生 SQL 实现 ON CONFLICT DO UPDATE
+      // 注意：ON CONFLICT 需要引用表达式索引的完整表达式
+      await db.execute(sql`
+        INSERT INTO app_huajune.recruitment_daily_stats (
+          agent_id, stat_date, brand_id, job_id,
+          total_events, unique_candidates, unique_sessions,
+          messages_sent, messages_received, inbound_candidates,
+          candidates_replied, unread_replied,
+          proactive_outreach, proactive_responded,
+          wechat_exchanged, interviews_booked, candidates_hired,
+          reply_rate, wechat_rate, interview_rate,
+          is_dirty, aggregated_at, created_at, updated_at
+        ) VALUES (
+          ${stats.agentId}, ${statDateStr}::timestamptz, ${stats.brandId}, ${stats.jobId},
+          ${stats.totalEvents}, ${stats.uniqueCandidates}, ${stats.uniqueSessions},
+          ${stats.messagesSent}, ${stats.messagesReceived}, ${stats.inboundCandidates},
+          ${stats.candidatesReplied}, ${stats.unreadReplied},
+          ${stats.proactiveOutreach}, ${stats.proactiveResponded},
+          ${stats.wechatExchanged}, ${stats.interviewsBooked}, ${stats.candidatesHired},
+          ${stats.replyRate}, ${stats.wechatRate}, ${stats.interviewRate},
+          false, ${nowStr}::timestamp, ${nowStr}::timestamp, ${nowStr}::timestamp
+        )
+        ON CONFLICT (agent_id, stat_date, COALESCE(brand_id, -1), COALESCE(job_id, -1))
+        DO UPDATE SET
+          total_events = EXCLUDED.total_events,
+          unique_candidates = EXCLUDED.unique_candidates,
+          unique_sessions = EXCLUDED.unique_sessions,
+          messages_sent = EXCLUDED.messages_sent,
+          messages_received = EXCLUDED.messages_received,
+          inbound_candidates = EXCLUDED.inbound_candidates,
+          candidates_replied = EXCLUDED.candidates_replied,
+          unread_replied = EXCLUDED.unread_replied,
+          proactive_outreach = EXCLUDED.proactive_outreach,
+          proactive_responded = EXCLUDED.proactive_responded,
+          wechat_exchanged = EXCLUDED.wechat_exchanged,
+          interviews_booked = EXCLUDED.interviews_booked,
+          candidates_hired = EXCLUDED.candidates_hired,
+          reply_rate = EXCLUDED.reply_rate,
+          wechat_rate = EXCLUDED.wechat_rate,
+          interview_rate = EXCLUDED.interview_rate,
+          is_dirty = false,
+          aggregated_at = EXCLUDED.aggregated_at,
+          updated_at = EXCLUDED.updated_at
+      `);
 
       console.log(
         `${LOG_PREFIX} Upserted stats: ${stats.agentId} @ ${stats.statDate.toISOString().split("T")[0]}`
@@ -503,4 +433,4 @@ class RecruitmentStatsRepository {
 export const recruitmentStatsRepository = new RecruitmentStatsRepository();
 
 // 导出工具函数供其他模块使用
-export { normalizeToStartOfDay, calculateRate };
+export { calculateRate };

@@ -14,7 +14,7 @@ import {
   wrapPlaywrightScript,
   type TabSelectionResult,
 } from "@/lib/tools/shared/playwright-utils";
-import { SourcePlatform } from "@/db/types";
+import { SourcePlatform, WechatExchangeType } from "@/db/types";
 import {
   recruitmentEventService,
   recruitmentContext,
@@ -615,7 +615,8 @@ export const zhipinExchangeWechatTool = () =>
             builder.forBrand(brandId);
           }
 
-          const event = builder.wechatExchanged(wechatNumber); // 传入提取的微信号
+          // zhipin 主动交换：我方发起请求，对方可能不同意，标记为 requested
+          const event = builder.wechatExchanged(wechatNumber, WechatExchangeType.REQUESTED);
           recruitmentEventService.recordAsync(event);
         }
 

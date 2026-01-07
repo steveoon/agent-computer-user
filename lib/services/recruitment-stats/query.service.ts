@@ -10,6 +10,11 @@ import { getDb } from "@/db";
 import { recruitmentEvents, dataDictionary } from "@/db/schema";
 import { getDictionaryType } from "@/db/types";
 import { recruitmentStatsRepository, calculateRate } from "./repository";
+import {
+  toBeijingMidnight,
+  toBeijingDayEnd,
+  toBeijingDateString,
+} from "@/lib/utils/beijing-timezone";
 import type {
   StatsQuery,
   AggregatedStats,
@@ -97,22 +102,16 @@ class QueryService {
     // 使用传入的结束日期，或默认为今天
     const endDateRef = referenceEndDate ?? new Date();
 
-    // 当前周期（使用 UTC 保持与 aggregation.service 一致）
-    const currentEnd = new Date(endDateRef);
-    currentEnd.setUTCHours(23, 59, 59, 999);
-
-    const currentStart = new Date(endDateRef);
-    currentStart.setUTCDate(currentStart.getUTCDate() - days + 1);
-    currentStart.setUTCHours(0, 0, 0, 0);
+    // 当前周期（使用北京时区）
+    const currentEnd = toBeijingDayEnd(endDateRef);
+    const currentStartDate = new Date(endDateRef.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+    const currentStart = toBeijingMidnight(currentStartDate);
 
     // 上一周期
-    const previousEnd = new Date(currentStart);
-    previousEnd.setUTCDate(previousEnd.getUTCDate() - 1);
-    previousEnd.setUTCHours(23, 59, 59, 999);
-
-    const previousStart = new Date(previousEnd);
-    previousStart.setUTCDate(previousStart.getUTCDate() - days + 1);
-    previousStart.setUTCHours(0, 0, 0, 0);
+    const previousEndDate = new Date(currentStart.getTime() - 1);
+    const previousEnd = toBeijingDayEnd(previousEndDate);
+    const previousStartDate = new Date(previousEnd.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+    const previousStart = toBeijingMidnight(previousStartDate);
 
     console.log(
       `${LOG_PREFIX} Dashboard summary: current=${currentStart.toISOString()}-${currentEnd.toISOString()}, previous=${previousStart.toISOString()}-${previousEnd.toISOString()}`
@@ -390,7 +389,8 @@ class QueryService {
     const dailyMap = new Map<string, DailyTrendItem>();
 
     for (const row of rawStats) {
-      const dateKey = row.statDate.toISOString().split("T")[0];
+      // 使用北京时间日期作为 key
+      const dateKey = toBeijingDateString(row.statDate);
       const existing = dailyMap.get(dateKey);
 
       if (existing) {
