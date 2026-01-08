@@ -34,18 +34,18 @@ class MCPClientManager {
     this.initializeClientConfigs();
 
     // 添加进程退出时的资源清理
-    process.on("beforeExit", async () => {
-      await this.cleanupAllResources();
-    });
+    // 注意：不使用 beforeExit 事件，因为它在 standalone 模式下可能会在事件循环
+    // 暂时空闲时被错误触发，导致 MCP 客户端被过早清理
+    // 只在收到明确的终止信号时清理资源
 
     process.on("SIGINT", async () => {
       await this.cleanupAllResources();
-      process.exit(0);
+      // 不要调用 process.exit()，让 Node.js 自然退出以确保清理完成
     });
 
     process.on("SIGTERM", async () => {
       await this.cleanupAllResources();
-      process.exit(0);
+      // 不要调用 process.exit()，让 Node.js 自然退出以确保清理完成
     });
   }
 
