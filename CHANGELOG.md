@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.23.2](https://github.com/steveoon/agent-computer-user/compare/v1.23.1...v1.23.2) (2026-01-08)
+
+
+### Bug Fixes
+
+* **mcp:** remove beforeExit handler to prevent premature cleanup ([aeb36fa](https://github.com/steveoon/agent-computer-user/commit/aeb36faddd6e8587e0aed48739a648410d23b047))
+
 ## [1.23.2-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.23.1...v1.23.2-develop.1) (2026-01-08)
 
 
