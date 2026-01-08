@@ -82,7 +82,7 @@ export namespace DulidayRaw {
       id: z.number(),
       jobBasicInfoId: z.number(),
       employmentForm: z.number(),
-      minWorkMonths: z.number(),
+      minWorkMonths: z.number().nullable(),
       temporaryEmploymentStartTime: z.string().nullable(),
       temporaryEmploymentEndTime: z.string().nullable(),
       employmentDescription: z.string().nullable(),
