@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.23.1](https://github.com/steveoon/agent-computer-user/compare/v1.23.0...v1.23.1) (2026-01-08)
+
+
+### Bug Fixes
+
+* **types:** allow minWorkMonths to be nullable in DulidayRaw schema ([e5e8062](https://github.com/steveoon/agent-computer-user/commit/e5e8062a6b46d89de977a39c0e0004ebe27f5a80))
+
 ## [1.23.1-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.23.0...v1.23.1-develop.1) (2026-01-08)
 
 
