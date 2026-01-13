@@ -2,6 +2,18 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.24.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.23.2...v1.24.0-develop.1) (2026-01-13)
+
+
+### Bug Fixes
+
+* **scripts:** improve multi-agent.sh security and reliability ([2a597e8](https://github.com/steveoon/agent-computer-user/commit/2a597e8129404ec3c7057bf21c5133121e9b2a47))
+
+
+### Features
+
+* **types:** add duliday-sync type definitions ([1eaa4ad](https://github.com/steveoon/agent-computer-user/commit/1eaa4adc2a76d290b1f39d8c74e287ca303af212))
+
 ## [1.23.2](https://github.com/steveoon/agent-computer-user/compare/v1.23.1...v1.23.2) (2026-01-08)
 
 
