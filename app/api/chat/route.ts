@@ -17,14 +17,37 @@ import { DEFAULT_PROVIDER_CONFIGS, DEFAULT_MODEL_CONFIG } from "@/lib/config/mod
 import { APPROVAL, executeBashCommandLocally } from "@/lib/utils/hitl-utils";
 import type { ChatRequestBody } from "@/types";
 import { SourcePlatform, ApiSource } from "@/db/types";
+import { parseAISDKError, toError } from "@/lib/errors/error-utils";
 import {
   recruitmentContext,
   processStepToolResults,
   type RecruitmentContext,
 } from "@/lib/services/recruitment-event";
 
-// Allow streaming responses up to 30 seconds
+// Allow streaming responses up to 5 minutes (for computer use scenarios)
 export const maxDuration = 300;
+
+// 系统提示词配置映射 - 避免重复的三元表达式和 if-else 分支
+const PROMPT_CONFIG: Record<string, { label: string; loader: () => Promise<string> }> = {
+  bossZhipinSystemPrompt: {
+    label: "Boss直聘",
+    loader: getBossZhipinSystemPrompt,
+  },
+  bossZhipinLocalSystemPrompt: {
+    label: "Boss直聘(本地版)",
+    loader: async () => {
+      const { getBossZhipinLocalSystemPrompt } = await import("@/lib/loaders/system-prompts.loader");
+      return getBossZhipinLocalSystemPrompt();
+    },
+  },
+  generalComputerSystemPrompt: {
+    label: "通用计算机",
+    loader: async () => {
+      const { getGeneralComputerSystemPrompt } = await import("@/lib/loaders/system-prompts.loader");
+      return getGeneralComputerSystemPrompt();
+    },
+  },
+};
 
 // 清理沙箱的公共函数
 async function cleanupSandboxIfNeeded(sandboxId: string | null, error: unknown, context: string) {
@@ -158,46 +181,28 @@ export async function POST(req: Request) {
       console.log(`[CHAT API] 使用模型: ${chatModel}`);
 
       // 🎯 获取系统提示词 - 根据activeSystemPrompt选择
-      let systemPrompt: string;
-      const promptType = activeSystemPrompt || "bossZhipinSystemPrompt";
+      // 区分"请求类型"和"解析后类型"，确保提示词与工具过滤一致
+      const requestedPromptType = activeSystemPrompt ?? "bossZhipinSystemPrompt";
+      const requestedConfig = PROMPT_CONFIG[requestedPromptType];
 
-      if (systemPrompts && systemPrompts[promptType]) {
-        console.log(
-          `✅ 使用客户端传入的${
-            promptType === "bossZhipinSystemPrompt"
-              ? "Boss直聘"
-              : promptType === "bossZhipinLocalSystemPrompt"
-                ? "Boss直聘(本地版)"
-                : "通用计算机"
-          }系统提示词`
-        );
-        systemPrompt = systemPrompts[promptType];
+      // 未知类型且无自定义提示词时，回落到通用计算机（保持原有行为）
+      const resolvedPromptType =
+        requestedConfig || systemPrompts?.[requestedPromptType]
+          ? requestedPromptType
+          : "generalComputerSystemPrompt";
+      const resolvedConfig = PROMPT_CONFIG[resolvedPromptType];
+
+      let systemPrompt: string;
+      if (systemPrompts?.[requestedPromptType]) {
+        const label = requestedConfig?.label ?? `自定义(${requestedPromptType})`;
+        console.log(`✅ 使用客户端传入的${label}系统提示词`);
+        systemPrompt = systemPrompts[requestedPromptType];
       } else {
-        console.log(
-          `⚠️ 使用默认${
-            promptType === "bossZhipinSystemPrompt"
-              ? "Boss直聘"
-              : promptType === "bossZhipinLocalSystemPrompt"
-                ? "Boss直聘(本地版)"
-                : "通用计算机"
-          }系统提示词（降级模式）`
-        );
-        // 降级到默认提示词
-        if (promptType === "bossZhipinSystemPrompt") {
-          systemPrompt = await getBossZhipinSystemPrompt();
-        } else if (promptType === "bossZhipinLocalSystemPrompt") {
-          // 需要导入getBossZhipinLocalSystemPrompt
-          const { getBossZhipinLocalSystemPrompt } = await import(
-            "@/lib/loaders/system-prompts.loader"
-          );
-          systemPrompt = await getBossZhipinLocalSystemPrompt();
-        } else {
-          // 需要导入getGeneralComputerSystemPrompt
-          const { getGeneralComputerSystemPrompt } = await import(
-            "@/lib/loaders/system-prompts.loader"
-          );
-          systemPrompt = await getGeneralComputerSystemPrompt();
+        if (!requestedConfig) {
+          console.warn(`⚠️ 未识别的 promptType: ${requestedPromptType}，回落到 ${resolvedPromptType}`);
         }
+        console.log(`⚠️ 使用默认${resolvedConfig.label}系统提示词（降级模式）`);
+        systemPrompt = await resolvedConfig.loader();
       }
 
       // 🎯 对历史消息应用智能Token优化 (10K tokens阈值)
@@ -210,7 +215,9 @@ export async function POST(req: Request) {
       // 估算消息大小并记录优化效果
       const originalSize = JSON.stringify(messages).length;
       const processedSize = JSON.stringify(processedMessages).length;
-      const savedPercent = (((originalSize - processedSize) / originalSize) * 100).toFixed(2);
+      const savedPercent = originalSize > 0
+        ? (((originalSize - processedSize) / originalSize) * 100).toFixed(2)
+        : "0.00";
 
       console.log(
         `📊 消息优化: ${(originalSize / 1024).toFixed(2)}KB -> ${(processedSize / 1024).toFixed(
@@ -218,7 +225,7 @@ export async function POST(req: Request) {
         )}KB (节省 ${savedPercent}%) | 消息数: ${messages.length} -> ${processedMessages.length}`
       );
 
-      // 使用新的工具注册表系统创建和过滤工具
+      // 使用新的工具注册表系统创建和过滤工具（用 resolvedPromptType 确保与提示词一致）
       const filteredTools = createAndFilterTools(
         {
           sandboxId,
@@ -230,7 +237,7 @@ export async function POST(req: Request) {
           dulidayToken,
           defaultWechatId,
         },
-        promptType
+        resolvedPromptType
       );
 
       // 创建 UI 消息流 - 支持 HITL
@@ -365,37 +372,54 @@ export async function POST(req: Request) {
             onFinish: async ({ usage, finishReason, steps }) => {
               // 区分正常完成和被中止（中止时 finishReason 为 other 或 error）
               const isAborted = finishReason === "other" || finishReason === "error";
-              if (isAborted) {
+              const statusIcon = isAborted ? "⏹️" : "🏁";
+              const statusText = isAborted ? "Stream被中止" : "Stream完成";
+
+              // 生产环境：一行摘要；开发环境：详细步骤
+              if (process.env.NODE_ENV === "production") {
+                const toolsSummary = steps
+                  .flatMap(s => s.toolCalls?.map(t => t.toolName) || [])
+                  .filter((v, i, a) => a.indexOf(v) === i) // unique
+                  .join(", ");
                 console.log(
-                  `\n⏹️ Stream被中止 | 原因: ${finishReason} | 总步数: ${steps.length} | 总tokens: ${usage?.totalTokens || 0}`
+                  `\n${statusIcon} ${statusText} | 原因: ${finishReason} | 步数: ${steps.length} | tokens: ${usage?.totalTokens || 0} | tools: [${toolsSummary || "无"}]`
                 );
               } else {
                 console.log(
-                  `\n🏁 Stream完成 | 原因: ${finishReason} | 总步数: ${steps.length} | 总tokens: ${usage?.totalTokens || 0}`
+                  `\n${statusIcon} ${statusText} | 原因: ${finishReason} | 总步数: ${steps.length} | 总tokens: ${usage?.totalTokens || 0}`
                 );
-              }
-              // 打印每步摘要
-              if (steps.length > 0) {
-                console.log("📋 步骤摘要:");
-                steps.forEach((step, i) => {
-                  const tools = step.toolCalls?.map(t => t.toolName).join(", ") || "无";
-                  console.log(`   ${i + 1}. ${step.finishReason} | tools: ${tools}`);
-                });
+                // 开发环境：打印每步摘要
+                if (steps.length > 0) {
+                  console.log("📋 步骤摘要:");
+                  steps.forEach((step, i) => {
+                    const tools = step.toolCalls?.map(t => t.toolName).join(", ") || "无";
+                    console.log(`   ${i + 1}. ${step.finishReason} | tools: ${tools}`);
+                  });
+                }
               }
             },
-            onError: async error => {
+            onError: async ({ error }) => {
               console.error("Stream generation error:", error);
 
-              // 记录详细错误信息
-              if (error && typeof error === "object") {
-                const errorObj = error as Record<string, unknown>;
+              // 使用 AI SDK 错误解析器提取结构化信息
+              const aiError = parseAISDKError(error);
+              if (aiError) {
+                console.error("AI SDK Error details:", {
+                  provider: aiError.provider,
+                  model: aiError.model,
+                  statusCode: aiError.statusCode,
+                  isAuthError: aiError.isAuthError,
+                  isRateLimited: aiError.isRateLimited,
+                  isTimeout: aiError.isTimeout,
+                  originalMessage: aiError.originalMessage,
+                });
+              } else {
+                // 非 AI SDK 错误，转换为 Error 对象记录
+                const err = toError(error);
                 console.error("Error details:", {
-                  name: errorObj.name,
-                  message: errorObj.message,
-                  type: errorObj.type,
-                  statusCode: errorObj.statusCode,
-                  cause: errorObj.cause,
-                  stack: errorObj.stack,
+                  name: err.name,
+                  message: err.message,
+                  stack: err.stack,
                 });
               }
 

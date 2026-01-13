@@ -21,8 +21,27 @@ import { SystemPromptsEditor } from "@/components/admin/system-prompts-editor";
 import { GeneralConfigManager } from "@/components/admin/general-config-manager";
 import { BrandTable } from "@/components/admin/brand-management";
 import { BackButton } from "@/components/ui/back-button";
+import { DropZone, DropZoneHint } from "@/components/ui/drop-zone";
 import { useConfigManager } from "@/hooks/useConfigManager";
 import { useRouter } from "next/navigation";
+
+type FilePickerOptions = {
+  multiple?: boolean;
+  types?: Array<{
+    description?: string;
+    accept: Record<string, string[]>;
+  }>;
+};
+
+type FilePickerHandle = {
+  getFile: () => Promise<File>;
+};
+
+type FilePickerWindow = Window & {
+  showOpenFilePicker?: (options?: FilePickerOptions) => Promise<FilePickerHandle[]>;
+};
+
+const FILE_PICKER_ACCEPT = ".json,application/json";
 
 export default function AdminSettingsPage() {
   const {
@@ -42,6 +61,74 @@ export default function AdminSettingsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
   const [currentTime, setCurrentTime] = useState<string>("");
+
+  const handleImportConfig = async () => {
+    const pickerWindow: FilePickerWindow = window;
+
+    if (typeof pickerWindow.showOpenFilePicker === "function") {
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("showOpenFilePicker timeout")), 5000);
+        });
+
+        const pickerPromise = pickerWindow.showOpenFilePicker({
+          multiple: false,
+          types: [
+            {
+              description: "JSON",
+              accept: {
+                "application/json": [".json"],
+              },
+            },
+          ],
+        });
+
+        const [handle] = await Promise.race([pickerPromise, timeoutPromise]);
+
+        if (handle) {
+          const file = await handle.getFile();
+          await importConfig(file);
+        }
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          const errorMessage = error.message || "";
+          if (!errorMessage.includes("Intercepted")) {
+            return;
+          }
+        }
+      }
+    }
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = FILE_PICKER_ACCEPT;
+
+    let cleanedUp = false;
+    const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      input.remove();
+    };
+
+    input.onchange = async event => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) {
+        cleanup();
+        return;
+      }
+
+      const file = target.files?.[0];
+      if (file) {
+        await importConfig(file);
+      }
+      cleanup();
+    };
+
+    document.body.appendChild(input);
+    window.addEventListener("focus", cleanup, { once: true });
+    input.click();
+  };
 
   useEffect(() => {
     setCurrentTime(new Date().toLocaleString());
@@ -83,7 +170,12 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="relative min-h-screen w-full bg-background">
+    <DropZone
+      onFileDrop={importConfig}
+      accept={FILE_PICKER_ACCEPT}
+      hint="拖拽配置文件到此处导入"
+      className="min-h-screen w-full bg-background"
+    >
       {/* 背景光斑效果 - 固定定位 */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="bg-blob bg-blob-1" />
@@ -123,16 +215,7 @@ export default function AdminSettingsPage() {
             <Button
               variant="outline"
               onClick={() => {
-                const input = document.createElement("input");
-                input.type = "file";
-                input.accept = ".json";
-                input.onchange = e => {
-                  const file = (e.target as HTMLInputElement).files?.[0];
-                  if (file) {
-                    importConfig(file);
-                  }
-                };
-                input.click();
+                void handleImportConfig();
               }}
               className="glass-button"
             >
@@ -153,6 +236,9 @@ export default function AdminSettingsPage() {
             </Button>
           </div>
         </div>
+
+        {/* 拖拽导入提示 */}
+        <DropZoneHint />
 
         {/* 主要内容区域 */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -359,6 +445,6 @@ export default function AdminSettingsPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </DropZone>
   );
 }

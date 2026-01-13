@@ -321,6 +321,44 @@ describe("Brand Resolution Logic", () => {
       expect(result.resolvedBrand).toBe("肯德基");
       expect(result.matchType).toBe("exact");
     });
+
+    it("should match brands ignoring spaces and common separators", () => {
+      // 测试场景：LLM 提取的品牌名称没有空格，但数据库中的品牌有空格
+      const brandsWithSpaces = ["M Stand", "Costa Coffee", "Tim Hortons", "肯德基"];
+      const input: BrandResolutionInput = {
+        uiSelectedBrand: undefined,
+        configDefaultBrand: "肯德基",
+        conversationBrand: "Mstand", // LLM 提取的品牌，没有空格
+        availableBrands: brandsWithSpaces,
+        strategy: "smart"
+      };
+
+      const result = resolveBrandConflict(input);
+
+      // 应该成功匹配到 "M Stand"
+      expect(result.resolvedBrand).toBe("M Stand");
+      expect(result.source).toBe("conversation");
+      expect(result.matchType).toBe("fuzzy");
+    });
+
+    it("should match brands with different separator styles", () => {
+      // 测试场景：品牌名称使用不同的分隔符
+      const brandsWithSeparators = ["Costa-Coffee", "Tim_Hortons", "M.Stand", "肯德基"];
+      const input: BrandResolutionInput = {
+        uiSelectedBrand: undefined,
+        configDefaultBrand: "肯德基",
+        conversationBrand: "CostaCoffee", // 无分隔符版本
+        availableBrands: brandsWithSeparators,
+        strategy: "smart"
+      };
+
+      const result = resolveBrandConflict(input);
+
+      // 应该成功匹配到 "Costa-Coffee"
+      expect(result.resolvedBrand).toBe("Costa-Coffee");
+      expect(result.source).toBe("conversation");
+      expect(result.matchType).toBe("fuzzy");
+    });
   });
 
   describe("Logging and debugging", () => {

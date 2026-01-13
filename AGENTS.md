@@ -1,44 +1,35 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `app/` contains Next.js 15 route groups, layouts, server actions, and MCP entry points; add new surfaces under descriptive segment folders to keep routing explicit.
-- Presentation logic lives under `components/` (UI primitives) and `hooks/` (state + effects). Cross-cutting services, model registries, and stores sit in `lib/`.
-- Platform wiring—`configs/`, `drizzle/`, `db/`, and `scripts/`—covers feature flags, schema migrations, seeds, and automation (multi-agent, release, deploy). Avoid mixing product logic in these directories.
-- Tests belong in `__tests__/` for integration suites or colocated `*.test.ts(x)` files for focused coverage. Static assets stay in `public/`.
+- `app/` holds Next.js 15 route groups, layouts, server actions, and MCP entry points; add new surfaces under descriptive segments.
+- `components/` contains UI primitives; `hooks/` holds state/effect hooks; shared services, registries, and stores live in `lib/`.
+- Platform wiring stays in `configs/`, `drizzle/`, `db/`, and `scripts/`—avoid product logic there.
+- Tests go in `__tests__/` for integration suites or colocated `*.test.ts(x)` files; assets belong in `public/`.
 
-## Architecture Snapshot
-- Multi-provider AI orchestration lives under `lib/model-registry/` and `lib/services/`, enabling Anthropic computer-use, Qwen replies, OpenRouter, and Google providers through AI SDK adapters.
-- Zustand stores plus LocalForage persistence coordinate configurable brand/system/reply prompts; review `lib/services/config.service.ts` before changing global state flows.
-- Desktop automation uses the E2B desktop agent, with MCP browser control and multi-brand recruitment scenarios outlined in `docs/guides/`.
-
-## Build, Test & Development Commands
-- Core loop: `pnpm dev` (Turbopack) and `pnpm agent:start` (spawns agents after dependency checks). Use `pnpm agent:list` / `pnpm agent:logs <name>` for inspection.
-- Quality gates: `pnpm lint`, `pnpm format:check`, `pnpm test`, `pnpm test:run`, and `pnpm test:coverage`. UI debugging is available via `pnpm test:ui`.
-- Database lifecycle: `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:push`, `pnpm db:init`. Run `pnpm test:mcp-connection` before shipping MCP protocol changes.
-- Deploy parity: `docker compose -f docker-compose.local.yml up -d` for ARM64 dev, `docker compose -f docker-compose.prod.yml up -d` for production parity.
+## Build, Test, and Development Commands
+- `pnpm dev`: run the Next.js dev server (Turbopack).
+- `pnpm agent:start`: start multi-agent flows; use `pnpm agent:list` and `pnpm agent:logs <name>` for inspection.
+- `pnpm lint` and `pnpm format`: enforce eslint and Prettier rules (run before committing).
+- `pnpm test`, `pnpm test:run`, `pnpm test:coverage`: run Vitest suites and coverage.
+- `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:push`, `pnpm db:init`: Drizzle schema lifecycle.
 
 ## Coding Style & Naming Conventions
-- TypeScript across the repo with 2-space indentation. Export explicit types for anything shared beyond a file boundary.
-- React components use PascalCase filenames; server utilities follow `lib/server-*.ts`, hooks use `useThing`, and Drizzle schemas stay in `drizzle/schema/*.ts`.
-- Tailwind utility chains should read from layout → color → motion; reach for `class-variance-authority` when stateful variants appear.
-- Always run `pnpm lint --fix` and `pnpm format` before committing to align with `eslint.config.mjs` and Prettier defaults.
+- TypeScript throughout; use 2-space indentation.
+- React components use PascalCase filenames; hooks follow `useThing`; server utilities use `lib/server-*.ts`.
+- Drizzle schemas live in `drizzle/schema/*.ts`.
+- Tailwind utility chains should read layout → color → motion; use `class-variance-authority` for stateful variants.
+- 尽量不使用类型断言，确保类型安全。
 
 ## Testing Guidelines
-- Vitest + Testing Library bootstrap via `vitest.setup.ts`; keep DOM helpers and mocks under `__mocks__/` to avoid duplication.
-- Name files `*.test.ts` / `*.test.tsx`; integration specs housed in `__tests__/` help `pnpm test --runInBand __tests__/multi-agent.test.ts` stay predictable.
-- Maintain meaningful coverage for new surfaces (logic, hooks, multi-agent commands). Keep generated `coverage/` artifacts untracked unless debugging CI.
+- Testing stack: Vitest + Testing Library; setup in `vitest.setup.ts`.
+- Name tests `*.test.ts` / `*.test.tsx`; integration suites under `__tests__/`.
+- Run targeted suites with `pnpm test --runInBand __tests__/multi-agent.test.ts`.
+- 改动完成后尽量运行 `pnpm lint` 或 `npx tsc --noEmit`，确保没有类型错误。
 
 ## Commit & Pull Request Guidelines
-- Use conventional commits so semantic-release can bump versions (`feat:`, `fix:`, `chore(release): 1.14.0 [skip ci]`). Include scope when touching automation or DB layers.
-- PRs should document: business context, testing output (command snippets or screenshots), database/agent impacts, and links to relevant docs.
-- Update `README.md`, `docs/`, or `CLAUDE.md` when behavior, commands, or architecture primitives change; keep AGENTS.md synchronized.
+- Use conventional commits (e.g., `feat:`, `fix:`, `chore(release): 1.14.0 [skip ci]`), include scope for automation/DB changes.
+- PRs should include business context, testing output, agent or DB impacts, and doc updates when behavior or commands change.
 
-## Multi-Agent & Deployment Ops
-- `scripts/multi-agent.sh` manages isolated browser profiles with automatic port assignment. Typical flows: `pnpm agent:add zhipin --count 2`, `pnpm agent:start`, `pnpm agent:update -- --skip-install`.
-- Prereqs (`jq`, `curl`, `lsof`, Chrome) are auto-validated; investigate failures with `pnpm agent:logs <name> chrome`.
-- After code pushes on a host, run `pnpm agent:update` to stop running agents, pull latest main/develop, reinstall, rebuild, and restart the original set automatically.
-
-## Security & Configuration Tips
-- Secrets stay in `.env.local`, Docker overrides, or remote secret stores; reference usage through `next.config.ts` and `drizzle.config.ts` only.
-- Use the Supabase/Postgres credentials exposed via `db/` helpers; never commit real keys or generated Drizzle migrations containing secrets.
-- Before releases, run `docker compose -f docker-compose.local.yml up -d` plus `pnpm agent:status` to confirm both web and agent stacks are healthy.
+## Security & Configuration
+- Keep secrets in `.env.local` or remote stores; do not commit credentials.
+- Validate MCP changes with `pnpm test:mcp-connection` before shipping.
