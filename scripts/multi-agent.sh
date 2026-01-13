@@ -11,7 +11,7 @@ readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[1;33m'
 readonly BLUE='\033[0;34m'
-readonly MAGENTA='\033[0;35m'
+# readonly MAGENTA='\033[0;35m'  # 暂未使用
 readonly CYAN='\033[0;36m'
 readonly NC='\033[0m' # No Color
 
@@ -136,6 +136,42 @@ is_port_in_use() {
     lsof -i ":$port" -sTCP:LISTEN -t > /dev/null 2>&1
 }
 
+# 通过端口获取监听进程 PID
+get_pid_by_port() {
+    local port=$1
+    lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | head -1
+}
+
+# 原子更新配置文件，避免写入失败导致清空
+update_config_atomic() {
+    local jq_filter=$1
+    shift
+
+    local tmp_file
+    tmp_file=$(mktemp "${CONFIG_FILE}.tmp.XXXXXX") || return 1
+
+    if jq "$@" "$jq_filter" "$CONFIG_FILE" > "$tmp_file"; then
+        mv "$tmp_file" "$CONFIG_FILE"
+        return 0
+    fi
+
+    rm -f "$tmp_file"
+    return 1
+}
+
+# 验证 Agent ID 格式
+validate_agent_id() {
+    local id=$1
+
+    if [[ ! "$id" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]]; then
+        log_error "Agent ID 无效: $id"
+        log_info "允许格式: ^[a-zA-Z0-9][a-zA-Z0-9_-]*$"
+        return 1
+    fi
+
+    return 0
+}
+
 # 获取下一个可用端口
 get_next_available_port() {
     local start_port=$1
@@ -244,6 +280,9 @@ cmd_add() {
         log_error "使用自定义 ID 时不能同时指定 --count"
         exit 1
     fi
+    if [[ -n "$custom_id" ]]; then
+        validate_agent_id "$custom_id" || exit 1
+    fi
 
     # 验证类型
     if ! jq -e ".templates.$type" "$TEMPLATE_FILE" > /dev/null 2>&1; then
@@ -289,6 +328,7 @@ cmd_add() {
             agent_num=$(get_next_agent_number "$type")
             agent_id="${type}-${agent_num}"
         fi
+        validate_agent_id "$agent_id" || exit 1
 
         # 分配端口
         local ports
@@ -319,8 +359,10 @@ EOF
 )
 
         # 添加到配置文件
-        local updated_config=$(jq ".agents += [$new_agent]" "$CONFIG_FILE")
-        echo "$updated_config" > "$CONFIG_FILE"
+        if ! update_config_atomic --argjson new_agent "$new_agent" '.agents += [$new_agent]'; then
+            log_error "更新配置文件失败"
+            exit 1
+        fi
 
         log_success "已添加 Agent: $agent_id (App: $app_port, Chrome: $chrome_port)"
     done
@@ -382,9 +424,16 @@ start_chrome() {
         return 1
     fi
 
-    if [[ ! -f "$chrome_exec" ]]; then
+    if [[ ! -f "$chrome_exec" && ! -d "$chrome_exec" ]]; then
         log_error "Chrome 可执行文件不存在: $chrome_exec"
         log_info "请检查路径是否正确"
+        return 1
+    fi
+
+    if is_port_in_use "$chrome_port"; then
+        local existing_pid=$(get_pid_by_port "$chrome_port")
+        log_error "Chrome 调试端口 $chrome_port 已被占用${existing_pid:+ (PID: $existing_pid)}"
+        log_info "请先停止占用端口的进程或调整配置"
         return 1
     fi
 
@@ -400,6 +449,23 @@ start_chrome() {
         "--user-data-dir=$user_data_dir"
     )
 
+    # 合并 agent 自定义 Chrome 启动参数
+    local extra_args=()
+    while IFS= read -r arg; do
+        [[ -n "$arg" ]] && extra_args+=("$arg")
+    done < <(echo "$agent" | jq -r '.chromeArgs[]?' 2>/dev/null || true)
+    if (( ${#extra_args[@]} > 0 )); then
+        chrome_args+=("${extra_args[@]}")
+    fi
+
+    # 推导 app bundle 路径 (macOS)
+    local chrome_app=""
+    if [[ "$chrome_exec" == *.app ]]; then
+        chrome_app="$chrome_exec"
+    elif [[ "$chrome_exec" == *"/Contents/MacOS/"* ]]; then
+        chrome_app="${chrome_exec%%/Contents/MacOS/*}"
+    fi
+
     # 启动 Chrome
     # 使用 open -a 命令启动（macOS 原生方式）
     # 这样可以保留原生 UI 功能（如文件选择对话框）
@@ -407,8 +473,14 @@ start_chrome() {
     local chrome_pid=""
 
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS: 使用 open 命令，保留原生 UI 功能
-        open -na "Google Chrome" --args "${chrome_args[@]}"
+        if [[ -n "$chrome_app" && -d "$chrome_app" ]]; then
+            # macOS: 使用 open 命令，保留原生 UI 功能
+            open -na "$chrome_app" --args "${chrome_args[@]}"
+        else
+            # 回退: 直接执行可执行文件
+            "$chrome_exec" "${chrome_args[@]}" > "$LOGS_DIR/${agent_id}-chrome.log" 2>&1 &
+            chrome_pid=$!
+        fi
 
         # open 命令立即返回，需要等待并查找 Chrome 进程
         sleep 2
@@ -424,11 +496,6 @@ start_chrome() {
         chrome_pid=$!
     fi
 
-    # 保存 Chrome PID（如果获取到）
-    if [[ -n "$chrome_pid" ]]; then
-        echo "$chrome_pid" > "$PIDS_DIR/${agent_id}-chrome.pid"
-    fi
-
     # 等待 Chrome 就绪
     local timeout=$CHROME_STARTUP_TIMEOUT
     local count=0
@@ -440,6 +507,17 @@ start_chrome() {
             return 1
         fi
     done
+
+    # 通过调试端口获取更可靠的 Chrome PID
+    local port_pid=$(get_pid_by_port "$chrome_port")
+    if [[ -n "$port_pid" ]]; then
+        chrome_pid="$port_pid"
+    fi
+
+    # 保存 Chrome PID（如果获取到）
+    if [[ -n "$chrome_pid" ]]; then
+        echo "$chrome_pid" > "$PIDS_DIR/${agent_id}-chrome.pid"
+    fi
 
     if [[ -n "$chrome_pid" ]]; then
         log_success "Chrome 已就绪 (PID: $chrome_pid)"
@@ -545,12 +623,21 @@ cmd_start() {
     if [[ -z "$target_id" ]]; then
         # 启动所有
         log_info "启动所有 Agent..."
+        local failed=()
         while IFS= read -r agent; do
             local id=$(echo "$agent" | jq -r '.id')
-            cmd_start "$id"
+            if ! cmd_start "$id"; then
+                failed+=("$id")
+            fi
         done < <(get_agents)
+        if (( ${#failed[@]} > 0 )); then
+            log_warn "以下 Agent 启动失败: ${failed[*]}"
+            return 1
+        fi
         return
     fi
+
+    validate_agent_id "$target_id" || return 1
 
     # 获取 Agent 配置
     local agent=$(jq -c ".agents[] | select(.id == \"$target_id\")" "$CONFIG_FILE")
@@ -603,11 +690,24 @@ cmd_stop() {
     if [[ -z "$target_id" ]]; then
         # 停止所有
         log_info "停止所有 Agent..."
+        local failed=()
         while IFS= read -r agent; do
             local id=$(echo "$agent" | jq -r '.id')
-            cmd_stop "$id"
+            if ! cmd_stop "$id"; then
+                failed+=("$id")
+            fi
         done < <(get_agents)
+        if (( ${#failed[@]} > 0 )); then
+            log_warn "以下 Agent 停止失败: ${failed[*]}"
+            return 1
+        fi
         return
+    fi
+
+    validate_agent_id "$target_id" || return 1
+    if ! jq -e ".agents[] | select(.id == \"$target_id\")" "$CONFIG_FILE" > /dev/null 2>&1; then
+        log_warn "未找到 Agent: $target_id"
+        return 1
     fi
 
     log_info "停止 Agent: $target_id"
@@ -646,8 +746,13 @@ cmd_stop() {
         need_find_chrome=true
     fi
 
-    if [[ "$need_find_chrome" == "true" ]] && [[ -n "$user_data_dir" && "$user_data_dir" != "null" ]]; then
-        chrome_pid=$(pgrep -f "user-data-dir=$user_data_dir" 2>/dev/null | head -1 || true)
+    if [[ "$need_find_chrome" == "true" ]]; then
+        if [[ -n "$chrome_port" && "$chrome_port" != "null" ]]; then
+            chrome_pid=$(get_pid_by_port "$chrome_port")
+        fi
+        if [[ -z "$chrome_pid" && -n "$user_data_dir" && "$user_data_dir" != "null" ]]; then
+            chrome_pid=$(pgrep -f "user-data-dir=$user_data_dir" 2>/dev/null | head -1 || true)
+        fi
     fi
 
     if [[ -n "$chrome_pid" ]] && ps -p "$chrome_pid" > /dev/null 2>&1; then
@@ -716,13 +821,20 @@ cmd_remove() {
         log_error "请指定要删除的 Agent ID"
         exit 1
     fi
+    validate_agent_id "$target_id" || exit 1
+    if ! jq -e ".agents[] | select(.id == \"$target_id\")" "$CONFIG_FILE" > /dev/null 2>&1; then
+        log_warn "未找到 Agent: $target_id"
+        exit 1
+    fi
 
     # 先停止
     cmd_stop "$target_id"
 
     # 从配置文件删除
-    local updated_config=$(jq "del(.agents[] | select(.id == \"$target_id\"))" "$CONFIG_FILE")
-    echo "$updated_config" > "$CONFIG_FILE"
+    if ! update_config_atomic --arg id "$target_id" 'del(.agents[] | select(.id == $id))'; then
+        log_error "更新配置文件失败"
+        exit 1
+    fi
 
     # 删除日志文件
     rm -f "$LOGS_DIR/${target_id}"*.log
@@ -934,7 +1046,7 @@ _install_dependencies_if_needed() {
 
     # 检测 package.json 是否有变化
     local need_install=false
-    if git diff HEAD@{1} HEAD --name-only 2>/dev/null | grep -q "package.json\|pnpm-lock.yaml"; then
+    if git diff 'HEAD@{1}' HEAD --name-only 2>/dev/null | grep -q "package.json\|pnpm-lock.yaml"; then
         need_install=true
         log_warn "检测到依赖变化，需要重新安装"
     else
