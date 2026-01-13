@@ -62,6 +62,24 @@ export type {
 
 export { CoordinatesSchema, CHINA_BOUNDS } from "./geocoding";
 
+// 从 duliday-sync.ts 导出同步相关类型
+export type {
+  GeocodingStats,
+  SyncResult,
+  SyncRecord,
+  SyncResponse,
+  SyncStreamMessage,
+  PartialSuccessResponse,
+} from "./duliday-sync";
+
+export {
+  GeocodingStatsSchema,
+  SyncResultSchema,
+  SyncRecordSchema,
+  SyncResponseSchema,
+  SyncStreamMessageSchema,
+} from "./duliday-sync";
+
 // AI SDK 相关类型
 export type FinishReason =
   | "stop"
