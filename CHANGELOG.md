@@ -2,6 +2,21 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.24.0](https://github.com/steveoon/agent-computer-user/compare/v1.23.2...v1.24.0) (2026-01-13)
+
+
+### Bug Fixes
+
+* **loader:** 修复品牌名称空格导致的匹配失败 ([20cbdd6](https://github.com/steveoon/agent-computer-user/commit/20cbdd6200fd8e2409a3d65d00765aa56f258084))
+* **scripts:** improve multi-agent.sh security and reliability ([2a597e8](https://github.com/steveoon/agent-computer-user/commit/2a597e8129404ec3c7057bf21c5133121e9b2a47))
+
+
+### Features
+
+* **admin:** 添加配置文件拖拽导入功能 ([79c9c16](https://github.com/steveoon/agent-computer-user/commit/79c9c16114bdc22e45e7c26c6431193ac8e864a7))
+* **agent:** 添加 IndexedDB 清理命令及稳定性改进 ([77ddf0d](https://github.com/steveoon/agent-computer-user/commit/77ddf0d976512ce2771bf2b3f544376faa09485f))
+* **types:** add duliday-sync type definitions ([1eaa4ad](https://github.com/steveoon/agent-computer-user/commit/1eaa4adc2a76d290b1f39d8c74e287ca303af212))
+
 # [1.24.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.24.0-develop.1...v1.24.0-develop.2) (2026-01-13)
 
 
