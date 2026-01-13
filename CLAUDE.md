@@ -321,3 +321,15 @@ catch (error) {
 ### Commit Convention
 
 Use conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
+
+### Claude Code Skills
+
+项目配置了 Vercel AI SDK v6 Skill (`.claude/skills/vercel-ai-sdk-v6.skill/`)，处理以下场景时**应主动使用**：
+
+- `generateText` / `streamText` API 使用和配置
+- Tool calling、structured output、streaming endpoints
+- Next.js Route Handlers (App Router) 中的 AI 端点
+- AI SDK 错误处理和类型问题
+- 从 v5 迁移到 v6 的模式
+
+**使用方式**: 当遇到上述场景时，使用 Skill tool 调用 `vercel-ai-sdk-v6.skill`
