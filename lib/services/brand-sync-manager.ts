@@ -1,11 +1,92 @@
 import { getAvailableBrands } from "@/actions/brand-mapping";
 import { configService } from "@/lib/services/config.service";
 
+// 从统一类型文件导入（Schema-First 原则）
+import type { SyncRecord } from "@/types/duliday-sync";
+import { SyncResponseSchema, SyncStreamMessageSchema } from "@/types/duliday-sync";
+
 /**
  * 品牌同步管理器
  * 确保数据库中的所有品牌都被同步到本地 IndexedDB
  */
 export class BrandSyncManager {
+  private static async parseSyncResponse(response: Response): Promise<SyncRecord> {
+    const contentType = response.headers.get("content-type") || "";
+
+    if (contentType.includes("application/x-ndjson")) {
+      if (!response.body) {
+        throw new Error("未收到同步响应流");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let result: SyncRecord | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+
+          try {
+            const data = JSON.parse(line);
+            const parsed = SyncStreamMessageSchema.safeParse(data);
+            if (!parsed.success) {
+              continue;
+            }
+
+            if (parsed.data.type === "result") {
+              result = parsed.data.data;
+            } else if (parsed.data.type === "error") {
+              throw new Error(parsed.data.error || "同步请求失败");
+            }
+          } catch (error) {
+            console.warn("解析同步流数据失败:", error);
+          }
+        }
+      }
+
+      if (buffer.trim()) {
+        try {
+          const data = JSON.parse(buffer);
+          const parsed = SyncStreamMessageSchema.safeParse(data);
+          if (parsed.success) {
+            if (parsed.data.type === "result") {
+              result = parsed.data.data;
+            } else if (parsed.data.type === "error") {
+              throw new Error(parsed.data.error || "同步请求失败");
+            }
+          }
+        } catch (error) {
+          console.warn("解析同步流剩余数据失败:", error);
+        }
+      }
+
+      if (!result) {
+        throw new Error("未收到同步结果数据");
+      }
+
+      return result;
+    }
+
+    const json = await response.json();
+    const parsed = SyncResponseSchema.safeParse(json);
+    if (!parsed.success) {
+      throw new Error("同步响应格式校验失败");
+    }
+
+    const responseData = parsed.data;
+    // 提取 SyncRecord（可能包装在 data 字段中）
+    const record = "data" in responseData ? responseData.data : responseData;
+    return record as SyncRecord;
+  }
+
   /**
    * 检查并同步缺失的品牌
    * @param dulidayToken Duliday API Token
@@ -79,21 +160,31 @@ export class BrandSyncManager {
           throw new Error(errorData.error || "同步请求失败");
         }
 
-        const { data: syncRecord } = await response.json();
+        const syncRecord = await BrandSyncManager.parseSyncResponse(response);
 
         // 处理同步结果
         if (syncRecord && syncRecord.results) {
-          for (const result of syncRecord.results) {
-            const brand = missingBrands.find(b => b.name === result.brandName);
-            if (brand) {
-              if (result.success) {
-                syncedBrands.push(brand.name);
-                console.log(`✅ 成功同步品牌: ${brand.name}`);
-              } else {
-                failedBrands.push(brand.name);
-                errors[brand.name] = result.errors.join(", ") || "同步失败";
-                console.error(`❌ 同步品牌失败: ${brand.name}`, result.errors);
-              }
+          const resultsByBrand = new Map(
+            syncRecord.results.map(result => [result.brandName, result])
+          );
+
+          for (const brand of missingBrands) {
+            const result = resultsByBrand.get(brand.name);
+
+            if (!result) {
+              failedBrands.push(brand.name);
+              errors[brand.name] = "同步响应中缺少该品牌的结果";
+              console.error(`❌ 同步结果缺失: ${brand.name}`);
+              continue;
+            }
+
+            if (result.success) {
+              syncedBrands.push(brand.name);
+              console.log(`✅ 成功同步品牌: ${brand.name}`);
+            } else {
+              failedBrands.push(brand.name);
+              errors[brand.name] = result.errors.join(", ") || "同步失败";
+              console.error(`❌ 同步品牌失败: ${brand.name}`, result.errors);
             }
           }
         }

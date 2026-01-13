@@ -1,3 +1,4 @@
+import { z } from "zod/v3";
 import { DulidayRaw, ZhipinData } from "@/types/zhipin";
 import { convertDulidayListToZhipinData } from "@/lib/mappers/duliday-to-zhipin.mapper";
 import {
@@ -6,11 +7,16 @@ import {
   formatHttpError,
 } from "@/lib/utils/duliday-error-formatter";
 import { getBrandNameByOrgId } from "@/actions/brand-mapping";
-import { z } from 'zod/v3';
+
+// 从统一类型文件导入（Schema-First 原则）
+import type { GeocodingStats, SyncResult, SyncRecord } from "@/types/duliday-sync";
+export type { GeocodingStats, SyncResult, SyncRecord };
+
 // 注意：服务器端不使用 configService，数据保存逻辑在客户端处理
 
 /**
  * 部分成功的响应接口
+ * 保留在此处因为依赖 DulidayRaw.Position 具体类型
  */
 export interface PartialSuccessResponse {
   validPositions: DulidayRaw.Position[];
@@ -26,44 +32,6 @@ export interface PartialSuccessResponse {
  */
 const DULIDAY_API_BASE = "https://k8s.duliday.com/persistence/a";
 const DULIDAY_LIST_ENDPOINT = `${DULIDAY_API_BASE}/job-requirement/hiring/list`;
-
-/**
- * 地理编码统计结果
- */
-export interface GeocodingStats {
-  total: number; // 需要编码的总数
-  success: number; // 成功数
-  failed: number; // 失败数
-  skipped: number; // 跳过数（已有坐标）
-  failedStores: string[]; // 失败的门店名称列表
-}
-
-/**
- * 同步结果接口
- */
-export interface SyncResult {
-  success: boolean;
-  totalRecords: number;
-  processedRecords: number;
-  storeCount: number;
-  brandName: string;
-  errors: string[];
-  duration: number;
-  convertedData?: Partial<ZhipinData>; // 可选：转换后的数据
-  geocodingStats?: GeocodingStats; // 地理编码统计
-}
-
-/**
- * 同步历史记录接口
- */
-export interface SyncRecord {
-  id: string;
-  timestamp: string;
-  organizationIds: number[];
-  results: SyncResult[];
-  totalDuration: number;
-  overallSuccess: boolean;
-}
 
 /**
  * 数据同步服务类
