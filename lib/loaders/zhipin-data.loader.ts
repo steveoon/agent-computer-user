@@ -164,7 +164,10 @@ export async function loadZhipinData(
 export function fuzzyMatchBrand(inputBrand: string, availableBrands: string[]): string | null {
   if (!inputBrand) return null;
 
+  const normalizeBrandName = (value: string) => value.toLowerCase().replace(/[\s._-]+/g, "");
+
   const inputLower = inputBrand.toLowerCase();
+  const inputNormalized = normalizeBrandName(inputBrand);
 
   // 1. 精确匹配（忽略大小写）
   const exactMatch = availableBrands.find(brand => brand.toLowerCase() === inputLower);
@@ -172,11 +175,25 @@ export function fuzzyMatchBrand(inputBrand: string, availableBrands: string[]): 
     return exactMatch;
   }
 
-  // 2. 包含匹配（品牌名包含输入或输入包含品牌名，忽略大小写）
+  // 2. 精确匹配（忽略空格/常见分隔符）
+  const normalizedMatch = availableBrands.find(
+    brand => normalizeBrandName(brand) === inputNormalized
+  );
+  if (normalizedMatch) {
+    return normalizedMatch;
+  }
+
+  // 3. 包含匹配（品牌名包含输入或输入包含品牌名，忽略大小写/分隔符）
   // 收集所有匹配项，然后选择最具体的（最长的）
   const containsMatches = availableBrands.filter(brand => {
     const brandLower = brand.toLowerCase();
-    return brandLower.includes(inputLower) || inputLower.includes(brandLower);
+    if (brandLower.includes(inputLower) || inputLower.includes(brandLower)) {
+      return true;
+    }
+    const brandNormalized = normalizeBrandName(brand);
+    return (
+      brandNormalized.includes(inputNormalized) || inputNormalized.includes(brandNormalized)
+    );
   });
 
   if (containsMatches.length > 0) {
@@ -184,7 +201,7 @@ export function fuzzyMatchBrand(inputBrand: string, availableBrands: string[]): 
     return containsMatches.sort((a, b) => b.length - a.length)[0];
   }
 
-  // 3. 特殊处理：山姆相关的匹配
+  // 4. 特殊处理：山姆相关的匹配
   if (inputLower.includes("山姆") || inputLower.includes("sam")) {
     const samBrand = availableBrands.find(brand => {
       const brandLower = brand.toLowerCase();
