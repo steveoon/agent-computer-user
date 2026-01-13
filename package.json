@@ -32,6 +32,7 @@
     "agent:logs": "scripts/multi-agent.sh logs",
     "agent:update": "scripts/multi-agent.sh update",
     "agent:remove": "scripts/multi-agent.sh remove",
+    "agent:clean-db": "scripts/multi-agent.sh clean-indexeddb",
     "monitor:start": "npx tsx scripts/unread-monitor.ts",
     "monitor:start:auto": "AUTO_SUBMIT=true npx tsx scripts/unread-monitor.ts",
     "db:generate": "drizzle-kit generate",

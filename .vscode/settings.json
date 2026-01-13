@@ -36,5 +36,6 @@
     "**/coverage": true,
     "**/pnpm-lock.yaml": true,
     "**/.git": true
-  }
+  },
+  "shellcheck.exclude": ["SC2155"]
 }
