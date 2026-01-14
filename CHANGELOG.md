@@ -2,6 +2,20 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.25.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.24.0...v1.25.0-develop.1) (2026-01-14)
+
+
+### Bug Fixes
+
+* **playwright:** 增强 browser_tabs 错误处理和超时机制 ([09ce92f](https://github.com/steveoon/agent-computer-user/commit/09ce92f18a01462a58401073668c747e41823d8f))
+* **sync:** 改进同步进度计算精度 ([d25d6e6](https://github.com/steveoon/agent-computer-user/commit/d25d6e61ef3a00f906fb1baac4e08b1708e657cb))
+
+
+### Features
+
+* **smart-reply:** 增强错误处理和 LLM 统计信息 ([b7cf26a](https://github.com/steveoon/agent-computer-user/commit/b7cf26a94f07058092558eaea0f5d92e6b755260))
+* 添加 ToolLoopAgent 实现和浏览器自动化技能文档 ([447e86f](https://github.com/steveoon/agent-computer-user/commit/447e86f1d10c9ab0df10380f3cc90c84513c32af))
+
 # [1.24.0](https://github.com/steveoon/agent-computer-user/compare/v1.23.2...v1.24.0) (2026-01-13)
 
 
