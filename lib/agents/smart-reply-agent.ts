@@ -18,7 +18,6 @@
  * - 保持完整业务逻辑: 品牌解析、门店排序、上下文构建
  */
 
-import { generateText } from "ai";
 import { getDynamicRegistry } from "@/lib/model-registry/dynamic-registry";
 import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS, type ModelId } from "@/lib/config/models";
 import { ReplyPromptBuilder, type ReplyBuilderParams } from "@/lib/prompt-engineering";
@@ -30,6 +29,9 @@ import { type ProviderConfigs } from "./types";
 import { classifyMessage } from "./classification-agent";
 // 复用原有业务逻辑
 import { buildContextInfo } from "@/lib/loaders/zhipin-data.loader";
+// 安全的文本生成包装
+import { safeGenerateText, type SafeGenerateTextUsage } from "@/lib/ai";
+import { logError, type AppError } from "@/lib/errors";
 
 // ========== 类型定义 ==========
 
@@ -72,6 +74,12 @@ export interface SmartReplyAgentResult {
   contextInfo?: string;
   /** 调试信息（门店排序、详细级别等） */
   debugInfo?: SmartReplyDebugInfo;
+  /** LLM 使用统计 */
+  usage?: SafeGenerateTextUsage;
+  /** 生成耗时（毫秒） */
+  latencyMs?: number;
+  /** 错误信息（如果生成失败） */
+  error?: AppError;
 }
 
 // ========== 主函数 ==========
@@ -132,7 +140,7 @@ export async function generateSmartReply(
     candidateInfo
   );
 
-  // Step 4: 生成回复（使用 generateText）
+  // Step 4: 生成回复（使用 safeGenerateText，带超时和错误处理）
   const registry = getDynamicRegistry(providerConfigs);
   const replyModel = (modelConfig?.replyModel || DEFAULT_MODEL_CONFIG.replyModel) as ModelId;
 
@@ -150,11 +158,30 @@ export async function generateSmartReply(
 
   const prompts = replyBuilder.build(replyParams);
 
-  const replyResult = await generateText({
+  const replyResult = await safeGenerateText({
     model: registry.languageModel(replyModel),
     system: prompts.system,
     prompt: prompts.prompt,
+    context: "SmartReply",
+    timeoutMs: 30_000,
+    maxOutputTokens: 2000,
   });
+
+  // 处理生成失败的情况
+  if (!replyResult.success) {
+    logError("SmartReply 生成失败", replyResult.error);
+
+    // 返回带错误信息的结果，让调用方决定如何处理
+    return {
+      classification,
+      suggestedReply: "", // 空回复表示失败
+      confidence: 0,
+      shouldExchangeWechat: false,
+      contextInfo,
+      debugInfo,
+      error: replyResult.error,
+    };
+  }
 
   // Step 5: 更新内存
   replyBuilder.updateMemory(candidateMessage, replyResult.text);
@@ -174,6 +201,8 @@ export async function generateSmartReply(
     shouldExchangeWechat,
     contextInfo,
     debugInfo, // 包含门店排序、详细级别等调试信息
+    usage: replyResult.usage,
+    latencyMs: replyResult.latencyMs,
   };
 }
 
