@@ -88,3 +88,55 @@ Agent-style tool loops must be bounded.
   - Input
   - Output or error
 - Avoid infinite or self-reinforcing loops
+
+---
+
+## G) Building Agents with ToolLoopAgent
+
+### When to use ToolLoopAgent
+- Reusable AI configurations across multiple endpoints
+- Multi-step tool orchestration (agent loops)
+- Type-safe agent definitions with consistent behavior
+- Complex workflows requiring tool chaining
+
+### Agent Design Principles
+
+#### 1) Single-Purpose Agents
+- Create focused agents for specific tasks (code review, customer support, research)
+- Avoid "everything" agents with too many tools/responsibilities
+- Each agent should have a clear domain boundary
+
+#### 2) Instruction Design
+- Write clear, testable system instructions
+- Include explicit rules and constraints
+- Specify tool usage order/priority when relevant
+- Keep instructions concise but complete
+
+#### 3) Tool Guidance
+- Document when and how to use each tool in instructions
+- Establish tool usage sequences (e.g., "search first, then analyze")
+- Include cross-referencing requirements for research tasks
+
+### Stop Condition Strategies
+
+- Default: `stepCountIs(20)` - 20 steps maximum
+- Each step = one generation (text or tool call)
+- Custom conditions: check for specific text markers, tool success, or state changes
+- Combine multiple conditions with array syntax
+
+### Agent Composition Patterns
+
+| Pattern | Use Case |
+|---------|----------|
+| Sequential | Pipeline: research → analysis → report |
+| Conditional routing | Classifier → specialized agent |
+| Parallel | Independent subtasks |
+
+### API Route Guidelines
+
+- Define agent outside route handler (reusable)
+- Use `createAgentUIStreamResponse` for streaming
+- Preprocess messages if context injection needed
+- Export `InferAgentUIMessage` type for client type safety
+
+For code examples, see `snippets/tool-loop-agent.ts`.

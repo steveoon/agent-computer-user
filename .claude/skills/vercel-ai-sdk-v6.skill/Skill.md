@@ -1,7 +1,6 @@
 ---
-name: Vercel AI SDK v6 Engineering Playbook
+name: vercel-ai-sdk-v6
 description: Use when implementing AI features in TypeScript/Next.js with Vercel AI SDK v6 (generateText/streamText, tools, structured output, streaming route handlers). Enforces v6 APIs and best practices; prevents hallucinated options.
-dependencies: node>=18
 ---
 
 # Purpose
@@ -16,6 +15,11 @@ Use this Skill when the task involves any of the following:
 - Next.js Route Handlers (App Router) for AI endpoints
 - Chat UI integration (e.g., tool usage, message handling)
 - Refactoring older AI SDK code to v6 patterns
+- **Building AI Agents** with `ToolLoopAgent` class
+- Agent loop control (`stepCountIs`, custom stop conditions)
+- Multi-step tool orchestration workflows
+- `createAgentUIStreamResponse` for agent API routes
+- Type-safe agent definitions (`InferAgentUIMessage`)
 
 # Non-Negotiable Rules
 1. Use only APIs/options shown in `REFERENCE.md` / `snippets/`. If not present, do not guess.
