@@ -60,7 +60,25 @@ export async function listBrowserTabs(): Promise<PlaywrightTabInfo[]> {
     );
   }
 
-  const result = await tools.browser_tabs.execute({ action: "list" });
+  // 添加超时处理，防止 MCP 无响应时卡死
+  const TIMEOUT_MS = 15000;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      reject(
+        new Error(
+          `browser_tabs 操作超时 (${TIMEOUT_MS / 1000}秒)。请检查：\n` +
+            "- Extension 模式：确保已安装并激活 Playwright MCP Bridge 扩展\n" +
+            "- CDP 模式：确保 Chrome 已启动并开启远程调试端口"
+        )
+      );
+    }, TIMEOUT_MS);
+  });
+
+  const result = await Promise.race([
+    tools.browser_tabs.execute({ action: "list" }),
+    timeoutPromise,
+  ]);
+
   return parseTabsResult(result);
 }
 
@@ -342,7 +360,39 @@ export function parsePlaywrightResult(result: unknown): unknown {
  * Parse tabs list result from browser_tabs tool
  */
 function parseTabsResult(result: unknown): PlaywrightTabInfo[] {
-  const mcpResult = result as { content?: Array<{ text?: string; type?: string }> };
+  const mcpResult = result as {
+    content?: Array<{ text?: string; type?: string }>;
+    isError?: boolean;
+  };
+
+  // 处理错误响应
+  if (mcpResult?.isError) {
+    const errorText = mcpResult.content?.[0]?.text || "Unknown error";
+    console.error("[PlaywrightUtils] browser_tabs 返回错误:", errorText);
+
+    // 检查是否是 "No open tabs" 错误
+    if (errorText.includes("No open tabs")) {
+      throw new Error(
+        "Playwright MCP Extension 模式报告没有打开的标签页。\n" +
+          "Extension 模式的限制：它只能控制由 MCP 导航打开的页面，无法访问已有标签页。\n" +
+          "解决方案：\n" +
+          "1. 使用 CDP 模式（设置 CHROME_REMOTE_DEBUGGING_PORT 环境变量）\n" +
+          "2. 或使用 browser_navigate 工具先导航到目标页面"
+      );
+    }
+
+    // 检查是否是页面关闭错误
+    if (errorText.includes("Target page, context or browser has been closed")) {
+      throw new Error(
+        "浏览器页面/上下文已关闭。请确保：\n" +
+          "1. 浏览器没有关闭目标页面\n" +
+          "2. Playwright MCP Bridge 扩展仍然激活\n" +
+          "3. 尝试刷新页面或重新激活扩展"
+      );
+    }
+
+    throw new Error(`Playwright MCP 错误: ${errorText}`);
+  }
 
   if (mcpResult?.content?.[0]) {
     const content = mcpResult.content[0];
