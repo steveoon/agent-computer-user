@@ -19,20 +19,30 @@
 
 ## 解决方案
 
-在 `postcss.config.mjs` 中禁用 Tailwind PostCSS 优化：
+在 `postcss.config.mjs` 中通过环境变量控制优化：
 
 ```js
 const config = {
   plugins: {
     "@tailwindcss/postcss": {
-      // 禁用优化以确保 dev/production 样式一致
-      optimize: false,
+      // Electron 构建时禁用优化，Web 构建时保持优化
+      optimize: process.env.ELECTRON_BUILD !== "true",
     },
   },
 };
 
 export default config;
 ```
+
+`package.json` 中的 Electron 构建脚本会自动设置环境变量：
+
+```json
+"electron:build": "ELECTRON_BUILD=true next build && ..."
+```
+
+这样：
+- **Web 构建** (`pnpm build`)：保持 CSS 优化，减小体积
+- **Electron 构建** (`pnpm electron:pack`)：禁用优化，确保样式一致
 
 ## 注意事项
 
