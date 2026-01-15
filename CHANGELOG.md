@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.25.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.25.0-develop.1...v1.25.0-develop.2) (2026-01-15)
+
+
+### Features
+
+* **electron:** 完成 Electron Desktop 客户端集成 ([9ea071b](https://github.com/steveoon/agent-computer-user/commit/9ea071b3df5652dd9afcbd94a2e2718b3ecd741a))
+
 # [1.25.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.24.0...v1.25.0-develop.1) (2026-01-14)
 
 
