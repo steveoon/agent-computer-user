@@ -81,7 +81,7 @@ export function ChatInputForm({
   };
 
   return (
-    <>
+    <div className="flex-shrink-0">
       {/* PromptSuggestions 始终显示在输入框上方 */}
       <PromptSuggestions
         disabled={isInitializing || !isAuthenticated}
@@ -123,6 +123,6 @@ export function ChatInputForm({
           />
         </form>
       </div>
-    </>
+    </div>
   );
 }

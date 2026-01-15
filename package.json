@@ -2,6 +2,7 @@
   "name": "ai-sdk-computer-use",
   "version": "1.25.0-develop.1",
   "private": true,
+  "main": "build/main.js",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
@@ -39,7 +40,14 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:init": "npx tsx scripts/init-brand-data.ts"
+    "db:init": "npx tsx scripts/init-brand-data.ts",
+    "electron:dev": "concurrently \"next dev\" \"tsc -w -p tsconfig-electron.json\" \"wait-on http://localhost:3000 && ELECTRON_RUN_AS_NODE= NODE_ENV=development electron .\"",
+    "electron:build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public/* .next/standalone/public/ 2>/dev/null || mkdir -p .next/standalone/public && cp -r public/* .next/standalone/public/ && tsc -p tsconfig-electron.json",
+    "electron:start": "ELECTRON_RUN_AS_NODE= electron .",
+    "electron:pack": "pnpm electron:build && electron-builder --dir",
+    "electron:dist": "pnpm electron:build && electron-builder",
+    "electron:dist:mac": "pnpm electron:build && electron-builder --mac",
+    "electron:dist:win": "pnpm electron:build && electron-builder --win"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.2",
@@ -80,6 +88,7 @@
     "lucide-react": "^0.479.0",
     "motion": "^12.4.10",
     "next": "15.4.10",
+    "next-electron-rsc": "^0.3.0",
     "next-themes": "^0.4.5",
     "postgres": "^3.4.7",
     "qwen-ai-provider": "^0.1.0",
@@ -115,8 +124,11 @@
     "@typescript-eslint/parser": "^8",
     "@vitejs/plugin-react": "^4.6.0",
     "@vitest/coverage-v8": "^3.2.4",
+    "concurrently": "^9.2.1",
     "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.5",
+    "electron": "^33.4.11",
+    "electron-builder": "^26.4.0",
     "eslint": "^9",
     "eslint-config-next": "15.4.1",
     "jsdom": "^26.1.0",
@@ -128,12 +140,19 @@
     "typescript": "^5",
     "vite-plugin-magical-svg": "^1.7.2",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wait-on": "^9.0.3"
   },
   "pnpm": {
     "overrides": {
       "@types/react": "19.1.8",
       "@types/react-dom": "19.1.6"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild",
+      "sharp",
+      "puppeteer"
+    ]
   }
 }

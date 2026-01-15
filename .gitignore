@@ -76,3 +76,9 @@ docs/sample-data/recruitment_events.json
 docs/sample-data/recruitment_daily_stats.json
 docs/sample-data/recruitment_daily_stats_new.json
 .zed/
+
+# Electron builder output
+dist/
+
+# Compiled Electron code
+build/

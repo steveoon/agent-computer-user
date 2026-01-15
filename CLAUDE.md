@@ -303,6 +303,8 @@ catch (error) {
 
 **Type Errors:** Run `npx tsc --noEmit`, use `unknown` instead of `any`
 
+**Electron Pack 后样式不一致:** Tailwind v4 的 PostCSS 优化导致 dev/production 样式差异。解决方案：在 `postcss.config.mjs` 中设置 `optimize: false`。详见 [ELECTRON_TAILWIND_FIX.md](docs/guides/ELECTRON_TAILWIND_FIX.md)
+
 ## Key Data Flows
 
 1. **Config**: `ConfigInitializer` → `configService.getConfig()` → Components

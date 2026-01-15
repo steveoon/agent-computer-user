@@ -1,0 +1,7 @@
+# pnpm workspace configuration
+# See https://pnpm.io/settings for details
+
+packages:
+  - '.'
+
+# Note: Build script approvals are configured in package.json under pnpm.onlyBuiltDependencies

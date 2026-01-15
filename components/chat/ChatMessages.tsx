@@ -29,7 +29,7 @@ export function ChatMessages({
   sendMessage,
 }: ChatMessagesProps) {
   return (
-    <div className="flex-1 space-y-6 py-4 overflow-y-auto px-4" ref={containerRef}>
+    <div className="flex-1 min-h-0 space-y-6 py-4 overflow-y-auto px-4" ref={containerRef}>
       {messages.length === 0 ? <ProjectInfo /> : null}
       {messages.map((message, i) => (
         <PreviewMessage

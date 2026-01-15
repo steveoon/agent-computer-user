@@ -1,0 +1,93 @@
+appId: com.aiagent.recruitment-assistant
+productName: AI Recruitment Assistant
+copyright: Copyright 2025
+
+# Disable asar to allow Next.js standalone to work properly
+asar: false
+
+# Build directories
+directories:
+  output: dist
+  buildResources: resources
+
+# Files to include in the package
+# Note: .next/static and public are copied into .next/standalone by electron:build script
+files:
+  - build                              # Compiled Electron code
+  - ".next/standalone/**/*"            # Next.js standalone build (includes static & public)
+  - "!.next/standalone/**/node_modules/electron"
+  - configs/agent-templates.json       # Template configs (readonly)
+
+# Extra resources to copy (outside asar)
+extraResources:
+  - from: configs/agent-templates.json
+    to: configs/agent-templates.json
+  # Environment files for multi-agent runtime
+  # These will be copied to each agent's runtime directory
+  - from: .env
+    to: .env
+    filter:
+      - "**/*"
+  - from: .env.local
+    to: .env.local
+    filter:
+      - "**/*"
+  - from: .env.production
+    to: .env.production
+    filter:
+      - "**/*"
+
+# macOS configuration
+mac:
+  category: public.app-category.business
+  target:
+    - target: dir
+      arch:
+        - arm64
+    - target: dmg
+      arch:
+        - arm64
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+  notarize: false
+
+# DMG configuration
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+  window:
+    width: 540
+    height: 380
+
+# Windows configuration
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  # Code signing disabled by not providing cscLink
+
+# NSIS installer configuration (Windows)
+nsis:
+  oneClick: false
+  perMachine: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+# Linux configuration (optional)
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Office

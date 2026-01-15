@@ -9,6 +9,7 @@ import { MODEL_DICTIONARY, type ModelId } from "@/lib/config/models";
 import { NavLink } from "@/components/ui/nav-link";
 import Image from "next/image";
 import { useTheme } from "next-themes";
+import { AgentPopover } from "@/components/agent-management";
 
 interface ChatHeaderProps {
   currentBrand?: string;
@@ -129,6 +130,9 @@ export function ChatHeader({
 
           {/* 操作按钮组 */}
           <div className="flex items-center gap-1">
+            {/* Agent 管理（仅 Electron 环境显示） */}
+            <AgentPopover />
+
             <Popover>
               <PopoverTrigger asChild>
                 <Button
