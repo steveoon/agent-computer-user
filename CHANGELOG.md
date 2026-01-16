@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.25.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.25.0-develop.2...v1.25.0-develop.3) (2026-01-16)
+
+
+### Bug Fixes
+
+* **agent:** 修复 Agent 管理 UI 和后端状态同步问题 ([d54ffc3](https://github.com/steveoon/agent-computer-user/commit/d54ffc30fbbcfe50d32b4753d9d06871eaca560c))
+
 # [1.25.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.25.0-develop.1...v1.25.0-develop.2) (2026-01-15)
 
 
