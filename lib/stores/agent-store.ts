@@ -14,6 +14,10 @@ import type {
 } from "@/types/agent";
 import { getElectronAgentApi, isElectronEnv } from "@/types/agent";
 
+// ========== 模块级订阅管理（解决 async cleanup 和引用计数问题）==========
+let subscriptionRefCount = 0;
+let cleanupFn: (() => void) | null = null;
+
 interface AgentStoreState {
   // 状态
   agents: AgentInfo[];
@@ -23,7 +27,7 @@ interface AgentStoreState {
   isElectron: boolean;
 
   // Actions
-  initialize: () => Promise<void>;
+  initialize: () => Promise<() => void>;  // 返回清理函数（支持引用计数）
   loadAgents: () => Promise<void>;
   loadTemplates: () => Promise<void>;
   addAgent: (type: string, options?: AddAgentOptions) => Promise<AgentInfo[]>;
@@ -58,20 +62,37 @@ export const useAgentStore = create<AgentStoreState>()(
 
       /**
        * 初始化 Store
+       * 使用引用计数支持多组件同时使用
+       * 返回清理函数以支持 React StrictMode 正确清理
        */
       initialize: async () => {
         const isElectron = isElectronEnv();
         set({ isElectron });
 
+        // 返回空清理函数如果不在 Electron 环境
         if (!isElectron) {
-          return;
+          return () => {};
         }
 
-        // 加载数据
-        await Promise.all([get().loadAgents(), get().loadTemplates()]);
+        // 增加引用计数
+        subscriptionRefCount++;
 
-        // 订阅事件
-        get().subscribeToEvents();
+        // 只有第一个调用者实际执行订阅
+        if (subscriptionRefCount === 1) {
+          // 加载数据
+          await Promise.all([get().loadAgents(), get().loadTemplates()]);
+          // 订阅事件并保存清理函数到模块级变量
+          cleanupFn = get().subscribeToEvents();
+        }
+
+        // 返回清理函数（减少引用计数，最后一个清理时执行实际清理）
+        return () => {
+          subscriptionRefCount--;
+          if (subscriptionRefCount === 0 && cleanupFn) {
+            cleanupFn();
+            cleanupFn = null;
+          }
+        };
       },
 
       /**
@@ -292,11 +313,16 @@ export const useAgentStore = create<AgentStoreState>()(
 
       /**
        * 添加 Agents 到列表
+       * 使用 ID 去重以防止与 loadAgents 竞态导致的重复
        */
       addAgentsToList: (newAgents) => {
-        set((state) => ({
-          agents: [...state.agents, ...newAgents],
-        }));
+        set((state) => {
+          const existingIds = new Set(state.agents.map((a) => a.id));
+          const uniqueNewAgents = newAgents.filter((a) => !existingIds.has(a.id));
+          return {
+            agents: [...state.agents, ...uniqueNewAgents],
+          };
+        });
       },
 
       /**
@@ -310,15 +336,15 @@ export const useAgentStore = create<AgentStoreState>()(
 
       /**
        * 订阅 Electron 事件
+       * 返回清理函数以避免重复订阅（React StrictMode）
        */
       subscribeToEvents: () => {
         const api = getElectronAgentApi();
         if (!api) return () => {};
 
-        // 订阅状态变化
+        // 订阅状态变化 - 使用后端发送的完整状态字符串
         const unsubStatus = api.onStatusChange((data: AgentStatusUpdate) => {
-          const status = data.status.isRunning ? "running" : "stopped";
-          get().updateAgentStatus(data.agentId, status);
+          get().updateAgentStatus(data.agentId, data.status);
         });
 
         // 订阅 Agent 添加

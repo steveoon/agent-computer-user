@@ -1,7 +1,21 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-// Type definitions for renderer process
-export interface AgentInfo {
+/**
+ * Preload 脚本类型定义
+ *
+ * 注意：类型的 canonical source 在 types/agent.ts
+ * 此处仅定义 IPC 通信所需的内部类型，不导出以避免重复定义
+ *
+ * @see types/agent.ts - AgentInfo, AgentStatus, AgentStatusUpdate, AgentTemplate 等
+ */
+
+// ============================================================================
+// Internal Types (与 types/agent.ts 保持一致，仅供 preload 内部使用)
+// ============================================================================
+
+type AgentStatus = "running" | "stopped" | "starting" | "stopping" | "error";
+
+interface AgentInfo {
   id: string;
   type: string;
   name: string;
@@ -9,45 +23,57 @@ export interface AgentInfo {
   appPort: number;
   chromePort: number;
   userDataDir: string;
-  status: "running" | "stopped" | "starting" | "stopping" | "error";
+  status: AgentStatus;
   createdAt: string;
 }
 
-export interface AgentStatus {
-  isRunning: boolean;
-  appPid?: number;
-  chromePid?: number;
-  appHealthy?: boolean;
-  chromeHealthy?: boolean;
+interface AgentStatusUpdate {
+  agentId: string;
+  status: AgentStatus;
   error?: string;
 }
 
-export interface AgentStatusUpdate {
-  agentId: string;
-  status: AgentStatus;
+interface AgentTemplate {
+  name: string;
+  description: string;
+  chromeArgs: string[];
+  env: Record<string, string>;
 }
 
-export interface AppPaths {
+interface Settings {
+  chromeExecutable: string;
+  userDataDirBase: string;
+  logsDir: string;
+  pidsDir: string;
+  healthCheckTimeout: number;
+  healthCheckInterval: number;
+  startPort: number;
+  startChromePort: number;
+}
+
+interface AppPaths {
   userData: string;
   configs: string;
   logs: string;
   pids: string;
 }
 
-export interface PlatformInfo {
+interface PlatformInfo {
   platform: NodeJS.Platform;
   arch: string;
   version: string;
 }
 
-// IPC response type
 interface IpcResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
 }
 
-// Helper to handle IPC responses
+// ============================================================================
+// IPC Helpers
+// ============================================================================
+
 async function handleIpcResponse<T>(
   channel: string,
   ...args: unknown[]
@@ -57,26 +83,6 @@ async function handleIpcResponse<T>(
     throw new Error(response.error ?? "Unknown error");
   }
   return response.data as T;
-}
-
-// Agent template type
-export interface AgentTemplate {
-  name: string;
-  description: string;
-  chromeArgs: string[];
-  env: Record<string, string>;
-}
-
-// Settings type
-export interface Settings {
-  chromeExecutable: string;
-  userDataDirBase: string;
-  logsDir: string;
-  pidsDir: string;
-  healthCheckTimeout: number;
-  healthCheckInterval: number;
-  startPort: number;
-  startChromePort: number;
 }
 
 // Agent management API

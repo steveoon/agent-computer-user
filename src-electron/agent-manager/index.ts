@@ -45,6 +45,8 @@ export class AgentManager extends EventEmitter {
   // Runtime status tracking
   private runtimeStatus: Map<string, AgentRuntimeStatus> = new Map();
   private operationLocks: Set<string> = new Set();
+  // 过渡状态单独管理，避免与 runtimeStatus 中的健康检查状态冲突
+  private transitionStates: Map<string, "starting" | "stopping"> = new Map();
 
   constructor(options: AgentManagerOptions) {
     super();
@@ -539,19 +541,27 @@ export class AgentManager extends EventEmitter {
 
   /**
    * Get agent status
-   * An agent is considered "running" only when both Chrome and app are healthy
+   * 优先检查过渡状态，然后检查实际运行状态
    */
   private async getAgentStatus(agentId: string): Promise<AgentStatus> {
-    const runtime = this.runtimeStatus.get(agentId);
+    // 1. 优先检查过渡状态 (starting/stopping)
+    const transition = this.transitionStates.get(agentId);
+    if (transition) {
+      return transition;
+    }
 
+    // 2. 检查运行时状态
+    const runtime = this.runtimeStatus.get(agentId);
     if (!runtime) {
       return "stopped";
     }
 
+    // 3. 检查错误状态
     if (runtime.error) {
       return "error";
     }
 
+    // 4. 根据健康检查判断运行状态
     // Both services must be running for agent to be considered fully running
     if (runtime.isRunning && runtime.chromeHealthy && runtime.appHealthy) {
       return "running";
@@ -587,11 +597,39 @@ export class AgentManager extends EventEmitter {
 
   /**
    * Update agent status and emit event
+   * 过渡状态通过 transitionStates 管理，最终状态通过 runtimeStatus 管理
    */
   private updateStatus(agentId: string, status: AgentStatus, error?: string): void {
+    // 管理过渡状态
+    if (status === "starting" || status === "stopping") {
+      this.transitionStates.set(agentId, status);
+    } else {
+      this.transitionStates.delete(agentId);
+    }
+
+    // 更新运行时状态
     const runtime = this.runtimeStatus.get(agentId);
     if (runtime) {
       runtime.error = error;
+      // 根据状态更新健康检查字段
+      if (status === "running") {
+        runtime.isRunning = true;
+        runtime.appHealthy = true;
+        runtime.chromeHealthy = true;
+      } else if (status === "stopped" || status === "error") {
+        runtime.isRunning = false;
+        runtime.appHealthy = false;
+        runtime.chromeHealthy = false;
+      }
+    } else if (status !== "starting" && status !== "stopping") {
+      // 只有非过渡状态才创建新的 runtime 记录
+      this.runtimeStatus.set(agentId, {
+        id: agentId,
+        isRunning: status === "running",
+        appHealthy: status === "running",
+        chromeHealthy: status === "running",
+        error,
+      });
     }
 
     this.emit("agent:status", { agentId, status, error });
@@ -713,6 +751,14 @@ export function getAgentManager(options?: AgentManagerOptions): AgentManager {
     throw new Error("AgentManager not initialized. Call with options first.");
   }
 
+  return instance;
+}
+
+/**
+ * Safe version of getAgentManager that returns null instead of throwing
+ * Useful for IPC handlers where AgentManager might not be initialized yet
+ */
+export function getAgentManagerSafe(): AgentManager | null {
   return instance;
 }
 

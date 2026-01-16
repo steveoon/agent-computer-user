@@ -71,11 +71,20 @@ export class ChromeLauncher {
 
       const logPath = path.join(this.logsPath, `${id}-chrome.log`);
       const logFd = fs.openSync(logPath, "a");
+      let chromeProcess: ChildProcess;
 
-      const chromeProcess = spawn(chromePath, chromeArgs, {
-        detached: true,
-        stdio: ["ignore", logFd, logFd],
-      });
+      try {
+        chromeProcess = spawn(chromePath, chromeArgs, {
+          detached: true,
+          stdio: ["ignore", logFd, logFd],
+        });
+      } finally {
+        try {
+          fs.closeSync(logFd);
+        } catch {
+          // Ignore
+        }
+      }
 
       // Don't wait for the process (detached)
       chromeProcess.unref();
@@ -249,10 +258,12 @@ export class ChromeLauncher {
     // Check for Chrome lock file
     const lockFile = path.join(userDataDir, "SingletonLock");
     try {
-      // On Unix, SingletonLock is a symlink
-      const stat = fs.lstatSync(lockFile);
-      if (stat.isSymbolicLink()) {
-        return true;
+      if (process.platform !== "win32") {
+        // On Unix, SingletonLock is a symlink
+        const stat = fs.lstatSync(lockFile);
+        if (stat.isSymbolicLink()) {
+          return true;
+        }
       }
     } catch {
       // Lock file doesn't exist
@@ -268,7 +279,21 @@ export class ChromeLauncher {
    */
   private findPidByUserDataDir(userDataDir: string): number | null {
     try {
-      if (process.platform !== "win32") {
+      if (process.platform === "win32") {
+        const escapedDir = userDataDir.replace(/'/g, "''");
+        const psCommand =
+          "Get-CimInstance Win32_Process | " +
+          `Where-Object { $_.CommandLine -like '*--user-data-dir=${escapedDir}*' } | ` +
+          "Select-Object -First 1 -ExpandProperty ProcessId";
+        const output = execSync(`powershell -NoProfile -Command "${psCommand}"`, {
+          encoding: "utf-8",
+        }).trim();
+
+        if (output) {
+          const pid = parseInt(output.split(/\s+/)[0], 10);
+          return isNaN(pid) ? null : pid;
+        }
+      } else {
         const output = execSync(`pgrep -f "user-data-dir=${userDataDir}" 2>/dev/null`, {
           encoding: "utf-8",
         }).trim();

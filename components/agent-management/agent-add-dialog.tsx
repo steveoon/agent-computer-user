@@ -51,6 +51,12 @@ export function AgentAddDialog({ trigger, onSuccess }: AgentAddDialogProps) {
       return;
     }
 
+    // 验证数量范围
+    if (count < 1 || count > 10) {
+      toast.error("数量必须在 1-10 之间");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const options: { id?: string; count?: number } = {};
@@ -153,7 +159,11 @@ export function AgentAddDialog({ trigger, onSuccess }: AgentAddDialogProps) {
                 min={1}
                 max={10}
                 value={count}
-                onChange={(e) => setCount(parseInt(e.target.value) || 1)}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  // 限制在有效范围内，空值默认为 1
+                  setCount(isNaN(value) ? 1 : Math.max(1, Math.min(10, value)));
+                }}
                 className="h-9 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 w-24"
               />
             </div>

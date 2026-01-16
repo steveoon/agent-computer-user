@@ -77,7 +77,13 @@ export type TemplatesFile = z.infer<typeof TemplatesFileSchema>;
 // ============================================================================
 
 /**
+ * Agent status for UI display
+ */
+export type AgentStatus = "running" | "stopped" | "starting" | "stopping" | "error";
+
+/**
  * Runtime status of an agent
+ * Note: 过渡状态 (starting/stopping) 由 AgentManager.transitionStates 单独管理
  */
 export interface AgentRuntimeStatus {
   id: string;
@@ -88,11 +94,6 @@ export interface AgentRuntimeStatus {
   chromeHealthy: boolean;
   error?: string;
 }
-
-/**
- * Agent status for UI display
- */
-export type AgentStatus = "running" | "stopped" | "starting" | "stopping" | "error";
 
 /**
  * Agent info combining config and runtime status

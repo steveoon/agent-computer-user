@@ -1,5 +1,6 @@
 import { ipcMain, shell, app } from "electron";
 import fs from "fs";
+import { getAgentManagerSafe } from "../agent-manager";
 import { getDefaultChromePath } from "../agent-manager/types";
 
 /**
@@ -13,29 +14,38 @@ export function registerSystemHandlers(): void {
 
   /**
    * Get Chrome executable path
+   * Falls back to platform default if AgentManager not initialized
    */
   ipcMain.handle("chrome:get-path", async () => {
-    try {
-      const chromePath = getDefaultChromePath();
-      return chromePath;
-    } catch (error) {
-      console.error("Failed to get Chrome path:", error);
-      return null;
-    }
+    const agentManager = getAgentManagerSafe();
+    const chromePath = agentManager?.getSettings()?.chromeExecutable;
+    return chromePath ?? getDefaultChromePath();
   });
 
   /**
    * Set Chrome executable path (updates settings)
-   * Note: This would need AgentManager integration for persistence
+   * Persists the path to AgentManager configuration
    */
   ipcMain.handle("chrome:set-path", async (_event, chromePath: string) => {
+    // Validate path exists
+    if (!fs.existsSync(chromePath)) {
+      return {
+        success: false,
+        error: `Chrome executable not found at: ${chromePath}`,
+      };
+    }
+
+    // Check if AgentManager is initialized
+    const agentManager = getAgentManagerSafe();
+    if (!agentManager) {
+      return {
+        success: false,
+        error: "AgentManager not initialized yet",
+      };
+    }
+
     try {
-      // Validate path exists
-      if (!fs.existsSync(chromePath)) {
-        throw new Error(`Chrome executable not found at: ${chromePath}`);
-      }
-      // Note: Actual persistence would require AgentManager.updateSettings()
-      // For now, just validate the path
+      await agentManager.updateSettings({ chromeExecutable: chromePath });
       return { success: true };
     } catch (error) {
       return {
@@ -47,14 +57,12 @@ export function registerSystemHandlers(): void {
 
   /**
    * Check if Chrome is available
+   * Falls back to platform default if AgentManager not initialized
    */
   ipcMain.handle("chrome:is-available", async () => {
-    try {
-      const chromePath = getDefaultChromePath();
-      return fs.existsSync(chromePath);
-    } catch {
-      return false;
-    }
+    const agentManager = getAgentManagerSafe();
+    const chromePath = agentManager?.getSettings()?.chromeExecutable ?? getDefaultChromePath();
+    return fs.existsSync(chromePath);
   });
 
   // ============================================================================

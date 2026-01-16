@@ -43,17 +43,12 @@ export interface AddAgentOptions {
 
 /**
  * Agent 状态更新
+ * 与后端 AgentManager.emit("agent:status", { agentId, status, error }) 保持一致
  */
 export interface AgentStatusUpdate {
   agentId: string;
-  status: {
-    isRunning: boolean;
-    appPid?: number;
-    chromePid?: number;
-    appHealthy?: boolean;
-    chromeHealthy?: boolean;
-    error?: string;
-  };
+  status: AgentStatus;  // 直接使用状态字符串
+  error?: string;
 }
 
 /**

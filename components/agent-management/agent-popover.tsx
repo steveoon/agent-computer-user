@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Bot,
   Play,
@@ -55,9 +55,30 @@ export function AgentPopover() {
 
   const runningCount = useAgentStore(selectRunningAgentCount);
 
-  // 初始化
+  // 使用 ref 跟踪清理函数，解决 async 竞态问题
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const isMountedRef = useRef(true);
+
+  // 初始化并订阅事件，组件卸载时清理
   useEffect(() => {
-    initialize();
+    isMountedRef.current = true;
+
+    const setup = async () => {
+      const cleanup = await initialize();
+      // 如果在初始化完成前已卸载，立即调用清理
+      if (!isMountedRef.current) {
+        cleanup();
+      } else {
+        cleanupRef.current = cleanup;
+      }
+    };
+    setup();
+
+    return () => {
+      isMountedRef.current = false;
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+    };
   }, [initialize]);
 
   // 不在 Electron 环境中不渲染

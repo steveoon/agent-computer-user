@@ -109,8 +109,21 @@ export async function selectTabByUrl(
       };
     }
 
-    // List all tabs
-    const tabs = await listBrowserTabs();
+    // 直接执行 list 操作，复用 tools 对象，避免调用 listBrowserTabs() 导致的重复 client.tools()
+    const TIMEOUT_MS = 15000;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(
+        () =>
+          reject(new Error(`browser_tabs 操作超时 (${TIMEOUT_MS / 1000}秒)`)),
+        TIMEOUT_MS
+      );
+    });
+
+    const listResult = await Promise.race([
+      tools.browser_tabs.execute({ action: "list" }),
+      timeoutPromise,
+    ]);
+    const tabs = parseTabsResult(listResult);
 
     // Find matching tab
     const pattern =
