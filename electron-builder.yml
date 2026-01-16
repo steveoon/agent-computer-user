@@ -1,6 +1,6 @@
-appId: com.aiagent.recruitment-assistant
-productName: AI Recruitment Assistant
-copyright: Copyright 2025
+appId: com.huajuan.recruitment-assistant
+productName: 花卷-Huajuan
+copyright: Copyright 2025 Huajuan
 
 # Disable asar to allow Next.js standalone to work properly
 asar: false
@@ -37,9 +37,17 @@ extraResources:
     filter:
       - "**/*"
 
+# Icon configuration
+# electron-builder will look for:
+# - mac: resources/icons/icon.icns
+# - win: resources/icons/icon.ico
+# - linux: resources/icons/icon.png
+icon: resources/icons/icon
+
 # macOS configuration
 mac:
   category: public.app-category.business
+  icon: resources/icons/icon.icns
   target:
     - target: dir
       arch:
@@ -68,6 +76,7 @@ dmg:
 
 # Windows configuration
 win:
+  icon: resources/icons/icon.ico
   target:
     - target: nsis
       arch:
@@ -87,6 +96,7 @@ nsis:
 
 # Linux configuration (optional)
 linux:
+  icon: resources/icons
   target:
     - AppImage
     - deb
