@@ -2,7 +2,7 @@ import { app, BrowserWindow, protocol, dialog } from "electron";
 import { createHandler } from "next-electron-rsc";
 import path from "path";
 import fs from "fs";
-import { execSync } from "child_process";
+import { fixPath } from "./fix-path";
 import { initializeAgentManager, getAgentManager } from "./agent-manager";
 import { registerAgentHandlers, unregisterAgentHandlers } from "./ipc/agent-handlers";
 import { registerSystemHandlers, unregisterSystemHandlers } from "./ipc/system-handlers";
@@ -14,47 +14,7 @@ import {
   isDebugModeRequested,
 } from "./logger";
 
-/**
- * Fix PATH for macOS/Linux GUI apps (when launched via Finder double-click)
- *
- * When an Electron app is launched by double-clicking the icon in Finder,
- * it doesn't inherit the user's shell PATH. This causes issues when trying
- * to spawn commands like `npx` that are installed via Homebrew or nvm.
- *
- * This function reads the PATH from the user's default shell and merges it
- * with the current process.env.PATH.
- */
-function fixPath(): void {
-  if (process.platform !== "darwin" && process.platform !== "linux") {
-    return;
-  }
-
-  try {
-    const shell = process.env.SHELL || "/bin/zsh";
-    // Use login shell (-l) to get the full PATH including .zshrc/.bashrc configs
-    const shellPath = execSync(`${shell} -ilc 'echo -n $PATH'`, {
-      encoding: "utf8",
-      timeout: 5000,
-      // Suppress stderr to avoid noise from shell startup
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-
-    if (shellPath) {
-      const currentPath = process.env.PATH || "";
-      // Merge paths, putting shell paths first (they usually have priority)
-      const mergedPaths = new Set([
-        ...shellPath.split(":"),
-        ...currentPath.split(":"),
-      ]);
-      process.env.PATH = [...mergedPaths].filter(Boolean).join(":");
-    }
-  } catch (error) {
-    // Silently fail - this is best-effort
-    console.error("[fixPath] Failed to fix PATH:", error);
-  }
-}
-
-// Fix PATH before any other code runs
+// Fix PATH before any other code runs (for macOS/Linux GUI apps)
 fixPath();
 
 // Clear early log and record startup

@@ -68,17 +68,31 @@ export function AgentPopover() {
 
   // 检测 macOS 平台并判断是否显示提示
   useEffect(() => {
+    let isMounted = true;
+
     if (typeof window !== "undefined" && window.electronApi?.system) {
-      window.electronApi.system.getPlatform().then((info) => {
-        const isMac = info.platform === "darwin";
-        setIsMacOS(isMac);
-        // 只在 macOS 上显示提示，且用户未关闭过
-        if (isMac) {
-          const dismissed = localStorage.getItem(MACOS_HINT_DISMISSED_KEY);
-          setShowMacOSHint(!dismissed);
-        }
-      });
+      window.electronApi.system
+        .getPlatform()
+        .then((info) => {
+          // 避免组件卸载后 setState
+          if (!isMounted) return;
+
+          const isMac = info.platform === "darwin";
+          setIsMacOS(isMac);
+          // 只在 macOS 上显示提示，且用户未关闭过
+          if (isMac) {
+            const dismissed = localStorage.getItem(MACOS_HINT_DISMISSED_KEY);
+            setShowMacOSHint(!dismissed);
+          }
+        })
+        .catch(() => {
+          // IPC 失败时静默处理，不影响主功能
+        });
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // 初始化并订阅事件，组件卸载时清理

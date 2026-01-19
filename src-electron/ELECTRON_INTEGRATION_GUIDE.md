@@ -462,6 +462,11 @@ import { execSync } from "child_process";
 
 /**
  * Fix PATH for macOS/Linux GUI apps (when launched via Finder double-click)
+ *
+ * Shell configuration files:
+ * - Login shell (-l): reads .bash_profile/.zprofile
+ * - Interactive shell (-i): reads .bashrc/.zshrc
+ * - Most users put PATH in .bashrc/.zshrc, so we need -il to capture both
  */
 function fixPath(): void {
   if (process.platform !== "darwin" && process.platform !== "linux") {
@@ -469,24 +474,49 @@ function fixPath(): void {
   }
 
   try {
-    const shell = process.env.SHELL || "/bin/zsh";
-    // Use login shell (-l) to get the full PATH including .zshrc/.bashrc configs
-    const shellPath = execSync(`${shell} -ilc 'echo -n $PATH'`, {
+    // Platform-aware default shell
+    const defaultShell = process.platform === "darwin" ? "/bin/zsh" : "/bin/bash";
+    const shell = process.env.SHELL || defaultShell;
+    const isFish = shell.includes("fish");
+
+    // Use -il (interactive login) to load both .profile AND .bashrc/.zshrc
+    const command = isFish
+      ? `${shell} -lc 'echo $PATH'`
+      : `${shell} -ilc 'echo -n "$PATH"'`;
+
+    const output = execSync(command, {
       encoding: "utf8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     });
 
-    if (shellPath) {
-      const currentPath = process.env.PATH || "";
-      const mergedPaths = new Set([
-        ...shellPath.split(":"),
-        ...currentPath.split(":"),
-      ]);
-      process.env.PATH = [...mergedPaths].filter(Boolean).join(":");
+    // Clean output and extract valid PATH
+    const cleanedOutput = output
+      .replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "")  // Remove ANSI codes
+      .replace(/[\x00-\x09\x0B\x0C\x0E-\x1F]/g, ""); // Remove control chars
+
+    const separator = isFish ? " " : ":";
+    const pathPattern = isFish
+      ? /^(\/[^\s]+\s*)+$/
+      : /^(\/[^:]+:)*\/[^:]+$/;
+
+    // Find line matching PATH pattern
+    const lines = cleanedOutput.split("\n").map((l) => l.trim()).filter(Boolean);
+    let extractedPath = lines.find((line) => pathPattern.test(line) && line.length > 10);
+
+    // Fallback: last line starting with /
+    if (!extractedPath && lines.length > 0) {
+      const lastLine = lines[lines.length - 1];
+      if (lastLine.startsWith("/")) extractedPath = lastLine;
     }
-  } catch (error) {
-    console.error("[fixPath] Failed to fix PATH:", error);
+
+    if (extractedPath) {
+      const shellPaths = extractedPath.split(separator).filter((p) => p.startsWith("/"));
+      const currentPaths = (process.env.PATH || "").split(":").filter(Boolean);
+      process.env.PATH = [...new Set([...shellPaths, ...currentPaths])].join(":");
+    }
+  } catch {
+    // Silently fail - this is best-effort
   }
 }
 

@@ -205,6 +205,12 @@ const chromeApi = {
   isAvailable: (): Promise<boolean> => ipcRenderer.invoke("chrome:is-available"),
 };
 
+// IPC operation result type
+interface IpcResult {
+  success: boolean;
+  error?: string;
+}
+
 // System API
 const systemApi = {
   // Get app paths
@@ -215,11 +221,11 @@ const systemApi = {
     ipcRenderer.invoke("system:get-platform"),
 
   // Open external URL
-  openExternal: (url: string): Promise<void> =>
+  openExternal: (url: string): Promise<IpcResult> =>
     ipcRenderer.invoke("system:open-external", url),
 
   // Show file in folder
-  showItemInFolder: (filePath: string): Promise<void> =>
+  showItemInFolder: (filePath: string): Promise<IpcResult> =>
     ipcRenderer.invoke("system:show-in-folder", filePath),
 };
 

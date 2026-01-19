@@ -110,13 +110,21 @@ export interface AppPaths {
 }
 
 /**
+ * IPC 操作结果
+ */
+export interface IpcResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
  * Electron System API 类型
  */
 export interface ElectronSystemApi {
   getPaths: () => Promise<AppPaths>;
   getPlatform: () => Promise<PlatformInfo>;
-  openExternal: (url: string) => Promise<void>;
-  showItemInFolder: (filePath: string) => Promise<void>;
+  openExternal: (url: string) => Promise<IpcResult>;
+  showItemInFolder: (filePath: string) => Promise<IpcResult>;
 }
 
 // 扩展 Window 类型以支持 Electron API
