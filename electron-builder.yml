@@ -52,9 +52,11 @@ mac:
     - target: dir
       arch:
         - arm64
+        - x64
     - target: dmg
       arch:
         - arm64
+        - x64
   hardenedRuntime: false
   gatekeeperAssess: false
   entitlements: resources/entitlements.mac.plist
