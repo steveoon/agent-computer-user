@@ -158,11 +158,13 @@ export async function POST(req: Request) {
     dulidayToken,
     defaultWechatId,
     maxSteps,
+    agentId,
   }: ChatRequestBody = await req.json();
 
   // 📊 Set up recruitment event context for tracking
+  // 优先级：请求传入 > 环境变量 > default
   const eventContext: RecruitmentContext = {
-    agentId: process.env.AGENT_ID || "default",
+    agentId: agentId || process.env.AGENT_ID || "default",
     sourcePlatform: SourcePlatform.ZHIPIN,
     apiSource: ApiSource.WEB,
     // brandId is not available in configData for web route

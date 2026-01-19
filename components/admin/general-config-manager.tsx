@@ -31,6 +31,7 @@ import {
 import { toast } from "sonner";
 import type { BrandPriorityStrategy } from "@/types";
 import { useModelConfigStore } from "@/lib/stores/model-config-store";
+import { isValidAgentId } from "@/lib/constants/agent";
 
 interface TokenStatus {
   isValid: boolean;
@@ -58,7 +59,7 @@ export const GeneralConfigManager = ({
   onStrategyChange,
 }: GeneralConfigManagerProps) => {
   // Agent 配置
-  const { maxSteps, setMaxSteps } = useModelConfigStore();
+  const { maxSteps, setMaxSteps, agentId, setAgentId } = useModelConfigStore();
 
   // Token 相关状态
   const [token, setToken] = useState("");
@@ -716,6 +717,32 @@ export const GeneralConfigManager = ({
                 </div>
               </div>
 
+              {/* Agent ID 配置 */}
+              <div className="space-y-3 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="agent-id">Agent 标识符</Label>
+                  {agentId && (
+                    <Badge variant="outline">{agentId}</Badge>
+                  )}
+                </div>
+                <Input
+                  id="agent-id"
+                  type="text"
+                  value={agentId}
+                  onChange={e => setAgentId(e.target.value)}
+                  placeholder="留空使用环境变量或默认值"
+                  className={agentId && !isValidAgentId(agentId) ? "border-red-500" : ""}
+                />
+                {agentId && !isValidAgentId(agentId) && (
+                  <p className="text-sm text-red-500">
+                    格式无效：必须以字母或数字开头，只能包含字母、数字、下划线或连字符
+                  </p>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  用于在埋点数据中区分不同的实例。留空将使用环境变量 AGENT_ID 或默认值 "default"。
+                </p>
+              </div>
+
               {/* 使用说明 */}
               <details className="text-sm">
                 <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
@@ -724,6 +751,7 @@ export const GeneralConfigManager = ({
                 <ul className="text-muted-foreground space-y-1 mt-2 ml-4">
                   <li>• 每次工具调用计为一轮，达到限制时可点击"继续"按钮</li>
                   <li>• 处理多个候选人时，建议设置 50-100 轮</li>
+                  <li>• Agent ID 用于在埋点和日志中区分不同的应用实例</li>
                 </ul>
               </details>
             </AccordionContent>

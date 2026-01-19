@@ -6,6 +6,7 @@ import {
   DEFAULT_PROVIDER_CONFIGS,
   MODEL_DICTIONARY,
 } from "@/lib/config/models";
+import { isValidAgentId } from "@/lib/constants/agent";
 
 /**
  * 🤖 模型配置管理Store
@@ -22,6 +23,7 @@ interface ModelConfigState {
 
   // Agent配置
   maxSteps: number; // Agent最大处理轮数 (1-500)
+  agentId: string; // Agent 标识符，空字符串表示使用环境变量/default
 }
 
 interface ModelConfigActions {
@@ -37,6 +39,7 @@ interface ModelConfigActions {
 
   // Agent配置方法
   setMaxSteps: (steps: number) => void;
+  setAgentId: (id: string) => void;
 
   // 重置方法
   resetToDefaults: () => void;
@@ -99,6 +102,7 @@ export const useModelConfigStore = create<ModelConfigStore>()(
       replyModel: DEFAULT_MODEL_CONFIG.replyModel,
       providerConfigs: { ...DEFAULT_PROVIDER_CONFIGS },
       maxSteps: 30, // 默认30轮
+      agentId: "", // 默认空，使用环境变量或 default
 
       // 模型配置方法
       setChatModel: (model: ModelId) => {
@@ -153,6 +157,16 @@ export const useModelConfigStore = create<ModelConfigStore>()(
         console.log(`[MODEL CONFIG] Agent最大轮数已更新为: ${validSteps}`);
       },
 
+      setAgentId: (id: string) => {
+        // 允许空字符串（表示使用 env/default）
+        if (id && !isValidAgentId(id)) {
+          console.warn(`[MODEL CONFIG] 无效的 Agent ID: ${id}，已忽略`);
+          return;
+        }
+        set({ agentId: id });
+        console.log(`[MODEL CONFIG] Agent ID 已更新为: ${id || "(使用环境变量/default)"}`);
+      },
+
       // 重置所有配置
       resetToDefaults: () => {
         set({
@@ -161,6 +175,7 @@ export const useModelConfigStore = create<ModelConfigStore>()(
           replyModel: DEFAULT_MODEL_CONFIG.replyModel,
           providerConfigs: { ...DEFAULT_PROVIDER_CONFIGS },
           maxSteps: 30,
+          agentId: "",
         });
         console.log(`[MODEL CONFIG] 所有配置已重置为默认值`);
       },
@@ -173,6 +188,7 @@ export const useModelConfigStore = create<ModelConfigStore>()(
         replyModel: state.replyModel,
         providerConfigs: state.providerConfigs,
         maxSteps: state.maxSteps,
+        agentId: state.agentId,
       }),
       // 自定义合并逻辑：解决新增Provider被覆盖的问题和无效模型ID问题
       merge: (persistedState, currentState) => {
@@ -206,6 +222,8 @@ export const useModelConfigStore = create<ModelConfigStore>()(
           maxSteps: persisted.maxSteps
             ? Math.max(1, Math.min(500, persisted.maxSteps))
             : 30,
+          // 恢复 agentId（验证类型）
+          agentId: typeof persisted.agentId === "string" ? persisted.agentId : "",
         };
       },
     }
@@ -218,6 +236,7 @@ export const useClassifyModel = () => useModelConfigStore(state => state.classif
 export const useReplyModel = () => useModelConfigStore(state => state.replyModel);
 export const useProviderConfigs = () => useModelConfigStore(state => state.providerConfigs);
 export const useMaxSteps = () => useModelConfigStore(state => state.maxSteps);
+export const useAgentId = () => useModelConfigStore(state => state.agentId);
 
 // 获取特定provider的配置
 export const useProviderConfig = (provider: string) =>

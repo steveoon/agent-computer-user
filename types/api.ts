@@ -36,6 +36,7 @@ export const ChatRequestBodySchema = z.object({
   dulidayToken: z.string().optional(),
   defaultWechatId: z.string().optional(), // 默认微信号
   maxSteps: z.number().min(1).max(500).optional(), // Agent最大处理轮数
+  agentId: z.string().optional(), // Agent 标识符
 });
 
 /**
@@ -58,6 +59,7 @@ export interface ChatRequestBody {
   dulidayToken?: string;
   defaultWechatId?: string; // 默认微信号
   maxSteps?: number; // Agent最大处理轮数 (1-500)
+  agentId?: string; // Agent 标识符
 }
 
 /**
