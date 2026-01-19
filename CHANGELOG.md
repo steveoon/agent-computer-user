@@ -2,6 +2,18 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.25.0-develop.4](https://github.com/steveoon/agent-computer-user/compare/v1.25.0-develop.3...v1.25.0-develop.4) (2026-01-19)
+
+
+### Bug Fixes
+
+* **electron:** 修复 macOS GUI 应用 PATH 环境变量缺失问题 ([78ef372](https://github.com/steveoon/agent-computer-user/commit/78ef372091901e2997c091385a8666482b72e2f9))
+
+
+### Features
+
+* **config:** 支持主 App 配置 agentId 标识符 ([dc7de56](https://github.com/steveoon/agent-computer-user/commit/dc7de5646c6e1c023be99ffa76ade5453e665f82))
+
 # [1.25.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.25.0-develop.2...v1.25.0-develop.3) (2026-01-16)
 
 
