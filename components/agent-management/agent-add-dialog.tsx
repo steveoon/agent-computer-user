@@ -142,7 +142,13 @@ export function AgentAddDialog({ trigger, onSuccess }: AgentAddDialogProps) {
               <Input
                 id="customId"
                 value={customId}
-                onChange={(e) => setCustomId(e.target.value)}
+                onChange={(e) => {
+                  setCustomId(e.target.value);
+                  // 填写自定义 ID 时，强制数量为 1
+                  if (e.target.value.trim()) {
+                    setCount(1);
+                  }
+                }}
                 placeholder="留空则自动生成"
                 className="h-9 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
               />
@@ -157,15 +163,22 @@ export function AgentAddDialog({ trigger, onSuccess }: AgentAddDialogProps) {
                 id="count"
                 type="number"
                 min={1}
-                max={10}
+                max={customId.trim() ? 1 : 10}
                 value={count}
                 onChange={(e) => {
                   const value = parseInt(e.target.value);
+                  const max = customId.trim() ? 1 : 10;
                   // 限制在有效范围内，空值默认为 1
-                  setCount(isNaN(value) ? 1 : Math.max(1, Math.min(10, value)));
+                  setCount(isNaN(value) ? 1 : Math.max(1, Math.min(max, value)));
                 }}
-                className="h-9 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 w-24"
+                disabled={!!customId.trim()}
+                className="h-9 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 w-24 disabled:opacity-50 disabled:cursor-not-allowed"
               />
+              {customId.trim() && (
+                <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                  自定义 ID 时只能添加 1 个
+                </p>
+              )}
             </div>
           </div>
 

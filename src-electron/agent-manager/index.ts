@@ -644,11 +644,11 @@ export class AgentManager extends EventEmitter {
       .map((a) => a.id) ?? [];
 
     let counter = 1;
-    let id = `${type}_${counter}`;
+    let id = `${type}-${counter}`;
 
     while (existingIds.includes(id)) {
       counter++;
-      id = `${type}_${counter}`;
+      id = `${type}-${counter}`;
     }
 
     return id;
