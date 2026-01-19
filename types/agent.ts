@@ -90,6 +90,35 @@ export function getElectronAgentApi(): ElectronAgentApi | null {
   return window.electronApi?.agent as ElectronAgentApi;
 }
 
+/**
+ * 平台信息
+ */
+export interface PlatformInfo {
+  platform: NodeJS.Platform;
+  arch: string;
+  version: string;
+}
+
+/**
+ * 应用路径信息
+ */
+export interface AppPaths {
+  userData: string;
+  configs: string;
+  logs: string;
+  pids: string;
+}
+
+/**
+ * Electron System API 类型
+ */
+export interface ElectronSystemApi {
+  getPaths: () => Promise<AppPaths>;
+  getPlatform: () => Promise<PlatformInfo>;
+  openExternal: (url: string) => Promise<void>;
+  showItemInFolder: (filePath: string) => Promise<void>;
+}
+
 // 扩展 Window 类型以支持 Electron API
 declare global {
   interface Window {
@@ -97,7 +126,7 @@ declare global {
       isElectron: boolean;
       agent: ElectronAgentApi;
       chrome: unknown;
-      system: unknown;
+      system: ElectronSystemApi;
     };
   }
 }

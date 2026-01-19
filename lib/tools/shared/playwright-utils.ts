@@ -123,6 +123,7 @@ export async function selectTabByUrl(
       tools.browser_tabs.execute({ action: "list" }),
       timeoutPromise,
     ]);
+
     const tabs = parseTabsResult(listResult);
 
     // Find matching tab

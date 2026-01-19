@@ -11,6 +11,8 @@ import {
   RefreshCw,
   Plus,
   Eraser,
+  Info,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,9 +37,14 @@ import { useRouter } from "next/navigation";
  * Agent 快捷管理面板
  * 显示在 ChatHeader 中的 Popover
  */
+// localStorage key for macOS permission hint dismissal
+const MACOS_HINT_DISMISSED_KEY = "agent-macos-permission-hint-dismissed";
+
 export function AgentPopover() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [isMacOS, setIsMacOS] = useState(false);
+  const [showMacOSHint, setShowMacOSHint] = useState(false);
   const {
     agents,
     loading,
@@ -58,6 +65,21 @@ export function AgentPopover() {
   // 使用 ref 跟踪清理函数，解决 async 竞态问题
   const cleanupRef = useRef<(() => void) | null>(null);
   const isMountedRef = useRef(true);
+
+  // 检测 macOS 平台并判断是否显示提示
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.electronApi?.system) {
+      window.electronApi.system.getPlatform().then((info) => {
+        const isMac = info.platform === "darwin";
+        setIsMacOS(isMac);
+        // 只在 macOS 上显示提示，且用户未关闭过
+        if (isMac) {
+          const dismissed = localStorage.getItem(MACOS_HINT_DISMISSED_KEY);
+          setShowMacOSHint(!dismissed);
+        }
+      });
+    }
+  }, []);
 
   // 初始化并订阅事件，组件卸载时清理
   useEffect(() => {
@@ -80,6 +102,12 @@ export function AgentPopover() {
       cleanupRef.current = null;
     };
   }, [initialize]);
+
+  // 关闭 macOS 权限提示
+  const dismissMacOSHint = () => {
+    setShowMacOSHint(false);
+    localStorage.setItem(MACOS_HINT_DISMISSED_KEY, "true");
+  };
 
   // 不在 Electron 环境中不渲染
   if (!isElectron) {
@@ -193,6 +221,29 @@ export function AgentPopover() {
             >
               关闭
             </Button>
+          </div>
+        )}
+
+        {/* macOS 权限提示 */}
+        {isMacOS && showMacOSHint && (
+          <div className="px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-800/30">
+            <div className="flex items-start gap-2">
+              <Info className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
+                  首次启动 Agent 时，macOS 会要求授权「App 管理」权限。
+                  请在弹出的系统设置窗口中开启本应用的开关。
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-4 w-4 p-0 hover:bg-amber-100 dark:hover:bg-amber-800/30 rounded flex-shrink-0"
+                onClick={dismissMacOSHint}
+              >
+                <X className="h-3 w-3 text-amber-500" />
+              </Button>
+            </div>
           </div>
         )}
 

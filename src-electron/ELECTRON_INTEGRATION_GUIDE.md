@@ -12,6 +12,7 @@
 6. [next-electron-rsc 配置](#6-next-electron-rsc-配置)
 7. [macOS Gatekeeper / Quarantine 属性](#7-macos-gatekeeper--quarantine-属性)
 8. [Next.js standalone 静态资源缺失](#8-nextjs-standalone-静态资源缺失)
+9. [macOS GUI 应用 PATH 环境变量缺失](#9-macos-gui-应用-path-环境变量缺失)
 
 ---
 
@@ -411,13 +412,170 @@ ls dist/mac-arm64/xxx.app/Contents/Resources/app/.next/standalone/public
 
 ---
 
+## 9. macOS GUI 应用 PATH 环境变量缺失
+
+### 问题描述
+
+打包后的应用通过 **双击图标** 启动时，调用 `child_process.spawn()` 执行 `npx` 命令失败：
+
+```
+Error: spawn npx ENOENT
+```
+
+但通过以下方式启动时一切正常：
+- `pnpm dev` / `pnpm electron:dev`
+- 终端执行 `open /Applications/xxx.app`
+- 终端执行 `/Applications/xxx.app/Contents/MacOS/xxx`
+
+### 原因分析
+
+这是 **macOS 的设计行为**，不是 bug。
+
+当通过 Finder 双击图标启动 GUI 应用时，应用 **不会继承** 用户 shell 的环境变量（`.zshrc`、`.bashrc` 等配置的 PATH）。GUI 应用只能获取系统级基础 PATH：
+
+```
+/usr/bin:/bin:/usr/sbin:/sbin
+```
+
+而 `npx`、`node` 等命令通常安装在：
+- Homebrew: `/opt/homebrew/bin` 或 `/usr/local/bin`
+- nvm: `~/.nvm/versions/node/xxx/bin`
+- volta: `~/.volta/bin`
+
+这些路径不在 GUI 应用的 PATH 中，导致 `spawn npx ENOENT`。
+
+### 复现条件对比
+
+| 启动方式 | PATH 来源 | 结果 |
+|---------|----------|------|
+| 终端 `pnpm dev` | 继承 shell 完整 PATH | ✅ 正常 |
+| 终端 `open xxx.app` | 继承 shell 完整 PATH | ✅ 正常 |
+| Finder 双击图标 | 系统基础 PATH | ❌ ENOENT |
+
+### 解决方案
+
+在 Electron 主进程启动时，主动读取用户 shell 的 PATH 并合并到 `process.env.PATH`：
+
+```typescript
+// src-electron/main.ts
+import { execSync } from "child_process";
+
+/**
+ * Fix PATH for macOS/Linux GUI apps (when launched via Finder double-click)
+ */
+function fixPath(): void {
+  if (process.platform !== "darwin" && process.platform !== "linux") {
+    return;
+  }
+
+  try {
+    const shell = process.env.SHELL || "/bin/zsh";
+    // Use login shell (-l) to get the full PATH including .zshrc/.bashrc configs
+    const shellPath = execSync(`${shell} -ilc 'echo -n $PATH'`, {
+      encoding: "utf8",
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    if (shellPath) {
+      const currentPath = process.env.PATH || "";
+      const mergedPaths = new Set([
+        ...shellPath.split(":"),
+        ...currentPath.split(":"),
+      ]);
+      process.env.PATH = [...mergedPaths].filter(Boolean).join(":");
+    }
+  } catch (error) {
+    console.error("[fixPath] Failed to fix PATH:", error);
+  }
+}
+
+// Call immediately at startup, before any spawn() calls
+fixPath();
+```
+
+### 替代方案
+
+#### 方案 1: 使用 fix-path 包
+
+[sindresorhus/fix-path](https://github.com/sindresorhus/fix-path) 是专门解决此问题的 npm 包：
+
+```bash
+pnpm add fix-path
+```
+
+```typescript
+import fixPath from "fix-path";
+fixPath();
+```
+
+**注意**：fix-path v5 是 ESM-only 模块，在 CommonJS 环境（如 Electron 主进程）中需要动态 import 或使用 v4 版本。
+
+#### 方案 2: 使用绝对路径
+
+如果知道命令的确切位置，可以直接使用绝对路径：
+
+```typescript
+// 而不是
+spawn("npx", ["..."]);
+
+// 使用
+spawn("/opt/homebrew/bin/npx", ["..."]);
+```
+
+缺点是路径在不同机器上可能不同。
+
+#### 方案 3: 将依赖打包进应用
+
+将 MCP 服务器等依赖作为项目依赖安装，而不是运行时通过 npx 下载：
+
+```bash
+pnpm add @playwright/mcp
+```
+
+```typescript
+// 使用本地安装的版本
+spawn("node", ["node_modules/@playwright/mcp/cli.js", "--extension"]);
+```
+
+### 调试方法
+
+在主进程启动时打印 PATH：
+
+```typescript
+console.log("Original PATH:", process.env.PATH);
+fixPath();
+console.log("Fixed PATH:", process.env.PATH);
+```
+
+双击启动时，原始 PATH 通常只有 `/usr/bin:/bin:/usr/sbin:/sbin`。
+
+### 社区讨论
+
+这是一个 **广泛存在的问题**，在多个项目中都有讨论：
+
+- [Electron Issue #4628 - OSX path issues](https://github.com/electron/electron/issues/4628)
+- [electron-packager Issue #1580 - spawn ENOENT](https://github.com/electron/packager/issues/1580)
+- [Cline Issue #2886 - spawn npx ENOENT](https://github.com/cline/cline/issues/2886)
+
+### 注意事项
+
+- 此问题只影响 macOS 和 Linux，Windows 不受影响
+- 每次打包后都需要测试双击启动的场景
+- 如果使用 CI/CD 自动化测试，确保包含 GUI 启动测试
+- `fix-path` 包有已知问题：可能影响从 Dock 退出应用的功能
+
+---
+
 ## 参考资源
 
 - [Electron 官方文档](https://www.electronjs.org/docs)
 - [next-electron-rsc](https://github.com/kirill-konshin/next-electron-rsc)
 - [electron-builder](https://www.electron.build/)
 - [pnpm 设置](https://pnpm.io/settings)
+- [fix-path - Fix $PATH on macOS/Linux GUI apps](https://github.com/sindresorhus/fix-path)
+- [shell-path - Get $PATH from shell](https://github.com/sindresorhus/shell-path)
 
 ---
 
-_最后更新: 2026-01-15_
+_最后更新: 2026-01-19_
