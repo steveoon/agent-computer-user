@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.25.0-develop.5](https://github.com/steveoon/agent-computer-user/compare/v1.25.0-develop.4...v1.25.0-develop.5) (2026-01-19)
+
+
+### Bug Fixes
+
+* **agent:** 统一 Agent ID 生成规则并优化添加对话框 ([151c539](https://github.com/steveoon/agent-computer-user/commit/151c539ed86685dabc584f508419022b3c6b48e0))
+
 # [1.25.0-develop.4](https://github.com/steveoon/agent-computer-user/compare/v1.25.0-develop.3...v1.25.0-develop.4) (2026-01-19)
 
 
