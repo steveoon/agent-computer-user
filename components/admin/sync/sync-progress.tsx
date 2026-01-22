@@ -281,7 +281,7 @@ export const SyncProgress = ({ className }: SyncProgressProps = {}) => {
             <StatusIcon isSyncing={isSyncing} success={currentSyncResult?.overallSuccess} />
             <span className="font-medium">{isSyncing ? "同步进行中..." : "同步已完成"}</span>
           </div>
-          <Badge variant={progressStyles.badge}>{overallProgress}%</Badge>
+          <Badge variant={progressStyles.badge}>{overallProgress.toFixed(1)}%</Badge>
         </div>
 
         <Progress value={overallProgress} className="w-full" aria-label="总体进度" />

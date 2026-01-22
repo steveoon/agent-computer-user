@@ -132,6 +132,44 @@ This API is experimental:
 
 ---
 
-## 9) Version boundary
+## 9) ToolLoopAgent (Agent Class)
+
+Encapsulates LLM configuration, tools, and behavior into reusable agent components.
+
+### Import
+`ToolLoopAgent`, `tool`, `stepCountIs`, `Output`, `createAgentUIStreamResponse`, `InferAgentUIMessage` from `'ai'`
+
+### Constructor Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `model` | `string \| LanguageModel` | Model identifier (Gateway or Provider format) |
+| `instructions` | `string` | System prompt defining agent behavior |
+| `tools` | `Record<string, Tool>` | Available tools for the agent |
+| `toolChoice` | `ToolChoice` | `'auto'` (default) / `'required'` / `'none'` / `{ type: 'tool', toolName }` |
+| `stopWhen` | `StopCondition[]` | Loop termination conditions (default: `stepCountIs(20)`) |
+| `output` | `Output` | Structured output schema via `Output.object({ schema })` |
+
+### Agent Methods
+- `agent.generate({ prompt })` → `{ text, output }` (one-shot)
+- `agent.stream({ prompt })` → `{ textStream }` (streaming)
+
+### API Route Helper
+- `createAgentUIStreamResponse({ agent, messages })` → `Response`
+
+### Type Inference
+- `InferAgentUIMessage<typeof agent>` → UIMessage type for client
+
+### Loop Termination Triggers
+1. Finish reason other than `tool-calls` returned
+2. Tool without `execute` function invoked
+3. Tool requiring approval called
+4. Stop condition met
+
+For code examples, see `snippets/tool-loop-agent.ts`.
+
+---
+
+## 10) Version boundary
 - This skill is for AI SDK v6 only.
 - If user code resembles older versions, propose migration.

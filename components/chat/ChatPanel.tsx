@@ -11,6 +11,54 @@ import type { ModelId } from "@/lib/config/models";
 import type { FinishReason } from "@/types";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 
+// 🎯 错误处理策略模式 - 提取到组件外部避免重渲染时重新创建
+interface ErrorMatcher {
+  readonly test: (msg: string) => boolean;
+  readonly title: string;
+  readonly description: string;
+  readonly variant: "error" | "warning";
+  readonly showSmartClean?: boolean;
+}
+
+const ERROR_MATCHERS: readonly ErrorMatcher[] = [
+  {
+    test: (msg: string) =>
+      msg.includes("Request Entity Too Large") ||
+      msg.includes("FUNCTION_PAYLOAD_TOO_LARGE") ||
+      msg.includes("Payload Too Large") ||
+      msg.includes("413"),
+    title: "请求内容过大",
+    description: "对话历史过长，请清理部分消息后重试",
+    variant: "error",
+    showSmartClean: true,
+  },
+  {
+    test: (msg: string) => msg.includes("AI服务当前负载过高"),
+    title: "服务繁忙",
+    description: "AI服务当前负载较高，请稍后重试",
+    variant: "warning",
+  },
+  {
+    test: (msg: string) => msg.includes("请求频率过高"),
+    title: "请求过于频繁",
+    description: "您的请求过于频繁，请稍后再试",
+    variant: "warning",
+  },
+] as const;
+
+const DEFAULT_ERROR: Omit<ErrorMatcher, "test"> = {
+  title: "Something went wrong",
+  description: "Please try again. If the problem persists, refresh the page.",
+  variant: "error",
+};
+
+function getErrorInfo(error: Error | undefined): (Omit<ErrorMatcher, "test"> & { showSmartClean?: boolean }) | null {
+  if (!error) return null;
+  const msg = error.message;
+  const matched = ERROR_MATCHERS.find(m => m.test(msg));
+  return matched ?? DEFAULT_ERROR;
+}
+
 interface ChatPanelProps {
   // 来自 useCustomChat
   messages: UIMessage[];
@@ -75,50 +123,9 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const [containerRef, endRef] = useScrollToBottom();
 
-  // 🎯 检查是否为请求过大错误
-  const isPayloadTooLargeError = (error: Error | undefined) => {
-    if (!error) return false;
-    return (
-      error.message.includes("Request Entity Too Large") ||
-      error.message.includes("FUNCTION_PAYLOAD_TOO_LARGE") ||
-      error.message.includes("Payload Too Large") ||
-      error.message.includes("413")
-    );
-  };
-
-  // 🎯 检查是否为服务过载错误
-  const isOverloadedError = (error: Error | undefined) => {
-    if (!error) return false;
-    return error.message.includes("AI服务当前负载过高");
-  };
-
-  // 🎯 检查是否为频率限制错误
-  const isRateLimitError = (error: Error | undefined) => {
-    if (!error) return false;
-    return error.message.includes("请求频率过高");
-  };
-
-  // 🎯 获取错误标题
-  const getErrorTitle = (error: Error | undefined) => {
-    if (isPayloadTooLargeError(error)) return "请求内容过大";
-    if (isOverloadedError(error)) return "服务繁忙";
-    if (isRateLimitError(error)) return "请求过于频繁";
-    return "Something went wrong";
-  };
-
-  // 🎯 获取错误描述
-  const getErrorDescription = (error: Error | undefined) => {
-    if (isPayloadTooLargeError(error)) {
-      return "对话历史过长，请清理部分消息后重试";
-    }
-    if (isOverloadedError(error)) {
-      return "AI服务当前负载较高，请稍后重试";
-    }
-    if (isRateLimitError(error)) {
-      return "您的请求过于频繁，请稍后再试";
-    }
-    return "Please try again. If the problem persists, refresh the page.";
-  };
+  // 🎯 使用策略模式获取错误信息（函数引用稳定，不会导致重渲染）
+  const errorInfo = getErrorInfo(error);
+  const isWarning = errorInfo?.variant === "warning";
 
   return (
     <ErrorBoundary>
@@ -149,36 +156,28 @@ export function ChatPanel({
         />
 
         {/* 错误状态显示 */}
-        {error && (
+        {errorInfo && (
           <div className="mx-4 mb-4">
             <div
               className={`border rounded-lg p-3 ${
-                isOverloadedError(error) || isRateLimitError(error)
-                  ? "bg-yellow-50 border-yellow-200"
-                  : "bg-red-50 border-red-200"
+                isWarning ? "bg-yellow-50 border-yellow-200" : "bg-red-50 border-red-200"
               }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div
-                    className={`w-2 h-2 rounded-full ${
-                      isOverloadedError(error) || isRateLimitError(error)
-                        ? "bg-yellow-500"
-                        : "bg-red-500"
-                    }`}
+                    className={`w-2 h-2 rounded-full ${isWarning ? "bg-yellow-500" : "bg-red-500"}`}
                   ></div>
                   <span
                     className={`text-sm font-medium ${
-                      isOverloadedError(error) || isRateLimitError(error)
-                        ? "text-yellow-700"
-                        : "text-red-700"
+                      isWarning ? "text-yellow-700" : "text-red-700"
                     }`}
                   >
-                    {getErrorTitle(error)}
+                    {errorInfo.title}
                   </span>
                 </div>
                 <div className="flex gap-2">
-                  {isPayloadTooLargeError(error) && (
+                  {errorInfo.showSmartClean && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -193,23 +192,17 @@ export function ChatPanel({
                     variant="outline"
                     onClick={() => reload()}
                     className={`text-xs h-7 px-2 ${
-                      isOverloadedError(error) || isRateLimitError(error)
+                      isWarning
                         ? "border-yellow-200 text-yellow-700 hover:bg-yellow-50"
                         : "border-red-200 text-red-700 hover:bg-red-50"
                     }`}
                   >
-                    {isOverloadedError(error) || isRateLimitError(error) ? "稍后重试" : "Retry"}
+                    {isWarning ? "稍后重试" : "Retry"}
                   </Button>
                 </div>
               </div>
-              <p
-                className={`text-xs mt-1 ${
-                  isOverloadedError(error) || isRateLimitError(error)
-                    ? "text-yellow-600"
-                    : "text-red-600"
-                }`}
-              >
-                {getErrorDescription(error)}
+              <p className={`text-xs mt-1 ${isWarning ? "text-yellow-600" : "text-red-600"}`}>
+                {errorInfo.description}
               </p>
             </div>
           </div>

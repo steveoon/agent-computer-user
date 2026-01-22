@@ -45,3 +45,14 @@
 - [ ] Loop terminates when no meaningful tool action remains
 - [ ] Denied approvals terminate or redirect the loop safely
 - [ ] Each loop iteration is logged for debugging
+
+## ToolLoopAgent Implementation
+- [ ] Agent has clear, focused `instructions` (not overly broad)
+- [ ] `stopWhen` configured appropriately (default is `stepCountIs(20)`)
+- [ ] Tools are single-purpose and well-described
+- [ ] Side-effect tools have `needsApproval: true`
+- [ ] `toolChoice` matches intended behavior (`auto`/`required`/`none`)
+- [ ] Structured output schema defined if downstream code consumes result
+- [ ] `InferAgentUIMessage` type exported for client type safety
+- [ ] API route uses `createAgentUIStreamResponse` correctly
+- [ ] Agent definition is reusable (not inline in route handler)

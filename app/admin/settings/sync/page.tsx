@@ -99,7 +99,7 @@ export default function SyncPage() {
                     <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
                       <div className="flex justify-between text-xs text-muted-foreground">
                         <span>总进度</span>
-                        <span>{overallProgress}%</span>
+                        <span>{overallProgress.toFixed(1)}%</span>
                       </div>
                       <Progress value={overallProgress} className="h-2" />
                       <p className="text-xs text-muted-foreground truncate">{currentStep}</p>

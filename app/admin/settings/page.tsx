@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,15 +16,54 @@ import {
   Upload,
   RotateCcw,
 } from "lucide-react";
-import { BrandDataEditor } from "@/components/admin/brand-data-editor";
-import { PromptsEditor } from "@/components/admin/prompts-editor";
-import { SystemPromptsEditor } from "@/components/admin/system-prompts-editor";
-import { GeneralConfigManager } from "@/components/admin/general-config-manager";
-import { BrandTable } from "@/components/admin/brand-management";
 import { BackButton } from "@/components/ui/back-button";
 import { DropZone, DropZoneHint } from "@/components/ui/drop-zone";
 import { useConfigManager } from "@/hooks/useConfigManager";
 import { useRouter } from "next/navigation";
+
+// 编辑器组件骨架加载状态
+function EditorSkeleton() {
+  return (
+    <Card className="glass-card">
+      <CardHeader>
+        <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mt-2" />
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          <div className="h-32 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="h-10 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// 动态导入编辑器组件 - 减少初始 bundle 大小
+const GeneralConfigManager = dynamic(
+  () => import("@/components/admin/general-config-manager").then(m => ({ default: m.GeneralConfigManager })),
+  { loading: EditorSkeleton, ssr: false }
+);
+
+const BrandDataEditor = dynamic(
+  () => import("@/components/admin/brand-data-editor").then(m => ({ default: m.BrandDataEditor })),
+  { loading: EditorSkeleton, ssr: false }
+);
+
+const PromptsEditor = dynamic(
+  () => import("@/components/admin/prompts-editor").then(m => ({ default: m.PromptsEditor })),
+  { loading: EditorSkeleton, ssr: false }
+);
+
+const SystemPromptsEditor = dynamic(
+  () => import("@/components/admin/system-prompts-editor").then(m => ({ default: m.SystemPromptsEditor })),
+  { loading: EditorSkeleton, ssr: false }
+);
+
+const BrandTable = dynamic(
+  () => import("@/components/admin/brand-management").then(m => ({ default: m.BrandTable })),
+  { loading: EditorSkeleton, ssr: false }
+);
 
 type FilePickerOptions = {
   multiple?: boolean;

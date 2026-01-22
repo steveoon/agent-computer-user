@@ -196,11 +196,23 @@ export const useSyncStore = create<SyncState>()(
                 } else if (data.type === "geocoding_progress") {
                   // 地理编码阶段进度 (50% - 90%)
                   const baseProgress = 50;
+                  const maxProgress = 90;
+                  const progressRange = maxProgress - baseProgress;
+                  const calculatedProgress =
+                    typeof data.overallProgress === "number"
+                      ? data.overallProgress
+                      : data.total > 0
+                        ? baseProgress + (data.processed / data.total) * progressRange
+                        : baseProgress;
+                  const roundedProgress = Math.round(calculatedProgress * 10) / 10;
                   set(state => ({
                     currentStep: `正在地理编码 [${data.brandName}]: ${data.processed}/${data.total}`,
                     overallProgress: Math.min(
-                      90,
-                      Math.max(baseProgress, state.overallProgress + 0.5)
+                      maxProgress,
+                      Math.max(
+                        baseProgress,
+                        Math.max(state.overallProgress, roundedProgress)
+                      )
                     ),
                   }));
                 } else if (data.type === "result") {

@@ -2,6 +2,60 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.25.0-develop.6](https://github.com/steveoon/agent-computer-user/compare/v1.25.0-develop.5...v1.25.0-develop.6) (2026-01-22)
+
+
+### Performance Improvements
+
+* 应用 Vercel React 最佳实践优化 ([21fb3ef](https://github.com/steveoon/agent-computer-user/commit/21fb3ef84eedc3ffd070cbbb1c9b3f7c9c476623))
+
+# [1.25.0-develop.5](https://github.com/steveoon/agent-computer-user/compare/v1.25.0-develop.4...v1.25.0-develop.5) (2026-01-19)
+
+
+### Bug Fixes
+
+* **agent:** 统一 Agent ID 生成规则并优化添加对话框 ([151c539](https://github.com/steveoon/agent-computer-user/commit/151c539ed86685dabc584f508419022b3c6b48e0))
+
+# [1.25.0-develop.4](https://github.com/steveoon/agent-computer-user/compare/v1.25.0-develop.3...v1.25.0-develop.4) (2026-01-19)
+
+
+### Bug Fixes
+
+* **electron:** 修复 macOS GUI 应用 PATH 环境变量缺失问题 ([78ef372](https://github.com/steveoon/agent-computer-user/commit/78ef372091901e2997c091385a8666482b72e2f9))
+
+
+### Features
+
+* **config:** 支持主 App 配置 agentId 标识符 ([dc7de56](https://github.com/steveoon/agent-computer-user/commit/dc7de5646c6e1c023be99ffa76ade5453e665f82))
+
+# [1.25.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.25.0-develop.2...v1.25.0-develop.3) (2026-01-16)
+
+
+### Bug Fixes
+
+* **agent:** 修复 Agent 管理 UI 和后端状态同步问题 ([d54ffc3](https://github.com/steveoon/agent-computer-user/commit/d54ffc30fbbcfe50d32b4753d9d06871eaca560c))
+
+# [1.25.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.25.0-develop.1...v1.25.0-develop.2) (2026-01-15)
+
+
+### Features
+
+* **electron:** 完成 Electron Desktop 客户端集成 ([9ea071b](https://github.com/steveoon/agent-computer-user/commit/9ea071b3df5652dd9afcbd94a2e2718b3ecd741a))
+
+# [1.25.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.24.0...v1.25.0-develop.1) (2026-01-14)
+
+
+### Bug Fixes
+
+* **playwright:** 增强 browser_tabs 错误处理和超时机制 ([09ce92f](https://github.com/steveoon/agent-computer-user/commit/09ce92f18a01462a58401073668c747e41823d8f))
+* **sync:** 改进同步进度计算精度 ([d25d6e6](https://github.com/steveoon/agent-computer-user/commit/d25d6e61ef3a00f906fb1baac4e08b1708e657cb))
+
+
+### Features
+
+* **smart-reply:** 增强错误处理和 LLM 统计信息 ([b7cf26a](https://github.com/steveoon/agent-computer-user/commit/b7cf26a94f07058092558eaea0f5d92e6b755260))
+* 添加 ToolLoopAgent 实现和浏览器自动化技能文档 ([447e86f](https://github.com/steveoon/agent-computer-user/commit/447e86f1d10c9ab0df10380f3cc90c84513c32af))
+
 # [1.24.0](https://github.com/steveoon/agent-computer-user/compare/v1.23.2...v1.24.0) (2026-01-13)
 
 

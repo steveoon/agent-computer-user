@@ -8,6 +8,7 @@ import type { ReplyPromptsConfig, BrandPriorityStrategy } from "@/types/config";
 import type { ModelConfig } from "@/lib/config/models";
 import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
 import { CandidateInfoSchema } from "@/lib/tools/zhipin/types";
+import type { SafeGenerateTextUsage } from "@/lib/ai";
 
 /**
  * 调试信息类型
@@ -34,6 +35,16 @@ type ZhipinReplyToolResult = {
     totalStores: number;
     totalPositions: number;
     brand: string;
+  };
+  /** LLM 使用统计 */
+  usage?: SafeGenerateTextUsage;
+  /** 生成耗时（毫秒） */
+  latencyMs?: number;
+  /** 错误信息（如果生成失败） */
+  error?: {
+    code: string;
+    message: string;
+    userMessage: string;
   };
 };
 
@@ -163,6 +174,25 @@ export const zhipinReplyTool = (
           defaultWechatId,
         });
 
+        // 检查是否有错误
+        if (replyResult.error) {
+          console.error(`❌ 回复生成失败: ${replyResult.error.userMessage}`);
+          return {
+            reply: "",
+            replyType: replyResult.classification.replyType,
+            reasoningText: replyResult.classification.reasoningText || "生成失败",
+            candidateMessage: candidate_message,
+            historyCount: processedHistory.length,
+            debugInfo: replyResult.debugInfo,
+            contextInfo: replyResult.contextInfo,
+            error: {
+              code: replyResult.error.code,
+              message: replyResult.error.message,
+              userMessage: replyResult.error.userMessage,
+            },
+          };
+        }
+
         console.log(`✅ 回复生成成功`);
         console.log(`📝 回复内容: ${replyResult.suggestedReply}`);
         console.log(`🎯 回复类型: ${replyResult.classification.replyType}`);
@@ -177,6 +207,8 @@ export const zhipinReplyTool = (
           historyCount: processedHistory.length,
           debugInfo: replyResult.debugInfo,
           contextInfo: replyResult.contextInfo,
+          usage: replyResult.usage,
+          latencyMs: replyResult.latencyMs,
         };
 
         // 如果需要包含统计信息
@@ -206,12 +238,35 @@ export const zhipinReplyTool = (
         output
       }
     ) {
-      // 格式化输出结果
+      // 检查是否有错误
+      if (output.error) {
+        const content = `❌ 智能回复生成失败\n\n` +
+          `🔴 错误: ${output.error.userMessage}\n` +
+          `🎯 回复类型: ${output.replyType}\n` +
+          `💬 候选人消息: "${output.candidateMessage}"`;
+        return {
+          type: "content" as const,
+          value: [{ type: "text" as const, text: content }],
+        };
+      }
+
+      // 格式化成功输出结果
       let content = `✅ 智能回复已生成\n\n`;
       content += `📝 回复内容:\n"${output.reply}"\n\n`;
       content += `🎯 回复类型: ${output.replyType}\n`;
       content += `💬 候选人消息: "${output.candidateMessage}"\n`;
       content += `📋 历史记录: ${output.historyCount}条\n`;
+
+      // 显示 LLM 统计信息
+      if (output.latencyMs !== undefined || output.usage) {
+        content += `\n⚡ LLM 统计:\n`;
+        if (output.latencyMs !== undefined) {
+          content += `• 耗时: ${output.latencyMs}ms\n`;
+        }
+        if (output.usage?.totalTokens !== undefined) {
+          content += `• Tokens: ${output.usage.totalTokens} (输入: ${output.usage.inputTokens ?? "?"}, 输出: ${output.usage.outputTokens ?? "?"})`;
+        }
+      }
 
       if (output.stats) {
         content += `\n📊 数据统计:\n`;

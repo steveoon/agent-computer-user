@@ -98,3 +98,103 @@ export async function POST(req: Request) {
     uiMessages: messages,
   });
 }
+
+// ============================================
+// Pattern: Research Agent with Tool Guidance
+// ============================================
+const searchTool = tool({
+  description: "Search the web for information.",
+  inputSchema: z.object({
+    query: z.string().describe("Search query"),
+  }),
+  execute: async ({ query }) => ({
+    results: [`Result for: ${query}`],
+  }),
+});
+
+export const researchAgent = new ToolLoopAgent({
+  model,
+  instructions: `You are a research assistant.
+
+When researching:
+1. Start with a broad search to understand the topic
+2. Cross-reference multiple sources
+3. Cite sources when presenting information
+4. If information conflicts, present both viewpoints`,
+  tools: { search: searchTool },
+  stopWhen: stepCountIs(15),
+});
+
+// ============================================
+// Pattern: Customer Support Agent
+// ============================================
+const checkOrderTool = tool({
+  description: "Check order status by order ID.",
+  inputSchema: z.object({
+    orderId: z.string(),
+  }),
+  execute: async ({ orderId }) => ({
+    orderId,
+    status: "shipped",
+    eta: "2024-01-15",
+  }),
+});
+
+const createTicketTool = tool({
+  description: "Create a support ticket (requires approval).",
+  inputSchema: z.object({
+    subject: z.string(),
+    description: z.string(),
+    priority: z.enum(["low", "medium", "high"]),
+  }),
+  needsApproval: true,
+  execute: async (input) => ({
+    ticketId: `TICKET-${Date.now()}`,
+    ...input,
+  }),
+});
+
+export const supportAgent = new ToolLoopAgent({
+  model,
+  instructions: `You are a customer support specialist.
+
+Rules:
+- Never promise refunds without checking policy
+- Always be empathetic and professional
+- If unsure, say so and offer to escalate
+- Keep responses concise and actionable`,
+  tools: {
+    checkOrder: checkOrderTool,
+    createTicket: createTicketTool,
+  },
+  stopWhen: [
+    stepCountIs(10),
+    ({ steps }) => steps.some((s) => s.finishReason === "stop"),
+  ],
+});
+
+export type SupportAgentUIMessage = InferAgentUIMessage<typeof supportAgent>;
+
+// ============================================
+// Pattern: Analysis Agent with Structured Output
+// ============================================
+export const analysisAgent = new ToolLoopAgent({
+  model,
+  instructions: "Analyze the provided content and extract key insights.",
+  output: Output.object({
+    schema: z.object({
+      sentiment: z.enum(["positive", "neutral", "negative"]),
+      summary: z.string().describe("Brief summary of the content"),
+      keyPoints: z.array(z.string()).describe("Main points extracted"),
+      actionItems: z.array(z.string()).optional(),
+    }),
+  }),
+  stopWhen: stepCountIs(5),
+});
+
+export async function analyzeContent(content: string) {
+  const { output } = await analysisAgent.generate({
+    prompt: `Analyze this content: ${content}`,
+  });
+  return output; // Typed as { sentiment, summary, keyPoints, actionItems? }
+}

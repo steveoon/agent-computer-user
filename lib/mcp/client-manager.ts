@@ -29,6 +29,20 @@ class MCPClientManager {
   private readonly mcpClients = new Map<string, any>();
   private readonly clientConfigs = new Map<string, MCPClientConfig>();
 
+  // 工具缓存 - 减少 client.tools() 调用频率
+  private readonly toolsCache = new Map<
+    string,
+    {
+      tools: MCPTools;
+      timestamp: number;
+    }
+  >();
+
+  // 缓存和重连配置
+  private static readonly TOOLS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 分钟
+  private static readonly MAX_RECONNECT_ATTEMPTS = 2;
+  private static readonly RECONNECT_DELAY_MS = 1000;
+
   private constructor() {
     // 私有构造函数，防止外部直接实例化
     this.initializeClientConfigs();
@@ -150,6 +164,35 @@ class MCPClientManager {
   }
 
   /**
+   * 延迟函数
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * 检查工具缓存是否有效
+   */
+  private isCacheValid(clientName: string): boolean {
+    const cached = this.toolsCache.get(clientName);
+    if (!cached) return false;
+
+    const now = Date.now();
+    const isExpired = now - cached.timestamp > MCPClientManager.TOOLS_CACHE_TTL_MS;
+    return !isExpired;
+  }
+
+  /**
+   * 清除指定客户端的工具缓存
+   */
+  private invalidateToolsCache(clientName: string): void {
+    if (this.toolsCache.has(clientName)) {
+      this.toolsCache.delete(clientName);
+      console.log(`🗑️ 已清除 ${clientName} 工具缓存`);
+    }
+  }
+
+  /**
    * 获取MCP客户端
    * @param clientName 客户端名称
    * @returns MCP客户端实例
@@ -218,22 +261,74 @@ class MCPClientManager {
 
   /**
    * 获取MCP客户端工具
+   *
+   * 功能特性：
+   * - 🗃️ 工具缓存 - 减少 client.tools() 调用频率
+   * - 🔄 自动重连 - 检测 "closed client" 错误并自动重连
+   *
    * @param clientName 客户端名称
    * @param schemas 可选的schema配置
    * @returns 工具对象
    */
   public async getMCPTools(clientName: string, schemas?: Record<string, any>): Promise<MCPTools> {
-    const client = await this.getMCPClient(clientName);
-
-    try {
-      const tools = schemas ? await client.tools({ schemas }) : await client.tools();
-      const config = this.clientConfigs.get(clientName);
-      console.log(`🔧 已获取 ${config?.description} 工具: ${Object.keys(tools).join(", ")}`);
-      return tools;
-    } catch (error) {
-      console.error(`❌ 获取 ${clientName} 工具失败:`, error);
-      return {};
+    // 检查缓存（仅在无 schemas 参数时使用缓存）
+    if (!schemas && this.isCacheValid(clientName)) {
+      const cached = this.toolsCache.get(clientName);
+      if (cached) {
+        console.log(`📦 使用缓存的 ${clientName} 工具 (${Object.keys(cached.tools).length} 个)`);
+        return cached.tools;
+      }
     }
+
+    let attempts = 0;
+
+    while (attempts <= MCPClientManager.MAX_RECONNECT_ATTEMPTS) {
+      try {
+        const client = await this.getMCPClient(clientName);
+        const tools = schemas ? await client.tools({ schemas }) : await client.tools();
+        const config = this.clientConfigs.get(clientName);
+        console.log(`🔧 已获取 ${config?.description} 工具: ${Object.keys(tools).join(", ")}`);
+
+        // 更新缓存（仅在无 schemas 参数时缓存）
+        if (!schemas) {
+          this.toolsCache.set(clientName, {
+            tools,
+            timestamp: Date.now(),
+          });
+        }
+
+        return tools;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const isClosedClientError =
+          errorMessage.includes("closed client") || errorMessage.includes("MCPClientError");
+
+        if (isClosedClientError && attempts < MCPClientManager.MAX_RECONNECT_ATTEMPTS) {
+          attempts++;
+          console.warn(
+            `⚠️ MCP 客户端已断开，正在重连 (${attempts}/${MCPClientManager.MAX_RECONNECT_ATTEMPTS})...`
+          );
+
+          // 清除缓存
+          this.invalidateToolsCache(clientName);
+
+          // 等待后重连
+          await this.delay(MCPClientManager.RECONNECT_DELAY_MS);
+          try {
+            await this.reconnectClient(clientName);
+          } catch (reconnectError) {
+            console.warn(`⚠️ ${clientName} 重连失败:`, reconnectError);
+          }
+          continue;
+        }
+
+        const config = this.clientConfigs.get(clientName);
+        console.error(`❌ 获取 ${config?.description} 工具失败 (尝试 ${attempts + 1} 次后):`, error);
+        return {};
+      }
+    }
+
+    return {};
   }
 
   /**
@@ -288,6 +383,8 @@ class MCPClientManager {
       const config = this.clientConfigs.get(clientName);
 
       try {
+        // 确保关闭时不再使用过期工具缓存
+        this.invalidateToolsCache(clientName);
         if (client.close) {
           await client.close();
         }
@@ -344,8 +441,50 @@ class MCPClientManager {
    */
   public async reconnectClient(clientName: string): Promise<any> {
     console.log(`🔄 重连 ${clientName} 客户端...`);
+
+    // 重连前清除工具缓存
+    this.invalidateToolsCache(clientName);
+
     await this.closeMCPClient(clientName);
     return this.getMCPClient(clientName);
+  }
+
+  /**
+   * 强制刷新工具缓存
+   * @param clientName 客户端名称
+   * @param schemas 可选的 schema 配置
+   */
+  public async refreshToolsCache(
+    clientName: string,
+    schemas?: Record<string, any>
+  ): Promise<MCPTools> {
+    this.invalidateToolsCache(clientName);
+    return this.getMCPTools(clientName, schemas);
+  }
+
+  /**
+   * 清除所有工具缓存
+   */
+  public clearAllToolsCache(): void {
+    this.toolsCache.clear();
+    console.log("🗑️ 已清除所有工具缓存");
+  }
+
+  /**
+   * 获取缓存统计信息（用于调试）
+   */
+  public getToolsCacheStats(): Record<string, { age: number; toolCount: number }> {
+    const now = Date.now();
+    const stats: Record<string, { age: number; toolCount: number }> = {};
+
+    this.toolsCache.forEach((value, key) => {
+      stats[key] = {
+        age: Math.round((now - value.timestamp) / 1000), // 秒
+        toolCount: Object.keys(value.tools).length,
+      };
+    });
+
+    return stats;
   }
 
   /**
@@ -392,3 +531,9 @@ export const closeMCPClient = (clientName: string) => mcpClientManager.closeMCPC
 export const reconnectMCPClient = (clientName: string) =>
   mcpClientManager.reconnectClient(clientName);
 export const getMCPStatus = () => mcpClientManager.getStatus();
+
+// 缓存管理函数
+export const refreshToolsCache = (clientName: string, schemas?: Record<string, any>) =>
+  mcpClientManager.refreshToolsCache(clientName, schemas);
+export const clearAllToolsCache = () => mcpClientManager.clearAllToolsCache();
+export const getToolsCacheStats = () => mcpClientManager.getToolsCacheStats();

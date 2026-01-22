@@ -9,7 +9,8 @@ import {
   getToolPartOutput,
   getToolPartErrorText,
 } from "@/types/tool-common";
-import { toolRegistry } from "./tool-messages";
+import { lazyToolRegistry } from "./tool-messages/lazy-registry";
+import { LazyToolWrapper } from "./tool-messages/lazy-tool-wrapper";
 import { Markdown } from "./markdown";
 import type { ReactNode } from "react";
 
@@ -119,8 +120,8 @@ export function MessagePartsAdapter({
                 ? (part as unknown as { toolCallId: string }).toolCallId
                 : `tool-${i}`;
 
-            // 查找对应的工具配置
-            const toolConfig = toolRegistry[toolName];
+            // 查找对应的懒加载工具配置
+            const toolConfig = lazyToolRegistry[toolName];
             if (!toolConfig) {
               // 未注册的工具，显示基本信息
               return (
@@ -135,11 +136,11 @@ export function MessagePartsAdapter({
               );
             }
 
-            // 使用工具配置渲染 - AI SDK v5 格式
-            const ToolComponent = toolConfig.render;
+            // 使用懒加载包装器渲染工具组件
             return (
               <div key={`${toolCallId}-${i}`} className="mb-3">
-                <ToolComponent
+                <LazyToolWrapper
+                  config={toolConfig}
                   toolName={toolName}
                   input={(input || {}) as Record<string, unknown>}
                   state={state || "input-available"}

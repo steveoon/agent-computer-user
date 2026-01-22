@@ -128,6 +128,7 @@ export const ChatDetailsResultSchema = z.strictObject({
   summary: ChatDetailsSummarySchema.optional().describe("聊天摘要"),
   formattedHistory: z.array(z.string()).optional().describe("格式化的对话历史"),
   rawResult: z.unknown().optional().describe("原始结果(调试用)"),
+  mcpBackend: z.enum(["playwright", "puppeteer"]).optional().describe("MCP 后端类型"),
 });
 
 // ========== TypeScript Types (derived from Zod schemas) ==========

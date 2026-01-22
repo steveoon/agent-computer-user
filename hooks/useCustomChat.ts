@@ -31,7 +31,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
   const { currentBrand } = useBrand();
 
   // 🤖 模型配置
-  const { chatModel, classifyModel, replyModel, providerConfigs, maxSteps } = useModelConfig();
+  const { chatModel, classifyModel, replyModel, providerConfigs, maxSteps, agentId } = useModelConfig();
 
   // 🔧 配置数据 - 从 localforage 加载
   const {
@@ -180,6 +180,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       if (dulidayToken) requestBody.dulidayToken = dulidayToken;
       if (defaultWechatId) requestBody.defaultWechatId = defaultWechatId;
       if (maxSteps) requestBody.maxSteps = maxSteps;
+      if (agentId) requestBody.agentId = agentId;
 
       await sendMessage({ text: message.content }, { body: requestBody });
     },
@@ -399,6 +400,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       if (dulidayToken) requestBody.dulidayToken = dulidayToken;
       if (defaultWechatId) requestBody.defaultWechatId = defaultWechatId;
       if (maxSteps) requestBody.maxSteps = maxSteps;
+      if (agentId) requestBody.agentId = agentId;
 
       // 重置 finishReason
       setLastFinishReason(null);
@@ -429,6 +431,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       dulidayToken,
       defaultWechatId,
       maxSteps,
+      agentId,
       chatId,
     ]
   );
@@ -458,6 +461,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
         if (activeSystemPrompt) requestBody.activeSystemPrompt = activeSystemPrompt;
         if (dulidayToken) requestBody.dulidayToken = dulidayToken;
         if (maxSteps) requestBody.maxSteps = maxSteps;
+        if (agentId) requestBody.agentId = agentId;
 
         // 重置 finishReason
         setLastFinishReason(null);
@@ -499,6 +503,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       dulidayToken,
       defaultWechatId,
       maxSteps,
+      agentId,
     ]
   );
 

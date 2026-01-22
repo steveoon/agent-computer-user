@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSyncService } from "@/lib/services/duliday-sync.service";
 import { geocodingService } from "@/lib/services/geocoding.service";
-import { z } from 'zod/v3';
+import { z } from "zod/v3";
 
 /**
  * 同步请求体 Schema
@@ -105,13 +105,14 @@ export async function POST(request: NextRequest) {
           const send = (data: unknown) => {
             controller.enqueue(encoder.encode(JSON.stringify(data) + "\n"));
           };
+          const roundToOneDecimal = (value: number) => Math.round(value * 10) / 10;
 
           const syncRecord = await syncService.syncMultipleOrganizations(
             numericOrgIds,
             (progress, currentOrg, message) => {
               // 这里的 progress 是同步阶段的进度 (0-100)
               // 我们将其映射到总体进度的 0-50%
-              const overallProgress = Math.round(progress * 0.5);
+              const overallProgress = roundToOneDecimal(progress * 0.5);
               send({
                 type: "progress",
                 progress: overallProgress,
@@ -136,6 +137,8 @@ export async function POST(request: NextRequest) {
             0
           );
           console.log(`[SYNC API] 共 ${totalStoresToGeocode} 个门店需要地理编码`);
+          const geocodingProgressByBrand = new Map<string, { processed: number; total: number }>();
+          let totalGeocodingProcessed = 0;
 
           for (const result of syncRecord.results) {
             if (result.convertedData?.stores && result.convertedData.stores.length > 0) {
@@ -162,6 +165,21 @@ export async function POST(request: NextRequest) {
                   await geocodingService.batchGeocodeStoresWithStats(
                     result.convertedData.stores,
                     (processed, total, currentStats) => {
+                      const previousProgress = geocodingProgressByBrand.get(result.brandName);
+                      const previousProcessed = previousProgress?.processed ?? 0;
+                      const nextProcessed = Math.max(previousProcessed, processed);
+                      totalGeocodingProcessed += nextProcessed - previousProcessed;
+                      geocodingProgressByBrand.set(result.brandName, {
+                        processed: nextProcessed,
+                        total,
+                      });
+                      const geocodingProgress =
+                        totalStoresToGeocode > 0
+                          ? roundToOneDecimal(
+                              50 + (totalGeocodingProcessed / totalStoresToGeocode) * 40
+                            )
+                          : 50;
+                      const overallProgress = Math.min(90, Math.max(50, geocodingProgress));
                       // 计算总体进度 (50% - 90%)
                       // 简化计算：每次更新都发送消息
                       send({
@@ -169,6 +187,7 @@ export async function POST(request: NextRequest) {
                         brandName: result.brandName,
                         processed,
                         total,
+                        overallProgress,
                         stats: currentStats,
                       });
                     }
