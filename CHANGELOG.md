@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.25.0-develop.6](https://github.com/steveoon/agent-computer-user/compare/v1.25.0-develop.5...v1.25.0-develop.6) (2026-01-22)
+
+
+### Performance Improvements
+
+* 应用 Vercel React 最佳实践优化 ([21fb3ef](https://github.com/steveoon/agent-computer-user/commit/21fb3ef84eedc3ffd070cbbb1c9b3f7c9c476623))
+
 # [1.25.0-develop.5](https://github.com/steveoon/agent-computer-user/compare/v1.25.0-develop.4...v1.25.0-develop.5) (2026-01-19)
 
 
