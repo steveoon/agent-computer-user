@@ -194,25 +194,29 @@ export async function POST(req: Request) {
           : "generalComputerSystemPrompt";
       const resolvedConfig = PROMPT_CONFIG[resolvedPromptType];
 
-      let systemPrompt: string;
-      if (systemPrompts?.[requestedPromptType]) {
-        const label = requestedConfig?.label ?? `自定义(${requestedPromptType})`;
-        console.log(`✅ 使用客户端传入的${label}系统提示词`);
-        systemPrompt = systemPrompts[requestedPromptType];
-      } else {
-        if (!requestedConfig) {
-          console.warn(`⚠️ 未识别的 promptType: ${requestedPromptType}，回落到 ${resolvedPromptType}`);
-        }
-        console.log(`⚠️ 使用默认${resolvedConfig.label}系统提示词（降级模式）`);
-        systemPrompt = await resolvedConfig.loader();
-      }
+      // 🎯 并行执行两个独立的异步操作，减少瀑布流等待
+      const [systemPrompt, processedMessages] = await Promise.all([
+        // Promise 1: 获取系统提示词
+        (async () => {
+          if (systemPrompts?.[requestedPromptType]) {
+            const label = requestedConfig?.label ?? `自定义(${requestedPromptType})`;
+            console.log(`✅ 使用客户端传入的${label}系统提示词`);
+            return systemPrompts[requestedPromptType];
+          }
+          if (!requestedConfig) {
+            console.warn(`⚠️ 未识别的 promptType: ${requestedPromptType}，回落到 ${resolvedPromptType}`);
+          }
+          console.log(`⚠️ 使用默认${resolvedConfig.label}系统提示词（降级模式）`);
+          return resolvedConfig.loader();
+        })(),
 
-      // 🎯 对历史消息应用智能Token优化 (10K tokens阈值)
-      const processedMessages = await prunedMessages(messages, {
-        maxOutputTokens: 15000, // 硬限制：15K tokens
-        targetTokens: 8000, // 目标：8K tokens时开始优化
-        preserveRecentMessages: 2, // 保护最近2条消息
-      });
+        // Promise 2: 对历史消息应用智能Token优化 (独立操作)
+        prunedMessages(messages, {
+          maxOutputTokens: 15000, // 硬限制：15K tokens
+          targetTokens: 8000, // 目标：8K tokens时开始优化
+          preserveRecentMessages: 2, // 保护最近2条消息
+        }),
+      ]);
 
       // 估算消息大小并记录优化效果
       const originalSize = JSON.stringify(messages).length;

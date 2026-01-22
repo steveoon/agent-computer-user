@@ -33,11 +33,15 @@ export function useConfigMigration() {
       try {
         console.log("🔍 检查配置迁移状态...");
 
-        // 检查是否需要迁移
-        const shouldMigrate = await needsMigration();
+        // 🚀 并行执行迁移检查和品牌状态检查，减少瀑布流等待
+        const [shouldMigrate, syncStatus] = await Promise.all([
+          needsMigration(),
+          BrandSyncManager.getBrandSyncStatus(),
+        ]);
 
         if (!isMounted) return;
 
+        // 只有需要时才执行迁移（串行，因为依赖检查结果）
         if (shouldMigrate) {
           console.log("🔄 开始执行浏览器端配置迁移...");
 
@@ -47,7 +51,6 @@ export function useConfigMigration() {
             isLoading: true,
           }));
 
-          // 执行迁移
           await migrateFromHardcodedData();
 
           if (!isMounted) return;
@@ -55,9 +58,8 @@ export function useConfigMigration() {
           console.log("✅ 浏览器端配置迁移完成");
         }
 
-        // 检查并同步缺失的品牌（无论是否执行了迁移）
+        // 处理品牌同步（使用已并行获取的 syncStatus）
         console.log("🔍 检查缺失的品牌...");
-        const syncStatus = await BrandSyncManager.getBrandSyncStatus();
 
         if (syncStatus.missingBrands.length > 0) {
           console.log(

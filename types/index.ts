@@ -40,9 +40,26 @@ export type {
 
 export { CONFIG_STORAGE_KEY, CONFIG_VERSION } from "./config";
 
-// 导出其他类型
-export * from "./image-optimize-type";
-export * from "./feishu";
+// 从 image-optimize-type.ts 导出图像优化相关类型（显式导出，避免 tree-shaking 问题）
+export type {
+  CompressionConfig,
+  CompressionResult,
+  ImageAnalysis,
+  CompressionParams,
+  BestCompressionResult,
+  OptimalDimensions,
+} from "./image-optimize-type";
+
+// 从 feishu.ts 导出飞书相关类型（显式导出，避免 tree-shaking 问题）
+export type {
+  FeishuNotificationType,
+  FeishuNotificationOptions,
+  FeishuApiResponse,
+  FeishuMessageResult,
+  FeishuToolParams,
+} from "./feishu";
+
+export { FEISHU_NOTIFICATION_LABELS } from "./feishu";
 
 // 从 geocoding.ts 导出地理编码相关类型
 export type {

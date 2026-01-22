@@ -41,6 +41,17 @@ export interface ToolConfig {
 
 export type ToolRegistry = Record<string, ToolConfig>;
 
+/**
+ * 懒加载工具配置 - 用于代码分割和 bundle 优化
+ */
+export interface LazyToolConfig {
+  icon: LucideIcon;
+  defaultTheme: ToolTheme;
+  loader: () => Promise<{ default: React.ComponentType<ToolMessageProps> }>;
+}
+
+export type LazyToolRegistry = Record<string, LazyToolConfig>;
+
 // 预定义的颜色主题
 export const themes = {
   zinc: {
