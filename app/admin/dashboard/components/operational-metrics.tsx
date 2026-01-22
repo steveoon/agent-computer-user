@@ -1,6 +1,5 @@
 "use client";
 
-import { Card, CardContent } from "@/components/ui/card";
 import { MessageCircleReply, Send, ArrowRightLeft, AlertCircle } from "lucide-react";
 import { useDashboardStatsStore } from "@/lib/stores/dashboard-stats-store";
 import { AnimatedNumber } from "@/components/ui/animated-number";
@@ -42,12 +41,50 @@ function sumStats(
 }
 
 /**
- * 运营效率指标组件
+ * 迷你 Sparkline 组件
+ */
+function MiniSparkline({ data, color }: { data: number[]; color: string }) {
+  const max = Math.max(...data, 1);
+  return (
+    <div className="flex items-end gap-[2px] h-4">
+      {data.map((value, index) => (
+        <div
+          key={index}
+          className="w-[2px] rounded-sm transition-all duration-300"
+          style={{
+            height: `${Math.max((value / max) * 100, 15)}%`,
+            background: `linear-gradient(to top, ${color}40, ${color})`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 运营效率指标配置
+ */
+interface MetricConfig {
+  title: string;
+  icon: typeof MessageCircleReply;
+  value: number;
+  isRate: boolean;
+  description: string;
+  color: string;
+  warnThreshold?: number;
+  sparklineKey?: "unreadReplied" | "proactiveOutreach";
+}
+
+/**
+ * 运营效率指标组件 - 紧凑指标条设计
  *
- * 展示第二行运营效率相关的 KPI 指标
+ * 特点：
+ * - 合并为单行指标条，竖线分隔
+ * - 添加 7 天迷你 sparkline
+ * - 深色科技风样式
  */
 export function OperationalMetrics() {
-  const { summary, loading } = useDashboardStatsStore();
+  const { summary, loading, dailyTrend } = useDashboardStatsStore();
 
   // 汇总当前周期的所有数据
   const currentStats = sumStats(summary?.current);
@@ -58,14 +95,22 @@ export function OperationalMetrics() {
       ? currentStats.proactiveResponseRate / 100
       : 0;
 
-  // 运营效率指标配置 - 名称对齐 docs/OPERATIONAL_METRICS_GUIDE.md
-  const metrics = [
+  // 从趋势数据中提取迷你图数据
+  const sparklineData = {
+    unreadReplied: dailyTrend?.slice(-7).map(d => d.unreadReplied ?? 0) || [],
+    proactiveOutreach: dailyTrend?.slice(-7).map(d => d.proactiveOutreach ?? 0) || [],
+  };
+
+  // 运营效率指标配置
+  const metrics: MetricConfig[] = [
     {
       title: "未读秒回覆盖量",
       icon: MessageCircleReply,
       value: currentStats?.unreadReplied ?? 0,
       isRate: false,
-      description: "Unread Instant Reply Coverage",
+      description: "Unread Instant Reply",
+      color: "#FBBF24", // Amber
+      sparklineKey: "unreadReplied",
     },
     {
       title: "主动触达数",
@@ -73,42 +118,79 @@ export function OperationalMetrics() {
       value: currentStats?.proactiveOutreach ?? 0,
       isRate: false,
       description: "Proactive Outreach",
+      color: "#22D3EE", // Cyan
+      sparklineKey: "proactiveOutreach",
     },
     {
       title: "主动触达回复率",
       icon: ArrowRightLeft,
       value: proactiveResponseRatePercent,
       isRate: true,
-      description: "Proactive Response Rate",
-      warnThreshold: 10, // 10%
+      description: "Response Rate",
+      color: "#A3E635", // Lime
+      warnThreshold: 10,
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {metrics.map((metric) => {
-        // 对于回复率，检查是否低于阈值
-        const isWarning = metric.isRate && metric.warnThreshold && metric.value < metric.warnThreshold;
+    <div className="dash-card p-4">
+      <div className="flex items-center justify-between divide-x divide-[var(--dash-border)]">
+        {metrics.map((metric, index) => {
+          // 对于回复率，检查是否低于阈值
+          const isWarning = metric.isRate && metric.warnThreshold && metric.value < metric.warnThreshold;
+          const sparkData = metric.sparklineKey ? sparklineData[metric.sparklineKey] : null;
 
-        return (
-          <Card
-            key={metric.title}
-            className="border-0 shadow-sm bg-white hover:shadow-md transition-shadow"
-          >
-            <CardContent className="pt-6 pl-6">
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between pr-4">
-                  <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                    {metric.title}
-                  </span>
-                  <metric.icon className="h-4 w-4 text-muted-foreground/40" />
+          return (
+            <div
+              key={metric.title}
+              className={`flex-1 flex items-center justify-between px-4 ${index === 0 ? "pl-0" : ""} ${index === metrics.length - 1 ? "pr-0" : ""}`}
+            >
+              <div className="flex items-center gap-3">
+                {/* 图标 */}
+                <div
+                  className="h-8 w-8 rounded-lg flex items-center justify-center"
+                  style={{
+                    background: `linear-gradient(135deg, ${metric.color}20, ${metric.color}10)`,
+                    border: `1px solid ${metric.color}30`,
+                  }}
+                >
+                  <metric.icon
+                    className="h-4 w-4"
+                    style={{ color: metric.color }}
+                  />
                 </div>
 
+                {/* 标题和描述 */}
+                <div>
+                  <p className="text-xs font-medium text-[var(--dash-text-muted)] uppercase tracking-wider">
+                    {metric.title}
+                  </p>
+                  <p className="text-[10px] text-[var(--dash-text-muted)] opacity-60 mt-0.5">
+                    {metric.description}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Sparkline */}
+                {sparkData && sparkData.length > 0 && (
+                  <div className="opacity-50">
+                    <MiniSparkline data={sparkData} color={metric.color} />
+                  </div>
+                )}
+
+                {/* 数值 */}
                 {loading ? (
-                  <div className="h-10 w-24 bg-muted/20 rounded animate-pulse mt-1" />
+                  <div className="h-8 w-16 bg-[var(--dash-surface-2)] rounded animate-pulse" />
                 ) : (
-                  <div className="flex items-baseline gap-3 mt-1">
-                    <span className="text-3xl font-bold tracking-tight text-foreground">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-2xl font-bold dash-number"
+                      style={{
+                        color: metric.color,
+                        textShadow: `0 0 20px ${metric.color}40`,
+                      }}
+                    >
                       {metric.isRate ? (
                         <AnimatedNumber
                           value={metric.value}
@@ -124,19 +206,15 @@ export function OperationalMetrics() {
                       )}
                     </span>
                     {isWarning && (
-                      <AlertCircle className="h-4 w-4 text-amber-500" />
+                      <AlertCircle className="h-4 w-4 text-dash-rose animate-pulse" aria-hidden="true" />
                     )}
                   </div>
                 )}
-
-                <p className="text-xs text-muted-foreground/80 font-light mt-2 truncate">
-                  {metric.description}
-                </p>
               </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -8,13 +8,19 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
 
   /* 花卷品牌色 */
   --color-brand-primary: var(--brand-primary);
   --color-brand-light: var(--brand-light);
   --color-brand-dark: var(--brand-dark);
+
+  /* Dashboard 深色主题色板 */
+  --color-dash-amber: #FBBF24;
+  --color-dash-cyan: #22D3EE;
+  --color-dash-rose: #FB7185;
+  --color-dash-lime: #A3E635;
 
   /* Tremor 图表颜色 - blue */
   --color-blue-50: #eff6ff;
@@ -322,4 +328,309 @@
 
 .animate-gradient-flow {
   animation: gradient-flow 2s linear infinite;
+}
+
+/* ================================
+   Dashboard 深色科技风主题
+   ================================ */
+
+/* 深色主题变量 */
+:root {
+  --dash-bg-base: oklch(0.13 0.02 265);
+  --dash-surface-1: oklch(0.18 0.015 265);
+  --dash-surface-2: oklch(0.22 0.012 265);
+  --dash-border: oklch(0.28 0.01 265);
+  --dash-border-glow: oklch(0.38 0.01 265);
+  --dash-text-primary: oklch(0.98 0 0);
+  --dash-text-secondary: oklch(0.82 0.008 265);
+  --dash-text-muted: oklch(0.65 0.008 265);
+}
+
+/* Dashboard 容器背景 */
+.dash-bg {
+  background: var(--dash-bg-base);
+  position: relative;
+}
+
+.dash-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 80% -20%, rgba(251, 191, 36, 0.15), transparent),
+    radial-gradient(ellipse 60% 40% at 20% 100%, rgba(34, 211, 238, 0.08), transparent);
+  pointer-events: none;
+}
+
+/* 网格叠加层 */
+.dash-grid-overlay {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 8px 8px;
+  pointer-events: none;
+}
+
+/* Dashboard 卡片基础样式 */
+.dash-card {
+  background: var(--dash-surface-1);
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.dash-card:hover {
+  border-color: var(--dash-border-glow);
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.05);
+}
+
+/* 发光效果 */
+.glow-amber {
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.3), 0 0 40px rgba(251, 191, 36, 0.1);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.3), 0 0 40px rgba(34, 211, 238, 0.1);
+}
+
+.glow-rose {
+  box-shadow: 0 0 20px rgba(251, 113, 133, 0.3), 0 0 40px rgba(251, 113, 133, 0.1);
+}
+
+.glow-lime {
+  box-shadow: 0 0 20px rgba(163, 230, 53, 0.3), 0 0 40px rgba(163, 230, 53, 0.1);
+}
+
+/* 文字发光效果 */
+.text-glow-amber {
+  text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 20px rgba(34, 211, 238, 0.5);
+}
+
+.text-glow-rose {
+  text-shadow: 0 0 20px rgba(251, 113, 133, 0.5);
+}
+
+.text-glow-lime {
+  text-shadow: 0 0 20px rgba(163, 230, 53, 0.5);
+}
+
+/* 渐变边框 */
+.gradient-border {
+  position: relative;
+  background: var(--dash-surface-1);
+  border-radius: 12px;
+}
+
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(34, 211, 238, 0.1));
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.gradient-border:hover::before {
+  opacity: 1;
+}
+
+/* 毛玻璃效果 */
+.dash-glass {
+  background: rgba(24, 28, 38, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* 脉冲发光动画 */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(251, 113, 133, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(251, 113, 133, 0.6), 0 0 35px rgba(251, 113, 133, 0.3);
+  }
+}
+
+.pulse-glow-rose {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* 数字字体样式 */
+.dash-number {
+  font-family: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* 入场动画 */
+@keyframes dash-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dash-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.dash-animate-fade-in {
+  animation: dash-fade-in 0.4s ease-out forwards;
+}
+
+.dash-animate-scale-in {
+  animation: dash-scale-in 0.5s ease-out forwards;
+}
+
+/* 延迟类 */
+.dash-delay-1 { animation-delay: 50ms; }
+.dash-delay-2 { animation-delay: 100ms; }
+.dash-delay-3 { animation-delay: 150ms; }
+.dash-delay-4 { animation-delay: 200ms; }
+.dash-delay-5 { animation-delay: 250ms; }
+
+/* 3D 卡片悬浮效果 */
+.dash-card-3d {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transform-style: preserve-3d;
+  perspective: 1000px;
+}
+
+.dash-card-3d:hover {
+  transform: translateY(-2px) rotateX(2deg);
+}
+
+/* Sparkline 迷你图样式 */
+.dash-sparkline {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 20px;
+}
+
+.dash-sparkline-bar {
+  width: 3px;
+  background: linear-gradient(to top, rgba(251, 191, 36, 0.3), rgba(251, 191, 36, 0.8));
+  border-radius: 1px;
+  transition: height 0.3s ease;
+}
+
+/* 漏斗渐变 */
+.dash-funnel-gradient {
+  background: linear-gradient(
+    180deg,
+    rgba(251, 191, 36, 0.8) 0%,
+    rgba(34, 211, 238, 0.6) 50%,
+    rgba(163, 230, 53, 0.4) 100%
+  );
+}
+
+/* 流动线条动画 */
+@keyframes flow-line {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+.dash-flow-line {
+  animation: flow-line 2s ease-in-out infinite;
+}
+
+/* Command bar 样式 */
+.dash-command-bar {
+  background: rgba(24, 28, 38, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+}
+
+/* Pill 按钮 */
+.dash-pill {
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  background: transparent;
+  color: var(--dash-text-secondary);
+  border: 1px solid transparent;
+}
+
+.dash-pill:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--dash-text-primary);
+}
+
+.dash-pill-active {
+  background: rgba(251, 191, 36, 0.15);
+  color: #FBBF24;
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+/* 深色表格样式 */
+.dash-table {
+  background: var(--dash-surface-1);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.dash-table-row {
+  border-bottom: 1px solid var(--dash-border);
+  transition: background 0.2s ease;
+}
+
+.dash-table-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dash-table-row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.01);
+}
+
+/* 热力图着色 */
+.dash-heatmap-low { background: rgba(163, 230, 53, 0.1); color: #A3E635; }
+.dash-heatmap-medium { background: rgba(251, 191, 36, 0.15); color: #FBBF24; }
+.dash-heatmap-high { background: rgba(251, 113, 133, 0.2); color: #FB7185; }
+
+/* 响应式适配 */
+@media (prefers-reduced-motion: reduce) {
+  .dash-animate-fade-in,
+  .dash-animate-scale-in,
+  .dash-flow-line,
+  .pulse-glow-rose {
+    animation: none;
+  }
+
+  .dash-card-3d:hover {
+    transform: none;
+  }
 }

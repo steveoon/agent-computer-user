@@ -12,19 +12,55 @@ import {
 } from "@/actions/recruitment-stats";
 
 /**
- * 格式化时间为相对时间（简短版）
+ * 格式化时间为相对时间（使用 Intl.RelativeTimeFormat）
  */
+const rtf = new Intl.RelativeTimeFormat("zh-CN", { numeric: "auto", style: "short" });
+
 function formatRelativeTime(isoString: string): string {
   const date = new Date(isoString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
 
   if (diffMins < 1) return "刚刚";
-  if (diffMins < 60) return `${diffMins}分钟前`;
-  if (diffHours < 24) return `${diffHours}小时前`;
-  return `${Math.floor(diffHours / 24)}天前`;
+  if (diffMins < 60) return rtf.format(-diffMins, "minute");
+  if (diffHours < 24) return rtf.format(-diffHours, "hour");
+  return rtf.format(-diffDays, "day");
+}
+
+/**
+ * 根据等待时间获取紧急度颜色
+ */
+function getUrgencyColor(isoString: string): { bg: string; text: string; border: string } {
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  if (diffHours >= 24) {
+    // 超过 24 小时 - 高紧急 Rose
+    return {
+      bg: "rgba(251, 113, 133, 0.15)",
+      text: "#FB7185",
+      border: "rgba(251, 113, 133, 0.3)",
+    };
+  }
+  if (diffHours >= 4) {
+    // 4-24 小时 - 中等紧急 Amber
+    return {
+      bg: "rgba(251, 191, 36, 0.15)",
+      text: "#FBBF24",
+      border: "rgba(251, 191, 36, 0.3)",
+    };
+  }
+  // 4 小时内 - 正常 Cyan
+  return {
+    bg: "rgba(34, 211, 238, 0.1)",
+    text: "#22D3EE",
+    border: "rgba(34, 211, 238, 0.2)",
+  };
 }
 
 /**
@@ -36,17 +72,28 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 
 /**
- * 候选人卡片组件
+ * 候选人卡片组件 - 深色主题版
  */
 function CandidateCard({ candidate }: { candidate: UnrepliedCandidate }) {
+  const urgencyColor = getUrgencyColor(candidate.lastMessageTime);
+
   return (
-    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-white/70 border border-amber-100 hover:bg-white transition-colors flex-shrink-0">
+    <div
+      className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all flex-shrink-0 hover:scale-[1.02]"
+      style={{
+        background: urgencyColor.bg,
+        border: `1px solid ${urgencyColor.border}`,
+      }}
+    >
       {/* 姓名 + 岗位 */}
-      <div className="flex items-center gap-1">
-        <span className="font-medium text-sm text-gray-800">
+      <div className="flex items-center gap-1.5">
+        <span
+          className="font-medium text-sm"
+          style={{ color: urgencyColor.text }}
+        >
           {candidate.name}
         </span>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-[var(--dash-text-muted)]">
           {candidate.position ?? "未知"}
         </span>
       </div>
@@ -57,22 +104,22 @@ function CandidateCard({ candidate }: { candidate: UnrepliedCandidate }) {
           <TooltipTrigger asChild>
             <Badge
               variant="outline"
-              className="h-5 px-1.5 text-xs font-normal text-gray-500 border-gray-200 cursor-help"
+              className="h-5 px-1.5 text-[10px] font-normal text-[var(--dash-text-muted)] border-[var(--dash-border)] bg-transparent cursor-help"
             >
-              <Bot className="h-3 w-3 mr-0.5" />
+              <Bot className="h-2.5 w-2.5 mr-0.5" />
               {candidate.agentId.split("-").slice(-1)[0]}
             </Badge>
           </TooltipTrigger>
-          <TooltipContent side="top">
+          <TooltipContent side="top" className="dash-glass text-[var(--dash-text-secondary)]">
             {candidate.agentId}
           </TooltipContent>
         </Tooltip>
         <Badge
           variant="outline"
-          className={`h-5 px-1.5 text-xs font-normal ${
+          className={`h-5 px-1.5 text-[10px] font-normal ${
             candidate.platform === "zhipin"
-              ? "text-blue-600 border-blue-200 bg-blue-50/50"
-              : "text-cyan-600 border-cyan-200 bg-cyan-50/50"
+              ? "text-dash-cyan border-dash-cyan/30 bg-dash-cyan/10"
+              : "text-dash-lime border-dash-lime/30 bg-dash-lime/10"
           }`}
         >
           {PLATFORM_LABELS[candidate.platform ?? ""] ?? candidate.platform ?? "未知"}
@@ -80,7 +127,10 @@ function CandidateCard({ candidate }: { candidate: UnrepliedCandidate }) {
       </div>
 
       {/* 时间 */}
-      <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
+      <div
+        className="flex items-center gap-1 text-xs dash-number"
+        style={{ color: urgencyColor.text }}
+      >
         <Clock className="h-3 w-3" />
         {formatRelativeTime(candidate.lastMessageTime)}
       </div>
@@ -89,7 +139,7 @@ function CandidateCard({ candidate }: { candidate: UnrepliedCandidate }) {
 }
 
 /**
- * 未回复候选人组件 - 紧凑横向设计 + 跑马灯效果
+ * 未回复候选人组件 - Rose 警告条 + 脉冲发光
  */
 export function UnrepliedCandidates() {
   const { filters } = useDashboardStatsStore();
@@ -145,21 +195,33 @@ export function UnrepliedCandidates() {
   // 计算动画时长（根据内容宽度）
   const animationDuration = Math.max(candidates.length * 5, 15);
 
+  // 根据候选人数量决定紧急程度
+  const urgencyLevel = candidates.length >= 5 ? "high" : candidates.length >= 2 ? "medium" : "low";
+
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50/80 border border-amber-200/60">
+    <div
+      className={`
+        flex items-center gap-3 p-3 rounded-xl
+        bg-dash-rose/10 border border-dash-rose/30
+        ${urgencyLevel === "high" ? "pulse-glow-rose" : ""}
+      `}
+    >
       {/* 标题 */}
-      <div className="flex items-center gap-1.5 text-amber-700 flex-shrink-0">
+      <div className="flex items-center gap-1.5 text-dash-rose flex-shrink-0">
         <UserX className="h-4 w-4" />
         <span className="text-sm font-medium">待回复</span>
         {!loading && candidates.length > 0 && (
-          <Badge variant="secondary" className="bg-amber-100 text-amber-700 h-5 px-1.5 text-xs">
+          <Badge
+            variant="secondary"
+            className="bg-dash-rose/20 text-dash-rose border-dash-rose/30 h-5 px-1.5 text-xs dash-number"
+          >
             {candidates.length}
           </Badge>
         )}
       </div>
 
       {/* 分隔线 */}
-      <div className="h-6 w-px bg-amber-200/80 flex-shrink-0" />
+      <div className="h-6 w-px bg-dash-rose/30 flex-shrink-0" />
 
       {/* 候选人列表 - 跑马灯容器 */}
       <div
@@ -169,14 +231,14 @@ export function UnrepliedCandidates() {
         onMouseLeave={() => setIsPaused(false)}
       >
         {loading && (
-          <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
+          <div className="flex items-center gap-1.5 text-[var(--dash-text-muted)] text-sm">
             <RefreshCw className="h-3.5 w-3.5 animate-spin" />
             加载中...
           </div>
         )}
 
         {error && !loading && (
-          <div className="text-destructive text-sm">{error}</div>
+          <div className="text-dash-rose text-sm">{error}</div>
         )}
 
         {!loading && !error && candidates.length > 0 && (
@@ -217,12 +279,13 @@ export function UnrepliedCandidates() {
         size="sm"
         onClick={loadData}
         disabled={loading}
-        className="h-7 w-7 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-100 flex-shrink-0"
+        aria-label="刷新待回复候选人列表"
+        className="h-7 w-7 p-0 text-dash-rose hover:text-dash-rose hover:bg-dash-rose/20 flex-shrink-0"
       >
-        <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+        <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
       </Button>
 
-      {/* 跑马灯动画样式 */}
+      {/* 跑马灯动画样式 - 支持 prefers-reduced-motion */}
       <style jsx>{`
         @keyframes marquee {
           0% {
@@ -230,6 +293,11 @@ export function UnrepliedCandidates() {
           }
           100% {
             transform: translateX(-50%);
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          * {
+            animation: none !important;
           }
         }
       `}</style>

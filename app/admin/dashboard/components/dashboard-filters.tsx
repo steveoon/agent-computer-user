@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -9,10 +9,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Bot, X, CalendarDays } from "lucide-react";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { Bot, X } from "lucide-react";
 import { useDashboardStatsStore } from "@/lib/stores/dashboard-stats-store";
 import type { DashboardFilters as DashboardFiltersType } from "@/lib/services/recruitment-stats/types";
 import { cn } from "@/lib/utils";
+import type { DateRange } from "react-day-picker";
+
+/**
+ * 将日期字符串解析为本地时间 Date 对象
+ * 避免 new Date("YYYY-MM-DD") 解析为 UTC 时间的问题
+ */
+function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/**
+ * 将 Date 对象格式化为本地时间日期字符串 (YYYY-MM-DD)
+ */
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 /**
  * 预设时间范围选项
@@ -29,14 +50,15 @@ const PRESET_OPTIONS: Array<{
 ];
 
 /**
- * Dashboard 筛选器组件
+ * Dashboard 筛选器组件 - Command Bar 风格
  *
- * 单行紧凑布局，提供时间范围预设和 Agent 筛选
+ * 深色毛玻璃背景，紧凑 pill 形状按钮
  */
 export function DashboardFilters() {
   const {
     filters,
     setPreset,
+    setCustomDateRange,
     setAgentFilter,
     setBrandFilter,
     clearDimensionFilters,
@@ -63,28 +85,43 @@ export function DashboardFilters() {
   // 是否有维度筛选
   const hasDimensionFilters = filters.agentId || filters.brandId;
 
-  // 格式化日期显示 (MM.DD 格式)
-  const formatDateRange = () => {
-    const start = filters.startDate.slice(5).replace("-", ".");
-    const end = filters.endDate.slice(5).replace("-", ".");
-    return `${start} - ${end}`;
+  // 将 store 中的日期字符串转换为 DateRange 对象（使用本地时间解析）
+  const dateRangeValue = useMemo<DateRange | undefined>(() => {
+    if (!filters.startDate || !filters.endDate) return undefined;
+    return {
+      from: parseLocalDate(filters.startDate),
+      to: parseLocalDate(filters.endDate),
+    };
+  }, [filters.startDate, filters.endDate]);
+
+  // 处理日期范围选择变化（使用本地时间格式化）
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    if (range?.from && range?.to) {
+      setCustomDateRange(
+        formatLocalDate(range.from),
+        formatLocalDate(range.to)
+      );
+    } else if (!range) {
+      // 清除自定义日期范围时，重置为默认预设（7天）
+      setPreset("last7days");
+    }
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur-sm border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+    <div className="dash-command-bar px-4 py-3 sticky top-4 z-20">
       <div className="flex items-center gap-3 flex-wrap">
-        {/* 时间范围预设按钮组 */}
-        <div className="flex items-center bg-gray-50 rounded-lg p-1 gap-0.5">
+        {/* 时间范围预设按钮组 - Pill 风格 */}
+        <div className="flex items-center gap-1" role="group" aria-label="时间范围选择">
           {PRESET_OPTIONS.map((option) => (
             <button
               key={option.value}
               onClick={() => setPreset(option.value)}
               disabled={loading}
+              aria-label={`选择${option.label}时间范围`}
+              aria-pressed={filters.preset === option.value}
               className={cn(
-                "px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
-                filters.preset === option.value
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                "dash-pill",
+                filters.preset === option.value && "dash-pill-active"
               )}
             >
               {option.label}
@@ -93,11 +130,11 @@ export function DashboardFilters() {
         </div>
 
         {/* 分隔线 */}
-        <div className="h-6 w-px bg-gray-200" />
+        <div className="h-6 w-px bg-[var(--dash-border)]" />
 
         {/* Agent 筛选 */}
         <div className="flex items-center gap-2">
-          <Bot className="h-4 w-4 text-gray-400" />
+          <Bot className="h-4 w-4 text-[var(--dash-text-muted)]" />
           <Select
             value={filters.agentId ?? "all"}
             onValueChange={(value) =>
@@ -105,13 +142,19 @@ export function DashboardFilters() {
             }
             disabled={loading || filterOptionsLoading}
           >
-            <SelectTrigger className="w-[140px] h-8 border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors">
+            <SelectTrigger className="w-[140px] h-8 bg-[var(--dash-surface-2)] border-[var(--dash-border)] text-[var(--dash-text-secondary)] hover:bg-[var(--dash-surface-1)] hover:border-[var(--dash-border-glow)] transition-colors text-sm">
               <SelectValue placeholder="全部 Agent" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部 Agent</SelectItem>
+            <SelectContent className="bg-[var(--dash-surface-1)] border-[var(--dash-border)]">
+              <SelectItem value="all" className="text-[var(--dash-text-secondary)] focus:bg-[var(--dash-surface-2)] focus:text-[var(--dash-text-primary)]">
+                全部 Agent
+              </SelectItem>
               {availableAgents.map((agent) => (
-                <SelectItem key={agent.agentId} value={agent.agentId}>
+                <SelectItem
+                  key={agent.agentId}
+                  value={agent.agentId}
+                  className="text-[var(--dash-text-secondary)] focus:bg-[var(--dash-surface-2)] focus:text-[var(--dash-text-primary)]"
+                >
                   {agent.displayName}
                 </SelectItem>
               ))}
@@ -119,56 +162,34 @@ export function DashboardFilters() {
           </Select>
         </div>
 
-        {/* Brand 筛选 - 暂时禁用，待 message_received 事件支持 brand_id 关联后启用 */}
-        {/* <div className="flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-gray-400" />
-          <Select
-            value={filters.brandId?.toString() ?? "all"}
-            onValueChange={(value) =>
-              setBrandFilter(value === "all" ? undefined : parseInt(value, 10))
-            }
-            disabled={loading || filterOptionsLoading}
-          >
-            <SelectTrigger className="w-[140px] h-8 border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors">
-              <SelectValue placeholder="全部品牌" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部品牌</SelectItem>
-              {availableBrands.map((brand) => (
-                <SelectItem key={brand.id} value={brand.id.toString()}>
-                  {brand.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div> */}
-
         {/* 已选筛选标签 */}
         {hasDimensionFilters && (
           <>
-            <div className="h-6 w-px bg-gray-200" />
+            <div className="h-6 w-px bg-[var(--dash-border)]" />
             <div className="flex items-center gap-2">
               {selectedAgentName && (
-                <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 text-xs font-medium bg-blue-50 text-blue-600 rounded-full">
+                <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 text-xs font-medium bg-dash-cyan/15 text-dash-cyan rounded-full border border-dash-cyan/30">
                   {selectedAgentName}
                   <button
                     onClick={() => setAgentFilter(undefined)}
-                    className="hover:bg-blue-100 rounded-full p-0.5 transition-colors"
+                    className="hover:bg-dash-cyan/20 rounded-full p-0.5 transition-colors"
                     disabled={loading}
+                    aria-label={`移除 Agent 筛选: ${selectedAgentName}`}
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-3 w-3" aria-hidden="true" />
                   </button>
                 </span>
               )}
               {selectedBrandName && (
-                <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 text-xs font-medium bg-green-50 text-green-600 rounded-full">
+                <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 text-xs font-medium bg-dash-lime/15 text-dash-lime rounded-full border border-dash-lime/30">
                   {selectedBrandName}
                   <button
                     onClick={() => setBrandFilter(undefined)}
-                    className="hover:bg-green-100 rounded-full p-0.5 transition-colors"
+                    className="hover:bg-dash-lime/20 rounded-full p-0.5 transition-colors"
                     disabled={loading}
+                    aria-label={`移除品牌筛选: ${selectedBrandName}`}
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-3 w-3" aria-hidden="true" />
                   </button>
                 </span>
               )}
@@ -177,7 +198,7 @@ export function DashboardFilters() {
                 size="sm"
                 onClick={clearDimensionFilters}
                 disabled={loading}
-                className="h-7 px-2 text-xs text-gray-400 hover:text-gray-600"
+                className="h-7 px-2 text-xs text-[var(--dash-text-muted)] hover:text-dash-rose hover:bg-dash-rose/10"
               >
                 清除
               </Button>
@@ -185,10 +206,19 @@ export function DashboardFilters() {
           </>
         )}
 
-        {/* 日期范围显示 - 右侧 */}
-        <div className="ml-auto flex items-center gap-1.5 text-sm text-gray-400">
-          <CalendarDays className="h-3.5 w-3.5" />
-          <span>{formatDateRange()}</span>
+        {/* 日期范围选择器 - 右侧 */}
+        <div className="ml-auto">
+          <DateRangePicker
+            value={dateRangeValue}
+            onChange={handleDateRangeChange}
+            disabled={loading}
+            variant="dark"
+            className={cn(
+              "h-8 bg-[var(--dash-surface-2)] border-[var(--dash-border)] text-[var(--dash-text-secondary)] hover:bg-[var(--dash-surface-1)] hover:border-[var(--dash-border-glow)] transition-colors text-sm",
+              !filters.preset && "border-dash-amber/50 bg-dash-amber/5"
+            )}
+            placeholder="自定义日期"
+          />
         </div>
       </div>
     </div>
