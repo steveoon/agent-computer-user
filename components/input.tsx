@@ -36,7 +36,9 @@ export const Input = ({
   const { navigateHistory, resetIndex, setTempInput, history } = useInputHistoryStore();
   const hasNavigated = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const stopCooldownRef = useRef<number | null>(null);
   const [dynamicPlaceholder, setDynamicPlaceholder] = useState<string | null>(null);
+  const [isStopping, setIsStopping] = useState(false);
 
   // 更智能的禁用逻辑：只有在真正加载中且没有错误时才禁用，或者用户未认证
   const shouldDisable = (isLoading && !error) || isInitializing || !isAuthenticated;
@@ -155,6 +157,32 @@ export const Input = ({
     }
   }, [status]);
 
+  // Reset stop cooldown when streaming ends
+  useEffect(() => {
+    if (status !== "streaming" && status !== "submitted") {
+      setIsStopping(false);
+      if (stopCooldownRef.current !== null) {
+        window.clearTimeout(stopCooldownRef.current);
+        stopCooldownRef.current = null;
+      }
+    }
+  }, [status]);
+
+  const handleStopClick = () => {
+    if (isStopping) return;
+    setIsStopping(true);
+    stop();
+
+    if (stopCooldownRef.current !== null) {
+      window.clearTimeout(stopCooldownRef.current);
+    }
+
+    stopCooldownRef.current = window.setTimeout(() => {
+      setIsStopping(false);
+      stopCooldownRef.current = null;
+    }, 800);
+  };
+
   return (
     <div className="relative w-full">
       <Textarea
@@ -179,7 +207,8 @@ export const Input = ({
       {status === "streaming" || status === "submitted" ? (
         <button
           type="button"
-          onClick={stop}
+          onClick={handleStopClick}
+          disabled={isStopping}
           aria-label="停止生成"
           className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-2 bg-black hover:bg-zinc-800 disabled:bg-zinc-300 disabled:cursor-not-allowed transition-colors"
         >
