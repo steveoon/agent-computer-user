@@ -2,6 +2,19 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.26.0](https://github.com/steveoon/agent-computer-user/compare/v1.25.0...v1.26.0) (2026-01-23)
+
+
+### Bug Fixes
+
+* **chat:** 修复停止生成逻辑和地理编码城市验证 ([7a1b5a7](https://github.com/steveoon/agent-computer-user/commit/7a1b5a78cc1c033e4908dd44ea83ac4d9dae8651))
+* **dashboard:** 修复日期筛选时区偏差并优化选择器 UX ([4af0bb5](https://github.com/steveoon/agent-computer-user/commit/4af0bb50bc17b8a20ac636032ad7125a94731e7b))
+
+
+### Features
+
+* **dashboard:** 深色科技风主题重构与日期样式优化 ([14eeec9](https://github.com/steveoon/agent-computer-user/commit/14eeec943f0ad5828d099273f1dc181aecd7dad6))
+
 # [1.26.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.26.0-develop.1...v1.26.0-develop.2) (2026-01-23)
 
 
