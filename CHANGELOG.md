@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.26.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.26.0-develop.1...v1.26.0-develop.2) (2026-01-23)
+
+
+### Bug Fixes
+
+* **chat:** 修复停止生成逻辑和地理编码城市验证 ([7a1b5a7](https://github.com/steveoon/agent-computer-user/commit/7a1b5a78cc1c033e4908dd44ea83ac4d9dae8651))
+
 # [1.26.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.25.0...v1.26.0-develop.1) (2026-01-23)
 
 
