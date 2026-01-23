@@ -49,6 +49,7 @@ interface DashboardStatsState {
   // Actions
   setFilters: (filters: Partial<DashboardFilters>) => void;
   setPreset: (preset: DashboardFilters["preset"]) => void;
+  setCustomDateRange: (startDate: string, endDate: string) => void;
   setAgentFilter: (agentId?: string) => void;
   setBrandFilter: (brandId?: number) => void;
   clearDimensionFilters: () => void;
@@ -150,6 +151,22 @@ export const useDashboardStatsStore = create<DashboardStatsState>()(
           console.error("[DashboardStatsStore] loadFilterOptions failed:", error);
           set({ filterOptionsLoading: false });
         }
+      },
+
+      /**
+       * 设置自定义日期范围
+       * 设置后 preset 变为 undefined
+       */
+      setCustomDateRange: (startDate: string, endDate: string) => {
+        set({
+          filters: {
+            ...get().filters,
+            preset: undefined,
+            startDate,
+            endDate,
+          },
+        });
+        get().loadDashboardData();
       },
 
       /**

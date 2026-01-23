@@ -23,6 +23,7 @@ import {
   processStepToolResults,
   type RecruitmentContext,
 } from "@/lib/services/recruitment-event";
+import { wrapToolsWithAbortSignal } from "@/lib/ai/abort-utils";
 
 // Allow streaming responses up to 5 minutes (for computer use scenarios)
 export const maxDuration = 300;
@@ -245,10 +246,15 @@ export async function POST(req: Request) {
         },
         resolvedPromptType
       );
+      const abortableTools = wrapToolsWithAbortSignal(filteredTools, req.signal);
 
       // 创建 UI 消息流 - 支持 HITL
       const stream = createUIMessageStream({
         execute: async ({ writer }) => {
+          if (req.signal.aborted) {
+            return;
+          }
+
           // 复制消息以便修改
           const mutableMessages = [...processedMessages] as UIMessage[];
 
@@ -349,7 +355,7 @@ export async function POST(req: Request) {
             model: dynamicRegistry.languageModel(chatModel),
             system: systemPrompt,
             messages: await convertToModelMessages(mutableMessages),
-            tools: filteredTools,
+            tools: abortableTools,
             providerOptions: {
               anthropic: { cacheControl: { type: "ephemeral" } },
             },

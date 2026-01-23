@@ -90,6 +90,48 @@ export function extractCityFromAddress(address: string): string {
 }
 
 /**
+ * 清理城市名，避免传入无效值（如"当地"）影响地理编码
+ */
+function normalizeCityForGeocoding(city?: string): string | undefined {
+  if (!city) return undefined;
+  const trimmed = city.trim();
+  const invalidCities = new Set([
+    "当地",
+    "本地",
+    "未知",
+    "市辖区",
+    "附近",
+    "周边",
+    "就近",
+    "本市",
+  ]);
+
+  if (!trimmed || invalidCities.has(trimmed) || trimmed.length < 2) {
+    return undefined;
+  }
+
+  return trimmed;
+}
+
+/**
+ * 从地址中提取更“像地址”的内容（优先括号内）
+ * 例如: "XX店（中山区鲁迅路29号，地铁青泥洼桥附近）" → "中山区鲁迅路29号"
+ */
+function extractAddressHint(address: string): string | undefined {
+  const match = address.match(/[（(]([^）)]*)[）)]/);
+  if (!match || !match[1]) return undefined;
+  const hint = match[1].trim();
+  if (!hint) return undefined;
+
+  // 括号内容包含路/街/道/巷/号/弄等更像地址时才采用
+  if (/路|街|道|巷|号|弄/.test(hint)) {
+    return hint;
+  }
+
+  return undefined;
+}
+
+/**
  * 清理地址字符串，移除干扰地理编码的内容
  * 例如: "北京市-朝阳区-安慧里二区4号1, 2, 3层肯德基(亚运村店)"
  *    → "北京市朝阳区安慧里二区4号"
@@ -222,16 +264,20 @@ class GeocodingService {
         return null;
       }
 
+      const normalizedCity = normalizeCityForGeocoding(city);
+
       // 清理关键词：移除括号注释（如"万科西山（最近门店）" → "万科西山"）
       const cleanedKeyword = keyword.replace(/[（(][^）)]*[）)]/g, "").trim();
 
       // 构建搜索关键词
-      const searchKeyword = city ? `${city}${cleanedKeyword}` : cleanedKeyword;
+      const searchKeyword = normalizedCity
+        ? `${normalizedCity}${cleanedKeyword}`
+        : cleanedKeyword;
       console.log(`   POI搜索: ${searchKeyword}`);
 
       const searchResult = await searchTool.execute({
         keywords: searchKeyword,
-        ...(city ? { city } : {}),
+        ...(normalizedCity ? { city: normalizedCity } : {}),
       });
 
       if (searchResult.isError) {
@@ -352,23 +398,27 @@ class GeocodingService {
         return null;
       }
 
+      const normalizedCity = normalizeCityForGeocoding(city);
+      const addressHint = extractAddressHint(address);
+      const addressSource = addressHint || address;
+
       // 清理地址，移除干扰地理编码的内容
-      const cleanedAddress = cleanAddressForGeocoding(address);
+      const cleanedAddress = cleanAddressForGeocoding(addressSource);
 
       // 🔧 如果地址不包含城市名，将城市名拼接到地址前面
       // 这样可以确保高德 API 正确识别目标区域
       let fullAddress = cleanedAddress;
-      if (city && !cleanedAddress.includes(city.replace(/市$/, ""))) {
+      if (normalizedCity && !cleanedAddress.includes(normalizedCity.replace(/市$/, ""))) {
         // 城市名去掉"市"后缀再检查，避免 "大连" vs "大连市" 的问题
-        const cityWithoutSuffix = city.replace(/市$/, "");
+        const cityWithoutSuffix = normalizedCity.replace(/市$/, "");
         if (!cleanedAddress.includes(cityWithoutSuffix)) {
-          fullAddress = `${city}${cleanedAddress}`;
+          fullAddress = `${normalizedCity}${cleanedAddress}`;
         }
       }
 
       const result = await geoTool.execute({
         address: fullAddress,
-        ...(city ? { city } : {}),
+        ...(normalizedCity ? { city: normalizedCity } : {}),
       });
 
       if (result.isError) {

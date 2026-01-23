@@ -1,7 +1,5 @@
 "use client";
 
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Users,
   MessageSquare,
@@ -35,7 +33,7 @@ function formatTrend(value: number | null | undefined): {
 }
 
 /**
- * 趋势指示器组件
+ * 趋势指示器组件 - 深色主题版
  */
 function TrendIndicator({
   value,
@@ -47,10 +45,10 @@ function TrendIndicator({
   const { text, type } = formatTrend(value);
 
   const getColorClass = () => {
-    if (type === "neutral") return "text-muted-foreground";
+    if (type === "neutral") return "text-[var(--dash-text-muted)]";
     // invertColors 用于"下降是好事"的指标（如错误率）
     const isPositive = invertColors ? type === "down" : type === "up";
-    return isPositive ? "text-green-600" : "text-red-600";
+    return isPositive ? "text-dash-lime" : "text-dash-rose";
   };
 
   const getIcon = () => {
@@ -60,18 +58,61 @@ function TrendIndicator({
   };
 
   return (
-    <Badge variant="outline" className={`${getColorClass()} text-xs gap-1`}>
+    <span className={`inline-flex items-center gap-1 text-xs font-medium ${getColorClass()}`}>
       {getIcon()}
-      {text}
-    </Badge>
+      <span className="dash-number">{text}</span>
+    </span>
   );
 }
 
 /**
- * KPI 卡片组组件
+ * 迷你 Sparkline 组件
+ */
+function MiniSparkline({ data, color }: { data: number[]; color: string }) {
+  const max = Math.max(...data, 1);
+  return (
+    <div className="flex items-end gap-[2px] h-5">
+      {data.map((value, index) => (
+        <div
+          key={index}
+          className="w-[3px] rounded-sm transition-all duration-300"
+          style={{
+            height: `${Math.max((value / max) * 100, 10)}%`,
+            background: `linear-gradient(to top, ${color}40, ${color})`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * KPI 卡片配置类型
+ */
+interface KpiConfig {
+  title: string;
+  icon: typeof Users;
+  value: number;
+  isRate: boolean;
+  trendKey: "messagesReceived" | "inboundCandidates" | "wechatExchanged" | null;
+  description: string;
+  color: string;
+  glowClass: string;
+  isHero?: boolean;
+  warnThreshold?: number;
+}
+
+/**
+ * KPI 卡片组组件 - 深色科技风版本
+ *
+ * 特点：
+ * - Hero 卡片模式：首个指标占 2 列
+ * - 深色表面 + 微妙渐变 + 边框发光
+ * - Monospace 数字字体 + 发光效果
+ * - 3D 悬浮动效
  */
 export function KpiCards() {
-  const { summary, loading } = useDashboardStatsStore();
+  const { summary, loading, dailyTrend } = useDashboardStatsStore();
 
   // 计算当前周期的汇总值
   const currentStats = summary?.current || [];
@@ -100,23 +141,34 @@ export function KpiCards() {
 
   const trend = summary?.trend;
 
-  // KPI 配置 - 对齐 docs/OPERATIONAL_METRICS_GUIDE.md
-  const kpis = [
+  // 从趋势数据中提取迷你图数据
+  const sparklineData = {
+    messagesReceived: dailyTrend?.slice(-7).map(d => d.messagesReceived ?? 0) || [],
+    inboundCandidates: dailyTrend?.slice(-7).map(d => d.inboundCandidates) || [],
+    wechatExchanged: dailyTrend?.slice(-7).map(d => d.wechatExchanged) || [],
+  };
+
+  // KPI 配置 - 新配色方案（4 等分布局）
+  const kpis: KpiConfig[] = [
     {
       title: "入站消息总数",
       icon: Users,
       value: totals.messagesReceived,
       isRate: false,
-      trendKey: "messagesReceived" as const,
-      description: "Total Flow / Messages Received",
+      trendKey: "messagesReceived",
+      description: "Total Messages",
+      color: "#FBBF24", // Amber
+      glowClass: "glow-amber",
     },
     {
-      title: "入站候选人数",
+      title: "入站候选人",
       icon: MessageSquare,
       value: totals.inboundCandidates,
       isRate: false,
-      trendKey: "inboundCandidates" as const,
+      trendKey: "inboundCandidates",
       description: "Inbound Candidates",
+      color: "#22D3EE", // Cyan
+      glowClass: "glow-cyan",
     },
     {
       title: "回复率",
@@ -125,87 +177,129 @@ export function KpiCards() {
       isRate: true,
       trendKey: null,
       description: "Reply Rate",
-      warnThreshold: 50, // 50%
+      color: "#A3E635", // Lime
+      glowClass: "glow-lime",
+      warnThreshold: 50,
     },
     {
-      title: "微信获取数",
+      title: "微信获取",
       icon: CalendarCheck,
       value: totals.wechatExchanged,
       isRate: false,
-      trendKey: "wechatExchanged" as const,
+      trendKey: "wechatExchanged",
       description: "WeChat Obtained",
+      color: "#FB7185", // Rose
+      glowClass: "glow-rose",
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {kpis.map((kpi, index) => {
         // 对于回复率，检查是否低于阈值
         const isWarning = kpi.isRate && kpi.warnThreshold && kpi.value < kpi.warnThreshold;
+        const sparkData = kpi.trendKey ? sparklineData[kpi.trendKey] : null;
 
         return (
-          <Card
+          <div
             key={kpi.title}
-            className="relative border-0 shadow-sm bg-white hover:shadow-md transition-shadow overflow-hidden"
+            className={`
+              relative overflow-hidden rounded-xl
+              bg-[var(--dash-surface-1)] border border-[var(--dash-border)]
+              transition-all duration-300 ease-out
+              hover:border-[var(--dash-border-glow)] hover:shadow-lg
+              dash-card-3d
+              dash-animate-scale-in dash-delay-${index + 1}
+            `}
+            style={{
+              "--card-glow": kpi.color,
+            } as React.CSSProperties}
           >
-            {/* 左侧彩色装饰条 - 模拟参考图的 Impact 风格 */}
+            {/* 顶部渐变光条 */}
             <div
-              className={`absolute left-0 top-0 bottom-0 w-1 ${
-                index === 0
-                  ? "bg-blue-500"
-                  : index === 1
-                    ? "bg-indigo-500"
-                    : index === 2
-                      ? "bg-emerald-500"
-                      : "bg-violet-500"
-              }`}
+              className="absolute top-0 left-0 right-0 h-[2px]"
+              style={{
+                background: `linear-gradient(90deg, transparent, ${kpi.color}80, transparent)`,
+              }}
             />
 
-            <CardContent className="pt-6 pl-6">
-              <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                  {kpi.title}
-                </span>
+            {/* 背景渐变 */}
+            <div
+              className="absolute inset-0 opacity-5"
+              style={{
+                background: `radial-gradient(ellipse at top right, ${kpi.color}, transparent 70%)`,
+              }}
+            />
 
-                {loading ? (
-                  <div className="h-10 w-24 bg-muted/20 rounded animate-pulse mt-1" />
-                ) : (
-                  <div className="flex items-baseline gap-3 mt-1">
-                    <span className="text-3xl font-bold tracking-tight text-foreground">
-                      {kpi.isRate ? (
-                        <AnimatedNumber
-                          value={kpi.value}
-                          decimals={1}
-                          suffix="%"
-                          duration={0.6}
-                        />
-                      ) : (
-                        <AnimatedNumber
-                          value={kpi.value}
-                          duration={0.6}
-                        />
-                      )}
+            <div className="relative p-5">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  {/* 标题 */}
+                  <div className="flex items-center gap-2 mb-1">
+                    <kpi.icon
+                      className="h-4 w-4"
+                      style={{ color: kpi.color }}
+                    />
+                    <span className="text-xs font-medium text-[var(--dash-text-muted)] uppercase tracking-wider">
+                      {kpi.title}
                     </span>
-                    {isWarning && (
-                      <AlertCircle className="h-4 w-4 text-amber-500" />
-                    )}
+                  </div>
+
+                  {/* 数值 */}
+                  {loading ? (
+                    <div className={`h-12 w-28 bg-[var(--dash-surface-2)] rounded animate-pulse mt-2 ${kpi.isHero ? "lg:h-16 lg:w-36" : ""}`} />
+                  ) : (
+                    <div className="flex items-baseline gap-3 mt-2">
+                      <span
+                        className={`
+                          dash-number font-bold tracking-tight
+                          ${kpi.isHero ? "text-4xl lg:text-5xl" : "text-3xl"}
+                        `}
+                        style={{
+                          color: kpi.color,
+                          textShadow: `0 0 30px ${kpi.color}50`,
+                        }}
+                      >
+                        {kpi.isRate ? (
+                          <AnimatedNumber
+                            value={kpi.value}
+                            decimals={1}
+                            suffix="%"
+                            duration={0.6}
+                          />
+                        ) : (
+                          <AnimatedNumber
+                            value={kpi.value}
+                            duration={0.6}
+                          />
+                        )}
+                      </span>
+                      {isWarning && (
+                        <AlertCircle className="h-4 w-4 text-dash-rose animate-pulse" aria-hidden="true" />
+                      )}
+                    </div>
+                  )}
+
+                  {/* 趋势 + 描述 */}
+                  <div className="flex items-center gap-3 mt-3">
                     {kpi.trendKey && trend && (
-                      <div className="scale-90 origin-left">
-                        <TrendIndicator value={trend[kpi.trendKey]} />
-                      </div>
+                      <TrendIndicator value={trend[kpi.trendKey]} />
                     )}
+                    <span className="text-xs text-[var(--dash-text-muted)]">
+                      {kpi.description}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Sparkline */}
+                {sparkData && sparkData.length > 0 && (
+                  <div className="ml-4 opacity-60">
+                    <MiniSparkline data={sparkData} color={kpi.color} />
                   </div>
                 )}
-
-                <div className="flex items-center gap-1.5 mt-2">
-                  <kpi.icon className="h-3.5 w-3.5 text-muted-foreground/60" />
-                  <p className="text-xs text-muted-foreground/80 font-light truncate">
-                    {kpi.description}
-                  </p>
-                </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         );
       })}
     </div>

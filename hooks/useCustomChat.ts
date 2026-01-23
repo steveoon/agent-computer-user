@@ -299,11 +299,26 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
   const stop = useCallback(() => {
     stopGeneration();
 
-    const lastMessage = messages.at(-1);
-    const lastMessageLastPart = lastMessage?.parts.at(-1);
-    if (lastMessage?.role === "assistant" && lastMessageLastPart?.type?.startsWith("tool-")) {
+    setMessages(prev => {
+      const lastMessage = prev.at(-1);
+      const lastMessageLastPart = lastMessage?.parts.at(-1);
+      const isToolPart =
+        typeof lastMessageLastPart?.type === "string" &&
+        lastMessageLastPart.type.startsWith("tool-");
+      const state = lastMessageLastPart && "state" in lastMessageLastPart
+        ? lastMessageLastPart.state
+        : undefined;
+
+      if (!lastMessage || lastMessage.role !== "assistant" || !isToolPart) {
+        return prev;
+      }
+
+      if (state === "output-available" || state === "output-error") {
+        return prev;
+      }
+
       // AI SDK v5 tool part 格式 - 需要保留 toolCallId
-      setMessages(prev => [
+      return [
         ...prev.slice(0, -1),
         {
           ...lastMessage,
@@ -316,9 +331,9 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
             } as ToolPart,
           ],
         },
-      ]);
-    }
-  }, [stopGeneration, messages, setMessages]);
+      ];
+    });
+  }, [stopGeneration, setMessages]);
 
   // 🎯 AI SDK v5: 手动实现 handleInputChange
   const handleInputChange = useCallback(
