@@ -12,6 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { toBeijingDateString } from "@/lib/utils/beijing-timezone";
 
 /**
  * 检测用户本地时区的 Hook
@@ -26,18 +27,6 @@ function useTimeZone(): string | undefined {
 
   return timeZone;
 }
-
-/** 禁用未来日期的判断函数（提升到模块级避免重复创建） */
-const disableFutureDates = (date: Date): boolean => date > new Date();
-
-/**
- * 日期范围格式化器（使用 Intl.DateTimeFormat）
- * 短格式：不含年份，适合 Dashboard 等空间有限的场景
- */
-const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
-  month: "numeric",
-  day: "numeric",
-});
 
 interface DateRangePickerProps {
   /** 当前选中的日期范围 */
@@ -54,6 +43,8 @@ interface DateRangePickerProps {
   align?: "start" | "center" | "end";
   /** 主题变体 */
   variant?: "default" | "dark";
+  /** 日历显示时区（IANA 标识符，如 "Asia/Shanghai"） */
+  timeZone?: string;
 }
 
 /**
@@ -72,10 +63,12 @@ export function DateRangePicker({
   disabled = false,
   align = "start",
   variant = "default",
+  timeZone,
 }: DateRangePickerProps) {
   const isDark = variant === "dark";
   const [open, setOpen] = React.useState(false);
-  const timeZone = useTimeZone();
+  const fallbackTimeZone = useTimeZone();
+  const resolvedTimeZone = timeZone ?? fallbackTimeZone;
   // 内部选择状态（用于跟踪选择过程）
   const [internalRange, setInternalRange] = React.useState<
     DateRange | undefined
@@ -98,16 +91,72 @@ export function DateRangePicker({
     return "complete";
   }, [activeRange]);
 
+  const isBeijingTimeZone = resolvedTimeZone === "Asia/Shanghai";
+
+  // 短格式日期（不含年份）
+  const shortFormatter = React.useMemo(
+    () => new Intl.DateTimeFormat("zh-CN", {
+      month: "numeric",
+      day: "numeric",
+      timeZone: resolvedTimeZone,
+    }),
+    [resolvedTimeZone]
+  );
+
+  // ISO 日期格式化（YYYY-MM-DD）
+  const isoFormatter = React.useMemo(
+    () => new Intl.DateTimeFormat("en-CA", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: resolvedTimeZone,
+    }),
+    [resolvedTimeZone]
+  );
+
+  const formatIsoDate = React.useCallback(
+    (date: Date) => {
+      if (isBeijingTimeZone) {
+        return toBeijingDateString(date);
+      }
+      const parts = isoFormatter.formatToParts(date);
+      const year = parts.find((part) => part.type === "year")?.value;
+      const month = parts.find((part) => part.type === "month")?.value;
+      const day = parts.find((part) => part.type === "day")?.value;
+      if (year && month && day) {
+        return `${year}-${month}-${day}`;
+      }
+      return isoFormatter.format(date);
+    },
+    [isBeijingTimeZone, isoFormatter]
+  );
+
+  const formatShortDate = React.useCallback(
+    (date: Date) => shortFormatter.format(date),
+    [shortFormatter]
+  );
+
+  const disableFutureDates = React.useCallback(
+    (date: Date) => {
+      if (isBeijingTimeZone) {
+        return toBeijingDateString(date) > toBeijingDateString(new Date());
+      }
+      return date > new Date();
+    },
+    [isBeijingTimeZone]
+  );
+
   // 格式化显示文本
   const displayText = React.useMemo(() => {
-    if (!value?.from) return placeholder;
+    if (!activeRange?.from) return placeholder;
+    const fromText = formatIsoDate(activeRange.from);
 
-    if (value.to) {
-      return `${dateFormatter.format(value.from)} - ${dateFormatter.format(value.to)}`;
+    if (!activeRange.to) {
+      return `已选：${fromText} -> ?`;
     }
 
-    return dateFormatter.format(value.from);
-  }, [value, placeholder]);
+    return `${formatShortDate(activeRange.from)} - ${formatShortDate(activeRange.to)}`;
+  }, [activeRange, placeholder, formatIsoDate, formatShortDate]);
 
   // 处理日期选择
   const handleSelect = React.useCallback(
@@ -160,8 +209,8 @@ export function DateRangePicker({
         <Calendar
           autoFocus
           mode="range"
-          timeZone={timeZone}
-          defaultMonth={value?.from}
+          timeZone={resolvedTimeZone}
+          defaultMonth={activeRange?.from}
           selected={activeRange}
           onSelect={handleSelect}
           numberOfMonths={2}

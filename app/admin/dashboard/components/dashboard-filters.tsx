@@ -14,26 +14,8 @@ import { Bot, X } from "lucide-react";
 import { useDashboardStatsStore } from "@/lib/stores/dashboard-stats-store";
 import type { DashboardFilters as DashboardFiltersType } from "@/lib/services/recruitment-stats/types";
 import { cn } from "@/lib/utils";
+import { parseBeijingDateString, toBeijingDateString } from "@/lib/utils/beijing-timezone";
 import type { DateRange } from "react-day-picker";
-
-/**
- * 将日期字符串解析为本地时间 Date 对象
- * 避免 new Date("YYYY-MM-DD") 解析为 UTC 时间的问题
- */
-function parseLocalDate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
-
-/**
- * 将 Date 对象格式化为本地时间日期字符串 (YYYY-MM-DD)
- */
-function formatLocalDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
 
 /**
  * 预设时间范围选项
@@ -85,21 +67,21 @@ export function DashboardFilters() {
   // 是否有维度筛选
   const hasDimensionFilters = filters.agentId || filters.brandId;
 
-  // 将 store 中的日期字符串转换为 DateRange 对象（使用本地时间解析）
+  // 将 store 中的日期字符串转换为 DateRange 对象（使用北京时间解析）
   const dateRangeValue = useMemo<DateRange | undefined>(() => {
     if (!filters.startDate || !filters.endDate) return undefined;
     return {
-      from: parseLocalDate(filters.startDate),
-      to: parseLocalDate(filters.endDate),
+      from: parseBeijingDateString(filters.startDate),
+      to: parseBeijingDateString(filters.endDate),
     };
   }, [filters.startDate, filters.endDate]);
 
-  // 处理日期范围选择变化（使用本地时间格式化）
+  // 处理日期范围选择变化（使用北京时间格式化）
   const handleDateRangeChange = (range: DateRange | undefined) => {
     if (range?.from && range?.to) {
       setCustomDateRange(
-        formatLocalDate(range.from),
-        formatLocalDate(range.to)
+        toBeijingDateString(range.from),
+        toBeijingDateString(range.to)
       );
     } else if (!range) {
       // 清除自定义日期范围时，重置为默认预设（7天）
@@ -213,6 +195,7 @@ export function DashboardFilters() {
             onChange={handleDateRangeChange}
             disabled={loading}
             variant="dark"
+            timeZone="Asia/Shanghai"
             className={cn(
               "h-8 bg-[var(--dash-surface-2)] border-[var(--dash-border)] text-[var(--dash-text-secondary)] hover:bg-[var(--dash-surface-1)] hover:border-[var(--dash-border-glow)] transition-colors text-sm",
               !filters.preset && "border-dash-amber/50 bg-dash-amber/5"
