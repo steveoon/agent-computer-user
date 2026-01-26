@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { AgentCleanupResult } from "../types/agent";
 
 /**
  * Preload 脚本类型定义
@@ -39,6 +40,7 @@ interface AgentTemplate {
   chromeArgs: string[];
   env: Record<string, string>;
 }
+
 
 interface Settings {
   chromeExecutable: string;
@@ -113,7 +115,7 @@ const agentApi = {
     handleIpcResponse("agent:remove", agentId),
 
   // Cleanup agent ports (kill processes occupying the ports)
-  cleanup: (agentId: string): Promise<{ message: string; cleaned: number }> =>
+  cleanup: (agentId: string): Promise<AgentCleanupResult> =>
     handleIpcResponse("agent:cleanup", agentId),
 
   // Get single agent

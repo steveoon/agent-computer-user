@@ -247,16 +247,28 @@ export function registerAgentHandlers(agentManager: AgentManager): void {
         }
       }
 
-      if (results.length === 0) {
-        return { success: true, data: { message: "没有发现占用端口的进程", cleaned: 0 } };
+      const cleanedCount = results.filter(r => r.killed).length;
+      const lockCleanup = await agentManager.cleanupProfileLocks(agentId);
+      const lockCleaned = lockCleanup.cleaned;
+
+      const messageParts: string[] = [];
+      if (cleanedCount > 0) {
+        messageParts.push(`已清理 ${cleanedCount} 个端口进程`);
+      }
+      if (lockCleaned > 0) {
+        messageParts.push(`已移除 ${lockCleaned} 个 Chrome 锁文件`);
+      }
+      if (messageParts.length === 0) {
+        messageParts.push(lockCleanup.message || "没有发现占用端口的进程");
       }
 
-      const cleanedCount = results.filter(r => r.killed).length;
       return {
         success: true,
         data: {
-          message: `已清理 ${cleanedCount} 个进程`,
+          message: messageParts.join("，"),
           cleaned: cleanedCount,
+          lockCleaned,
+          lockFiles: lockCleanup.removedFiles,
           details: results
         }
       };

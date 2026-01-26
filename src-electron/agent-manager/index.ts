@@ -210,6 +210,22 @@ export class AgentManager extends EventEmitter {
   }
 
   /**
+   * Clean up stale Chrome profile lock files for an agent
+   */
+  async cleanupProfileLocks(agentId: string) {
+    if (!this.config || !this.chromeLauncher) {
+      throw new Error("Agent manager not initialized");
+    }
+
+    const agent = this.getAgent(agentId);
+    if (!agent) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+
+    return this.chromeLauncher.cleanupProfileLocks(agent.userDataDir);
+  }
+
+  /**
    * Add new agent(s)
    */
   async addAgents(type: string, options: AddAgentOptions = {}): Promise<AgentInfo[]> {
