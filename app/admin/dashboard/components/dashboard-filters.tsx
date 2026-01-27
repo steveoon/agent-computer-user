@@ -10,7 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Bot, X } from "lucide-react";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { Bot, Briefcase, X } from "lucide-react";
 import { useDashboardStatsStore } from "@/lib/stores/dashboard-stats-store";
 import type { DashboardFilters as DashboardFiltersType } from "@/lib/services/recruitment-stats/types";
 import { cn } from "@/lib/utils";
@@ -43,10 +44,12 @@ export function DashboardFilters() {
     setCustomDateRange,
     setAgentFilter,
     setBrandFilter,
+    setJobFilter,
     clearDimensionFilters,
     loading,
     availableAgents,
     availableBrands,
+    availableJobs,
     filterOptionsLoading,
     loadFilterOptions,
   } = useDashboardStatsStore();
@@ -64,8 +67,20 @@ export function DashboardFilters() {
     ? availableBrands.find((b) => b.id === filters.brandId)?.name
     : null;
 
-  // 是否有维度筛选
-  const hasDimensionFilters = filters.agentId || filters.brandId;
+  // 获取选中的岗位标签
+  const selectedJobLabels = useMemo(() => {
+    if (!filters.jobNames || filters.jobNames.length === 0) return [];
+    return filters.jobNames
+      .map((name) => availableJobs.find((j) => j.value === name)?.label ?? name)
+      .slice(0, 2); // 最多显示 2 个
+  }, [filters.jobNames, availableJobs]);
+  const hasMoreJobs = (filters.jobNames?.length ?? 0) > 2;
+
+  // 是否有维度筛选（显式检查 undefined，避免 brandId=0 被误判）
+  const hasDimensionFilters =
+    filters.agentId !== undefined ||
+    filters.brandId !== undefined ||
+    (filters.jobNames && filters.jobNames.length > 0);
 
   // 将 store 中的日期字符串转换为 DateRange 对象（使用北京时间解析）
   const dateRangeValue = useMemo<DateRange | undefined>(() => {
@@ -144,11 +159,25 @@ export function DashboardFilters() {
           </Select>
         </div>
 
+        {/* 岗位筛选（多选） */}
+        <div className="flex items-center gap-2">
+          <Briefcase className="h-4 w-4 text-[var(--dash-text-muted)]" />
+          <MultiSelect
+            options={availableJobs}
+            selected={filters.jobNames ?? []}
+            onChange={(values) => setJobFilter(values.length > 0 ? values : undefined)}
+            placeholder="全部岗位"
+            searchPlaceholder="搜索岗位..."
+            disabled={loading || filterOptionsLoading}
+            className="min-w-[160px]"
+          />
+        </div>
+
         {/* 已选筛选标签 */}
         {hasDimensionFilters && (
           <>
             <div className="h-6 w-px bg-[var(--dash-border)]" />
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {selectedAgentName && (
                 <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 text-xs font-medium bg-dash-cyan/15 text-dash-cyan rounded-full border border-dash-cyan/30">
                   {selectedAgentName}
@@ -173,6 +202,31 @@ export function DashboardFilters() {
                   >
                     <X className="h-3 w-3" aria-hidden="true" />
                   </button>
+                </span>
+              )}
+              {/* 已选岗位标签 */}
+              {selectedJobLabels.map((label, index) => (
+                <span
+                  key={filters.jobNames?.[index]}
+                  className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 text-xs font-medium bg-dash-amber/15 text-dash-amber rounded-full border border-dash-amber/30"
+                >
+                  <span className="max-w-[80px] truncate">{label}</span>
+                  <button
+                    onClick={() => {
+                      const newJobNames = filters.jobNames?.filter((_, i) => i !== index);
+                      setJobFilter(newJobNames && newJobNames.length > 0 ? newJobNames : undefined);
+                    }}
+                    className="hover:bg-dash-amber/20 rounded-full p-0.5 transition-colors"
+                    disabled={loading}
+                    aria-label={`移除岗位筛选: ${label}`}
+                  >
+                    <X className="h-3 w-3" aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+              {hasMoreJobs && (
+                <span className="text-xs text-[var(--dash-text-muted)]">
+                  +{(filters.jobNames?.length ?? 0) - 2} 岗位
                 </span>
               )}
               <Button

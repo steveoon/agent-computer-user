@@ -287,6 +287,61 @@ class RecruitmentEventsRepository {
   }
 
   /**
+   * 获取 Job 筛选选项列表
+   *
+   * 用于 Dashboard 岗位筛选下拉框
+   * 根据 JOB_FILTER_MODE 返回 name 或 id 形式的选项
+   */
+  async getDistinctJobOptions(): Promise<Array<{ value: string; label: string }>> {
+    // 当前实现：使用 job_name
+    // 将来切换到 job_id 时，修改 job-filter.ts 中的 JOB_FILTER_MODE，
+    // 并实现 getDistinctJobsById 方法
+    return this.getDistinctJobsByName();
+  }
+
+  /**
+   * 通过 job_name 获取选项（当前方案）
+   */
+  private async getDistinctJobsByName(): Promise<Array<{ value: string; label: string }>> {
+    const result = await withRetry(async () => {
+      const db = getDb();
+      return db
+        .selectDistinct({
+          jobName: recruitmentEvents.jobName,
+        })
+        .from(recruitmentEvents)
+        .where(sql`${recruitmentEvents.jobName} IS NOT NULL AND ${recruitmentEvents.jobName} != ''`)
+        .orderBy(recruitmentEvents.jobName);
+    }, "getDistinctJobsByName");
+
+    return (
+      result
+        ?.map((r) => r.jobName)
+        .filter((name): name is string => name !== null)
+        .map((name) => ({ value: name, label: name })) ?? []
+    );
+  }
+
+  /**
+   * 通过 job_id 获取选项（将来方案）
+   *
+   * TODO: 实现时需要关联 data_dictionary 或 jobs 表获取 id 和名称
+   */
+  // private async getDistinctJobsById(): Promise<Array<{ value: string; label: string }>> {
+  //   const db = getDb();
+  //   const result = await db
+  //     .selectDistinct({
+  //       jobId: recruitmentEvents.jobId,
+  //     })
+  //     .from(recruitmentEvents)
+  //     .where(sql`job_id IS NOT NULL AND job_id > 0`);
+  //
+  //   // 关联 jobs 表获取名称
+  //   // return result.map(r => ({ value: String(r.jobId), label: jobName }));
+  //   return [];
+  // }
+
+  /**
    * 获取某个 Agent 某天的所有品牌-岗位组合
    *
    * 用于细粒度聚合

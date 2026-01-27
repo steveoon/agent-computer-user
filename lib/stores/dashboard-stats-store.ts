@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { getDashboardData, getFilterOptions } from "@/actions/recruitment-stats";
 import { toBeijingDateString } from "@/lib/utils/beijing-timezone";
-import type { AgentOption, BrandOption } from "@/actions/recruitment-stats";
+import type { AgentOption, BrandOption, JobOption } from "@/actions/recruitment-stats";
 import type {
   DashboardFilters,
   DashboardSummary,
@@ -41,9 +41,10 @@ interface DashboardStatsState {
   // 筛选参数
   filters: DashboardFilters;
 
-  // 筛选选项（Agent 和 Brand 列表）
+  // 筛选选项（Agent、Brand 和 Job 列表）
   availableAgents: AgentOption[];
   availableBrands: BrandOption[];
+  availableJobs: JobOption[];
   filterOptionsLoading: boolean;
 
   // Actions
@@ -52,6 +53,7 @@ interface DashboardStatsState {
   setCustomDateRange: (startDate: string, endDate: string) => void;
   setAgentFilter: (agentId?: string) => void;
   setBrandFilter: (brandId?: number) => void;
+  setJobFilter: (jobNames?: string[]) => void;
   clearDimensionFilters: () => void;
   loadFilterOptions: () => Promise<void>;
   loadDashboardData: (silent?: boolean) => Promise<void>;
@@ -76,6 +78,7 @@ export const useDashboardStatsStore = create<DashboardStatsState>()(
       // 筛选选项初始状态
       availableAgents: [],
       availableBrands: [],
+      availableJobs: [],
       filterOptionsLoading: false,
 
       /**
@@ -113,7 +116,21 @@ export const useDashboardStatsStore = create<DashboardStatsState>()(
       },
 
       /**
-       * 清除维度筛选（Agent + Brand）
+       * 设置 Job 筛选（多选）
+       * undefined 或空数组表示"全部"
+       */
+      setJobFilter: (jobNames) => {
+        set((state) => ({
+          filters: {
+            ...state.filters,
+            jobNames: jobNames && jobNames.length > 0 ? jobNames : undefined,
+          },
+        }));
+        get().loadDashboardData();
+      },
+
+      /**
+       * 清除维度筛选（Agent + Brand + Job）
        * 保留时间范围筛选
        */
       clearDimensionFilters: () => {
@@ -122,14 +139,14 @@ export const useDashboardStatsStore = create<DashboardStatsState>()(
             ...state.filters,
             agentId: undefined,
             brandId: undefined,
-            jobId: undefined,
+            jobNames: undefined,
           },
         }));
         get().loadDashboardData();
       },
 
       /**
-       * 加载筛选选项（Agent 和 Brand 列表）
+       * 加载筛选选项（Agent、Brand 和 Job 列表）
        */
       loadFilterOptions: async () => {
         set({ filterOptionsLoading: true });
@@ -141,6 +158,7 @@ export const useDashboardStatsStore = create<DashboardStatsState>()(
             set({
               availableAgents: result.data.agents,
               availableBrands: result.data.brands,
+              availableJobs: result.data.jobs,
               filterOptionsLoading: false,
             });
           } else {
@@ -285,6 +303,7 @@ export const useDashboardStatsStore = create<DashboardStatsState>()(
           filters: initialFilters,
           availableAgents: [],
           availableBrands: [],
+          availableJobs: [],
           filterOptionsLoading: false,
         });
       },

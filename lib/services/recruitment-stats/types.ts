@@ -198,7 +198,8 @@ export interface DashboardFilters {
   endDate: string;
   agentId?: string;
   brandId?: number;
-  jobId?: number;
+  /** 岗位名称列表（多选筛选） */
+  jobNames?: string[];
   preset?: "today" | "yesterday" | "last7days" | "last14days" | "last30days";
 }
 
