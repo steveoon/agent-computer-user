@@ -2,7 +2,9 @@ appId: com.huajuan.recruitment-assistant
 productName: 花卷-Huajuan
 copyright: Copyright 2025 Huajuan
 
-# Disable asar to allow Next.js standalone to work properly
+# ASAR disabled: Next.js standalone has dynamic require() calls that don't work in ASAR archives
+# Error: Cannot find module './cjs/react.development.js' when asar: true
+# Size reduction is achieved through files exclusion rules instead
 asar: false
 
 # Build directories
@@ -17,14 +19,31 @@ files:
   - ".next/standalone/**/*"            # Next.js standalone build (includes static & public)
   - "!.next/standalone/**/node_modules/electron"
   - configs/agent-templates.json       # Template configs (readonly)
-  # Ensure @playwright/mcp and its transitive dependencies are included
+
+  # MCP dependencies - only include what's needed
   # pnpm stores deps in .pnpm, so we need to include them explicitly
   - node_modules/@playwright/mcp/**/*
   - node_modules/@modelcontextprotocol/sdk/**/*
   - node_modules/.pnpm/@playwright+mcp*/**/*
   - node_modules/.pnpm/@modelcontextprotocol+sdk@*/**/*
-  - node_modules/.pnpm/playwright@*/**/*
+  # Only playwright-core is needed for MCP, not the full playwright package
   - node_modules/.pnpm/playwright-core@*/**/*
+
+  # === Global exclusions to reduce package size ===
+  # Source maps (not needed in production)
+  - "!**/*.map"
+  - "!**/*.map.js"
+  # TypeScript declaration files
+  - "!**/*.d.ts"
+  - "!**/*.d.mts"
+  # Test files
+  - "!**/__tests__/**"
+  - "!**/*.test.*"
+  - "!**/*.spec.*"
+  # Documentation
+  - "!**/README.md"
+  - "!**/CHANGELOG.md"
+  - "!**/LICENSE"
 
 # Extra resources to copy (outside asar)
 extraResources:
@@ -70,6 +89,12 @@ mac:
   entitlements: resources/entitlements.mac.plist
   entitlementsInherit: resources/entitlements.mac.plist
   notarize: false
+  # Exclude other platforms' native modules
+  files:
+    - "!**/*-win32-*/**"
+    - "!**/*-linux-*/**"
+    - "!**/win32-*/**"
+    - "!**/linux-*/**"
 
 # DMG configuration
 dmg:
@@ -95,6 +120,14 @@ win:
       arch:
         - x64
   # Code signing disabled by not providing cscLink
+  # Exclude other platforms' native modules to reduce package size
+  # This is critical for NSIS which has a ~200MB memory limit
+  files:
+    - "!**/*-darwin-*/**"
+    - "!**/*-linux-*/**"
+    - "!**/darwin-*/**"
+    - "!**/linux-*/**"
+    - "!**/fsevents/**"
 
 # NSIS installer configuration (Windows)
 nsis:
@@ -111,3 +144,10 @@ linux:
     - AppImage
     - deb
   category: Office
+  # Exclude other platforms' native modules
+  files:
+    - "!**/*-darwin-*/**"
+    - "!**/*-win32-*/**"
+    - "!**/darwin-*/**"
+    - "!**/win32-*/**"
+    - "!**/fsevents/**"
