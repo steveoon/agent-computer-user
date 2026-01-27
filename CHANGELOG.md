@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.28.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.27.0...v1.28.0-develop.1) (2026-01-27)
+
+
+### Features
+
+* 添加 Token 缺失友好提示并支持 Windows 构建 ([8e75486](https://github.com/steveoon/agent-computer-user/commit/8e754860bce4a0ba6f5b8171ec0da6b9573d4212))
+
 # [1.27.0](https://github.com/steveoon/agent-computer-user/compare/v1.26.0...v1.27.0) (2026-01-27)
 
 
