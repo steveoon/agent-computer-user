@@ -2,6 +2,7 @@
 import { EventEmitter } from "events";
 import { createMCPClient } from "@ai-sdk/mcp";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   MCPClientConfig,
   MCPManagerStatus,
@@ -138,6 +139,52 @@ class MCPClientManager {
   }
 
   /**
+   * 检测是否应该使用内嵌 MCP Server
+   *
+   * 条件：MCP_SERVER_PORT 环境变量已设置
+   * - 在 Electron 打包环境中，AgentManager 会启动内嵌 MCP Server 并设置此变量
+   * - 在开发环境中，此变量不会被设置，使用 npx + Stdio 传输
+   */
+  private shouldUseEmbeddedMCP(): boolean {
+    return !!process.env.MCP_SERVER_PORT;
+  }
+
+  /**
+   * 获取内嵌 MCP Server 的端口
+   */
+  private getEmbeddedMCPPort(): number | null {
+    const portStr = process.env.MCP_SERVER_PORT;
+    if (!portStr) return null;
+
+    const port = parseInt(portStr, 10);
+    return isNaN(port) ? null : port;
+  }
+
+  /**
+   * 创建使用 Streamable HTTP 传输的 MCP 客户端（用于内嵌 MCP Server）
+   */
+  private async createEmbeddedMCPClient(_clientName: string): Promise<any> {
+    const port = this.getEmbeddedMCPPort();
+    if (!port) {
+      throw new Error("MCP_SERVER_PORT 未设置");
+    }
+
+    // Use 127.0.0.1 explicitly to match server binding (avoid IPv6 localhost resolution issues)
+    const mcpUrl = `http://127.0.0.1:${port}/mcp`;
+    console.log(`🔌 使用内嵌 MCP Server (Streamable HTTP): ${mcpUrl}`);
+
+    // Create Streamable HTTP transport
+    const transport = new StreamableHTTPClientTransport(new URL(mcpUrl));
+
+    // Create MCP client with Streamable HTTP transport
+    const client = await createMCPClient({
+      transport,
+    });
+
+    return client;
+  }
+
+  /**
    * 动态生成 Playwright MCP 参数
    * 根据运行时环境变量决定使用 CDP 或 Extension 模式
    *
@@ -209,7 +256,24 @@ class MCPClientManager {
       throw new Error(`未知的MCP客户端: ${clientName}`);
     }
 
-    // Playwright 使用动态参数
+    // 对于 Playwright 客户端，检查是否应该使用内嵌 MCP Server
+    if (clientName === "playwright" && this.shouldUseEmbeddedMCP()) {
+      const port = this.getEmbeddedMCPPort();
+      console.log(`🎭 Playwright MCP 模式: 内嵌 SSE (port: ${port})`);
+      console.log(`🚀 正在初始化 Playwright 浏览器自动化服务（内嵌 SSE 模式）...`);
+
+      try {
+        const client = await this.createEmbeddedMCPClient(clientName);
+        this.mcpClients.set(clientName, client);
+        console.log(`✅ Playwright 浏览器自动化服务（内嵌 SSE 模式）初始化成功`);
+        return client;
+      } catch (error) {
+        console.error(`❌ Playwright 浏览器自动化服务（内嵌 SSE 模式）初始化失败:`, error);
+        throw error;
+      }
+    }
+
+    // Playwright 使用动态参数（Stdio 模式）
     let args = config.args;
     let description = config.description;
 

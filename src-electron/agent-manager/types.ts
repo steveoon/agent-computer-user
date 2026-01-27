@@ -121,6 +121,16 @@ export interface AppLaunchResult {
 }
 
 /**
+ * Result of MCP server start operation
+ */
+export interface MCPServerStartResult {
+  success: boolean;
+  port?: number;
+  url?: string;
+  error?: string;
+}
+
+/**
  * Agent manager initialization options
  */
 export interface AgentManagerOptions {

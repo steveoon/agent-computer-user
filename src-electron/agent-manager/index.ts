@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { EventEmitter } from "events";
+import { app } from "electron";
 import type {
   AgentConfig,
   AgentInfo,
@@ -12,6 +13,7 @@ import type {
   ConfigFile,
   Settings,
   TemplatesFile,
+  MCPServerStartResult,
 } from "./types";
 import {
   AgentConfigSchema,
@@ -25,6 +27,7 @@ import { ChromeLauncher } from "./chrome-launcher";
 import { AppLauncher } from "./app-launcher";
 import { RuntimeManager, getRuntimeManager } from "./runtime-manager";
 import { portManager } from "./port-manager";
+import { EmbeddedMCPServer, createEmbeddedMCPServer } from "../mcp-server";
 
 /**
  * Agent Manager - Core orchestration class
@@ -41,6 +44,12 @@ export class AgentManager extends EventEmitter {
   private chromeLauncher: ChromeLauncher | null = null;
   private appLauncher: AppLauncher | null = null;
   private runtimeManager: RuntimeManager;
+
+  // MCP Server instances for packaged Electron environment
+  // Key: agentId, Value: EmbeddedMCPServer instance
+  private mcpServers: Map<string, EmbeddedMCPServer> = new Map();
+  // Track MCP server ports for each agent
+  private mcpServerPorts: Map<string, number> = new Map();
 
   // Runtime status tracking
   private runtimeStatus: Map<string, AgentRuntimeStatus> = new Map();
@@ -361,8 +370,91 @@ export class AgentManager extends EventEmitter {
   }
 
   /**
+   * Check if we should use embedded MCP server
+   * Returns true in packaged Electron environment (Windows/macOS/Linux)
+   * Returns false in development mode (npx is available)
+   */
+  private shouldUseEmbeddedMCP(): boolean {
+    return app.isPackaged;
+  }
+
+  /**
+   * Start embedded MCP server for an agent
+   * Only used in packaged Electron environment
+   */
+  private async startMCPServer(agent: AgentConfig): Promise<MCPServerStartResult> {
+    const { id, chromePort } = agent;
+
+    try {
+      console.log(`[AgentManager] Starting embedded MCP server for agent ${id}...`);
+
+      // Create MCP server instance
+      const mcpServer = createEmbeddedMCPServer({
+        chromePort,
+        chromeHost: "localhost",
+      });
+
+      // Calculate preferred port (base 3999 + offset based on agent index)
+      // Guard against findIndex returning -1 (agent not found in config)
+      const rawIndex = this.config?.agents.findIndex(a => a.id === id) ?? -1;
+      const agentIndex = Math.max(0, rawIndex);
+      const preferredPort = 3999 + agentIndex;
+
+      // Start the server
+      const serverInfo = await mcpServer.start(preferredPort);
+
+      // Store server reference and port
+      this.mcpServers.set(id, mcpServer);
+      this.mcpServerPorts.set(id, serverInfo.port);
+
+      console.log(`[AgentManager] MCP server started for agent ${id} on port ${serverInfo.port}`);
+
+      return {
+        success: true,
+        port: serverInfo.port,
+        url: serverInfo.url,
+      };
+    } catch (error) {
+      console.error(`[AgentManager] Failed to start MCP server for agent ${id}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Stop embedded MCP server for an agent
+   */
+  private async stopMCPServer(agentId: string): Promise<void> {
+    const mcpServer = this.mcpServers.get(agentId);
+
+    if (mcpServer) {
+      try {
+        console.log(`[AgentManager] Stopping MCP server for agent ${agentId}...`);
+        await mcpServer.stop();
+        console.log(`[AgentManager] MCP server stopped for agent ${agentId}`);
+      } catch (error) {
+        console.warn(`[AgentManager] Error stopping MCP server for agent ${agentId}:`, error);
+      } finally {
+        this.mcpServers.delete(agentId);
+        this.mcpServerPorts.delete(agentId);
+      }
+    }
+  }
+
+  /**
+   * Get MCP server port for an agent
+   * Returns undefined if no embedded MCP server is running
+   */
+  getMCPServerPort(agentId: string): number | undefined {
+    return this.mcpServerPorts.get(agentId);
+  }
+
+  /**
    * Start a single agent
    * Launches both Chrome and Next.js application processes
+   * In packaged environment, also starts embedded MCP server
    */
   private async startSingleAgent(agent: AgentConfig): Promise<void> {
     const { id } = agent;
@@ -383,6 +475,7 @@ export class AgentManager extends EventEmitter {
 
     let chromePid: number | undefined;
     let appPid: number | undefined;
+    let mcpServerPort: number | undefined;
 
     try {
       // Step 1: Prepare runtime directory for the agent
@@ -405,13 +498,44 @@ export class AgentManager extends EventEmitter {
         this.savePidFile(id, "chrome", chromePid);
       }
 
+      // Step 2.5: Start embedded MCP server (only in packaged environment)
+      if (this.shouldUseEmbeddedMCP()) {
+        console.log(`[AgentManager] Packaged environment detected, starting embedded MCP server...`);
+        const mcpResult = await this.startMCPServer(agent);
+
+        if (!mcpResult.success) {
+          // MCP server failed - clean up Chrome and throw error
+          console.error(`[AgentManager] MCP server start failed, stopping Chrome...`);
+          await this.chromeLauncher!.stop(id, agent.chromePort, agent.userDataDir);
+          throw new Error(`MCP 服务器启动失败: ${mcpResult.error}`);
+        }
+        mcpServerPort = mcpResult.port;
+        console.log(`[AgentManager] Embedded MCP server started on port ${mcpServerPort}`);
+      } else {
+        console.log(`[AgentManager] Development environment, using npx for MCP`);
+      }
+
       // Step 3: Launch Next.js application
+      // Pass MCP server port via environment variable
       console.log(`[AgentManager] Launching app for agent ${id}...`);
-      const appResult = await this.appLauncher!.launch(agent, runtimeDir);
+
+      // Inject MCP_SERVER_PORT into agent env if embedded MCP is running
+      const agentWithMCPEnv = mcpServerPort
+        ? {
+            ...agent,
+            env: {
+              ...agent.env,
+              MCP_SERVER_PORT: String(mcpServerPort),
+            },
+          }
+        : agent;
+
+      const appResult = await this.appLauncher!.launch(agentWithMCPEnv, runtimeDir);
 
       if (!appResult.success) {
-        // Chrome launched but app failed - need to stop Chrome
-        console.error(`[AgentManager] App launch failed, stopping Chrome...`);
+        // Chrome launched but app failed - need to stop Chrome and MCP server
+        console.error(`[AgentManager] App launch failed, stopping Chrome and MCP server...`);
+        await this.stopMCPServer(id);
         await this.chromeLauncher!.stop(id, agent.chromePort, agent.userDataDir);
         throw new Error(`应用启动失败: ${appResult.error}`);
       }
@@ -439,6 +563,7 @@ export class AgentManager extends EventEmitter {
       console.log(`[AgentManager] Agent ${id} started successfully`);
     } catch (error) {
       // Clean up on failure
+      await this.stopMCPServer(id);
       if (chromePid) {
         try {
           await this.chromeLauncher!.stop(id, agent.chromePort, agent.userDataDir);
@@ -484,7 +609,7 @@ export class AgentManager extends EventEmitter {
 
   /**
    * Stop a single agent
-   * Stops both Next.js application and Chrome processes
+   * Stops Next.js application, MCP server (if running), and Chrome processes
    */
   private async stopSingleAgent(agent: AgentConfig): Promise<void> {
     const { id, appPort, chromePort, userDataDir } = agent;
@@ -513,12 +638,18 @@ export class AgentManager extends EventEmitter {
         console.warn(`[AgentManager] Failed to stop app: ${error}`);
       }
 
-      // Step 2: Stop Chrome gracefully (protects IndexedDB)
+      // Step 2: Stop embedded MCP server (if running)
+      if (this.mcpServers.has(id)) {
+        console.log(`[AgentManager] Stopping MCP server for agent ${id}...`);
+        await this.stopMCPServer(id);
+      }
+
+      // Step 3: Stop Chrome gracefully (protects IndexedDB)
       console.log(`[AgentManager] Stopping Chrome for agent ${id}...`);
       await this.chromeLauncher!.stop(id, chromePort, userDataDir);
       console.log(`[AgentManager] Chrome stopped`);
 
-      // Step 3: Clean up runtime directory (optional - saves disk space)
+      // Step 4: Clean up runtime directory (optional - saves disk space)
       // Note: We don't clean up immediately to allow log inspection
       // Runtime directories will be cleaned up on next start
 
@@ -726,6 +857,18 @@ export class AgentManager extends EventEmitter {
         }
       }
     }
+
+    // Stop any remaining MCP servers
+    for (const [agentId, mcpServer] of this.mcpServers) {
+      try {
+        console.log(`[AgentManager] Stopping remaining MCP server for agent ${agentId}...`);
+        await mcpServer.stop();
+      } catch (error) {
+        console.error(`Failed to stop MCP server for agent ${agentId}:`, error);
+      }
+    }
+    this.mcpServers.clear();
+    this.mcpServerPorts.clear();
 
     // Clean up app launcher processes
     if (this.appLauncher) {

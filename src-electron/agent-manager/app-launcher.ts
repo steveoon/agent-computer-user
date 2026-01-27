@@ -1,6 +1,7 @@
 import { spawn, ChildProcess, execSync } from "child_process";
 import fs from "fs";
 import path from "path";
+import { app } from "electron";
 import type { AgentConfig, AppLaunchResult } from "./types";
 import { TIMEOUTS } from "./types";
 
@@ -54,7 +55,10 @@ export class AppLauncher {
     // Step 3: Load environment variables from .env files
     const envVars = this.loadEnvFiles(runtimeDir);
 
-    // Step 4: Build process environment
+    // Step 4: Get Node.js runtime info
+    const nodeInfo = this.getNodeRuntime();
+
+    // Step 5: Build process environment
     const processEnv: NodeJS.ProcessEnv = {
       ...process.env,
       ...envVars,
@@ -65,9 +69,11 @@ export class AppLauncher {
       AGENT_ID: id,
       // Add any custom env from agent config
       ...agent.env,
+      // If using Electron as Node.js, set the flag
+      ...(nodeInfo.useElectronAsNode ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
     };
 
-    // Step 5: Setup logging
+    // Step 6: Setup logging
     fs.mkdirSync(this.logsPath, { recursive: true });
     const logPath = path.join(this.logsPath, `${id}-app.log`);
 
@@ -77,12 +83,11 @@ export class AppLauncher {
 
     const logFd = fs.openSync(logPath, "a");
 
-    // Step 6: Launch Node.js process
+    // Step 7: Launch Node.js process
     try {
-      // Find Node.js executable
-      const nodePath = this.getNodePath();
+      console.log(`[AppLauncher] Using Node runtime: ${nodeInfo.nodePath} (Electron as Node: ${nodeInfo.useElectronAsNode})`);
 
-      const appProcess = spawn(nodePath, ["server.js"], {
+      const appProcess = spawn(nodeInfo.nodePath, ["server.js"], {
         cwd: runtimeDir,
         env: processEnv,
         detached: true,
@@ -249,11 +254,30 @@ export class AppLauncher {
   }
 
   /**
-   * Get Node.js executable path
+   * Node runtime information
    */
-  private getNodePath(): string {
-    // Check if we're running inside Electron
-    // process.execPath might be Electron, not Node
+  private getNodeRuntime(): { nodePath: string; useElectronAsNode: boolean } {
+    // In packaged Electron app, use Electron itself as Node.js runtime
+    // by setting ELECTRON_RUN_AS_NODE=1 environment variable
+    if (app.isPackaged) {
+      // process.execPath points to the Electron executable
+      return {
+        nodePath: process.execPath,
+        useElectronAsNode: true,
+      };
+    }
+
+    // In development mode, try to find system Node.js
+    return {
+      nodePath: this.findSystemNode(),
+      useElectronAsNode: false,
+    };
+  }
+
+  /**
+   * Find system Node.js executable (for development mode)
+   */
+  private findSystemNode(): string {
     if (process.platform === "win32") {
       // On Windows, try to find node.exe
       const possiblePaths = [

@@ -17,6 +17,14 @@ files:
   - ".next/standalone/**/*"            # Next.js standalone build (includes static & public)
   - "!.next/standalone/**/node_modules/electron"
   - configs/agent-templates.json       # Template configs (readonly)
+  # Ensure @playwright/mcp and its transitive dependencies are included
+  # pnpm stores deps in .pnpm, so we need to include them explicitly
+  - node_modules/@playwright/mcp/**/*
+  - node_modules/@modelcontextprotocol/sdk/**/*
+  - node_modules/.pnpm/@playwright+mcp*/**/*
+  - node_modules/.pnpm/@modelcontextprotocol+sdk@*/**/*
+  - node_modules/.pnpm/playwright@*/**/*
+  - node_modules/.pnpm/playwright-core@*/**/*
 
 # Extra resources to copy (outside asar)
 extraResources:
