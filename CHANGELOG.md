@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.28.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.28.0-develop.1...v1.28.0-develop.2) (2026-01-27)
+
+
+### Features
+
+* **electron:** 内嵌 MCP Server 支持，解决打包后无法执行 npx 的问题 ([40f5d8f](https://github.com/steveoon/agent-computer-user/commit/40f5d8fe1caa241bbef7800e90a788c7276e1bf7))
+
 # [1.28.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.27.0...v1.28.0-develop.1) (2026-01-27)
 
 
