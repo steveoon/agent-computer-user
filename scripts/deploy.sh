@@ -2,12 +2,17 @@
 
 # 部署脚本 - 构建并推送到 GitHub Container Registry
 
-set -e
+set -euo pipefail
 
 echo "🚀 开始部署流程..."
 
 # 安全检查：确保 .env 文件不会被包含在镜像中
-if ! grep -q "^\.env$" .dockerignore; then
+if ! awk '
+  NF && $1 !~ /^#/ {
+    if ($0 ~ /(^|\/)\.env($|[[:space:]]|\*)/ || $0 ~ /\*\*\/\.env/) found=1
+  }
+  END { exit !found }
+' .dockerignore; then
     echo "❌ 错误：.dockerignore 文件中没有包含 .env"
     echo "这可能导致敏感信息被打包进 Docker 镜像！"
     echo "请检查 .dockerignore 文件"
@@ -18,14 +23,27 @@ fi
 if [ -f .env ]; then
     echo "📋 加载构建时需要的环境变量..."
     # 只导出 NEXT_PUBLIC_ 开头的变量
-    export $(grep -E '^NEXT_PUBLIC_' .env | xargs)
+    while IFS= read -r line; do
+        case "$line" in
+            ''|'#'*) continue ;;
+            export\ NEXT_PUBLIC_*=*)
+                line="${line#export }"
+                ;;
+            NEXT_PUBLIC_*=*)
+                ;;
+            *) continue ;;
+        esac
+        key="${line%%=*}"
+        val="${line#*=}"
+        export "$key=$val"
+    done < .env
 fi
 
 # 1. 构建 Docker 镜像
 echo "📦 构建 Docker 镜像 (linux/amd64)..."
 docker build --no-cache . --platform linux/amd64 \
-  --build-arg NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
-  --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY \
+  --build-arg "NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL-}" \
+  --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY-}" \
   -t ghcr.io/steveoon/ai-computer-use:latest
 
 # 2. 推送到 GitHub Container Registry
@@ -57,8 +75,56 @@ if [ -f "$OUTPUT_FILE" ]; then
     echo "✅ 镜像已导出: $OUTPUT_FILE (大小: $FILE_SIZE)"
 else
     echo "❌ 镜像导出失败"
+    exit 1
 fi
 
+# 4. 上传镜像到服务器
+REMOTE_SERVER="${DEPLOY_SERVER:-aliyun-server}"
+REMOTE_PATH="${DEPLOY_PATH:-/data/huajune/}"
+UPLOAD_METHOD="${DEPLOY_UPLOAD_METHOD:-rsync}"
+
+echo ""
+echo "📤 上传镜像到服务器..."
+echo "   目标: ${REMOTE_SERVER}:${REMOTE_PATH}"
+
+case "$UPLOAD_METHOD" in
+    rsync)
+        if command -v rsync >/dev/null 2>&1; then
+            RSYNC_FLAGS="${RSYNC_FLAGS:--avz --partial --info=progress2}"
+            if rsync $RSYNC_FLAGS "$OUTPUT_FILE" "${REMOTE_SERVER}:${REMOTE_PATH}"; then
+                echo "✅ 镜像已上传到 ${REMOTE_SERVER}:${REMOTE_PATH}"
+            else
+                echo "❌ 上传失败，请检查网络连接和服务器配置"
+                echo "   你可以手动执行: rsync $RSYNC_FLAGS $OUTPUT_FILE ${REMOTE_SERVER}:${REMOTE_PATH}"
+                exit 1
+            fi
+        else
+            echo "⚠️  未检测到 rsync，回退到 scp"
+            if scp -C "$OUTPUT_FILE" "${REMOTE_SERVER}:${REMOTE_PATH}"; then
+                echo "✅ 镜像已上传到 ${REMOTE_SERVER}:${REMOTE_PATH}"
+            else
+                echo "❌ 上传失败，请检查网络连接和服务器配置"
+                echo "   你可以手动执行: scp -C $OUTPUT_FILE ${REMOTE_SERVER}:${REMOTE_PATH}"
+                exit 1
+            fi
+        fi
+        ;;
+    scp)
+        if scp -C "$OUTPUT_FILE" "${REMOTE_SERVER}:${REMOTE_PATH}"; then
+            echo "✅ 镜像已上传到 ${REMOTE_SERVER}:${REMOTE_PATH}"
+        else
+            echo "❌ 上传失败，请检查网络连接和服务器配置"
+            echo "   你可以手动执行: scp -C $OUTPUT_FILE ${REMOTE_SERVER}:${REMOTE_PATH}"
+            exit 1
+        fi
+        ;;
+    *)
+        echo "❌ 未知上传方式: ${UPLOAD_METHOD}（可选: rsync/scp）"
+        exit 1
+        ;;
+esac
+
+echo ""
 echo "✅ 部署完成!"
 echo ""
 echo "🖥️  在 VPS 上运行以下命令部署："
@@ -92,3 +158,7 @@ echo "⚠️  重要提醒："
 echo "   - 确保 VPS 上有正确的 .env 文件"
 echo "   - 不要将 .env 文件提交到代码仓库"
 echo "   - 定期更新环境变量和镜像"
+echo ""
+echo "💡 自定义上传配置："
+echo "   DEPLOY_SERVER=my-server DEPLOY_PATH=/my/path/ ./scripts/deploy.sh"
+echo "   DEPLOY_UPLOAD_METHOD=rsync RSYNC_FLAGS='-avz --partial --info=progress2' ./scripts/deploy.sh"

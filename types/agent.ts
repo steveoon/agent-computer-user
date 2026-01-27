@@ -34,6 +34,16 @@ export interface AgentTemplate {
 }
 
 /**
+ * Agent 清理结果
+ */
+export interface AgentCleanupResult {
+  message: string;
+  cleaned: number;
+  lockCleaned?: number;
+  lockFiles?: string[];
+}
+
+/**
  * 添加 Agent 选项
  */
 export interface AddAgentOptions {
@@ -61,7 +71,7 @@ export interface ElectronAgentApi {
   stop: (agentId?: string) => Promise<void>;
   restart: (agentId?: string) => Promise<void>;
   remove: (agentId: string) => Promise<void>;
-  cleanup: (agentId: string) => Promise<{ message: string; cleaned: number }>;
+  cleanup: (agentId: string) => Promise<AgentCleanupResult>;
   get: (agentId: string) => Promise<AgentInfo>;
   getTemplates: () => Promise<Record<string, AgentTemplate>>;
   openUI: (agentId: string) => Promise<{ url: string; port: number; reused?: boolean }>;

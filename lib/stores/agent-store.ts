@@ -258,7 +258,7 @@ export const useAgentStore = create<AgentStoreState>()(
       },
 
       /**
-       * 清理 Agent 端口（杀死占用端口的进程）
+       * 清理 Agent 端口与 Chrome Profile 锁文件
        */
       cleanupAgent: async (agentId) => {
         const api = getElectronAgentApi();
@@ -267,14 +267,15 @@ export const useAgentStore = create<AgentStoreState>()(
         set({ error: null });
         try {
           const result = await api.cleanup(agentId);
-          if (result.cleaned > 0) {
-            toast.success("端口已清理", { description: result.message });
+          const didCleanup = (result.cleaned ?? 0) > 0 || (result.lockCleaned ?? 0) > 0;
+          if (didCleanup) {
+            toast.success("清理完成", { description: result.message });
           } else {
             toast.info("无需清理", { description: result.message });
           }
-          return result.cleaned > 0;
+          return didCleanup;
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : "清理端口失败";
+          const errorMessage = error instanceof Error ? error.message : "清理失败";
           set({ error: errorMessage });
           toast.error("清理失败", { description: errorMessage });
           return false;

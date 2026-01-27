@@ -5,6 +5,13 @@ import type { AgentConfig, Settings, ChromeLaunchResult } from "./types";
 import { TIMEOUTS } from "./types";
 import { portManager } from "./port-manager";
 
+export interface ProfileLockCleanupResult {
+  cleaned: number;
+  removedFiles: string[];
+  skipped: boolean;
+  message: string;
+}
+
 /**
  * Chrome process launcher and manager
  * Handles Chrome lifecycle including graceful shutdown for IndexedDB protection
@@ -275,6 +282,62 @@ export class ChromeLauncher {
   }
 
   /**
+   * Clean up stale Chrome profile lock files when no process is using the profile
+   */
+  async cleanupProfileLocks(userDataDir: string): Promise<ProfileLockCleanupResult> {
+    if (!fs.existsSync(userDataDir)) {
+      return {
+        cleaned: 0,
+        removedFiles: [],
+        skipped: false,
+        message: "Profile 目录不存在",
+      };
+    }
+
+    const pid = this.findPidByUserDataDir(userDataDir);
+    if (pid) {
+      return {
+        cleaned: 0,
+        removedFiles: [],
+        skipped: true,
+        message: `Chrome 正在运行 (PID: ${pid})，未清理锁文件`,
+      };
+    }
+
+    const lockFiles = this.getProfileLockFiles(userDataDir);
+    const removedFiles: string[] = [];
+
+    for (const filePath of lockFiles) {
+      if (!this.pathExistsNoFollow(filePath)) {
+        continue;
+      }
+
+      try {
+        fs.unlinkSync(filePath);
+        removedFiles.push(path.basename(filePath));
+      } catch {
+        // Ignore errors for individual lock files
+      }
+    }
+
+    if (removedFiles.length === 0) {
+      return {
+        cleaned: 0,
+        removedFiles: [],
+        skipped: false,
+        message: "未发现 Chrome 锁文件",
+      };
+    }
+
+    return {
+      cleaned: removedFiles.length,
+      removedFiles,
+      skipped: false,
+      message: `已移除 ${removedFiles.length} 个 Chrome 锁文件`,
+    };
+  }
+
+  /**
    * Find Chrome PID by user data directory
    */
   private findPidByUserDataDir(userDataDir: string): number | null {
@@ -308,6 +371,23 @@ export class ChromeLauncher {
     }
 
     return null;
+  }
+
+  private getProfileLockFiles(userDataDir: string): string[] {
+    return [
+      path.join(userDataDir, "SingletonLock"),
+      path.join(userDataDir, "SingletonCookie"),
+      path.join(userDataDir, "SingletonSocket"),
+    ];
+  }
+
+  private pathExistsNoFollow(filePath: string): boolean {
+    try {
+      fs.lstatSync(filePath);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**

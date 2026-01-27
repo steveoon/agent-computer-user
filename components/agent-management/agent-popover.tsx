@@ -27,11 +27,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAgentStore, selectRunningAgentCount } from "@/lib/stores/agent-store";
+import { useAuthStore } from "@/lib/stores/auth-store";
 import { AgentStatusBadge } from "./agent-status-badge";
 import { AgentAddDialog } from "./agent-add-dialog";
 import { cn } from "@/lib/utils";
 import type { AgentInfo } from "@/types/agent";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 /**
  * Agent 快捷管理面板
@@ -61,6 +63,7 @@ export function AgentPopover() {
   } = useAgentStore();
 
   const runningCount = useAgentStore(selectRunningAgentCount);
+  const { isAuthenticated } = useAuthStore();
 
   // 使用 ref 跟踪清理函数，解决 async 竞态问题
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -128,9 +131,28 @@ export function AgentPopover() {
     return null;
   }
 
+  // 认证检查辅助函数
+  const requireAuth = (): boolean => {
+    if (!isAuthenticated) {
+      toast.error("请先登录", {
+        description: "您需要登录后才能启动 Agent",
+        richColors: true,
+        position: "top-center",
+      });
+      return false;
+    }
+    return true;
+  };
+
   const handleStartAll = async () => {
+    if (!requireAuth()) return;
     // 批量启动不自动打开 UI
     await startAgent(undefined, false);
+  };
+
+  const handleStartAgent = async (agentId: string) => {
+    if (!requireAuth()) return;
+    await startAgent(agentId);
   };
 
   const handleStopAll = async () => {
@@ -279,7 +301,7 @@ export function AgentPopover() {
                 <AgentListItem
                   key={agent.id}
                   agent={agent}
-                  onStart={() => startAgent(agent.id)}
+                  onStart={() => handleStartAgent(agent.id)}
                   onStop={() => stopAgent(agent.id)}
                   onOpenUI={() => openAgentUI(agent.id)}
                   onRemove={() => removeAgent(agent.id)}

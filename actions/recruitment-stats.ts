@@ -102,13 +102,13 @@ export async function getDashboardData(
 ): Promise<{ success: true; data: DashboardData } | { success: false; error: string }> {
   try {
     const { startDate, endDate, days } = calculateDateRange(filters);
-    const { agentId, brandId, jobId } = filters;
+    const { agentId, brandId, jobNames } = filters;
 
     // 并行获取汇总数据和趋势数据
     // 注意：传入 endDate 作为参考日期，支持"昨天"等历史日期查询
     const [summary, dailyTrend] = await Promise.all([
-      queryService.getDashboardSummary(agentId, days, endDate, brandId, jobId),
-      queryService.getStatsTrend(agentId, startDate, endDate, brandId, jobId),
+      queryService.getDashboardSummary(agentId, days, endDate, brandId, jobNames),
+      queryService.getStatsTrend(agentId, startDate, endDate, brandId, jobNames),
     ]);
 
     return {
@@ -157,13 +157,13 @@ export async function getStatsTrend(
 ): Promise<{ success: true; data: DailyTrendItem[] } | { success: false; error: string }> {
   try {
     const { startDate, endDate } = calculateDateRange(filters);
-    const { agentId, brandId, jobId } = filters;
+    const { agentId, brandId, jobNames } = filters;
     const dailyTrend = await queryService.getStatsTrend(
       agentId,
       startDate,
       endDate,
       brandId,
-      jobId
+      jobNames
     );
     return {
       success: true,
@@ -333,11 +333,20 @@ export interface BrandOption {
 }
 
 /**
+ * Job 筛选选项
+ */
+export interface JobOption {
+  value: string;
+  label: string;
+}
+
+/**
  * 筛选器选项
  */
 export interface FilterOptions {
   agents: AgentOption[];
   brands: BrandOption[];
+  jobs: JobOption[];
 }
 
 /**

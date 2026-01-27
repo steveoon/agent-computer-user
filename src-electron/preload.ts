@@ -5,6 +5,7 @@ import { contextBridge, ipcRenderer } from "electron";
  *
  * 注意：类型的 canonical source 在 types/agent.ts
  * 此处仅定义 IPC 通信所需的内部类型，不导出以避免重复定义
+ * （src-electron 有独立的 tsconfig，不能直接导入外部类型文件）
  *
  * @see types/agent.ts - AgentInfo, AgentStatus, AgentStatusUpdate, AgentTemplate 等
  */
@@ -39,6 +40,14 @@ interface AgentTemplate {
   chromeArgs: string[];
   env: Record<string, string>;
 }
+
+interface AgentCleanupResult {
+  message: string;
+  cleaned: number;
+  lockCleaned?: number;
+  lockFiles?: string[];
+}
+
 
 interface Settings {
   chromeExecutable: string;
@@ -113,7 +122,7 @@ const agentApi = {
     handleIpcResponse("agent:remove", agentId),
 
   // Cleanup agent ports (kill processes occupying the ports)
-  cleanup: (agentId: string): Promise<{ message: string; cleaned: number }> =>
+  cleanup: (agentId: string): Promise<AgentCleanupResult> =>
     handleIpcResponse("agent:cleanup", agentId),
 
   // Get single agent
@@ -238,16 +247,10 @@ contextBridge.exposeInMainWorld("electronApi", {
 });
 
 // Type definitions for the exposed API
+// Note: Window.electronApi type is defined in types/agent.ts for the main project
 export type ElectronApi = {
   agent: typeof agentApi;
   chrome: typeof chromeApi;
   system: typeof systemApi;
   isElectron: boolean;
 };
-
-// Also expose on window for TypeScript
-declare global {
-  interface Window {
-    electronApi?: ElectronApi;
-  }
-}

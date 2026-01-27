@@ -5,11 +5,17 @@
  * 提供日/周/月/年等多时间维度的查询支持
  */
 
-import { eq, and, or, gte, lte, sql, inArray } from "drizzle-orm";
+import { eq, and, or, gte, lte, sql, inArray, count, countDistinct } from "drizzle-orm";
 import { getDb } from "@/db";
 import { recruitmentEvents, dataDictionary } from "@/db/schema";
-import { getDictionaryType } from "@/db/types";
+import { getDictionaryType, RecruitmentEventType } from "@/db/types";
 import { recruitmentStatsRepository, calculateRate } from "./repository";
+import { recruitmentEventsRepository } from "@/lib/services/recruitment-event/repository";
+import {
+  buildJobCondition,
+  buildJobConditionRaw,
+  hasJobFilter,
+} from "./job-filter";
 import {
   toBeijingMidnight,
   toBeijingDayEnd,
@@ -85,19 +91,20 @@ class QueryService {
    * 获取 Dashboard 概览数据
    *
    * 包含当前周期、上一周期和环比趋势
+   * 采用混合查询策略：无 jobNames 使用预聚合表，有 jobNames 从 events 表实时聚合
    *
    * @param agentId - 可选 Agent ID
    * @param days - 周期天数（默认 7 天）
    * @param referenceEndDate - 参考结束日期（默认为今天，用于支持"昨天"等历史日期查询）
    * @param brandId - 可选品牌 ID
-   * @param jobId - 可选职位 ID
+   * @param jobNames - 可选岗位名称列表（多选）
    */
   async getDashboardSummary(
     agentId?: string,
     days: number = 7,
     referenceEndDate?: Date,
     brandId?: number,
-    jobId?: number
+    jobNames?: string[]
   ): Promise<DashboardSummary> {
     // 使用传入的结束日期，或默认为今天
     const endDateRef = referenceEndDate ?? new Date();
@@ -114,14 +121,28 @@ class QueryService {
     const previousStart = toBeijingMidnight(previousStartDate);
 
     console.log(
-      `${LOG_PREFIX} Dashboard summary: current=${currentStart.toISOString()}-${currentEnd.toISOString()}, previous=${previousStart.toISOString()}-${previousEnd.toISOString()}`
+      `${LOG_PREFIX} Dashboard summary: current=${currentStart.toISOString()}-${currentEnd.toISOString()}, previous=${previousStart.toISOString()}-${previousEnd.toISOString()}, jobNames=${jobNames?.join(",") ?? "all"}`
     );
 
-    // 并行查询当前和上一周期
-    const [currentRaw, previousRaw] = await Promise.all([
-      recruitmentStatsRepository.queryAggregatedStats(agentId, currentStart, currentEnd, brandId, jobId),
-      recruitmentStatsRepository.queryAggregatedStats(agentId, previousStart, previousEnd, brandId, jobId),
-    ]);
+    // 混合查询策略：有 jobNames 使用实时聚合，否则使用预聚合表
+    const hasJobFilter = jobNames && jobNames.length > 0;
+
+    let currentRaw: Awaited<ReturnType<typeof recruitmentStatsRepository.queryAggregatedStats>>;
+    let previousRaw: Awaited<ReturnType<typeof recruitmentStatsRepository.queryAggregatedStats>>;
+
+    if (hasJobFilter) {
+      // 从 events 表实时聚合
+      [currentRaw, previousRaw] = await Promise.all([
+        this.queryStatsFromEvents(agentId, currentStart, currentEnd, brandId, jobNames),
+        this.queryStatsFromEvents(agentId, previousStart, previousEnd, brandId, jobNames),
+      ]);
+    } else {
+      // 使用预聚合表（快速）
+      [currentRaw, previousRaw] = await Promise.all([
+        recruitmentStatsRepository.queryAggregatedStats(agentId, currentStart, currentEnd, brandId),
+        recruitmentStatsRepository.queryAggregatedStats(agentId, previousStart, previousEnd, brandId),
+      ]);
+    }
 
     // 转换格式
     const current = currentRaw.map(row => this.toAggregatedStats(row, currentStart, currentEnd));
@@ -133,6 +154,151 @@ class QueryService {
     const trend = this.calculateTrends(current, previous);
 
     return { current, previous, trend };
+  }
+
+  /**
+   * 从 events 表实时聚合统计数据
+   *
+   * 用于支持 jobNames 筛选（预聚合表不支持 job_name 维度）
+   */
+  private async queryStatsFromEvents(
+    agentId: string | undefined,
+    startDate: Date,
+    endDate: Date,
+    brandId?: number,
+    jobNames?: string[]
+  ): Promise<{
+    agentId: string;
+    brandId: number | null;
+    jobId: number | null;
+    totalEvents: number;
+    uniqueCandidates: number;
+    uniqueSessions: number;
+    messagesSent: number;
+    messagesReceived: number;
+    inboundCandidates: number;
+    candidatesReplied: number;
+    unreadReplied: number;
+    proactiveOutreach: number;
+    proactiveResponded: number;
+    wechatExchanged: number;
+    interviewsBooked: number;
+    candidatesHired: number;
+  }[]> {
+    const db = getDb();
+
+    // 构建 WHERE 条件
+    const conditions = [
+      gte(recruitmentEvents.eventTime, startDate),
+      lte(recruitmentEvents.eventTime, endDate),
+    ];
+
+    if (agentId) {
+      conditions.push(eq(recruitmentEvents.agentId, agentId));
+    }
+    if (brandId !== undefined) {
+      conditions.push(eq(recruitmentEvents.brandId, brandId));
+    }
+    // 使用集中化的 Job 筛选工具
+    const jobCondition = buildJobCondition(jobNames ?? []);
+    if (jobCondition) {
+      conditions.push(jobCondition);
+    }
+
+    // 构建子查询的静态条件字符串（避免 Drizzle 参数重复绑定问题）
+    const buildSubqueryConditions = (alias: string): string => {
+      const parts: string[] = [];
+      if (agentId) {
+        const escapedAgentId = agentId.replace(/'/g, "''");
+        parts.push(`${alias}.agent_id = '${escapedAgentId}'`);
+      }
+      if (brandId !== undefined) {
+        parts.push(`${alias}.brand_id = ${brandId}`);
+      }
+      // 使用集中化的 Job 筛选工具
+      if (hasJobFilter(jobNames)) {
+        parts.push(buildJobConditionRaw(alias, jobNames!));
+      }
+      return parts.length > 0 ? "AND " + parts.join(" AND ") : "";
+    };
+
+    const receivedConditionsStr = buildSubqueryConditions("received");
+    const contactedConditionsStr = buildSubqueryConditions("contacted");
+    const startDateIso = startDate.toISOString();
+    const endDateIso = endDate.toISOString();
+
+    // 执行聚合查询（参考 aggregation.service.ts 的逻辑）
+    // 注意：不按 agent 分组，所以 agentId 用常量而非从数据库查询
+    const [stats] = await db
+      .select({
+        totalEvents: count(),
+        uniqueCandidates: countDistinct(recruitmentEvents.candidateKey),
+        uniqueSessions: countDistinct(recruitmentEvents.sessionId),
+        messagesSent: sql<number>`COUNT(*) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_SENT})`,
+        messagesReceived: sql<number>`COALESCE(SUM(${recruitmentEvents.unreadCountBeforeReply}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_RECEIVED}), 0)`,
+        inboundCandidates: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_RECEIVED} OR (${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_SENT} AND ${recruitmentEvents.wasUnreadBeforeReply} = true))`,
+        candidatesReplied: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_SENT} AND ${recruitmentEvents.wasUnreadBeforeReply} = true)`,
+        unreadReplied: sql<number>`COALESCE(SUM(${recruitmentEvents.unreadCountBeforeReply}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_SENT} AND ${recruitmentEvents.wasUnreadBeforeReply} = true), 0)`,
+        proactiveOutreach: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.CANDIDATE_CONTACTED})`,
+        // proactiveResponded: 主动触达后对方回复的候选人数（使用 candidate_name 宽松匹配）
+        proactiveResponded: sql<number>`(
+          SELECT COUNT(DISTINCT received.candidate_name)
+          FROM ${recruitmentEvents} AS received
+          WHERE received.event_type = ${RecruitmentEventType.MESSAGE_RECEIVED}
+            AND received.event_time >= ${startDateIso}::timestamptz
+            AND received.event_time <= ${endDateIso}::timestamptz
+            ${sql.raw(receivedConditionsStr)}
+            AND received.candidate_name IN (
+              SELECT DISTINCT contacted.candidate_name
+              FROM ${recruitmentEvents} AS contacted
+              WHERE contacted.event_type = ${RecruitmentEventType.CANDIDATE_CONTACTED}
+                AND contacted.event_time >= ${startDateIso}::timestamptz
+                AND contacted.event_time <= ${endDateIso}::timestamptz
+                ${sql.raw(contactedConditionsStr)}
+            )
+        )`,
+        wechatExchanged: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (
+          WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.WECHAT_EXCHANGED}
+          AND (
+            ${recruitmentEvents.eventDetails}->>'exchangeType' = 'accepted'
+            OR ${recruitmentEvents.eventDetails}->>'exchangeType' = 'completed'
+            OR (
+              ${recruitmentEvents.eventDetails}->>'exchangeType' IS NULL
+              AND ${recruitmentEvents.eventDetails}->>'wechatNumber' IS NOT NULL
+              AND ${recruitmentEvents.eventDetails}->>'wechatNumber' != ''
+            )
+          )
+        )`,
+        interviewsBooked: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.INTERVIEW_BOOKED})`,
+        candidatesHired: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.CANDIDATE_HIRED})`,
+      })
+      .from(recruitmentEvents)
+      .where(and(...conditions));
+
+    if (!stats) {
+      return [];
+    }
+
+    return [
+      {
+        agentId: agentId ?? "all",
+        brandId: brandId ?? null,
+        jobId: null,
+        totalEvents: Number(stats.totalEvents) || 0,
+        uniqueCandidates: Number(stats.uniqueCandidates) || 0,
+        uniqueSessions: Number(stats.uniqueSessions) || 0,
+        messagesSent: Number(stats.messagesSent) || 0,
+        messagesReceived: Number(stats.messagesReceived) || 0,
+        inboundCandidates: Number(stats.inboundCandidates) || 0,
+        candidatesReplied: Number(stats.candidatesReplied) || 0,
+        unreadReplied: Number(stats.unreadReplied) || 0,
+        proactiveOutreach: Number(stats.proactiveOutreach) || 0,
+        proactiveResponded: Number(stats.proactiveResponded) || 0,
+        wechatExchanged: Number(stats.wechatExchanged) || 0,
+        interviewsBooked: Number(stats.interviewsBooked) || 0,
+        candidatesHired: Number(stats.candidatesHired) || 0,
+      },
+    ];
   }
 
   /**
@@ -358,31 +524,38 @@ class QueryService {
    * 获取日粒度趋势数据
    *
    * 返回指定日期范围内每天的统计数据
+   * 采用混合查询策略：无 jobNames 使用预聚合表，有 jobNames 从 events 表实时聚合
    *
    * @param agentId - 可选 Agent ID
    * @param startDate - 开始日期
    * @param endDate - 结束日期
    * @param brandId - 可选品牌 ID
-   * @param jobId - 可选岗位 ID
+   * @param jobNames - 可选岗位名称列表
    */
   async getStatsTrend(
     agentId: string | undefined,
     startDate: Date,
     endDate: Date,
     brandId?: number,
-    jobId?: number
+    jobNames?: string[]
   ): Promise<DailyTrendItem[]> {
     console.log(
-      `${LOG_PREFIX} Getting stats trend: ${agentId ?? "all"} from ${startDate.toISOString()} to ${endDate.toISOString()}`
+      `${LOG_PREFIX} Getting stats trend: ${agentId ?? "all"} from ${startDate.toISOString()} to ${endDate.toISOString()}, jobNames=${jobNames?.join(",") ?? "all"}`
     );
 
-    // 查询原始日统计数据
+    const hasJobFilter = jobNames && jobNames.length > 0;
+
+    if (hasJobFilter) {
+      // 从 events 表实时聚合日趋势
+      return this.queryTrendFromEvents(agentId, startDate, endDate, brandId, jobNames);
+    }
+
+    // 使用预聚合表（快速）
     const rawStats = await recruitmentStatsRepository.queryStats(
       agentId,
       startDate,
       endDate,
-      brandId,
-      jobId
+      brandId
     );
 
     // 按日期聚合（因为可能有多个 brand/job 组合）
@@ -419,6 +592,111 @@ class QueryService {
 
     // 按日期排序返回
     return Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  /**
+   * 从 events 表实时聚合日趋势数据
+   */
+  private async queryTrendFromEvents(
+    agentId: string | undefined,
+    startDate: Date,
+    endDate: Date,
+    brandId?: number,
+    jobNames?: string[]
+  ): Promise<DailyTrendItem[]> {
+    const db = getDb();
+
+    // 构建 WHERE 条件
+    const conditions = [
+      gte(recruitmentEvents.eventTime, startDate),
+      lte(recruitmentEvents.eventTime, endDate),
+    ];
+
+    if (agentId) {
+      conditions.push(eq(recruitmentEvents.agentId, agentId));
+    }
+    if (brandId !== undefined) {
+      conditions.push(eq(recruitmentEvents.brandId, brandId));
+    }
+    // 使用集中化的 Job 筛选工具
+    const jobConditionTrend = buildJobCondition(jobNames ?? []);
+    if (jobConditionTrend) {
+      conditions.push(jobConditionTrend);
+    }
+
+    // 构建子查询的静态条件字符串（避免 Drizzle 参数重复绑定问题）
+    const buildSubqueryConditions = (alias: string): string => {
+      const parts: string[] = [];
+      if (agentId) {
+        const escapedAgentId = agentId.replace(/'/g, "''");
+        parts.push(`${alias}.agent_id = '${escapedAgentId}'`);
+      }
+      if (brandId !== undefined) {
+        parts.push(`${alias}.brand_id = ${brandId}`);
+      }
+      // 使用集中化的 Job 筛选工具
+      if (hasJobFilter(jobNames)) {
+        parts.push(buildJobConditionRaw(alias, jobNames!));
+      }
+      return parts.length > 0 ? "AND " + parts.join(" AND ") : "";
+    };
+
+    const contactedConditionsStr = buildSubqueryConditions("contacted");
+    const startDateIso = startDate.toISOString();
+    const endDateIso = endDate.toISOString();
+
+    // 按日期聚合
+    const results = await db
+      .select({
+        date: sql<string>`to_char(${recruitmentEvents.eventTime} AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD')`,
+        messagesReceived: sql<number>`COALESCE(SUM(${recruitmentEvents.unreadCountBeforeReply}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_RECEIVED}), 0)`,
+        inboundCandidates: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_RECEIVED} OR (${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_SENT} AND ${recruitmentEvents.wasUnreadBeforeReply} = true))`,
+        candidatesReplied: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_SENT} AND ${recruitmentEvents.wasUnreadBeforeReply} = true)`,
+        wechatExchanged: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (
+          WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.WECHAT_EXCHANGED}
+          AND (
+            ${recruitmentEvents.eventDetails}->>'exchangeType' = 'accepted'
+            OR ${recruitmentEvents.eventDetails}->>'exchangeType' = 'completed'
+            OR (
+              ${recruitmentEvents.eventDetails}->>'exchangeType' IS NULL
+              AND ${recruitmentEvents.eventDetails}->>'wechatNumber' IS NOT NULL
+              AND ${recruitmentEvents.eventDetails}->>'wechatNumber' != ''
+            )
+          )
+        )`,
+        interviewsBooked: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.INTERVIEW_BOOKED})`,
+        unreadReplied: sql<number>`COALESCE(SUM(${recruitmentEvents.unreadCountBeforeReply}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_SENT} AND ${recruitmentEvents.wasUnreadBeforeReply} = true), 0)`,
+        proactiveOutreach: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateKey}) FILTER (WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.CANDIDATE_CONTACTED})`,
+        // proactiveResponded: 当天主动触达后收到回复的候选人（使用 candidate_name 宽松匹配）
+        proactiveResponded: sql<number>`COUNT(DISTINCT ${recruitmentEvents.candidateName}) FILTER (
+          WHERE ${recruitmentEvents.eventType} = ${RecruitmentEventType.MESSAGE_RECEIVED}
+            AND ${recruitmentEvents.candidateName} IN (
+              SELECT DISTINCT contacted.candidate_name
+              FROM ${recruitmentEvents} AS contacted
+              WHERE contacted.event_type = ${RecruitmentEventType.CANDIDATE_CONTACTED}
+                AND contacted.event_time >= ${startDateIso}::timestamptz
+                AND contacted.event_time <= ${endDateIso}::timestamptz
+                ${sql.raw(contactedConditionsStr)}
+                AND to_char(contacted.event_time AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD') = to_char(${recruitmentEvents.eventTime} AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD')
+            )
+        )`,
+      })
+      .from(recruitmentEvents)
+      .where(and(...conditions))
+      .groupBy(sql`to_char(${recruitmentEvents.eventTime} AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD')`)
+      .orderBy(sql`to_char(${recruitmentEvents.eventTime} AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM-DD')`);
+
+    return results.map(row => ({
+      date: row.date,
+      messagesReceived: Number(row.messagesReceived) || 0,
+      inboundCandidates: Number(row.inboundCandidates) || 0,
+      candidatesReplied: Number(row.candidatesReplied) || 0,
+      wechatExchanged: Number(row.wechatExchanged) || 0,
+      interviewsBooked: Number(row.interviewsBooked) || 0,
+      unreadReplied: Number(row.unreadReplied) || 0,
+      proactiveOutreach: Number(row.proactiveOutreach) || 0,
+      proactiveResponded: Number(row.proactiveResponded) || 0,
+    }));
   }
 
   /**
@@ -536,22 +814,24 @@ class QueryService {
   /**
    * 获取筛选器选项
    *
-   * 返回可用的 Agent 和 Brand 列表
+   * 返回可用的 Agent、Brand 和 Job 列表
    */
   async getFilterOptions(): Promise<{
     agents: Array<{ agentId: string; displayName: string }>;
     brands: Array<{ id: number; name: string }>;
+    jobs: Array<{ value: string; label: string }>;
   }> {
     console.log(`${LOG_PREFIX} Getting filter options`);
 
-    // 并行获取 Agent 和 Brand IDs
-    const [agentIds, brandIds] = await Promise.all([
+    // 并行获取 Agent、Brand IDs 和 Job 选项
+    const [agentIds, brandIds, jobs] = await Promise.all([
       recruitmentStatsRepository.getDistinctAgents(),
       recruitmentStatsRepository.getDistinctBrandIds(),
+      recruitmentEventsRepository.getDistinctJobOptions(),
     ]);
 
     // Agent 列表（暂时使用 agentId 作为显示名称）
-    const agents = agentIds.map(agentId => ({
+    const agents = agentIds.map((agentId: string) => ({
       agentId,
       displayName: agentId,
     }));
@@ -576,9 +856,9 @@ class QueryService {
         .orderBy(dataDictionary.displayOrder);
     }
 
-    console.log(`${LOG_PREFIX} Filter options: ${agents.length} agents, ${brands.length} brands`);
+    console.log(`${LOG_PREFIX} Filter options: ${agents.length} agents, ${brands.length} brands, ${jobs.length} jobs`);
 
-    return { agents, brands };
+    return { agents, brands, jobs };
   }
 }
 
