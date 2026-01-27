@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.28.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.28.0-develop.2...v1.28.0-develop.3) (2026-01-27)
+
+
+### Performance Improvements
+
+* **electron:** 优化打包体积，排除不必要的文件 ([9806d2d](https://github.com/steveoon/agent-computer-user/commit/9806d2d108ee4ed627381b9699d92583cbaa603d))
+
 # [1.28.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.28.0-develop.1...v1.28.0-develop.2) (2026-01-27)
 
 
