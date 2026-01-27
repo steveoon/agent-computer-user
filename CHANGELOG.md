@@ -2,6 +2,20 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.27.0](https://github.com/steveoon/agent-computer-user/compare/v1.26.0...v1.27.0) (2026-01-27)
+
+
+### Bug Fixes
+
+* **electron:** 修复 preload.ts 类型定义导致的打包错误 ([90cdf35](https://github.com/steveoon/agent-computer-user/commit/90cdf35086c88b2966b925980bae7707fef1c423))
+
+
+### Features
+
+* **agent:** 增强 Agent 清理功能并添加启动认证检查 ([a991d94](https://github.com/steveoon/agent-computer-user/commit/a991d945c864a7e5de6326c0b64f41fbd3913150))
+* **dashboard:** 添加岗位多选筛选功能 ([8de150e](https://github.com/steveoon/agent-computer-user/commit/8de150e2783e0b7899be6e76242f743a9a85b24b))
+* **deploy:** 增强部署脚本健壮性并支持自动上传 ([4d8c4a3](https://github.com/steveoon/agent-computer-user/commit/4d8c4a3fba8bc6246fd33a4049f3d62cf24b346a))
+
 # [1.27.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.27.0-develop.1...v1.27.0-develop.2) (2026-01-27)
 
 
