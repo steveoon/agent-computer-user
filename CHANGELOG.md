@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.28.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.28.0-develop.1...v1.28.0-develop.2) (2026-01-29)
+
+
+### Features
+
+* add GitHub Actions workflow for Windows x64 build ([bc8ee42](https://github.com/steveoon/agent-computer-user/commit/bc8ee4204f83905b68397efdfa8a8c77489b129f))
+
 # [1.28.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.27.0...v1.28.0-develop.1) (2026-01-27)
 
 
