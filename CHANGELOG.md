@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.28.1-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.28.0...v1.28.1-develop.1) (2026-01-29)
+
+
+### Bug Fixes
+
+* disable electron-builder auto publish to avoid GH_TOKEN error ([9369b8f](https://github.com/steveoon/agent-computer-user/commit/9369b8f1ddf3f7352b1da5ceef32c3f14232aa90))
+
 # [1.28.0](https://github.com/steveoon/agent-computer-user/compare/v1.27.0...v1.28.0) (2026-01-29)
 
 
