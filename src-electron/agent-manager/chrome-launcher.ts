@@ -262,6 +262,10 @@ export class ChromeLauncher {
    * Check if a Chrome profile directory is in use
    */
   private async isProfileInUse(userDataDir: string): Promise<boolean> {
+    if (!fs.existsSync(userDataDir)) {
+      return false;
+    }
+
     // Check for Chrome lock file
     const lockFile = path.join(userDataDir, "SingletonLock");
     try {
@@ -343,18 +347,43 @@ export class ChromeLauncher {
   private findPidByUserDataDir(userDataDir: string): number | null {
     try {
       if (process.platform === "win32") {
-        const escapedDir = userDataDir.replace(/'/g, "''");
         const psCommand =
-          "Get-CimInstance Win32_Process | " +
-          `Where-Object { $_.CommandLine -like '*--user-data-dir=${escapedDir}*' } | ` +
-          "Select-Object -First 1 -ExpandProperty ProcessId";
+          "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; " +
+          "$procs = Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | " +
+          "Select-Object ProcessId, CommandLine; " +
+          "if ($null -eq $procs) { return }; " +
+          "$procs | ConvertTo-Json -Compress";
         const output = execSync(`powershell -NoProfile -Command "${psCommand}"`, {
           encoding: "utf-8",
         }).trim();
 
-        if (output) {
-          const pid = parseInt(output.split(/\s+/)[0], 10);
-          return isNaN(pid) ? null : pid;
+        if (!output) {
+          return null;
+        }
+
+        let parsed:
+          | Array<{ ProcessId: number; CommandLine?: string }>
+          | { ProcessId: number; CommandLine?: string };
+        try {
+          parsed = JSON.parse(output);
+        } catch {
+          return null;
+        }
+
+        const list = Array.isArray(parsed) ? parsed : [parsed];
+        const target = this.normalizeWindowsPath(userDataDir);
+
+        for (const proc of list) {
+          const cmd = proc.CommandLine ?? "";
+          const match = cmd.match(/--user-data-dir=("[^"]+"|\S+)/);
+          if (!match) continue;
+
+          const rawDir = match[1].replace(/^"|"$/g, "");
+          const normalized = this.normalizeWindowsPath(rawDir);
+          if (normalized === target) {
+            const pid = Number(proc.ProcessId);
+            return Number.isNaN(pid) ? null : pid;
+          }
         }
       } else {
         const output = execSync(`pgrep -f "user-data-dir=${userDataDir}" 2>/dev/null`, {
@@ -371,6 +400,14 @@ export class ChromeLauncher {
     }
 
     return null;
+  }
+
+  private normalizeWindowsPath(value: string): string {
+    try {
+      return path.resolve(value).replace(/[\\/]+$/, "").toLowerCase();
+    } catch {
+      return value.replace(/[\\/]+$/, "").toLowerCase();
+    }
   }
 
   private getProfileLockFiles(userDataDir: string): string[] {
