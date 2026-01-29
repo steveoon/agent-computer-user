@@ -100,6 +100,8 @@ export class BrandSyncManager {
     syncedBrands: string[];
     failedBrands: string[];
     errors: Record<string, string>;
+    /** Token 缺失标志，调用方可据此显示提示 */
+    tokenMissing?: boolean;
   }> {
     const syncedBrands: string[] = [];
     const failedBrands: string[] = [];
@@ -139,7 +141,9 @@ export class BrandSyncManager {
       const token =
         dulidayToken || localStorage.getItem("duliday_token") || process.env.DULIDAY_TOKEN;
       if (!token) {
-        throw new Error("未找到 Duliday Token，请先配置 Token");
+        // Token 缺失时返回标志，由调用方决定如何处理（避免控制台报错）
+        console.info("ℹ️ 未配置 Duliday Token，跳过品牌同步");
+        return { syncedBrands, failedBrands, errors, tokenMissing: true };
       }
 
       // 通过 API 路由同步品牌（避免 CSP 问题）

@@ -12,6 +12,8 @@ export interface ConfigMigrationState {
   isError: boolean;
   error?: string;
   needsMigration: boolean;
+  /** Token 缺失警告（非阻断性，用于显示提示） */
+  tokenMissingWarning: boolean;
 }
 
 /**
@@ -24,6 +26,7 @@ export function useConfigMigration() {
     isSuccess: false,
     isError: false,
     needsMigration: false,
+    tokenMissingWarning: false,
   });
 
   useEffect(() => {
@@ -61,6 +64,8 @@ export function useConfigMigration() {
         // 处理品牌同步（使用已并行获取的 syncStatus）
         console.log("🔍 检查缺失的品牌...");
 
+        let tokenMissing = false;
+
         if (syncStatus.missingBrands.length > 0) {
           console.log(
             `🔄 发现 ${syncStatus.missingBrands.length} 个缺失的品牌: ${syncStatus.missingBrands.join(", ")}`
@@ -70,13 +75,18 @@ export function useConfigMigration() {
           try {
             const syncResult = await BrandSyncManager.syncMissingBrands();
 
-            if (syncResult.syncedBrands.length > 0) {
-              console.log(`✅ 成功同步品牌: ${syncResult.syncedBrands.join(", ")}`);
-            }
+            // 检查是否因 Token 缺失而跳过同步
+            if (syncResult.tokenMissing) {
+              tokenMissing = true;
+            } else {
+              if (syncResult.syncedBrands.length > 0) {
+                console.log(`✅ 成功同步品牌: ${syncResult.syncedBrands.join(", ")}`);
+              }
 
-            if (syncResult.failedBrands.length > 0) {
-              console.warn(`⚠️ 部分品牌同步失败: ${syncResult.failedBrands.join(", ")}`);
-              console.warn("失败详情:", syncResult.errors);
+              if (syncResult.failedBrands.length > 0) {
+                console.warn(`⚠️ 部分品牌同步失败: ${syncResult.failedBrands.join(", ")}`);
+                console.warn("失败详情:", syncResult.errors);
+              }
             }
           } catch (syncError) {
             console.error("❌ 品牌同步失败:", syncError);
@@ -91,6 +101,7 @@ export function useConfigMigration() {
           isSuccess: true,
           isError: false,
           needsMigration: false,
+          tokenMissingWarning: tokenMissing,
         });
       } catch (error) {
         console.error("❌ 配置迁移失败:", error);
@@ -123,6 +134,7 @@ export function useConfigMigration() {
           isError: true,
           error: error instanceof Error ? error.message : "未知错误",
           needsMigration: false,
+          tokenMissingWarning: false,
         });
       }
     }
@@ -152,6 +164,7 @@ export function useConfigMigration() {
         isSuccess: true,
         isError: false,
         needsMigration: false,
+        tokenMissingWarning: false,
       });
     } catch (error) {
       console.error("❌ 手动重试迁移失败:", error);
@@ -161,6 +174,7 @@ export function useConfigMigration() {
         isError: true,
         error: error instanceof Error ? error.message : "未知错误",
         needsMigration: false,
+        tokenMissingWarning: false,
       });
     }
   };

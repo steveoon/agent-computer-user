@@ -2,6 +2,20 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.28.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.28.0-develop.1...v1.28.0-develop.2) (2026-01-29)
+
+
+### Features
+
+* add GitHub Actions workflow for Windows x64 build ([bc8ee42](https://github.com/steveoon/agent-computer-user/commit/bc8ee4204f83905b68397efdfa8a8c77489b129f))
+
+# [1.28.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.27.0...v1.28.0-develop.1) (2026-01-27)
+
+
+### Features
+
+* 添加 Token 缺失友好提示并支持 Windows 构建 ([8e75486](https://github.com/steveoon/agent-computer-user/commit/8e754860bce4a0ba6f5b8171ec0da6b9573d4212))
+
 # [1.27.0](https://github.com/steveoon/agent-computer-user/compare/v1.26.0...v1.27.0) (2026-01-27)
 
 
