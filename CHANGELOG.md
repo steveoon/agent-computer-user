@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.28.1-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.28.1-develop.1...v1.28.1-develop.2) (2026-01-29)
+
+
+### Bug Fixes
+
+* **electron:** improve Windows Chrome profile detection ([b989163](https://github.com/steveoon/agent-computer-user/commit/b989163d1ad00330b376e1b78aa335d9addd6f5d))
+
 ## [1.28.1-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.28.0...v1.28.1-develop.1) (2026-01-29)
 
 
