@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.2...v1.29.0-develop.3) (2026-01-30)
+
+
+### Bug Fixes
+
+* **electron:** resolve styled-jsx via next's node_modules path ([08c987c](https://github.com/steveoon/agent-computer-user/commit/08c987c6b59fa8235a0676ed53ae9bce2d68b9c4))
+
 # [1.29.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.1...v1.29.0-develop.2) (2026-01-30)
 
 
