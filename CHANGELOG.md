@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.7](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.6...v1.29.0-develop.7) (2026-01-30)
+
+
+### Bug Fixes
+
+* **electron:** remove client-only/server-only from requiredPackages ([0c60c51](https://github.com/steveoon/agent-computer-user/commit/0c60c51d79ed76d52bf6b5f55edc4b28a160472c))
+
 # [1.29.0-develop.6](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.5...v1.29.0-develop.6) (2026-01-30)
 
 
