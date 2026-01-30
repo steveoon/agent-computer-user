@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.28.1-develop.2...v1.29.0-develop.1) (2026-01-30)
+
+
+### Features
+
+* **electron:** enhance build process and add standalone resolver for Windows ([a4942e9](https://github.com/steveoon/agent-computer-user/commit/a4942e9d498632d00bee1d96a81c7fe442f8ce0d))
+
 ## [1.28.1-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.28.1-develop.1...v1.28.1-develop.2) (2026-01-29)
 
 
