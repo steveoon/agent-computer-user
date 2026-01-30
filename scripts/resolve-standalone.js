@@ -52,7 +52,6 @@ const requiredPackages = [
   "react-dom",
   "detect-libc",
   "client-only",
-  "server-only",
 ];
 const standaloneNodeModules = path.join(tempDest, "node_modules");
 

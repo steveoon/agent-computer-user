@@ -46,7 +46,6 @@ const entriesToVerify = [
   "@swc/helpers/_/_interop_require_default", // 之前报错的具体路径
   "@next/env",
   "client-only", // React 相关
-  "server-only",
   "react-dom/server.browser",
   "detect-libc",
 ];
