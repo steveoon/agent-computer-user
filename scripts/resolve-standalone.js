@@ -55,13 +55,28 @@ for (const pkg of requiredPackages) {
   let srcPkgDir = path.join(projectRoot, "node_modules", pkg);
   if (!exists(srcPkgDir)) {
     try {
+      // 尝试直接解析
       const resolvedPkgJson = require.resolve(`${pkg}/package.json`, {
         paths: [projectRoot],
       });
       srcPkgDir = path.dirname(resolvedPkgJson);
     } catch {
-      console.error(`[resolve-standalone] Missing dependency in project: ${pkg}`);
-      process.exit(1);
+      // fallback: 通过 next 的位置来解析（styled-jsx 是 next 的依赖）
+      try {
+        const nextPkgPath = require.resolve("next/package.json", {
+          paths: [projectRoot],
+        });
+        const nextDir = path.dirname(nextPkgPath);
+        const resolvedPkgJson = require.resolve(`${pkg}/package.json`, {
+          paths: [nextDir],
+        });
+        srcPkgDir = path.dirname(resolvedPkgJson);
+      } catch {
+        console.error(
+          `[resolve-standalone] Missing dependency in project: ${pkg}`
+        );
+        process.exit(1);
+      }
     }
   }
 
