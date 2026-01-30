@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.8](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.7...v1.29.0-develop.8) (2026-01-30)
+
+
+### Bug Fixes
+
+* **electron:** add all Next.js core dependencies for Windows standalone ([5d8388f](https://github.com/steveoon/agent-computer-user/commit/5d8388fa91867c701c398644b0dfe8feb11679e5))
+
 # [1.29.0-develop.7](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.6...v1.29.0-develop.7) (2026-01-30)
 
 
