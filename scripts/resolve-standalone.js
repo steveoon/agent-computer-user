@@ -45,7 +45,15 @@ if (!exists(serverJsPath)) {
 
 // Next.js 核心依赖 - 这些是运行时必需的
 // client-only/server-only 由 outputFileTracingIncludes 处理（exports 限制）
-const requiredPackages = ["styled-jsx", "@swc/helpers", "@next/env", "react-dom", "detect-libc"];
+const requiredPackages = [
+  "styled-jsx",
+  "@swc/helpers",
+  "@next/env",
+  "react-dom",
+  "detect-libc",
+  "client-only",
+  "server-only",
+];
 const standaloneNodeModules = path.join(tempDest, "node_modules");
 
 const packageChecks = {

@@ -55,7 +55,10 @@ const nextConfig: NextConfig = {
 };
 ```
 
-**注意**：glob 模式要精确，`**/styled-jsx/**/*` 会扫描整个 `.pnpm` 目录导致内存溢出！
+**注意**：
+- glob 模式要精确，`**/styled-jsx/**/*` 会扫描整个 `.pnpm` 目录导致内存溢出！
+- `outputFileTracingIncludes` 可能将文件复制到 `.pnpm/` 嵌套结构而非顶层 `node_modules/`，导致 Node.js 无法解析
+- 建议同时配合 `resolve-standalone.js` 作为兜底方案
 
 ### 方案二：`resolve-standalone.js`（运行时兜底）
 
@@ -90,6 +93,37 @@ for (const pkg of requiredPackages) {
 **关键点**：
 - `require.resolve()` 直接解析会失败（因为不是直接依赖）
 - 需要通过 `next` 的路径来解析这些间接依赖
+- 对于有 `exports` 限制的包（如 `client-only`），需要通过入口文件向上查找 `package.json`
+
+### 处理 exports 限制的包
+
+某些包（如 `client-only`、`server-only`）的 `package.json` 中有 `exports` 字段，阻止直接访问 `package.json`：
+
+```javascript
+// ❌ 失败：exports 限制阻止访问
+require.resolve("client-only/package.json");
+
+// ✅ 成功：通过入口文件解析
+const entryPath = require.resolve("client-only");
+// 然后向上遍历目录找到 package.json
+```
+
+`resolve-standalone.js` 中的 `findPackageRootFromEntry` 函数专门处理这种情况：
+
+```javascript
+function findPackageRootFromEntry(entryPath, pkgName) {
+  let dir = path.dirname(entryPath);
+  while (dir && dir !== path.dirname(dir)) {
+    const pkgJson = path.join(dir, "package.json");
+    if (exists(pkgJson)) {
+      const pkg = JSON.parse(fs.readFileSync(pkgJson, "utf-8"));
+      if (pkg.name === pkgName) return dir;
+    }
+    dir = path.dirname(dir);
+  }
+  return null;
+}
+```
 
 ### 方案三：增加 CI 内存限制
 
@@ -112,17 +146,24 @@ GitHub Actions Windows runner 规格：
 
 ```javascript
 // scripts/verify-standalone.js
+const standaloneDir = path.resolve(".next/standalone");
+
 const entriesToVerify = [
   "next/dist/server/next",
   "next/dist/server/config",
   "styled-jsx/style",
-  "@swc/helpers",
+  "@swc/helpers/_/_interop_require_default",
   "@next/env",
+  "client-only",
+  "server-only",
+  "react-dom/server.browser",
+  "detect-libc",
 ];
 
 for (const entry of entriesToVerify) {
   try {
-    require.resolve(entry);
+    // ⚠️ 必须指定 paths 选项！
+    require.resolve(entry, { paths: [standaloneDir] });
     console.log(`✅ ${entry}`);
   } catch (e) {
     console.log(`❌ ${entry} - ${e.message}`);
@@ -130,6 +171,10 @@ for (const entry of entriesToVerify) {
   }
 }
 ```
+
+**关键点**：
+- **必须使用 `{ paths: [standaloneDir] }`**：`require.resolve()` 默认从脚本位置解析，不是从 `process.cwd()` 解析
+- `process.chdir()` 和 `Module._initPaths()` 对 `require.resolve()` 无效
 
 **优点**：
 - 能捕获条件分支、动态 require、间接依赖等静态分析无法覆盖的情况
@@ -144,7 +189,8 @@ for (const entry of entriesToVerify) {
 ## 相关文件
 
 - `next.config.ts` - `outputFileTracingIncludes` 配置
-- `scripts/resolve-standalone.js` - Windows standalone 后处理脚本
+- `scripts/resolve-standalone.js` - Windows standalone 后处理脚本（复制缺失包）
+- `scripts/verify-standalone.js` - 构建后验证脚本（检测缺失依赖）
 - `.github/workflows/build-windows.yml` - Windows CI 构建配置
 - `.npmrc` - pnpm 配置（`node-linker` 设置）
 
