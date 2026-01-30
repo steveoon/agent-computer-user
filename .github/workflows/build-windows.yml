@@ -54,6 +54,8 @@ jobs:
 
       - name: Build Electron app
         run: pnpm electron:build
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
 
       - name: Package Windows x64
         run: pnpm exec electron-builder --win --publish never

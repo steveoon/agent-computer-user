@@ -9,10 +9,10 @@ const nextConfig: NextConfig = {
     ? {
         outputFileTracingIncludes: {
           "/*": [
-            "./node_modules/.pnpm/**/styled-jsx/**/*",
-            "./node_modules/.pnpm/**/@swc/helpers/**/*",
-            "./node_modules/.pnpm/**/client-only/**/*",
-            "./node_modules/.pnpm/**/server-only/**/*",
+            "./node_modules/.pnpm/styled-jsx@*/node_modules/styled-jsx/**/*",
+            "./node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/**/*",
+            "./node_modules/.pnpm/client-only@*/node_modules/client-only/**/*",
+            "./node_modules/.pnpm/server-only@*/node_modules/server-only/**/*",
           ],
         },
       }
