@@ -349,7 +349,8 @@ export class ChromeLauncher {
       if (process.platform === "win32") {
         const psCommand =
           "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; " +
-          "$procs = Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | " +
+          "$procs = Get-CimInstance Win32_Process | " +
+          "Where-Object { $_.Name -eq 'chrome.exe' } | " +
           "Select-Object ProcessId, CommandLine; " +
           "if ($null -eq $procs) { return }; " +
           "$procs | ConvertTo-Json -Compress";
