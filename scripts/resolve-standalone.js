@@ -43,7 +43,9 @@ if (!exists(serverJsPath)) {
   process.exit(1);
 }
 
-const requiredPackages = ["styled-jsx", "@swc/helpers", "client-only", "server-only"];
+// client-only 和 server-only 由 outputFileTracingIncludes 处理，
+// 且它们的 package.json exports 限制导致 require.resolve 失败
+const requiredPackages = ["styled-jsx", "@swc/helpers"];
 const standaloneNodeModules = path.join(tempDest, "node_modules");
 
 const packageChecks = {
