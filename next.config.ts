@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
             "./node_modules/.pnpm/caniuse-lite@*/node_modules/caniuse-lite/**/*",
             "./node_modules/.pnpm/react-dom@*/node_modules/react-dom/**/*",
             "./node_modules/.pnpm/detect-libc@*/node_modules/detect-libc/**/*",
+            "./node_modules/.pnpm/semver@*/node_modules/semver/**/*",
             // React 相关
             "./node_modules/.pnpm/client-only@*/node_modules/client-only/**/*",
             "./node_modules/.pnpm/server-only@*/node_modules/server-only/**/*",

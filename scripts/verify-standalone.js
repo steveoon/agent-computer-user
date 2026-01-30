@@ -48,6 +48,7 @@ const entriesToVerify = [
   "client-only", // React 相关
   "react-dom/server.browser",
   "detect-libc",
+  "semver/functions/coerce",
 ];
 
 console.log(`[verify-standalone] Verifying modules in: ${standaloneDir}\n`);

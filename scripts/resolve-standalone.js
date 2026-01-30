@@ -52,6 +52,7 @@ const requiredPackages = [
   "react-dom",
   "detect-libc",
   "client-only",
+  "semver",
 ];
 const standaloneNodeModules = path.join(tempDest, "node_modules");
 
@@ -60,6 +61,7 @@ const packageChecks = {
     // _interop_require_default 是目录，检查其 package.json
     [path.join("_", "_interop_require_default", "package.json")],
   ],
+  semver: [[path.join("functions", "coerce.js")]],
 };
 
 function hasRequiredFiles(pkgDir, checks) {
