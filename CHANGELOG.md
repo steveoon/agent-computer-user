@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.6](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.5...v1.29.0-develop.6) (2026-01-30)
+
+
+### Bug Fixes
+
+* **electron:** correct @swc/helpers path check + add documentation ([5467954](https://github.com/steveoon/agent-computer-user/commit/5467954053a180f68ec5d4055cbfffdb15ca6f5c))
+
 # [1.29.0-develop.5](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.4...v1.29.0-develop.5) (2026-01-30)
 
 
