@@ -48,7 +48,8 @@ const standaloneNodeModules = path.join(tempDest, "node_modules");
 
 const packageChecks = {
   "@swc/helpers": [
-    [path.join("_", "_interop_require_default.js"), path.join("_", "_interop_require_default.mjs")],
+    // _interop_require_default 是目录，检查其 package.json
+    [path.join("_", "_interop_require_default", "package.json")],
   ],
 };
 

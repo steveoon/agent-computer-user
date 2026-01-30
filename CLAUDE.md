@@ -305,6 +305,8 @@ catch (error) {
 
 **Electron Pack 后样式不一致:** Tailwind v4 的 PostCSS 优化导致 dev/production 样式差异。解决方案：在 `postcss.config.mjs` 中设置 `optimize: false`。详见 [ELECTRON_TAILWIND_FIX.md](docs/guides/ELECTRON_TAILWIND_FIX.md)
 
+**Windows Standalone 构建依赖缺失:** pnpm isolated 模式 + Next.js standalone 在 Windows 上会缺失 `styled-jsx`、`@swc/helpers` 等依赖。解决方案：`outputFileTracingIncludes` + `resolve-standalone.js` 兜底。详见 [ELECTRON_WINDOWS_STANDALONE.md](docs/guides/ELECTRON_WINDOWS_STANDALONE.md)
+
 ## Key Data Flows
 
 1. **Config**: `ConfigInitializer` → `configService.getConfig()` → Components
