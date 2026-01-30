@@ -43,12 +43,25 @@ if (!exists(serverJsPath)) {
   process.exit(1);
 }
 
-const requiredPackages = ["styled-jsx"];
+const requiredPackages = ["styled-jsx", "@swc/helpers", "client-only", "server-only"];
 const standaloneNodeModules = path.join(tempDest, "node_modules");
+
+const packageChecks = {
+  "@swc/helpers": [
+    [path.join("_", "_interop_require_default.js"), path.join("_", "_interop_require_default.mjs")],
+  ],
+};
+
+function hasRequiredFiles(pkgDir, checks) {
+  if (!checks || checks.length === 0) return true;
+  return checks.every((alternatives) => alternatives.some((rel) => exists(path.join(pkgDir, rel))));
+}
 
 for (const pkg of requiredPackages) {
   const standalonePkgPath = path.join(standaloneNodeModules, pkg, "package.json");
-  if (exists(standalonePkgPath)) {
+  const standalonePkgDir = path.dirname(standalonePkgPath);
+  const checks = packageChecks[pkg];
+  if (exists(standalonePkgPath) && hasRequiredFiles(standalonePkgDir, checks)) {
     continue;
   }
 
@@ -81,7 +94,10 @@ for (const pkg of requiredPackages) {
   }
 
   const destPkgDir = path.join(standaloneNodeModules, pkg);
-  fs.mkdirSync(standaloneNodeModules, { recursive: true });
+  fs.mkdirSync(path.dirname(destPkgDir), { recursive: true });
+  if (exists(destPkgDir)) {
+    fs.rmSync(destPkgDir, { recursive: true, force: true });
+  }
   try {
     fs.cpSync(srcPkgDir, destPkgDir, { recursive: true, dereference: true });
     console.log(`[resolve-standalone] Copied ${pkg} into standalone node_modules.`);
@@ -90,7 +106,7 @@ for (const pkg of requiredPackages) {
     process.exit(1);
   }
 
-  if (!exists(path.join(destPkgDir, "package.json"))) {
+  if (!exists(path.join(destPkgDir, "package.json")) || !hasRequiredFiles(destPkgDir, checks)) {
     console.error(`[resolve-standalone] ${pkg} still missing after copy: ${destPkgDir}`);
     process.exit(1);
   }

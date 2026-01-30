@@ -1,8 +1,22 @@
 import type { NextConfig } from "next";
 
+const isElectronBuild = process.env.ELECTRON_BUILD === "true";
+
 const nextConfig: NextConfig = {
   /* config options here */
   output: "standalone",
+  ...(isElectronBuild
+    ? {
+        outputFileTracingIncludes: {
+          "/*": [
+            "./node_modules/.pnpm/**/styled-jsx/**/*",
+            "./node_modules/.pnpm/**/@swc/helpers/**/*",
+            "./node_modules/.pnpm/**/client-only/**/*",
+            "./node_modules/.pnpm/**/server-only/**/*",
+          ],
+        },
+      }
+    : {}),
   async headers() {
     return [
       {
