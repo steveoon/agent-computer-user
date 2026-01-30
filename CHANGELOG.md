@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.4](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.3...v1.29.0-develop.4) (2026-01-30)
+
+
+### Bug Fixes
+
+* **electron:** add outputFileTracingIncludes + enhanced fallback script ([cdf5d02](https://github.com/steveoon/agent-computer-user/commit/cdf5d02a7d48f264b32e488d5ba65f42a40af88d))
+
 # [1.29.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.2...v1.29.0-develop.3) (2026-01-30)
 
 
