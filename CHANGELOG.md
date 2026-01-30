@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.9](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.8...v1.29.0-develop.9) (2026-01-30)
+
+
+### Features
+
+* **electron:** add verify-standalone.js for build-time dependency validation ([ce05947](https://github.com/steveoon/agent-computer-user/commit/ce059479da18222599415f72d5e5b6ab3b4a9396))
+
 # [1.29.0-develop.8](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.7...v1.29.0-develop.8) (2026-01-30)
 
 
