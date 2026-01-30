@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.10](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.9...v1.29.0-develop.10) (2026-01-30)
+
+
+### Bug Fixes
+
+* **electron:** add react-dom/detect-libc deps and fix verify-standalone paths ([78201b8](https://github.com/steveoon/agent-computer-user/commit/78201b86e6e714a70b2c93be9c652ca420f259a3))
+
 # [1.29.0-develop.9](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.8...v1.29.0-develop.9) (2026-01-30)
 
 
