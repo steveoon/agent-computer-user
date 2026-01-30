@@ -46,6 +46,9 @@ const entriesToVerify = [
   "@swc/helpers/_/_interop_require_default", // 之前报错的具体路径
   "@next/env",
   "client-only", // React 相关
+  "server-only",
+  "react-dom/server.browser",
+  "detect-libc",
 ];
 
 console.log(`[verify-standalone] Verifying modules in: ${standaloneDir}\n`);
@@ -55,7 +58,8 @@ const resolved = [];
 
 for (const entry of entriesToVerify) {
   try {
-    const resolvedPath = require.resolve(entry);
+    // 必须指定 paths 选项，否则 require.resolve 会从脚本位置解析而非 standaloneDir
+    const resolvedPath = require.resolve(entry, { paths: [standaloneDir] });
     resolved.push({ entry, path: resolvedPath });
     console.log(`  ✅ ${entry}`);
   } catch (e) {

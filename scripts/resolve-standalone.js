@@ -45,7 +45,7 @@ if (!exists(serverJsPath)) {
 
 // Next.js 核心依赖 - 这些是运行时必需的
 // client-only/server-only 由 outputFileTracingIncludes 处理（exports 限制）
-const requiredPackages = ["styled-jsx", "@swc/helpers", "@next/env"];
+const requiredPackages = ["styled-jsx", "@swc/helpers", "@next/env", "react-dom", "detect-libc"];
 const standaloneNodeModules = path.join(tempDest, "node_modules");
 
 const packageChecks = {
@@ -60,6 +60,48 @@ function hasRequiredFiles(pkgDir, checks) {
   return checks.every((alternatives) => alternatives.some((rel) => exists(path.join(pkgDir, rel))));
 }
 
+const resolveBases = [projectRoot];
+
+function tryResolve(request, bases) {
+  for (const base of bases) {
+    try {
+      return require.resolve(request, { paths: [base] });
+    } catch {
+      // Try next base
+    }
+  }
+  return null;
+}
+
+function findPackageRootFromEntry(entryPath, pkgName) {
+  let dir = path.dirname(entryPath);
+  while (dir && dir !== path.dirname(dir)) {
+    const pkgJson = path.join(dir, "package.json");
+    if (exists(pkgJson)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgJson, "utf-8"));
+        if (pkg.name === pkgName) {
+          return dir;
+        }
+      } catch {
+        // Ignore invalid package.json
+      }
+    }
+    dir = path.dirname(dir);
+  }
+  return null;
+}
+
+const nextPkgPath = tryResolve("next/package.json", resolveBases);
+if (nextPkgPath) {
+  resolveBases.push(path.dirname(nextPkgPath));
+}
+
+const sharpPkgPath = tryResolve("sharp/package.json", resolveBases);
+if (sharpPkgPath) {
+  resolveBases.push(path.dirname(sharpPkgPath));
+}
+
 for (const pkg of requiredPackages) {
   const standalonePkgPath = path.join(standaloneNodeModules, pkg, "package.json");
   const standalonePkgDir = path.dirname(standalonePkgPath);
@@ -70,24 +112,22 @@ for (const pkg of requiredPackages) {
 
   let srcPkgDir = path.join(projectRoot, "node_modules", pkg);
   if (!exists(srcPkgDir)) {
-    try {
-      // 尝试直接解析
-      const resolvedPkgJson = require.resolve(`${pkg}/package.json`, {
-        paths: [projectRoot],
-      });
+    const resolvedPkgJson = tryResolve(`${pkg}/package.json`, resolveBases);
+    if (resolvedPkgJson) {
       srcPkgDir = path.dirname(resolvedPkgJson);
-    } catch {
-      // fallback: 通过 next 的位置来解析（styled-jsx 是 next 的依赖）
-      try {
-        const nextPkgPath = require.resolve("next/package.json", {
-          paths: [projectRoot],
-        });
-        const nextDir = path.dirname(nextPkgPath);
-        const resolvedPkgJson = require.resolve(`${pkg}/package.json`, {
-          paths: [nextDir],
-        });
-        srcPkgDir = path.dirname(resolvedPkgJson);
-      } catch {
+    } else {
+      const resolvedEntry = tryResolve(pkg, resolveBases);
+      if (resolvedEntry) {
+        const root = findPackageRootFromEntry(resolvedEntry, pkg);
+        if (root) {
+          srcPkgDir = root;
+        } else {
+          console.error(
+            `[resolve-standalone] Missing dependency in project: ${pkg}`
+          );
+          process.exit(1);
+        }
+      } else {
         console.error(
           `[resolve-standalone] Missing dependency in project: ${pkg}`
         );
