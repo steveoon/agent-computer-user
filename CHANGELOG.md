@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.5](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.4...v1.29.0-develop.5) (2026-01-30)
+
+
+### Bug Fixes
+
+* **electron:** optimize glob patterns and increase Node memory for Windows build ([413d3e5](https://github.com/steveoon/agent-computer-user/commit/413d3e5848c5eae44ae7506a346f03d202a3e691))
+
 # [1.29.0-develop.4](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.3...v1.29.0-develop.4) (2026-01-30)
 
 
