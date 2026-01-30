@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.13](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.12...v1.29.0-develop.13) (2026-01-30)
+
+
+### Bug Fixes
+
+* add semver as a required package in resolve and verify scripts ([24efabb](https://github.com/steveoon/agent-computer-user/commit/24efabbc862f53c79b73e016f55c9b4cac5428ac))
+
 # [1.29.0-develop.12](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.11...v1.29.0-develop.12) (2026-01-30)
 
 

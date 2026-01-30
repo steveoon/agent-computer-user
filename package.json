@@ -1,6 +1,6 @@
 {
   "name": "ai-sdk-computer-use",
-  "version": "1.29.0-develop.12",
+  "version": "1.29.0-develop.13",
   "private": true,
   "main": "build/main.js",
   "scripts": {
