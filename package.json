@@ -42,7 +42,7 @@
     "db:studio": "drizzle-kit studio",
     "db:init": "npx tsx scripts/init-brand-data.ts",
     "electron:dev": "concurrently \"next dev\" \"tsc -w -p tsconfig-electron.json\" \"wait-on http://localhost:3000 && cross-env ELECTRON_RUN_AS_NODE= NODE_ENV=development electron .\"",
-    "electron:build": "cross-env ELECTRON_BUILD=true next build && shx cp -r .next/static .next/standalone/.next/ && shx mkdir -p .next/standalone/public && shx cp -r public/* .next/standalone/public/ && node scripts/resolve-standalone.js && tsc -p tsconfig-electron.json",
+    "electron:build": "cross-env ELECTRON_BUILD=true next build && shx cp -r .next/static .next/standalone/.next/ && shx mkdir -p .next/standalone/public && shx cp -r public/* .next/standalone/public/ && node scripts/resolve-standalone.js && node scripts/verify-standalone.js && tsc -p tsconfig-electron.json",
     "electron:start": "cross-env ELECTRON_RUN_AS_NODE= electron .",
     "electron:pack": "pnpm electron:build && electron-builder --dir",
     "electron:dist": "pnpm electron:build && electron-builder",

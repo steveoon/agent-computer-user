@@ -106,6 +106,35 @@ GitHub Actions Windows runner 规格：
 - 公共仓库：4 vCPU / 16 GB RAM
 - 私有仓库：2 vCPU / 8 GB RAM
 
+### 方案四：构建后验证（推荐）
+
+在 `electron:build` 后运行 `verify-standalone.js`，通过实际 `require` 来检测缺失依赖：
+
+```javascript
+// scripts/verify-standalone.js
+const entriesToVerify = [
+  "next/dist/server/next",
+  "next/dist/server/config",
+  "styled-jsx/style",
+  "@swc/helpers",
+  "@next/env",
+];
+
+for (const entry of entriesToVerify) {
+  try {
+    require.resolve(entry);
+    console.log(`✅ ${entry}`);
+  } catch (e) {
+    console.log(`❌ ${entry} - ${e.message}`);
+    process.exit(1);
+  }
+}
+```
+
+**优点**：
+- 能捕获条件分支、动态 require、间接依赖等静态分析无法覆盖的情况
+- CI 构建阶段 fail fast，不用等到运行时才发现问题
+
 ## 相关链接
 
 - [GitHub Issue #48017 - Missing dependencies with pnpm 8](https://github.com/vercel/next.js/issues/48017)
