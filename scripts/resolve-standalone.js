@@ -31,6 +31,40 @@ function exists(p) {
   }
 }
 
+function getPnpmInvocation() {
+  const npmExecPath = process.env.npm_execpath || process.env.NPM_EXEC_PATH;
+  if (npmExecPath && exists(npmExecPath)) {
+    return {
+      command: process.execPath,
+      args: [npmExecPath],
+      label: `node ${npmExecPath}`,
+    };
+  }
+
+  const pnpmHome = process.env.PNPM_HOME;
+  if (pnpmHome) {
+    const pnpmCmd = path.join(pnpmHome, process.platform === "win32" ? "pnpm.cmd" : "pnpm");
+    if (exists(pnpmCmd)) {
+      return { command: pnpmCmd, args: [], label: pnpmCmd };
+    }
+  }
+
+  return { command: "pnpm", args: [], label: "pnpm" };
+}
+
+let pnpmInvocationLabel = null;
+function runPnpm(args, options) {
+  const invocation = getPnpmInvocation();
+  if (!pnpmInvocationLabel) {
+    pnpmInvocationLabel = invocation.label;
+    console.log(`[resolve-standalone] Using pnpm via: ${pnpmInvocationLabel}`);
+  }
+  return spawnSync(invocation.command, [...invocation.args, ...args], {
+    stdio: "inherit",
+    cwd: options.cwd,
+  });
+}
+
 // 验证 standalone 目录存在
 if (!exists(standaloneDir)) {
   console.error(`[resolve-standalone] Standalone directory not found: ${standaloneDir}`);
@@ -60,15 +94,16 @@ fs.mkdirSync(tempRuntimeDir, { recursive: true });
 console.log("[resolve-standalone] Attempting pnpm deploy --prod...");
 let deploySuccess = false;
 
-const deployResult = spawnSync("pnpm", ["deploy", "--prod", tempRuntimeDir], {
-  stdio: "inherit",
-  cwd: projectRoot,
-});
+const deployResult = runPnpm(["deploy", "--prod", tempRuntimeDir], { cwd: projectRoot });
 
 // 严格的可用性检测 + 诊断信息
 if (deployResult.status !== 0 || deployResult.error) {
   console.log(`[resolve-standalone] pnpm deploy status: ${deployResult.status}`);
-  console.log(`[resolve-standalone] pnpm deploy error: ${deployResult.error || "none"}`);
+  console.log(
+    `[resolve-standalone] pnpm deploy error: ${
+      deployResult.error ? deployResult.error.message : "none"
+    }`
+  );
 }
 
 deploySuccess =
@@ -101,13 +136,9 @@ if (!deploySuccess) {
   }
 
   console.log("[resolve-standalone] Running pnpm install --prod --frozen-lockfile --ignore-workspace...");
-  const installResult = spawnSync(
-    "pnpm",
+  const installResult = runPnpm(
     ["install", "--prod", "--frozen-lockfile", "--ignore-workspace"],
-    {
-      stdio: "inherit",
-      cwd: tempRuntimeDir,
-    }
+    { cwd: tempRuntimeDir }
   );
 
   // 如果 fallback 也失败，必须退出
