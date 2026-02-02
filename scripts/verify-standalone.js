@@ -77,15 +77,53 @@ const entriesToVerify = [
   "sharp",
 ];
 
+const fallbackContexts = {
+  "detect-libc": ["sharp", "next"],
+  "semver/functions/coerce": ["next", "sharp"],
+};
+
 console.log(`[verify-standalone] Verifying modules in: ${standaloneDir}\n`);
 
 const missing = [];
 const resolved = [];
 
+function tryResolve(request, basePaths) {
+  try {
+    return require.resolve(request, { paths: basePaths });
+  } catch {
+    return null;
+  }
+}
+
+function resolveFromPackage(request, pkgName) {
+  const pkgJson = tryResolve(`${pkgName}/package.json`, [standaloneDir]);
+  if (!pkgJson) return null;
+  const scopedRequire = Module.createRequire(pkgJson);
+  try {
+    return scopedRequire.resolve(request);
+  } catch {
+    return null;
+  }
+}
+
 for (const entry of entriesToVerify) {
   try {
     // 必须指定 paths 选项，否则 require.resolve 会从脚本位置解析而非 standaloneDir
-    const resolvedPath = require.resolve(entry, { paths: [standaloneDir] });
+    let resolvedPath = tryResolve(entry, [standaloneDir]);
+
+    // 对于嵌套依赖（例如 detect-libc/semver），允许从依赖包上下文解析
+    if (!resolvedPath && fallbackContexts[entry]) {
+      for (const pkgName of fallbackContexts[entry]) {
+        resolvedPath = resolveFromPackage(entry, pkgName);
+        if (resolvedPath) break;
+      }
+    }
+
+    if (!resolvedPath) {
+      const err = new Error(`Cannot find module '${entry}'`);
+      err.code = "MODULE_NOT_FOUND";
+      throw err;
+    }
     resolved.push({ entry, path: resolvedPath });
     console.log(`  ✅ ${entry}`);
   } catch (e) {

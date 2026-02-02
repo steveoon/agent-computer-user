@@ -226,14 +226,18 @@ console.log("[resolve-standalone] Symlink validation passed.");
 // =============================================================================
 // Step 6: 补充 Next.js 核心依赖（pnpm isolated 模式下可能缺失）
 // =============================================================================
-// 这些包是 next 的嵌套依赖，在 pnpm isolated 模式下不会被安装到顶层
+// 这些包是 next/sharp 的嵌套依赖，在 pnpm isolated 模式下不会被安装到顶层
 // 需要从项目的 node_modules 中复制到 standalone
 const criticalPackages = [
+  // Next.js 核心依赖
   "styled-jsx",
   "@swc/helpers",
   "@next/env",
   "client-only",
   "server-only",
+  // sharp 的依赖（Windows 上 verify-standalone 会检测）
+  "detect-libc",
+  "semver",
 ];
 
 console.log("[resolve-standalone] Ensuring critical Next.js dependencies...");
@@ -281,6 +285,11 @@ const resolveBases = [projectRoot];
 const nextPkgPath = tryResolve("next/package.json", resolveBases);
 if (nextPkgPath) {
   resolveBases.push(path.dirname(nextPkgPath));
+}
+// 添加 sharp 的路径（detect-libc 和 semver 是 sharp 的依赖）
+const sharpPkgPath = tryResolve("sharp/package.json", resolveBases);
+if (sharpPkgPath) {
+  resolveBases.push(path.dirname(sharpPkgPath));
 }
 
 for (const pkg of criticalPackages) {
