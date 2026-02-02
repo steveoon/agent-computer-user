@@ -11,8 +11,11 @@ const fs = require("fs");
 const path = require("path");
 const Module = require("module");
 
-// 仅在 Windows 上运行（与 resolve-standalone.js 一致）
-if (process.platform !== "win32") {
+// 仅在 Windows 上运行（支持 ELECTRON_BUILD_PLATFORM 环境变量进行 macOS 模拟测试）
+const isWindows =
+  process.platform === "win32" || process.env.ELECTRON_BUILD_PLATFORM === "win32";
+
+if (!isWindows) {
   console.log("[verify-standalone] Skipped: only needed on Windows.");
   process.exit(0);
 }

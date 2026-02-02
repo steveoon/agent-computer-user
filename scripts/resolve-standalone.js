@@ -2,17 +2,25 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-if (process.platform !== "win32") {
+// =============================================================================
+// 物理化 runtime 依赖树 - 根治 Windows standalone 依赖缺失问题
+// =============================================================================
+// 问题根因：pnpm isolated 模式 + NFT 静态追踪 + Windows symlink 限制
+// 解决思路：用 pnpm 生成真实 node_modules，物理化复制到 standalone
+// =============================================================================
+
+// 平台检测：支持 ELECTRON_BUILD_PLATFORM 环境变量（允许 macOS 模拟测试）
+const isWindows =
+  process.platform === "win32" || process.env.ELECTRON_BUILD_PLATFORM === "win32";
+
+if (!isWindows) {
   console.log("[resolve-standalone] Skipped: only needed on Windows.");
   process.exit(0);
 }
 
-const args = process.argv.slice(2);
-const isAutoFix = args.includes("--auto") || process.env.RESOLVE_STANDALONE_AUTOFIX === "true";
-const standaloneArg = args.find((arg) => !arg.startsWith("-")) || ".next/standalone";
-const src = path.resolve(standaloneArg);
-const tempDest = path.resolve(".next/standalone-resolved");
 const projectRoot = path.resolve(__dirname, "..");
+const standaloneDir = path.resolve(projectRoot, ".next/standalone");
+const tempRuntimeDir = path.resolve(projectRoot, ".next/standalone-runtime");
 
 function exists(p) {
   try {
@@ -23,67 +31,189 @@ function exists(p) {
   }
 }
 
-if (!exists(src)) {
-  console.error(`[resolve-standalone] Source not found: ${src}`);
+// 验证 standalone 目录存在
+if (!exists(standaloneDir)) {
+  console.error(`[resolve-standalone] Standalone directory not found: ${standaloneDir}`);
   process.exit(1);
 }
 
-if (exists(tempDest)) {
-  fs.rmSync(tempDest, { recursive: true, force: true });
+const serverJsPath = path.join(standaloneDir, "server.js");
+if (!exists(serverJsPath)) {
+  console.error(`[resolve-standalone] Missing server.js: ${serverJsPath}`);
+  process.exit(1);
 }
 
-fs.mkdirSync(tempDest, { recursive: true });
+console.log("[resolve-standalone] Starting dependency physicalization for Windows...");
 
+// =============================================================================
+// Step 0: 清理临时目录（避免旧的 node_modules 误判"成功"）
+// =============================================================================
+if (exists(tempRuntimeDir)) {
+  console.log("[resolve-standalone] Cleaning up temp directory...");
+  fs.rmSync(tempRuntimeDir, { recursive: true, force: true });
+}
+fs.mkdirSync(tempRuntimeDir, { recursive: true });
+
+// =============================================================================
+// Step 1: 尝试 pnpm deploy（首选，但对非 workspace 项目会失败）
+// =============================================================================
+console.log("[resolve-standalone] Attempting pnpm deploy --prod...");
+let deploySuccess = false;
+
+const deployResult = spawnSync("pnpm", ["deploy", "--prod", tempRuntimeDir], {
+  stdio: "inherit",
+  cwd: projectRoot,
+});
+
+// 严格的可用性检测 + 诊断信息
+if (deployResult.status !== 0 || deployResult.error) {
+  console.log(`[resolve-standalone] pnpm deploy status: ${deployResult.status}`);
+  console.log(`[resolve-standalone] pnpm deploy error: ${deployResult.error || "none"}`);
+}
+
+deploySuccess =
+  deployResult.status === 0 &&
+  !deployResult.error &&
+  exists(path.join(tempRuntimeDir, "node_modules"));
+
+// =============================================================================
+// Step 2: Fallback 到 pnpm install --prod（复制完整 manifest）
+// =============================================================================
+if (!deploySuccess) {
+  console.log(
+    "[resolve-standalone] pnpm deploy failed (expected for non-workspace), falling back to pnpm install --prod"
+  );
+
+  // 清理失败的 deploy 残留
+  if (exists(tempRuntimeDir)) {
+    fs.rmSync(tempRuntimeDir, { recursive: true, force: true });
+  }
+  fs.mkdirSync(tempRuntimeDir, { recursive: true });
+
+  // 复制完整 manifest + lock + 所有配置文件
+  const filesToCopy = ["package.json", "pnpm-lock.yaml", ".npmrc", ".pnpmfile.cjs"];
+  for (const file of filesToCopy) {
+    const srcPath = path.join(projectRoot, file);
+    if (exists(srcPath)) {
+      fs.copyFileSync(srcPath, path.join(tempRuntimeDir, file));
+      console.log(`[resolve-standalone] Copied ${file}`);
+    }
+  }
+
+  console.log("[resolve-standalone] Running pnpm install --prod --frozen-lockfile --ignore-workspace...");
+  const installResult = spawnSync(
+    "pnpm",
+    ["install", "--prod", "--frozen-lockfile", "--ignore-workspace"],
+    {
+      stdio: "inherit",
+      cwd: tempRuntimeDir,
+    }
+  );
+
+  // 如果 fallback 也失败，必须退出
+  if (installResult.status !== 0) {
+    console.error(`[resolve-standalone] pnpm install failed with status: ${installResult.status}`);
+    process.exit(1);
+  }
+
+  if (!exists(path.join(tempRuntimeDir, "node_modules"))) {
+    console.error("[resolve-standalone] Both pnpm deploy and pnpm install failed!");
+    process.exit(1);
+  }
+
+  console.log("[resolve-standalone] pnpm install --prod succeeded.");
+}
+
+// =============================================================================
+// Step 3: 清空旧 node_modules（避免混入 NFT 残留包）
+// =============================================================================
+const standaloneNodeModules = path.join(standaloneDir, "node_modules");
+if (exists(standaloneNodeModules)) {
+  console.log("[resolve-standalone] Removing old standalone node_modules...");
+  fs.rmSync(standaloneNodeModules, { recursive: true, force: true });
+}
+
+// =============================================================================
+// Step 4: 用 dereference: true 强制物理化复制
+// =============================================================================
+console.log("[resolve-standalone] Copying node_modules with dereference (physicalization)...");
 try {
-  fs.cpSync(src, tempDest, { recursive: true, dereference: true });
+  fs.cpSync(path.join(tempRuntimeDir, "node_modules"), standaloneNodeModules, {
+    recursive: true,
+    dereference: true,
+  });
 } catch (err) {
   console.error(`[resolve-standalone] Copy failed: ${err}`);
   process.exit(1);
 }
 
-const serverJsPath = path.join(tempDest, "server.js");
-if (!exists(serverJsPath)) {
-  console.error(`[resolve-standalone] Missing server.js after copy: ${serverJsPath}`);
+// =============================================================================
+// Step 5: 硬性校验是否仍有 symlink/junction（使用 fs.lstatSync）
+// =============================================================================
+console.log("[resolve-standalone] Validating no symlinks remain...");
+
+function hasSymlinks(dir, depth = 0) {
+  // 防止无限递归（正常 node_modules 不会超过 10 层）
+  if (depth > 15) return false;
+
+  let entries;
+  try {
+    entries = fs.readdirSync(dir);
+  } catch (err) {
+    console.warn(`[resolve-standalone] Cannot read dir: ${dir} - ${err.message}`);
+    return false; // 继续检查其他目录
+  }
+
+  for (const name of entries) {
+    const fullPath = path.join(dir, name);
+    try {
+      const stat = fs.lstatSync(fullPath);
+      if (stat.isSymbolicLink()) {
+        console.error(`[resolve-standalone] Found symlink: ${fullPath}`);
+        return true;
+      }
+      if (stat.isDirectory()) {
+        if (hasSymlinks(fullPath, depth + 1)) return true;
+      }
+    } catch (err) {
+      console.warn(`[resolve-standalone] Cannot stat: ${fullPath} - ${err.message}`);
+      // 继续检查其他文件
+    }
+  }
+  return false;
+}
+
+if (hasSymlinks(standaloneNodeModules)) {
+  console.error(
+    "[resolve-standalone] ERROR: symlinks/junctions still present after dereference!"
+  );
   process.exit(1);
 }
 
-// Next.js 核心依赖 - 这些是运行时必需的
-// client-only/server-only 由 outputFileTracingIncludes 处理（exports 限制）
-const requiredPackages = [
+console.log("[resolve-standalone] Symlink validation passed.");
+
+// =============================================================================
+// Step 6: 补充 Next.js 核心依赖（pnpm isolated 模式下可能缺失）
+// =============================================================================
+// 这些包是 next 的嵌套依赖，在 pnpm isolated 模式下不会被安装到顶层
+// 需要从项目的 node_modules 中复制到 standalone
+const criticalPackages = [
   "styled-jsx",
   "@swc/helpers",
   "@next/env",
-  "react-dom",
-  "detect-libc",
   "client-only",
-  "semver",
-  "sharp",
-  "@img/sharp-win32-x64",
-  "@img/sharp-libvips-win32-x64",
-  "@img/sharp-win32-arm64",
-  "@img/sharp-libvips-win32-arm64",
+  "server-only",
 ];
 
-const optionalPackages = new Set([
-  "@img/sharp-win32-arm64",
-  "@img/sharp-libvips-win32-arm64",
-]);
+console.log("[resolve-standalone] Ensuring critical Next.js dependencies...");
 
-const packageChecks = {
-  "@swc/helpers": [
-    // _interop_require_default 是目录，检查其 package.json
-    [path.join("_", "_interop_require_default", "package.json")],
-  ],
-  semver: [[path.join("functions", "coerce.js")]],
-  sharp: [[path.join("lib", "sharp.js")]],
-};
-
-function hasRequiredFiles(pkgDir, checks) {
-  if (!checks || checks.length === 0) return true;
-  return checks.every((alternatives) => alternatives.some((rel) => exists(path.join(pkgDir, rel))));
+function getPackageName(request) {
+  if (request.startsWith("@")) {
+    const parts = request.split("/");
+    return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : request;
+  }
+  return request.split("/")[0];
 }
-
-const resolveBases = [projectRoot];
 
 function tryResolve(request, bases) {
   for (const base of bases) {
@@ -115,116 +245,64 @@ function findPackageRootFromEntry(entryPath, pkgName) {
   return null;
 }
 
+// Build resolve bases from project root and key packages
+const resolveBases = [projectRoot];
 const nextPkgPath = tryResolve("next/package.json", resolveBases);
 if (nextPkgPath) {
   resolveBases.push(path.dirname(nextPkgPath));
 }
 
-const sharpPkgPath = tryResolve("sharp/package.json", resolveBases);
-if (sharpPkgPath) {
-  resolveBases.push(path.dirname(sharpPkgPath));
-}
+for (const pkg of criticalPackages) {
+  const pkgName = getPackageName(pkg);
+  const standalonePkgPath = path.join(standaloneNodeModules, pkgName, "package.json");
 
-function getPackageName(request) {
-  if (request.startsWith("@")) {
-    const parts = request.split("/");
-    return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : request;
+  // Skip if already exists in standalone
+  if (exists(standalonePkgPath)) {
+    console.log(`  ✅ ${pkgName} (already present)`);
+    continue;
   }
-  return request.split("/")[0];
-}
 
-function ensurePackages(packages, standaloneDir) {
-  const standaloneNodeModules = path.join(standaloneDir, "node_modules");
-  for (const pkg of packages) {
-    const pkgName = getPackageName(pkg);
-    const standalonePkgPath = path.join(standaloneNodeModules, pkgName, "package.json");
-    const standalonePkgDir = path.dirname(standalonePkgPath);
-    const checks = packageChecks[pkgName];
-    if (exists(standalonePkgPath) && hasRequiredFiles(standalonePkgDir, checks)) {
-      continue;
-    }
-
-    let srcPkgDir = path.join(projectRoot, "node_modules", pkgName);
-    if (!exists(srcPkgDir)) {
-      const resolvedPkgJson = tryResolve(`${pkgName}/package.json`, resolveBases);
-      if (resolvedPkgJson) {
-        srcPkgDir = path.dirname(resolvedPkgJson);
-      } else {
-        const resolvedEntry = tryResolve(pkg, resolveBases);
-        if (resolvedEntry) {
-          const root = findPackageRootFromEntry(resolvedEntry, pkgName);
-          if (root) {
-            srcPkgDir = root;
-          } else {
-            if (optionalPackages.has(pkgName)) {
-              console.warn(`[resolve-standalone] Optional dependency not found: ${pkgName}`);
-              continue;
-            }
-            console.error(`[resolve-standalone] Missing dependency in project: ${pkgName}`);
-            process.exit(1);
-          }
-        } else {
-          if (optionalPackages.has(pkgName)) {
-            console.warn(`[resolve-standalone] Optional dependency not found: ${pkgName}`);
-            continue;
-          }
-          console.error(`[resolve-standalone] Missing dependency in project: ${pkgName}`);
-          process.exit(1);
+  // Find source package
+  let srcPkgDir = path.join(projectRoot, "node_modules", pkgName);
+  if (!exists(srcPkgDir)) {
+    const resolvedPkgJson = tryResolve(`${pkgName}/package.json`, resolveBases);
+    if (resolvedPkgJson) {
+      srcPkgDir = path.dirname(resolvedPkgJson);
+    } else {
+      const resolvedEntry = tryResolve(pkg, resolveBases);
+      if (resolvedEntry) {
+        const root = findPackageRootFromEntry(resolvedEntry, pkgName);
+        if (root) {
+          srcPkgDir = root;
         }
       }
     }
+  }
 
-    const destPkgDir = path.join(standaloneNodeModules, pkgName);
-    fs.mkdirSync(path.dirname(destPkgDir), { recursive: true });
-    if (exists(destPkgDir)) {
-      fs.rmSync(destPkgDir, { recursive: true, force: true });
-    }
-    try {
-      fs.cpSync(srcPkgDir, destPkgDir, { recursive: true, dereference: true });
-      console.log(`[resolve-standalone] Copied ${pkgName} into standalone node_modules.`);
-    } catch (err) {
-      console.error(`[resolve-standalone] Failed to copy ${pkgName}: ${err}`);
-      process.exit(1);
-    }
+  if (!exists(srcPkgDir)) {
+    console.warn(`  ⚠️ ${pkgName} (not found, may be optional)`);
+    continue;
+  }
 
-    if (!exists(path.join(destPkgDir, "package.json")) || !hasRequiredFiles(destPkgDir, checks)) {
-      console.error(`[resolve-standalone] ${pkgName} still missing after copy: ${destPkgDir}`);
-      process.exit(1);
-    }
+  // Copy package to standalone
+  const destPkgDir = path.join(standaloneNodeModules, pkgName);
+  fs.mkdirSync(path.dirname(destPkgDir), { recursive: true });
+  if (exists(destPkgDir)) {
+    fs.rmSync(destPkgDir, { recursive: true, force: true });
+  }
+  try {
+    fs.cpSync(srcPkgDir, destPkgDir, { recursive: true, dereference: true });
+    console.log(`  ✅ ${pkgName} (copied from project node_modules)`);
+  } catch (err) {
+    console.error(`  ❌ ${pkgName} failed to copy: ${err}`);
+    process.exit(1);
   }
 }
 
-ensurePackages(requiredPackages, tempDest);
+// =============================================================================
+// Step 7: 清理临时目录
+// =============================================================================
+console.log("[resolve-standalone] Cleaning up temp directory...");
+fs.rmSync(tempRuntimeDir, { recursive: true, force: true });
 
-if (isAutoFix) {
-  const missingPath = path.join(tempDest, ".missing-modules.json");
-  const verifyScript = path.join(projectRoot, "scripts", "verify-standalone.js");
-  spawnSync(
-    process.execPath,
-    [verifyScript, tempDest, "--write-missing", "--missing-output", missingPath],
-    { stdio: "inherit" }
-  );
-
-  if (exists(missingPath)) {
-    try {
-      const payload = JSON.parse(fs.readFileSync(missingPath, "utf-8"));
-      const missingPackages = Array.isArray(payload.missing) ? payload.missing : [];
-      if (missingPackages.length > 0) {
-        console.log(`[resolve-standalone] Auto-fix missing packages: ${missingPackages.join(", ")}`);
-        ensurePackages(missingPackages, tempDest);
-      }
-    } catch (err) {
-      console.warn(`[resolve-standalone] Failed to read missing list: ${err}`);
-    }
-  }
-}
-
-try {
-  fs.rmSync(src, { recursive: true, force: true });
-  fs.renameSync(tempDest, src);
-} catch (err) {
-  console.error(`[resolve-standalone] Swap failed: ${err}`);
-  process.exit(1);
-}
-
-console.log("[resolve-standalone] Standalone directory materialized successfully.");
+console.log("[resolve-standalone] Standalone directory physicalized successfully.");
