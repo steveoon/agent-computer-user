@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.16](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.15...v1.29.0-develop.16) (2026-02-02)
+
+
+### Bug Fixes
+
+* **electron:** use direct pnpm invocation instead of PATH lookup ([b636068](https://github.com/steveoon/agent-computer-user/commit/b636068a5d809b0c9be93526ec5e8f46bd19e0bd))
+
 # [1.29.0-develop.15](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.14...v1.29.0-develop.15) (2026-02-02)
 
 
