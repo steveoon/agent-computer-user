@@ -1,11 +1,14 @@
 import type { NextConfig } from "next";
 
 const isElectronBuild = process.env.ELECTRON_BUILD === "true";
+const isWindowsElectronBuild =
+  isElectronBuild &&
+  (process.platform === "win32" || process.env.ELECTRON_BUILD_PLATFORM === "win32");
 
 const nextConfig: NextConfig = {
   /* config options here */
   output: "standalone",
-  ...(isElectronBuild
+  ...(isWindowsElectronBuild
     ? {
         outputFileTracingIncludes: {
           "/*": [
@@ -18,6 +21,11 @@ const nextConfig: NextConfig = {
             "./node_modules/.pnpm/react-dom@*/node_modules/react-dom/**/*",
             "./node_modules/.pnpm/detect-libc@*/node_modules/detect-libc/**/*",
             "./node_modules/.pnpm/semver@*/node_modules/semver/**/*",
+            "./node_modules/.pnpm/sharp@*/node_modules/sharp/**/*",
+            "./node_modules/.pnpm/@img+sharp-win32-x64@*/node_modules/@img/sharp-win32-x64/**/*",
+            "./node_modules/.pnpm/@img+sharp-libvips-win32-x64@*/node_modules/@img/sharp-libvips-win32-x64/**/*",
+            "./node_modules/.pnpm/@img+sharp-win32-arm64@*/node_modules/@img/sharp-win32-arm64/**/*",
+            "./node_modules/.pnpm/@img+sharp-libvips-win32-arm64@*/node_modules/@img/sharp-libvips-win32-arm64/**/*",
             // React 相关
             "./node_modules/.pnpm/client-only@*/node_modules/client-only/**/*",
             "./node_modules/.pnpm/server-only@*/node_modules/server-only/**/*",

@@ -7,6 +7,7 @@
  * 用法: node scripts/verify-standalone.js [standalone-dir]
  */
 
+const fs = require("fs");
 const path = require("path");
 const Module = require("module");
 
@@ -16,11 +17,32 @@ if (process.platform !== "win32") {
   process.exit(0);
 }
 
-const standaloneDir = path.resolve(process.argv[2] || ".next/standalone");
+const argv = process.argv.slice(2);
+let standaloneDirArg = null;
+let writeMissing = false;
+let missingOutput = null;
+
+for (let i = 0; i < argv.length; i += 1) {
+  const arg = argv[i];
+  if (arg === "--write-missing") {
+    writeMissing = true;
+    continue;
+  }
+  if (arg === "--missing-output") {
+    missingOutput = argv[i + 1];
+    i += 1;
+    continue;
+  }
+  if (!standaloneDirArg) {
+    standaloneDirArg = arg;
+  }
+}
+
+const standaloneDir = path.resolve(standaloneDirArg || ".next/standalone");
 
 // 检查 standalone 目录是否存在
 try {
-  require("fs").accessSync(standaloneDir);
+  fs.accessSync(standaloneDir);
 } catch {
   console.error(`[verify-standalone] Standalone directory not found: ${standaloneDir}`);
   process.exit(1);
@@ -49,6 +71,7 @@ const entriesToVerify = [
   "react-dom/server.browser",
   "detect-libc",
   "semver/functions/coerce",
+  "sharp",
 ];
 
 console.log(`[verify-standalone] Verifying modules in: ${standaloneDir}\n`);
@@ -82,6 +105,22 @@ for (const entry of entriesToVerify) {
 console.log("");
 
 if (missing.length > 0) {
+  if (writeMissing) {
+    const outputPath =
+      missingOutput || path.join(standaloneDir, ".missing-modules.json");
+    const uniqueMissing = Array.from(
+      new Set(missing.map((item) => item.missing))
+    );
+    try {
+      fs.writeFileSync(
+        outputPath,
+        JSON.stringify({ missing: uniqueMissing, entries: missing }, null, 2)
+      );
+      console.error(`[verify-standalone] Missing list written to: ${outputPath}`);
+    } catch (err) {
+      console.error(`[verify-standalone] Failed to write missing list: ${err}`);
+    }
+  }
   console.error(`[verify-standalone] ❌ ${missing.length} module(s) failed verification:\n`);
   for (const { entry, missing: mod } of missing) {
     console.error(`  - ${entry} (needs: ${mod})`);
