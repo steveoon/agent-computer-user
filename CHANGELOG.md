@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.15](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.14...v1.29.0-develop.15) (2026-02-02)
+
+
+### Bug Fixes
+
+* **electron:** physicalize Windows standalone dependencies to eliminate symlink issues ([6a327fb](https://github.com/steveoon/agent-computer-user/commit/6a327fb9a97b9fef8a7c7dd4e3eda2bd2153323b))
+
 # [1.29.0-develop.14](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.13...v1.29.0-develop.14) (2026-02-02)
 
 
