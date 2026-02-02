@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.17](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.16...v1.29.0-develop.17) (2026-02-02)
+
+
+### Bug Fixes
+
+* **electron:** add detect-libc and semver to critical packages for Windows ([72087bf](https://github.com/steveoon/agent-computer-user/commit/72087bfd884d4868964ebab54c0e64e80a6bada9))
+
 # [1.29.0-develop.16](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.15...v1.29.0-develop.16) (2026-02-02)
 
 
