@@ -57,13 +57,14 @@ Manage multiple Agent instances with isolated browser sessions. See [MULTI_AGENT
 
 ### Core Application Structure
 
-Next.js 15 AI recruitment assistant platform with:
+Next.js 15 AI recruitment assistant platform with AI SDK v6:
 
 **Multi-Provider AI Integration:**
 - Primary: Anthropic Claude Sonnet for computer use
 - Secondary: Qwen models via `qwen-ai-provider` for smart reply
-- Supports OpenAI, Google AI, OpenRouter via AI SDK
+- Supports OpenAI, Google AI, OpenRouter (v2, native AI SDK v6 support) via AI SDK
 - Provider management: `lib/model-registry/`
+- Custom OpenRouter provider: `lib/model-registry/providers/openrouter-custom.ts` (Kimi K2 stream fix only)
 
 **Configuration Management:**
 - Unified Config Service (`lib/services/config.service.ts`) using LocalForage
@@ -206,10 +207,12 @@ DULIDAY_TOKEN, EXA_API_KEY
 - `toModelOutput` returns text-only (URL reference) to avoid context bloat
 - UI component reads `displayData` for image rendering
 
-### AI SDK Message Handling
+### AI SDK v6 Message Handling
 - Uses `message.parts` array (not `message.content` array)
 - Tool invocations in `part.toolInvocation` (not `part.toolCall`)
-- See `docs/AI_SDK_MESSAGE_MIGRATION.md`
+- See `docs/guides/ai-sdk/AI_SDK_MESSAGE_MIGRATION.md`
+- Full v6 migration guide: `docs/guides/ai-sdk/AI_SDK_V6_MIGRATION.md`
+- v6 features reference: `docs/guides/ai-sdk/AI_SDK_V6_FEATURES.md`
 
 ### Tool Component Architecture
 - Registry pattern in `components/tool-messages/`
@@ -320,6 +323,12 @@ catch (error) {
 - Run `npx tsc --noEmit` before committing
 - When tests fail, analyze business logic first (don't just modify tests to pass)
 
+### Known Peer Dependency Warnings
+
+- `qwen-ai-provider@0.1.0` requires `zod@^3` but project uses zod v4 — awaiting upstream update
+- `@tremor/react@3.x` requires `react@^18` but project uses React 19 — awaiting upstream update
+- These warnings do not affect runtime behavior
+
 ### Commit Convention
 
 Use conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
@@ -331,7 +340,7 @@ Use conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore
 - `generateText` / `streamText` API 使用和配置
 - Tool calling、structured output、streaming endpoints
 - Next.js Route Handlers (App Router) 中的 AI 端点
-- AI SDK 错误处理和类型问题
-- 从 v5 迁移到 v6 的模式
+- AI SDK v6 错误处理和类型问题
+- v6 的 ProviderV3 接口和 provider 集成
 
 **使用方式**: 当遇到上述场景时，使用 Skill tool 调用 `vercel-ai-sdk-v6.skill`
