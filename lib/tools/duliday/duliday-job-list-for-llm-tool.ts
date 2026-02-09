@@ -8,6 +8,12 @@ import { aiJobListResponseSchema, type AIJobItem } from "./ai-job-types";
 const API_URL = "https://k8s.duliday.com/persistence/ai/api/job/list";
 
 /**
+ * 固定分页参数
+ */
+const DEFAULT_PAGE_NUM = 1;
+const DEFAULT_PAGE_SIZE = 15;
+
+/**
  * 输入参数 Schema
  */
 const inputSchema = z.object({
@@ -26,8 +32,6 @@ const inputSchema = z.object({
     .optional()
     .default([])
     .describe('品牌别名列表，如 ["肯德基", "必胜客"]'),
-  pageNum: z.number().optional().default(1).describe("页码，从 1 开始"),
-  pageSize: z.number().optional().default(10).describe("每页数量，默认 10 条"),
 });
 
 /**
@@ -353,13 +357,11 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
 返回结构化的岗位信息，包含薪资、招聘要求、工作时间、面试安排等完整信息。
 适用于自动回复求职者场景，帮助 LLM 了解岗位详情以生成个性化回复。`,
     inputSchema,
-    execute: async ({ cityNameList, regionNameList, brandAliasList, pageNum, pageSize }) => {
+    execute: async ({ cityNameList, regionNameList, brandAliasList }) => {
       console.log("🔍 duliday_job_list_for_llm tool called with:", {
         cityNameList,
         regionNameList,
         brandAliasList,
-        pageNum,
-        pageSize,
       });
 
       try {
@@ -374,8 +376,8 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
 
         // 构建请求体
         const requestBody = {
-          pageNum,
-          pageSize,
+          pageNum: DEFAULT_PAGE_NUM,
+          pageSize: DEFAULT_PAGE_SIZE,
           cityNameList,
           regionNameList,
           brandAliasList,
@@ -436,7 +438,7 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
         }
 
         // 格式化为 Markdown
-        const markdown = formatJobsToMarkdown(jobs, total, pageNum, pageSize);
+        const markdown = formatJobsToMarkdown(jobs, total, DEFAULT_PAGE_NUM, DEFAULT_PAGE_SIZE);
 
         return {
           type: "text" as const,
