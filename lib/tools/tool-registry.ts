@@ -18,6 +18,7 @@ import { dulidayJobDetailsTool } from "./duliday/duliday-job-details-tool";
 import { dulidayInterviewBookingTool } from "./duliday/duliday-interview-booking-tool";
 import { dulidayBiReportTool } from "./duliday/bi-report-tool";
 import { dulidayBiRefreshTool } from "./duliday/bi-refresh-tool";
+import { dulidayJobListForLlmTool } from "./duliday/duliday-job-list-for-llm-tool";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import { ZhipinDataSchema } from "@/types/zhipin";
 
@@ -336,6 +337,15 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     category: "business",
     requiresSandbox: false,
     create: () => dulidayBiRefreshTool(),
+  }),
+
+  duliday_job_list_for_llm: createToolDefinition({
+    name: "duliday_job_list_for_llm",
+    description: "查询在招岗位列表（LLM优化格式），返回 Markdown 格式化的岗位信息，包含薪资、招聘要求、工作时间、面试安排等完整信息，适用于自动回复求职者场景",
+    category: "business",
+    requiresSandbox: false,
+    requiredContext: ["dulidayToken"],
+    create: ctx => dulidayJobListForLlmTool(ctx.dulidayToken),
   }),
 };
 
