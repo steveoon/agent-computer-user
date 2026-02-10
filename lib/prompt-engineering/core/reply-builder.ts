@@ -24,6 +24,8 @@ import { CellularMemoryManager } from "../memory/cellular-memory-manager";
 import { ReplyExampleRepository } from "../examples/reply-examples";
 // CandidateInfo 用于 ContextOptimizer 内部方法
 import type { CandidateInfo } from "@/lib/tools/zhipin/types";
+import type { ReplyPolicyConfig } from "@/types/config";
+import { stageToLegacyReplyType } from "@/lib/agents/types";
 
 // 类型已经在 @/types/context-engineering 中统一定义
 // 导出以保持向后兼容
@@ -52,8 +54,13 @@ class ContextOptimizer {
    * 优化上下文信息
    */
   optimizeContext(params: ReplyBuilderParams): StructuredContext {
+    const effectiveReplyType = params.classification?.replyType || stageToLegacyReplyType(params.stage);
     const conversationState: ConversationState = {
-      replyType: params.classification.replyType,
+      replyType: effectiveReplyType,
+      stage: params.stage,
+      subGoals: params.subGoals,
+      needs: params.needs,
+      riskFlags: params.riskFlags,
       urgency: this.detectUrgency(params.message),
       sentiment: this.detectSentiment(params.message),
     };
@@ -71,7 +78,7 @@ class ContextOptimizer {
 
     // 提取的事实
     const extractedFacts =
-      this.config.includeExtractedFacts && params.classification.extractedInfo
+      this.config.includeExtractedFacts && params.classification?.extractedInfo
         ? this.prioritizeExtractedFacts(params.classification.extractedInfo)
         : {};
 
@@ -363,6 +370,46 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
     this.contextOptimizer = new ContextOptimizer(config?.contextOptimizerConfig);
   }
 
+  private getEffectiveReplyType(params: ReplyBuilderParams): string {
+    return params.classification?.replyType || stageToLegacyReplyType(params.stage);
+  }
+
+  private buildPolicySystemSection(params: ReplyBuilderParams): string {
+    const policy = params.replyPolicy as ReplyPolicyConfig | undefined;
+    if (!policy || !params.stage) {
+      return "";
+    }
+
+    const stageGoal = policy.stageGoals[params.stage];
+    const voice = policy.industryVoices[params.industryVoiceId || policy.defaultIndustryVoiceId];
+
+    const lines = [
+      "[Policy]",
+      `- stage: ${params.stage}`,
+      `- stageGoal: ${stageGoal.primaryGoal}`,
+      `- successCriteria: ${stageGoal.successCriteria.join("；")}`,
+      `- ctaStrategy: ${stageGoal.ctaStrategy}`,
+      stageGoal.disallowedActions?.length
+        ? `- disallowedActions: ${stageGoal.disallowedActions.join("；")}`
+        : "",
+      `[Persona]`,
+      `- tone: ${policy.persona.tone}`,
+      `- warmth: ${policy.persona.warmth}`,
+      `- length: ${policy.persona.length}`,
+      `- empathy: ${policy.persona.empathyStrategy}`,
+      `[IndustryVoice]`,
+      voice
+        ? `- voice: ${voice.name} | background=${voice.industryBackground} | guidance=${voice.guidance.join("；")}`
+        : "- voice: none",
+      `[HardConstraints]`,
+      `- ${policy.hardConstraints.rules.map(rule => rule.rule).join("；")}`,
+      `[FactGate]`,
+      `- mode=${policy.factGate.mode} fallback=${policy.factGate.fallbackBehavior}`,
+    ].filter(Boolean);
+
+    return lines.join("\n");
+  }
+
   /**
    * 构建原子化系统提示
    */
@@ -417,6 +464,7 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
    */
   buildMolecularPrompt(_input: string, context: Record<string, unknown>): MolecularContext {
     const params = context as unknown as ReplyBuilderParams;
+    const effectiveReplyType = this.getEffectiveReplyType(params);
 
     // 加载对话历史到内存管理器
     if (params.conversationHistory.length > 0) {
@@ -429,7 +477,7 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
     // 获取相关示例（传递上下文信息以智能选择）
     const examples = this.exampleRepo.getSimilarExamples(
       params.message,
-      params.classification.replyType,
+      effectiveReplyType,
       this.config.maxExamples || 2,
       params.contextInfo
     );
@@ -451,10 +499,11 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
     maxExamples?: number
   ): Example[] {
     const params = context as unknown as ReplyBuilderParams;
+    const effectiveReplyType = this.getEffectiveReplyType(params);
 
     return this.exampleRepo.getSimilarExamples(
       input,
-      params.classification.replyType,
+      effectiveReplyType,
       maxExamples || this.config.maxExamples || 2,
       params.contextInfo
     );
@@ -469,9 +518,14 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
     const systemPrompt = this.formatAtomicPrompt(atomic);
 
     // 添加品牌信息到系统提示
-    const finalSystemPrompt = params.targetBrand
-      ? `${systemPrompt}\n\n[当前品牌]\n${params.targetBrand}`
-      : systemPrompt;
+    const policySection = this.buildPolicySystemSection(params);
+    const finalSystemPrompt = [
+      systemPrompt,
+      params.targetBrand ? `[当前品牌]\n${params.targetBrand}` : "",
+      policySection,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     // 构建分子提示
     const molecular = this.buildMolecularPrompt(
@@ -535,6 +589,18 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
 
     if (ctx.conversationState) {
       prompt += `- 对话类型: ${ctx.conversationState.replyType}\n`;
+      if (ctx.conversationState.stage) {
+        prompt += `- 阶段: ${ctx.conversationState.stage}\n`;
+      }
+      if (ctx.conversationState.subGoals?.length) {
+        prompt += `- 子目标: ${ctx.conversationState.subGoals.join("、")}\n`;
+      }
+      if (ctx.conversationState.needs?.length) {
+        prompt += `- Needs: ${ctx.conversationState.needs.join("、")}\n`;
+      }
+      if (ctx.conversationState.riskFlags?.length) {
+        prompt += `- 风险标记: ${ctx.conversationState.riskFlags.join("、")}\n`;
+      }
       prompt += `- 紧急程度: ${ctx.conversationState.urgency || "一般"}\n`;
       prompt += `- 情绪倾向: ${ctx.conversationState.sentiment || "中性"}\n`;
     }
@@ -604,6 +670,9 @@ export class ReplyPromptBuilder extends BasePromptBuilder {
     if (ctx.extractedFacts) {
       prompt += `[识别信息]\n`;
       prompt += `- 意图类型: ${ctx.conversationState?.replyType}\n`;
+      if (ctx.conversationState?.stage) {
+        prompt += `- FunnelStage: ${ctx.conversationState.stage}\n`;
+      }
 
       const facts = ctx.extractedFacts;
       if (facts.hasUrgency) prompt += `- 紧急需求: 是\n`;

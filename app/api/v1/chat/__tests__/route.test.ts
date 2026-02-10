@@ -92,7 +92,7 @@ vi.mock("@/lib/tools/tool-registry", () => {
     zhipin_reply_generator: {
       name: "zhipin_reply_generator",
       requiresSandbox: false,
-      requiredContext: ["configData", "replyPrompts"],
+      requiredContext: ["configData", "replyPolicy"],
       create: vi.fn().mockReturnValue({}),
     },
   };
@@ -113,13 +113,13 @@ vi.mock("@/lib/tools/tool-registry", () => {
 vi.mock("@/types/tool-common", () => ({
   safeCreateTool: vi.fn((toolDef, context, shouldThrow = false) => {
     // 模拟真实的验证逻辑：
-    // zhipin_reply_generator 需要 configData 和 replyPrompts
+    // zhipin_reply_generator 需要 configData 和 replyPolicy
     // computer 需要 sandboxId
 
     if (toolDef.name === "zhipin_reply_generator") {
-      if (!context?.configData || !context?.replyPrompts) {
+      if (!context?.configData || !context?.replyPolicy) {
         const error = new Error(
-          `工具 ${toolDef.name} 上下文验证失败：缺少 configData 或 replyPrompts`
+          `工具 ${toolDef.name} 上下文验证失败：缺少 configData 或 replyPolicy`
         );
         if (shouldThrow) {
           throw error;
@@ -206,7 +206,7 @@ describe("POST /api/v1/chat", () => {
         description: "Generate Zhipin reply",
         category: "business" as const,
         requiresSandbox: false,
-        requiredContext: ["configData", "replyPrompts"],
+        requiredContext: ["configData", "replyPolicy"],
         contextSchemas: {
           // Mock ZhipinDataSchema - 简化版本用于测试
           configData: {
@@ -404,7 +404,7 @@ describe("POST /api/v1/chat", () => {
         allowedTools: ["zhipin_reply_generator"],
         contextStrategy: "error",
         context: {
-          // 缺少 configData 和 replyPrompts
+          // 缺少 configData 和 replyPolicy
         },
       });
 
@@ -461,7 +461,7 @@ describe("POST /api/v1/chat", () => {
         allowedTools: ["bash", "zhipin_reply_generator"],
         validateOnly: true,
         context: {
-          // zhipin_reply_generator 缺少 configData 和 replyPrompts
+          // zhipin_reply_generator 缺少 configData 和 replyPolicy
         },
       });
 
@@ -489,7 +489,7 @@ describe("POST /api/v1/chat", () => {
       expect(zhipinTool).toMatchObject({
         name: "zhipin_reply_generator",
         valid: false,
-        missingContext: expect.arrayContaining(["configData", "replyPrompts"]),
+        missingContext: expect.arrayContaining(["configData", "replyPolicy"]),
       });
     });
 
@@ -509,7 +509,7 @@ describe("POST /api/v1/chat", () => {
       expect(data.tools[0]).toMatchObject({
         name: "zhipin_reply_generator",
         valid: false,
-        missingContext: expect.arrayContaining(["configData", "replyPrompts"]),
+        missingContext: expect.arrayContaining(["configData", "replyPolicy"]),
       });
     });
   });

@@ -5,6 +5,12 @@
 
 import { z } from 'zod/v3';
 import { MessageClassificationSchema, type ReplyContext } from "./zhipin";
+import {
+  ReplyPolicyConfigSchema,
+  FunnelStageSchema,
+  ReplyNeedSchema,
+  RiskFlagSchema,
+} from "./reply-policy";
 // 使用来自lib/tools/zhipin/types的CandidateInfo，因为这是整个项目实际使用的版本
 import { CandidateInfoSchema } from "@/lib/tools/zhipin/types";
 
@@ -127,6 +133,10 @@ export type Example = z.infer<typeof ExampleSchema>;
  */
 export const ConversationStateSchema = z.object({
   replyType: z.string(),
+  stage: FunnelStageSchema.optional(),
+  subGoals: z.array(z.string()).optional(),
+  needs: z.array(ReplyNeedSchema).optional(),
+  riskFlags: z.array(RiskFlagSchema).optional(),
   sentiment: z.enum(["positive", "neutral", "negative"]).optional(),
   urgency: z.enum(["high", "medium", "low"]).optional(),
 });
@@ -383,6 +393,15 @@ export const ClassificationParamsSchema = z.object({
   message: z.string(),
   conversationHistory: z.array(z.string()).optional(),
   contextInfo: z.string().optional(), // 业务上下文信息，用于更准确的分类
+  planning: z
+    .object({
+      stage: FunnelStageSchema,
+      subGoals: z.array(z.string()).optional(),
+      needs: z.array(ReplyNeedSchema).optional(),
+      riskFlags: z.array(RiskFlagSchema).optional(),
+      confidence: z.number().min(0).max(1).optional(),
+    })
+    .optional(),
   brandData: z
     .object({
       city: z.string(),
@@ -402,12 +421,18 @@ export type ClassificationParams = z.infer<typeof ClassificationParamsSchema>;
 export const ReplyBuilderParamsSchema = z.object({
   message: z.string(),
   classification: MessageClassificationSchema, // 使用具体的 MessageClassificationSchema
+  stage: FunnelStageSchema.optional(),
+  subGoals: z.array(z.string()).optional(),
+  needs: z.array(ReplyNeedSchema).optional(),
+  riskFlags: z.array(RiskFlagSchema).optional(),
   contextInfo: z.string(),
   systemInstruction: z.string(),
   conversationHistory: z.array(z.string()),
   candidateInfo: CandidateInfoSchema.optional(),
   targetBrand: z.string().optional(), // 解析后的品牌（经过冲突解析）
   defaultWechatId: z.string().optional(), // 默认微信号
+  replyPolicy: ReplyPolicyConfigSchema.optional(),
+  industryVoiceId: z.string().optional(),
 });
 
 export type ReplyBuilderParams = z.infer<typeof ReplyBuilderParamsSchema>;

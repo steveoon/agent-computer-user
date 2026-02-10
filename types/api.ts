@@ -6,7 +6,12 @@
 import { z } from 'zod/v3';
 import type { UIMessage } from "ai";
 import type { ModelConfig } from "@/lib/config/models";
-import type { ZhipinData, SystemPromptsConfig, ReplyPromptsConfig, BrandPriorityStrategy } from "./index";
+import type {
+  ZhipinData,
+  SystemPromptsConfig,
+  ReplyPolicyConfig,
+  BrandPriorityStrategy,
+} from "./index";
 import type { OpenApiPromptType } from "@/lib/tools/tool-registry";
 import { BrandPriorityStrategySchema } from "./config";
 
@@ -31,7 +36,8 @@ export const ChatRequestBodySchema = z.object({
   modelConfig: z.unknown().optional(), // ModelConfig - 来自 lib/config/models
   configData: z.unknown().optional(), // ZhipinData
   systemPrompts: z.unknown().optional(), // SystemPromptsConfig
-  replyPrompts: z.unknown().optional(), // ReplyPromptsConfig
+  replyPolicy: z.unknown().optional(), // ReplyPolicyConfig
+  industryVoiceId: z.string().optional(),
   activeSystemPrompt: z.string().optional(), // keyof SystemPromptsConfig
   dulidayToken: z.string().optional(),
   defaultWechatId: z.string().optional(), // 默认微信号
@@ -54,7 +60,8 @@ export interface ChatRequestBody {
   modelConfig?: ModelConfig;
   configData?: ZhipinData;
   systemPrompts?: SystemPromptsConfig;
-  replyPrompts?: ReplyPromptsConfig;
+  replyPolicy?: ReplyPolicyConfig;
+  industryVoiceId?: string;
   activeSystemPrompt?: keyof SystemPromptsConfig;
   dulidayToken?: string;
   defaultWechatId?: string; // 默认微信号
@@ -110,7 +117,8 @@ export interface TestLLMReplyRequestBody {
   }>;
   modelConfig?: ModelConfig;
   configData?: ZhipinData;
-  replyPrompts?: ReplyPromptsConfig;
+  replyPolicy?: ReplyPolicyConfig;
+  industryVoiceId?: string;
 }
 
 /**
@@ -313,7 +321,8 @@ export const OpenChatRequestSchema = z.object({
       modelConfig: z.unknown().optional(),
       configData: z.unknown().optional(),
       systemPrompts: z.record(z.string(), z.string()).optional().describe("系统提示词映射"),
-      replyPrompts: z.unknown().optional(),
+      replyPolicy: z.unknown().optional(),
+      industryVoiceId: z.string().optional(),
       dulidayToken: z.string().optional(),
       defaultWechatId: z.string().optional(),
     })
@@ -366,7 +375,8 @@ export interface OpenChatRequest {
     modelConfig?: ModelConfig;
     configData?: ZhipinData;
     systemPrompts?: Record<string, string>;
-    replyPrompts?: ReplyPromptsConfig;
+    replyPolicy?: ReplyPolicyConfig;
+    industryVoiceId?: string;
     dulidayToken?: string;
     defaultWechatId?: string;
   };

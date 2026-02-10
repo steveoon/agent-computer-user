@@ -89,7 +89,7 @@ export default function AdminSettingsPage() {
     loading,
     error,
     updateBrandData,
-    updateReplyPrompts,
+    updateReplyPolicy,
     updateSystemPrompts,
     updateActiveSystemPrompt,
     updateBrandPriorityStrategy,
@@ -369,21 +369,21 @@ export default function AdminSettingsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {config?.replyPrompts ? Object.keys(config.replyPrompts).length : 0}
+                    {config?.replyPolicy ? Object.keys(config.replyPolicy).length : 0}
                   </div>
                   <p className="text-xs text-muted-foreground">个智能回复模板</p>
                   <div className="mt-3 flex flex-wrap gap-1">
-                    {config?.replyPrompts &&
-                      Object.keys(config.replyPrompts)
+                    {config?.replyPolicy &&
+                      Object.keys(config.replyPolicy)
                         .slice(0, 3)
                         .map(key => (
                           <Badge key={key} variant="outline" className="text-xs bg-white/30">
                             {key}
                           </Badge>
                         ))}
-                    {config?.replyPrompts && Object.keys(config.replyPrompts).length > 3 && (
+                    {config?.replyPolicy && Object.keys(config.replyPolicy).length > 3 && (
                       <Badge variant="secondary" className="text-xs bg-white/50 hover:bg-white/70">
-                        +{Object.keys(config.replyPrompts).length - 3} 更多
+                        +{Object.keys(config.replyPolicy).length - 3} 更多
                       </Badge>
                     )}
                   </div>
@@ -481,7 +481,7 @@ export default function AdminSettingsPage() {
 
           {/* 回复指令编辑 */}
           <TabsContent value="reply-prompts">
-            <PromptsEditor data={config?.replyPrompts} onSave={updateReplyPrompts} />
+            <PromptsEditor data={config?.replyPolicy} onSave={updateReplyPolicy} />
           </TabsContent>
         </Tabs>
       </div>

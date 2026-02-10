@@ -20,6 +20,7 @@ import { dulidayBiReportTool } from "./duliday/bi-report-tool";
 import { dulidayBiRefreshTool } from "./duliday/bi-refresh-tool";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import { ZhipinDataSchema } from "@/types/zhipin";
+import { ReplyPolicyConfigSchema } from "@/types/reply-policy";
 
 // Import types from centralized location
 import type {
@@ -54,7 +55,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
         ctx.preferredBrand || "",
         ctx.modelConfig || DEFAULT_MODEL_CONFIG,
         ctx.configData,
-        ctx.replyPrompts,
+        ctx.replyPolicy,
         ctx.defaultWechatId
       );
     },
@@ -100,18 +101,20 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     description: "智聘智能回复生成器",
     category: "business",
     requiresSandbox: false,
-    requiredContext: ["configData", "replyPrompts"],
+    requiredContext: ["configData", "replyPolicy"],
     contextSchemas: {
       configData: ZhipinDataSchema,
+      replyPolicy: ReplyPolicyConfigSchema,
     },
     create: ctx =>
       zhipinReplyTool(
         ctx.preferredBrand,
         ctx.modelConfig || DEFAULT_MODEL_CONFIG,
         ctx.configData,
-        ctx.replyPrompts,
+        ctx.replyPolicy,
         ctx.defaultWechatId,
-        ctx.brandPriorityStrategy
+        ctx.brandPriorityStrategy,
+        ctx.industryVoiceId
       ),
   }),
 

@@ -8,6 +8,7 @@
 // ========== 核心构建器 ==========
 export { BasePromptBuilder } from "./core/base-prompt-builder";
 export { ClassificationPromptBuilder, classificationBuilder } from "./core/classification-builder";
+export { TurnPlanningPromptBuilder, planningBuilder } from "./core/planning-builder";
 export { ReplyPromptBuilder, replyBuilder } from "./core/reply-builder";
 
 // ========== 内存管理 ==========
@@ -54,6 +55,7 @@ export { DEFAULT_BUILDER_CONFIG } from "@/types/context-engineering";
 
 import { ClassificationPromptBuilder } from "./core/classification-builder";
 import { ReplyPromptBuilder } from "./core/reply-builder";
+import { TurnPlanningPromptBuilder } from "./core/planning-builder";
 import type { BuilderConfig } from "@/types/context-engineering";
 
 /**
@@ -68,6 +70,13 @@ export function createClassificationBuilder(config?: Partial<BuilderConfig>) {
  */
 export function createReplyBuilder(config?: Partial<BuilderConfig>) {
   return new ReplyPromptBuilder(config);
+}
+
+/**
+ * 创建回合规划提示构建器实例
+ */
+export function createPlanningBuilder(config?: Partial<BuilderConfig>) {
+  return new TurnPlanningPromptBuilder(config);
 }
 
 // ========== 预设配置 ==========

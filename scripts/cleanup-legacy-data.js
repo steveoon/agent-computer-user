@@ -53,16 +53,10 @@
       }
     }
 
-    // 清理 replyPrompts 中的 location_match
-    if (config.replyPrompts && "location_match" in config.replyPrompts) {
-      // 如果 location_inquiry 不存在，迁移数据
-      if (!config.replyPrompts.location_inquiry) {
-        config.replyPrompts.location_inquiry = config.replyPrompts.location_match;
-        console.log("✅ 已将 location_match 内容迁移到 location_inquiry");
-      }
-
-      delete config.replyPrompts.location_match;
-      console.log("✅ 已移除 replyPrompts.location_match");
+    // 清理旧版 replyPrompts 字段（v2.0.0 迁移为 replyPolicy）
+    if (config.replyPrompts && config.replyPolicy) {
+      delete config.replyPrompts;
+      console.log("✅ 已移除旧版 replyPrompts（已迁移至 replyPolicy）");
       hasChanges = true;
     }
 
@@ -71,7 +65,7 @@
       // 更新版本号和时间戳
       config.metadata = {
         ...config.metadata,
-        version: "1.1.2",
+        version: "2.0.0",
         lastUpdated: new Date().toISOString(),
         cleanedAt: new Date().toISOString(),
       };
@@ -84,7 +78,7 @@
       console.log("\n📈 清理完成统计:");
       console.log("- 品牌数量:", Object.keys(config.brandData.brands).length);
       console.log("- 门店数量:", config.brandData.stores.length);
-      console.log("- 回复指令数量:", Object.keys(config.replyPrompts).length);
+      console.log("- 回复策略阶段数:", config.replyPolicy?.stageGoals ? Object.keys(config.replyPolicy.stageGoals).length : "N/A");
       console.log("- 系统提示词数量:", Object.keys(config.systemPrompts).length);
 
       console.log("\n🎉 数据清理完成！请刷新页面以应用更改。");

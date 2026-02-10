@@ -10,7 +10,7 @@ import { generateSmartReply } from "@/lib/agents";
 import { activeConfig } from "./display-config";
 import type { Store } from "../../types/zhipin";
 import type { ModelConfig } from "../config/models";
-import type { ZhipinData, ReplyPromptsConfig } from "@/types";
+import type { ZhipinData, ReplyPolicyConfig } from "@/types";
 
 const wait = async (seconds: number) => {
   await new Promise(resolve => setTimeout(resolve, seconds * 1000));
@@ -548,7 +548,7 @@ export const computerTool = (
   preferredBrand: string,
   modelConfig: ModelConfig,
   configData?: ZhipinData,
-  replyPrompts?: ReplyPromptsConfig,
+  replyPolicy?: ReplyPolicyConfig,
   defaultWechatId?: string
 ) =>
   tool({
@@ -1128,12 +1128,13 @@ export const computerTool = (
               preferredBrand,
               modelConfig,
               configData: configData!, // 配置数据
-              replyPrompts, // 回复指令
+              replyPolicy, // 回复指令
               defaultWechatId, // 默认微信号
             });
 
             console.log(`📝 生成的回复内容: ${replyResult.suggestedReply}`);
-            console.log(`🎯 回复类型: ${replyResult.classification.replyType}`);
+            console.log(`🎯 阶段: ${replyResult.turnPlan.stage}`);
+            console.log(`📌 Needs: ${replyResult.turnPlan.needs.join("、") || "none"}`);
             console.log(`💬 候选人消息: ${candidate_message}`);
             console.log(`📝 对话历史: ${processedHistory.length}条消息`);
             console.log(`⚙️ 自动输入: ${auto_input ? "是" : "否"}`);
@@ -1145,7 +1146,9 @@ export const computerTool = (
               replyResult.suggestedReply
             }"\n\n📊 生成详情:\n• 候选人消息: ${
               candidate_message || "无"
-            }\n• 回复类型: ${replyResult.classification.replyType}\n• 对话历史: ${
+            }\n• 阶段: ${replyResult.turnPlan.stage}\n• Needs: ${
+              replyResult.turnPlan.needs.join("、") || "none"
+            }\n• 对话历史: ${
               processedHistory.length
             }条消息\n• 使用数据: ${
               storeDatabase.stores.length

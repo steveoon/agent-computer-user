@@ -4,9 +4,10 @@ import React from "react";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { configService, migrateFromHardcodedData } from "@/lib/services/config.service";
-import type { AppConfigData, ZhipinData, ReplyPromptsConfig, SystemPromptsConfig, BrandPriorityStrategy } from "@/types";
+import type { AppConfigData, ZhipinData, ReplyPolicyConfig, SystemPromptsConfig, BrandPriorityStrategy } from "@/types";
 // 🔧 导入预定义的 Zod Schema，避免重复定义
 import { AppConfigDataSchema } from "@/types/config";
+import { ReplyPolicyConfigSchema } from "@/types/reply-policy";
 import { toast } from "sonner";
 
 interface ConfigState {
@@ -26,7 +27,7 @@ interface ConfigState {
       };
     }
   ) => Promise<void>;
-  updateReplyPrompts: (replyPrompts: ReplyPromptsConfig) => Promise<void>;
+  updateReplyPolicy: (replyPolicy: ReplyPolicyConfig) => Promise<void>;
   updateSystemPrompts: (systemPrompts: SystemPromptsConfig) => Promise<void>;
   updateActiveSystemPrompt: (promptType: keyof SystemPromptsConfig) => Promise<void>;
   updateBrandPriorityStrategy: (strategy: BrandPriorityStrategy) => Promise<void>;
@@ -75,7 +76,7 @@ const useConfigStore = create<ConfigState>()(
             brands: Object.keys(config.brandData?.brands || {}).length,
             stores: config.brandData?.stores?.length || 0,
             systemPrompts: Object.keys(config.systemPrompts || {}).length,
-            replyPrompts: Object.keys(config.replyPrompts || {}).length,
+            replyPolicy: Object.keys(config.replyPolicy || {}).length,
             version: config.metadata?.version || "unknown",
           });
 
@@ -143,7 +144,7 @@ const useConfigStore = create<ConfigState>()(
         }
       },
 
-      updateReplyPrompts: async (replyPrompts: ReplyPromptsConfig) => {
+      updateReplyPolicy: async (replyPolicy: ReplyPolicyConfig) => {
         const { config } = get();
         if (!config) {
           const errorMsg = "配置未加载，无法更新回复指令";
@@ -156,7 +157,7 @@ const useConfigStore = create<ConfigState>()(
           console.log("🔄 更新回复指令...");
           const updatedConfig: AppConfigData = {
             ...config,
-            replyPrompts,
+            replyPolicy,
             metadata: {
               ...config.metadata,
               lastUpdated: new Date().toISOString(),
@@ -166,12 +167,15 @@ const useConfigStore = create<ConfigState>()(
           await configService.saveConfig(updatedConfig);
           set({ config: updatedConfig, error: null });
 
-          const count = Object.keys(replyPrompts).length;
-          console.log("✅ 回复指令更新成功", { count });
+          const voiceCount = Object.keys(replyPolicy.industryVoices).length;
+          console.log("✅ 回复策略更新成功", {
+            stageCount: Object.keys(replyPolicy.stageGoals).length,
+            voiceCount,
+          });
 
           // 显示成功 toast 通知
-          toast.success("回复指令更新成功", {
-            description: `已保存 ${count} 个智能回复模板`,
+          toast.success("回复策略更新成功", {
+            description: `已保存 6 个阶段目标与 ${voiceCount} 个行业指纹`,
           });
         } catch (error) {
           console.error("❌ 回复指令更新失败:", error);
@@ -430,15 +434,15 @@ const useConfigStore = create<ConfigState>()(
           // 📊 额外的业务逻辑检查
           const brands = Object.keys(importedConfig.brandData.brands);
           const stores = importedConfig.brandData.stores;
-          const replyPrompts = Object.keys(
-            importedConfig.replyPrompts
-          ) as (keyof ReplyPromptsConfig)[];
+          const replyPolicy = Object.keys(
+            importedConfig.replyPolicy
+          ) as (keyof ReplyPolicyConfig)[];
           const systemPrompts = Object.keys(importedConfig.systemPrompts);
 
           console.log("📊 导入数据统计:", {
             brands: brands.length,
             stores: stores.length,
-            replyPrompts: replyPrompts.length,
+            replyPolicy: replyPolicy.length,
             systemPrompts: systemPrompts.length,
           });
 
@@ -450,34 +454,20 @@ const useConfigStore = create<ConfigState>()(
             throw new Error(`门店数据中引用了未定义的品牌: ${missingBrands.join(", ")}`);
           }
 
-          // 检查必要的回复指令
-          const requiredReplyPrompts: (keyof ReplyPromptsConfig)[] = [
-            "initial_inquiry",
-            "location_inquiry",
-            "no_location_match",
-            "salary_inquiry",
-            "schedule_inquiry",
-            "interview_request",
-            "age_concern",
-            "insurance_inquiry",
-            "followup_chat",
-            "general_chat",
-            "attendance_inquiry",
-            "flexibility_inquiry",
-            "attendance_policy_inquiry",
-            "work_hours_inquiry",
-            "availability_inquiry",
-            "part_time_support",
+          const policyValidation = ReplyPolicyConfigSchema.safeParse(importedConfig.replyPolicy);
+          if (!policyValidation.success) {
+            const issue = policyValidation.error.issues[0];
+            const path = issue?.path?.join(".") || "replyPolicy";
+            throw new Error(`replyPolicy 校验失败: ${path} - ${issue?.message || "格式错误"}`);
+          }
+
+          const resolvedVoice = importedConfig.replyPolicy.industryVoices[
+            importedConfig.replyPolicy.defaultIndustryVoiceId
           ];
-
-          const missingPrompts = requiredReplyPrompts.filter(prompt => {
-            const replyPromptsRecord = importedConfig.replyPrompts as Record<string, string>;
-            const promptValue = replyPromptsRecord[prompt];
-            return !promptValue || !promptValue.trim();
-          });
-
-          if (missingPrompts.length > 0) {
-            throw new Error(`缺少必要的回复指令: ${missingPrompts.join(", ")}`);
+          if (!resolvedVoice) {
+            throw new Error(
+              `defaultIndustryVoiceId=${importedConfig.replyPolicy.defaultIndustryVoiceId} 未在 industryVoices 中定义`
+            );
           }
 
           // 添加导入时间戳
@@ -496,14 +486,14 @@ const useConfigStore = create<ConfigState>()(
             brands: Object.keys(configWithTimestamp.brandData.brands).length,
             stores: configWithTimestamp.brandData.stores.length,
             systemPrompts: Object.keys(configWithTimestamp.systemPrompts).length,
-            replyPrompts: Object.keys(configWithTimestamp.replyPrompts).length,
+            industryVoices: Object.keys(configWithTimestamp.replyPolicy.industryVoices).length,
           };
 
           console.log("✅ 配置导入成功", stats);
 
           // 显示成功 toast 通知
           toast.success("配置导入成功", {
-            description: `已成功导入 ${stats.brands} 个品牌、${stats.stores} 家门店、${stats.systemPrompts} 个系统提示词和 ${stats.replyPrompts} 个回复指令`,
+            description: `已导入 ${stats.brands} 个品牌、${stats.stores} 家门店、${stats.systemPrompts} 个系统提示词和 ${stats.industryVoices} 个行业指纹`,
           });
         } catch (error) {
           console.error("❌ 配置导入失败:", error);

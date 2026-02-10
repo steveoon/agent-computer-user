@@ -129,7 +129,8 @@ export async function POST(req: Request) {
       brandPriorityStrategy: context.brandPriorityStrategy,
       modelConfig: effectiveModelConfig,
       configData: context.configData,
-      replyPrompts: context.replyPrompts,
+      replyPolicy: context.replyPolicy,
+      industryVoiceId: context.industryVoiceId,
       dulidayToken: context.dulidayToken,
       defaultWechatId: context.defaultWechatId,
     };

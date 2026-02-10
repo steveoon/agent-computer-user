@@ -31,7 +31,8 @@ export { ATTENDANCE_PATTERNS } from "./zhipin";
 // 从config.ts导出配置相关类型
 export type {
   SystemPromptsConfig,
-  ReplyPromptsConfig,
+  ReplyPolicyConfig,
+  LegacyReplyPromptsConfig,
   AppConfigData,
   ConfigService,
   ConfigManagerState,
@@ -39,6 +40,36 @@ export type {
 } from "./config";
 
 export { CONFIG_STORAGE_KEY, CONFIG_VERSION } from "./config";
+
+export type {
+  FunnelStage,
+  ReplyNeed,
+  RiskFlag,
+  TurnExtractedInfo,
+  TurnPlan,
+  StageGoalPolicy,
+  PersonaPolicy,
+  IndustryVoicePolicy,
+  HardConstraintRule,
+  HardConstraintsPolicy,
+  FactGatePolicy,
+} from "./reply-policy";
+
+export {
+  FunnelStageSchema,
+  ReplyNeedSchema,
+  RiskFlagSchema,
+  TurnExtractedInfoSchema,
+  TurnPlanSchema,
+  StageGoalPolicySchema,
+  PersonaPolicySchema,
+  IndustryVoicePolicySchema,
+  HardConstraintRuleSchema,
+  HardConstraintsPolicySchema,
+  FactGatePolicySchema,
+  ReplyPolicyConfigSchema,
+  DEFAULT_REPLY_POLICY,
+} from "./reply-policy";
 
 // 从 image-optimize-type.ts 导出图像优化相关类型（显式导出，避免 tree-shaking 问题）
 export type {

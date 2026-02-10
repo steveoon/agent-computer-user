@@ -4,15 +4,19 @@ import { Bot, AlertCircle, Zap } from "lucide-react";
 import { BaseToolMessage } from "./base-tool-message";
 import { themes, type ToolMessageProps } from "./types";
 import { useMemo } from "react";
-import { REPLY_TYPE_NAMES, type ReplyContext } from "@/types/zhipin";
 import { MatchedStoresCard } from "./matched-stores-card";
 import type { StoreWithDistance } from "@/types/geocoding";
+import type { FunnelStage, ReplyNeed, RiskFlag } from "@/types/reply-policy";
 
 /**
  * 工具输出类型（与 ZhipinReplyToolResult 对齐）
  */
 interface ZhipinReplyOutput {
   replyType?: string;
+  stage?: FunnelStage;
+  subGoals?: string[];
+  needs?: ReplyNeed[];
+  riskFlags?: RiskFlag[];
   reasoningText?: string;
   debugInfo?: {
     relevantStores: StoreWithDistance[];
@@ -31,6 +35,15 @@ interface ZhipinReplyOutput {
   };
 }
 
+const STAGE_LABELS: Record<FunnelStage, string> = {
+  trust_building: "建立信任",
+  private_channel: "转私域",
+  qualify_candidate: "候选匹配",
+  job_consultation: "岗位咨询",
+  interview_scheduling: "约面安排",
+  onboard_followup: "到岗回访",
+};
+
 export function ZhipinReplyToolMessage(props: ToolMessageProps) {
   const { input, state, output, isLatestMessage, status, messageId, partIndex } = props;
   const candidateMessage = input.candidate_message as string | undefined;
@@ -38,27 +51,34 @@ export function ZhipinReplyToolMessage(props: ToolMessageProps) {
   const includeStats = input.include_stats as boolean | undefined;
 
   // 从结果中提取分类信息、调试信息、错误和统计
-  const { replyType, reasoningText, matchedStores, error, usage, latencyMs } = useMemo(() => {
-    if (output && typeof output === "object" && "replyType" in output) {
-      const typedResult = output as ZhipinReplyOutput;
+  const { replyType, stage, needs, riskFlags, reasoningText, matchedStores, error, usage, latencyMs } =
+    useMemo(() => {
+      if (output && typeof output === "object") {
+        const typedResult = output as ZhipinReplyOutput;
+        return {
+          replyType: typedResult.replyType,
+          stage: typedResult.stage,
+          needs: typedResult.needs,
+          riskFlags: typedResult.riskFlags,
+          reasoningText: typedResult.reasoningText,
+          matchedStores: typedResult.debugInfo?.relevantStores,
+          error: typedResult.error,
+          usage: typedResult.usage,
+          latencyMs: typedResult.latencyMs,
+        };
+      }
       return {
-        replyType: typedResult.replyType,
-        reasoningText: typedResult.reasoningText,
-        matchedStores: typedResult.debugInfo?.relevantStores,
-        error: typedResult.error,
-        usage: typedResult.usage,
-        latencyMs: typedResult.latencyMs,
+        replyType: undefined,
+        stage: undefined,
+        needs: undefined,
+        riskFlags: undefined,
+        reasoningText: undefined,
+        matchedStores: undefined,
+        error: undefined,
+        usage: undefined,
+        latencyMs: undefined,
       };
-    }
-    return {
-      replyType: undefined,
-      reasoningText: undefined,
-      matchedStores: undefined,
-      error: undefined,
-      usage: undefined,
-      latencyMs: undefined,
-    };
-  }, [output]);
+    }, [output]);
 
   const details: string[] = [];
   if (candidateMessage) {
@@ -74,10 +94,19 @@ export function ZhipinReplyToolMessage(props: ToolMessageProps) {
   }
   if (includeStats) details.push("含统计");
 
-  // 添加分类信息到详情
-  if (replyType) {
-    const typeName = REPLY_TYPE_NAMES[replyType as ReplyContext] || replyType;
-    details.push(`🎯 ${typeName}`);
+  // 添加规划信息到详情
+  if (stage) {
+    details.push(`🎯 阶段: ${STAGE_LABELS[stage] || stage}`);
+  } else if (replyType) {
+    details.push(`🎯 类型: ${replyType}`);
+  }
+
+  if (needs && needs.length > 0) {
+    details.push(`📌 needs: ${needs.join("、")}`);
+  }
+
+  if (riskFlags && riskFlags.length > 0) {
+    details.push(`⚠️ 风险: ${riskFlags.join("、")}`);
   }
 
   // 添加错误标记到详情
@@ -119,11 +148,11 @@ export function ZhipinReplyToolMessage(props: ToolMessageProps) {
           </div>
         </div>
       )}
-      {/* 分类依据展示（仅在无错误时） */}
+      {/* 规划依据展示（仅在无错误时） */}
       {reasoningText && !error && state === "output-available" && (
         <div className="mt-2 ml-8 p-3 bg-gray-50 dark:bg-gray-800 rounded-md text-sm">
           <div className="flex items-start gap-2">
-            <span className="font-medium text-gray-600 dark:text-gray-400">📊 分类依据：</span>
+            <span className="font-medium text-gray-600 dark:text-gray-400">📊 规划依据：</span>
             <span className="text-gray-700 dark:text-gray-300 flex-1">{reasoningText}</span>
           </div>
         </div>

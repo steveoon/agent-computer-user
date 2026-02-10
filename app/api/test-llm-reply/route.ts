@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
       toolBrand,
       modelConfig,
       configData,
-      replyPrompts,
+      replyPolicy,
       conversationHistory,
     } = await request.json();
 
@@ -26,9 +26,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!replyPrompts) {
+    if (!replyPolicy) {
       return NextResponse.json(
-        { error: "缺少回复指令，请确保客户端正确传递 replyPrompts" },
+        { error: "缺少回复策略，请确保客户端正确传递 replyPolicy" },
         { status: 400 }
       );
     }
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     console.log("✅ test-llm-reply API: 使用客户端传递的配置数据", {
       brands: Object.keys(configData.brands),
       stores: configData.stores.length,
-      replyPromptsCount: Object.keys(replyPrompts).length,
+      hasReplyPolicy: !!replyPolicy,
     });
 
     // 调用新的 Agent-based 智能回复生成函数
@@ -51,14 +51,16 @@ export async function POST(request: NextRequest) {
         providerConfigs: modelConfig?.providerConfigs || DEFAULT_PROVIDER_CONFIGS,
       },
       configData,
-      replyPrompts,
+      replyPolicy,
     });
 
     return NextResponse.json({
       success: true,
       reply: result.suggestedReply,
-      replyType: result.classification.replyType,
-      reasoningText: result.classification.reasoningText,
+      stage: result.turnPlan.stage,
+      needs: result.turnPlan.needs,
+      riskFlags: result.turnPlan.riskFlags,
+      reasoningText: result.turnPlan.reasoningText,
       debugInfo: result.debugInfo,
       contextInfo: result.contextInfo,
       confidence: result.confidence,

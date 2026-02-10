@@ -2,15 +2,20 @@
  * Agents 模块统一导出
  *
  * 智能回复管道：
- * - classifyMessage: 消息分类（使用 generateText）
- * - generateSmartReply: 智能回复生成（分类 → 上下文 → 回复）
+ * - planTurn / classifyMessage: 回合规划（Policy-First）
+ * - generateSmartReply: 智能回复生成（规划 → needs上下文 → 回复）
  *
  * 架构说明：
  * 这是确定性的顺序管道，不是代理工作流，因此不使用 ToolLoopAgent。
  */
 
-// ========== Classification ==========
-export { classifyMessage, type ClassificationOutput } from "./classification-agent";
+// ========== Turn Planning ==========
+export {
+  planTurn,
+  classifyMessage,
+  type ClassificationOutput,
+  type TurnPlanningOutput,
+} from "./classification-agent";
 
 // ========== Smart Reply ==========
 export {
@@ -28,6 +33,8 @@ export {
   ModelConfigSchema,
   ClassificationOptionsSchema,
   BrandDataSchema,
+  // Utils
+  stageToLegacyReplyType,
   // Types
   type ProviderConfigs,
   type BrandData,

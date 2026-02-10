@@ -24,10 +24,12 @@ describe("GET /api/v1/config-schema", () => {
 
     // 验证所有必需字段
     expect(context).toHaveProperty("preferredBrand");
+    expect(context).toHaveProperty("brandPriorityStrategy");
     expect(context).toHaveProperty("modelConfig");
     expect(context).toHaveProperty("configData");
     expect(context).toHaveProperty("systemPrompts");
-    expect(context).toHaveProperty("replyPrompts");
+    expect(context).toHaveProperty("replyPolicy");
+    expect(context).toHaveProperty("industryVoiceId");
     expect(context).toHaveProperty("dulidayToken");
     expect(context).toHaveProperty("defaultWechatId");
   });
@@ -117,10 +119,12 @@ describe("GET /api/v1/config-schema", () => {
       // 预期的字段列表（与 OpenChatRequestSchema.shape.context.shape 保持一致）
       const expectedFields = [
         "preferredBrand",
+        "brandPriorityStrategy",
         "modelConfig",
         "configData",
         "systemPrompts",
-        "replyPrompts",
+        "replyPolicy",
+        "industryVoiceId",
         "dulidayToken",
         "defaultWechatId",
       ];
@@ -139,10 +143,12 @@ describe("GET /api/v1/config-schema", () => {
       // 预期的字段列表（与 OpenChatRequestSchema.shape.context.shape 保持一致）
       const expectedFields = [
         "preferredBrand",
+        "brandPriorityStrategy",
         "modelConfig",
         "configData",
         "systemPrompts",
-        "replyPrompts",
+        "replyPolicy",
+        "industryVoiceId",
         "dulidayToken",
         "defaultWechatId",
       ];

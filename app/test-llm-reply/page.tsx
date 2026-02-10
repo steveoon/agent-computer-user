@@ -11,6 +11,7 @@ import { useConfigDataForChat } from "@/hooks/useConfigDataForChat";
 import { Button } from "@/components/ui/button";
 import type { MessageClassification } from "@/types/zhipin";
 import type { StoreWithDistance } from "@/types/geocoding";
+import type { FunnelStage, ReplyNeed, RiskFlag } from "@/types/reply-policy";
 
 // Components
 import { ModelConfigCard } from "./components/model-config-card";
@@ -25,14 +26,16 @@ export default function TestLLMReplyPage() {
   const { classifyModel, replyModel, providerConfigs } = useModelConfig();
   const {
     configData,
-    replyPrompts,
+    replyPolicy,
     isLoading: configLoading,
     error: configError,
   } = useConfigDataForChat();
   const [message, setMessage] = useState("");
   const [toolBrand, setToolBrand] = useState(""); // 🆕 模拟工具识别的品牌
   const [reply, setReply] = useState("");
-  const [replyType, setReplyType] = useState("");
+  const [stage, setStage] = useState<FunnelStage | "">("");
+  const [needs, setNeeds] = useState<ReplyNeed[]>([]);
+  const [riskFlags, setRiskFlags] = useState<RiskFlag[]>([]);
   const [reasoning, setReasoning] = useState("");
   const [debugInfo, setDebugInfo] = useState<{
     relevantStores: StoreWithDistance[];
@@ -89,7 +92,7 @@ export default function TestLLMReplyPage() {
       return;
     }
 
-    if (!configData || !replyPrompts) {
+    if (!configData || !replyPolicy) {
       setError("配置数据未加载，请刷新页面重试");
       return;
     }
@@ -97,7 +100,9 @@ export default function TestLLMReplyPage() {
     setLoading(true);
     setError("");
     setReply("");
-    setReplyType("");
+    setStage("");
+    setNeeds([]);
+    setRiskFlags([]);
     setReasoning("");
     setDebugInfo(null); // 重置调试信息
     setContextInfo(""); // 重置上下文信息
@@ -118,7 +123,7 @@ export default function TestLLMReplyPage() {
             providerConfigs,
           },
           configData, // 🔧 传递配置数据
-          replyPrompts, // 🔧 传递回复指令
+          replyPolicy, // 🔧 传递回复策略
           conversationHistory, // 传递对话历史
         }),
       });
@@ -131,7 +136,9 @@ export default function TestLLMReplyPage() {
       // 确保只存储文本内容，避免渲染对象
       const replyText = typeof data.reply === "string" ? data.reply : data.reply?.text || "";
       setReply(replyText);
-      setReplyType(data.replyType || "");
+      setStage(data.stage || "");
+      setNeeds(Array.isArray(data.needs) ? data.needs : []);
+      setRiskFlags(Array.isArray(data.riskFlags) ? data.riskFlags : []);
       setReasoning(data.reasoningText || "");
       if (data.debugInfo) {
         setDebugInfo(data.debugInfo);
@@ -228,7 +235,9 @@ export default function TestLLMReplyPage() {
             {/* 结果展示区 */}
             <ReplyResult
               reply={reply}
-              replyType={replyType}
+              stage={stage}
+              needs={needs}
+              riskFlags={riskFlags}
               reasoning={reasoning}
               debugInfo={debugInfo}
               contextInfo={contextInfo}

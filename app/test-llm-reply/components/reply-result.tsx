@@ -2,7 +2,8 @@ import { Bot, Zap, Bug, RotateCw, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { REPLY_TYPE_NAMES, type ReplyContext, type MessageClassification } from "@/types/zhipin";
+import type { MessageClassification } from "@/types/zhipin";
+import type { FunnelStage, ReplyNeed, RiskFlag } from "@/types/reply-policy";
 import type { StoreWithDistance } from "@/types/geocoding";
 import { MatchedStoresCard } from "@/components/tool-messages/matched-stores-card";
 
@@ -15,7 +16,9 @@ interface DebugInfo {
 
 interface ReplyResultProps {
   reply: string;
-  replyType: string;
+  stage: FunnelStage | "";
+  needs: ReplyNeed[];
+  riskFlags: RiskFlag[];
   reasoning: string;
   debugInfo: DebugInfo | null;
   contextInfo: string;
@@ -26,7 +29,9 @@ interface ReplyResultProps {
 
 export function ReplyResult({
   reply,
-  replyType,
+  stage,
+  needs,
+  riskFlags,
   reasoning,
   debugInfo,
   contextInfo,
@@ -77,29 +82,40 @@ export function ReplyResult({
         </CardContent>
       </Card>
 
-      {/* 分类分析 */}
-      {(replyType || reasoning) && (
+      {/* 回合规划 */}
+      {(stage || reasoning || needs.length > 0 || riskFlags.length > 0) && (
         <Card className="glass-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-base text-blue-700 flex items-center gap-2">
               <Zap className="w-4 h-4" />
-              意图分析
+              回合规划
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
-            {replyType && (
+            {stage && (
               <div className="bg-blue-50/50 p-3 rounded border border-blue-100">
-                <span className="font-medium text-blue-700 block mb-1">识别意图类型</span>
-                <span className="text-gray-700">
-                  {REPLY_TYPE_NAMES[replyType as ReplyContext] || replyType}
-                  <span className="text-xs text-blue-400 ml-2 font-mono">({replyType})</span>
-                </span>
+                <span className="font-medium text-blue-700 block mb-1">阶段</span>
+                <span className="text-gray-700">{stage}</span>
+              </div>
+            )}
+
+            {needs.length > 0 && (
+              <div className="bg-blue-50/50 p-3 rounded border border-blue-100">
+                <span className="font-medium text-blue-700 block mb-1">Needs</span>
+                <span className="text-gray-700">{needs.join("、")}</span>
+              </div>
+            )}
+
+            {riskFlags.length > 0 && (
+              <div className="bg-blue-50/50 p-3 rounded border border-blue-100">
+                <span className="font-medium text-blue-700 block mb-1">风险标记</span>
+                <span className="text-gray-700">{riskFlags.join("、")}</span>
               </div>
             )}
 
             {reasoning && (
               <div className="bg-white/50 p-3 rounded border border-gray-100">
-                <span className="font-medium text-gray-700 block mb-1">推理依据</span>
+                <span className="font-medium text-gray-700 block mb-1">规划依据</span>
                 <span className="text-gray-600 leading-relaxed">{reasoning}</span>
               </div>
             )}

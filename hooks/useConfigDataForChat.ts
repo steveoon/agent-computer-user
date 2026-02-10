@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { configService } from "@/lib/services/config.service";
-import type { ZhipinData, SystemPromptsConfig, ReplyPromptsConfig, BrandPriorityStrategy } from "@/types";
+import type { ZhipinData, SystemPromptsConfig, ReplyPolicyConfig, BrandPriorityStrategy } from "@/types";
 
 interface ConfigDataForChat {
   configData: ZhipinData | null;
   systemPrompts: SystemPromptsConfig | null;
-  replyPrompts: ReplyPromptsConfig | null;
+  replyPolicy: ReplyPolicyConfig | null;
   activeSystemPrompt: keyof SystemPromptsConfig;
   brandPriorityStrategy: BrandPriorityStrategy;
   isLoading: boolean;
@@ -20,7 +20,7 @@ export function useConfigDataForChat(): ConfigDataForChat {
   const [state, setState] = useState<ConfigDataForChat>({
     configData: null,
     systemPrompts: null,
-    replyPrompts: null,
+    replyPolicy: null,
     activeSystemPrompt: "bossZhipinSystemPrompt",
     brandPriorityStrategy: "smart",
     isLoading: true,
@@ -42,7 +42,7 @@ export function useConfigDataForChat(): ConfigDataForChat {
         console.log("✅ 配置数据加载完成", {
           hasBrandData: !!config.brandData,
           hasSystemPrompts: !!config.systemPrompts,
-          hasReplyPrompts: !!config.replyPrompts,
+          hasReplyPolicy: !!config.replyPolicy,
           activeSystemPrompt: config.activeSystemPrompt,
           brandPriorityStrategy: config.brandPriorityStrategy,
         });
@@ -50,7 +50,7 @@ export function useConfigDataForChat(): ConfigDataForChat {
         setState({
           configData: config.brandData,
           systemPrompts: config.systemPrompts,
-          replyPrompts: config.replyPrompts,
+          replyPolicy: config.replyPolicy,
           activeSystemPrompt: config.activeSystemPrompt || "bossZhipinSystemPrompt",
           brandPriorityStrategy: config.brandPriorityStrategy || "smart",
           isLoading: false,

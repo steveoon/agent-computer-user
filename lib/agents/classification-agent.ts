@@ -1,105 +1,146 @@
 /**
- * Classification Agent
+ * Turn Planner Agent
  *
- * 使用 AI SDK v6 的 generateText 实现消息分类
- * 替代原有的 classifyUserMessage() 函数
- *
- * 核心价值:
- * - generateText 自动将 Zod enum 转换为 JSON Schema 约束
- * - 支持不具备 structuredOutputs 的模型（如 DeepSeek）
- * - 与原有 zhipin-data.loader.ts 中的分类逻辑行为一致
- *
- * 注意: 不使用 ToolLoopAgent + Output.object()，因为当模型不支持
- * structuredOutputs 时，Output.object() 不会将 enum 约束传递给模型
+ * Policy-First 模式下的回合规划器：
+ * - 输出 stage / subGoals / needs / riskFlags
+ * - 保留 extractedInfo 供后续门店过滤使用
+ * - 规则层先触发 needs，LLM 仅可追加
  */
 
 import { z } from "zod/v3";
 import { getDynamicRegistry } from "@/lib/model-registry/dynamic-registry";
 import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS, type ModelId } from "@/lib/config/models";
-import { ClassificationPromptBuilder } from "@/lib/prompt-engineering";
-import { ReplyContextSchema, MessageClassificationSchema } from "@/types/zhipin";
 import { safeGenerateObject } from "@/lib/ai";
+import { type MessageClassification } from "@/types/zhipin";
+import {
+  TurnPlanSchema,
+  type TurnPlan,
+  type ReplyNeed,
+  type FunnelStage,
+} from "@/types/reply-policy";
 import {
   ClassificationOptionsSchema,
   BrandDataSchema,
+  stageToLegacyReplyType,
   type ProviderConfigs,
   type ClassificationOptions,
 } from "./types";
 
-// ========== Schema 定义 ==========
-
-/**
- * 分类输出 Schema
- * 与现有 MessageClassificationSchema 对齐
- *
- * 使用 ReplyContextSchema (z.enum) 确保 replyType 只能是 16 种有效值之一
- * generateText 会自动将此 enum 转换为 JSON Schema 约束传递给模型
- *
- * 注意：使用 .nullable() 而非 .optional()
- * OpenAI structuredOutputs 严格模式要求所有属性都在 required 数组中
- * .optional() 会导致属性不在 required 中，从而报错
- * .nullable() 保证属性必须存在，但值可以是 null
- */
-const ClassificationOutputSchema = z.object({
-  replyType: ReplyContextSchema.describe("回复类型分类"),
-  extractedInfo: z
-    .object({
-      mentionedBrand: z.string().nullable().describe("提到的品牌名称，没有则为 null"),
-      city: z.string().nullable().describe("提到的工作城市，没有则为 null"),
-      mentionedLocations: z
-        .array(
-          z.object({
-            location: z.string().describe("地点名称"),
-            confidence: z.number().min(0).max(1).describe("地点识别置信度 0-1"),
-          })
-        )
-        .max(10)
-        .nullable()
-        .describe("提到的具体位置（按置信度排序，最多10个），没有则为 null"),
-      mentionedDistricts: z
-        .array(
-          z.object({
-            district: z.string().describe("区域名称"),
-            confidence: z.number().min(0).max(1).describe("区域识别置信度 0-1"),
-          })
-        )
-        .max(10)
-        .nullable()
-        .describe("提到的区域（按置信度排序，最多10个），没有则为 null"),
-      specificAge: z.number().nullable().describe("提到的具体年龄，没有则为 null"),
-      hasUrgency: z.boolean().nullable().describe("是否表达紧急需求，无法判断则为 null"),
-      preferredSchedule: z.string().nullable().describe("偏好的工作时间，没有则为 null"),
-    })
-    .describe("从消息中提取的关键信息"),
-  reasoningText: z.string().describe("分类依据和分析过程"),
+const TurnPlanningOutputSchema = z.object({
+  stage: TurnPlanSchema.shape.stage,
+  subGoals: TurnPlanSchema.shape.subGoals,
+  needs: TurnPlanSchema.shape.needs,
+  riskFlags: TurnPlanSchema.shape.riskFlags,
+  confidence: TurnPlanSchema.shape.confidence,
+  extractedInfo: TurnPlanSchema.shape.extractedInfo,
+  reasoningText: TurnPlanSchema.shape.reasoningText,
 });
 
-// ========== 便捷函数 ==========
+const NEED_RULES: Array<{ need: ReplyNeed; patterns: RegExp[] }> = [
+  { need: "salary", patterns: [/薪资|工资|时薪|底薪|提成|奖金|补贴|多少钱|收入/i] },
+  { need: "schedule", patterns: [/排班|班次|几点|上班|下班|工时|周末|节假日|做几天/i] },
+  { need: "policy", patterns: [/五险一金|社保|保险|合同|考勤|迟到|补班|试用期/i] },
+  { need: "availability", patterns: [/还有名额|空位|可用时段|什么时候能上|明天能面/i] },
+  { need: "location", patterns: [/在哪|位置|地址|附近|地铁|门店|哪个区|多远/i] },
+  { need: "stores", patterns: [/门店|哪家店|哪些店|有店吗/i] },
+  { need: "requirements", patterns: [/要求|条件|年龄|经验|学历|健康证|身高|体重/i] },
+  { need: "interview", patterns: [/面试|到店|约时间|约面/i] },
+  { need: "wechat", patterns: [/微信|vx|私聊|联系方式|加你/i] },
+];
 
-/**
- * 执行消息分类
- *
- * generateText 会自动将 Zod schema (包括 z.enum) 转换为 JSON Schema
- * 传递给模型，确保返回值符合约束
- *
- * @param message - 候选人消息
- * @param options - 分类选项
- * @returns 分类结果
- *
- * @example
- * ```typescript
- * const result = await classifyMessage("有什么工作吗？", {
- *   modelConfig: { classifyModel: "deepseek/deepseek-chat" },
- *   conversationHistory: [],
- *   brandData: { city: "上海", defaultBrand: "品牌A", availableBrands: ["品牌A"], storeCount: 10 },
- *   providerConfigs: { ... },
- * });
- * ```
- */
-export async function classifyMessage(
+function detectRuleNeeds(message: string, history: string[]): Set<ReplyNeed> {
+  const text = `${history.slice(-4).join(" ")} ${message}`;
+  const needs = new Set<ReplyNeed>();
+
+  for (const rule of NEED_RULES) {
+    if (rule.patterns.some(pattern => pattern.test(text))) {
+      needs.add(rule.need);
+    }
+  }
+
+  if (needs.size === 0) {
+    needs.add("none");
+  } else {
+    needs.delete("none");
+  }
+
+  return needs;
+}
+
+function sanitizePlan(plan: TurnPlan, ruleNeeds: Set<ReplyNeed>): TurnPlan {
+  const mergedNeeds = new Set<ReplyNeed>([...plan.needs, ...Array.from(ruleNeeds)]);
+  if (mergedNeeds.size > 1 && mergedNeeds.has("none")) {
+    mergedNeeds.delete("none");
+  }
+
+  return {
+    ...plan,
+    needs: Array.from(mergedNeeds),
+    confidence: Number.isFinite(plan.confidence) ? Math.max(0, Math.min(1, plan.confidence)) : 0.5,
+  };
+}
+
+function buildPlanningPrompt(
+  message: string,
+  history: string[],
+  brandData?: z.infer<typeof BrandDataSchema>
+): { system: string; prompt: string } {
+  const system = [
+    "你是招聘对话回合规划器，不直接回复候选人。",
+    "你只输出结构化规划结果，用于后续回复生成。",
+    "规划目标：确定阶段目标(stage)、子目标(subGoals)、事实需求(needs)、风险标记(riskFlags)。",
+  ].join("\n");
+
+  const prompt = [
+    "[阶段枚举]",
+    "- trust_building",
+    "- private_channel",
+    "- qualify_candidate",
+    "- job_consultation",
+    "- interview_scheduling",
+    "- onboard_followup",
+    "",
+    "[needs枚举]",
+    "- stores, location, salary, schedule, policy, availability, requirements, interview, wechat, none",
+    "",
+    "[riskFlags枚举]",
+    "- insurance_promise_risk, age_sensitive, confrontation_emotion, urgency_high, qualification_mismatch",
+    "",
+    "[规则]",
+    "- 优先判断本轮主阶段(stage)；subGoals 可多项。",
+    "- 候选人追问事实时，必须打开对应 needs。",
+    "- 不确定时 confidence 降低，不要臆断。",
+    "",
+    "[品牌数据]",
+    JSON.stringify(brandData || {}),
+    "",
+    "[历史对话]",
+    history.slice(-8).join("\n") || "无",
+    "",
+    "[候选人消息]",
+    message,
+  ].join("\n");
+
+  return { system, prompt };
+}
+
+
+function stageToFallbackNeeds(stage: FunnelStage): ReplyNeed[] {
+  const map: Record<FunnelStage, ReplyNeed[]> = {
+    trust_building: ["none"],
+    private_channel: ["wechat"],
+    qualify_candidate: ["requirements"],
+    job_consultation: ["salary", "schedule", "location"],
+    interview_scheduling: ["interview", "availability"],
+    onboard_followup: ["none"],
+  };
+  return map[stage];
+}
+
+export async function planTurn(
   message: string,
   options: Omit<ClassificationOptions, "candidateMessage"> & { providerConfigs?: ProviderConfigs }
-): Promise<z.infer<typeof MessageClassificationSchema>> {
+): Promise<TurnPlan> {
   const {
     providerConfigs = DEFAULT_PROVIDER_CONFIGS,
     modelConfig,
@@ -107,38 +148,76 @@ export async function classifyMessage(
     brandData,
   } = options;
 
-  // 创建动态 registry
   const registry = getDynamicRegistry(providerConfigs);
-
-  // 获取分类模型
-  const classifyModel = (modelConfig?.classifyModel ||
-    DEFAULT_MODEL_CONFIG.classifyModel) as ModelId;
-
-  // 构建分类提示
-  const classificationBuilder = new ClassificationPromptBuilder();
-  const prompts = classificationBuilder.build({
-    message,
-    conversationHistory,
-    brandData,
-  });
+  const classifyModel = (modelConfig?.classifyModel || DEFAULT_MODEL_CONFIG.classifyModel) as ModelId;
+  const prompts = buildPlanningPrompt(message, conversationHistory, brandData);
 
   const result = await safeGenerateObject({
     model: registry.languageModel(classifyModel),
-    schema: ClassificationOutputSchema,
-    schemaName: "ClassificationOutput",
+    schema: TurnPlanningOutputSchema,
+    schemaName: "TurnPlanningOutput",
     system: prompts.system,
     prompt: prompts.prompt,
   });
 
+  const ruleNeeds = detectRuleNeeds(message, conversationHistory);
+
   if (!result.success) {
-    // 抛出带有完整上下文的 AppError
-    throw result.error;
+    // 降级：返回可执行的最小规划
+    return {
+      stage: "trust_building",
+      subGoals: ["保持对话并澄清需求"],
+      needs: Array.from(ruleNeeds),
+      riskFlags: [],
+      confidence: 0.35,
+      extractedInfo: {
+        mentionedBrand: null,
+        city: brandData?.city || null,
+        mentionedLocations: null,
+        mentionedDistricts: null,
+        specificAge: null,
+        hasUrgency: null,
+        preferredSchedule: null,
+      },
+      reasoningText: "规划模型失败，使用规则降级策略",
+    };
   }
 
-  return result.data;
+  return sanitizePlan(result.data, ruleNeeds);
 }
 
-// ========== 类型导出 ==========
+/**
+ * 兼容接口：旧路径的 classifyMessage
+ * 运行时主路径应使用 planTurn。
+ */
+export async function classifyMessage(
+  message: string,
+  options: Omit<ClassificationOptions, "candidateMessage"> & { providerConfigs?: ProviderConfigs }
+): Promise<MessageClassification> {
+  const plan = await planTurn(message, options);
+  const replyType = stageToLegacyReplyType(plan.stage);
+  const needs = plan.needs.length > 0 ? plan.needs : stageToFallbackNeeds(plan.stage);
 
-export type ClassificationOutput = z.infer<typeof ClassificationOutputSchema>;
+  const riskHints = plan.riskFlags.join("、");
+  const needHints = needs.join("、");
+
+  return {
+    replyType,
+    extractedInfo: {
+      mentionedBrand: plan.extractedInfo.mentionedBrand ?? null,
+      city: plan.extractedInfo.city ?? null,
+      mentionedLocations: plan.extractedInfo.mentionedLocations ?? null,
+      mentionedDistricts: plan.extractedInfo.mentionedDistricts ?? null,
+      specificAge: plan.extractedInfo.specificAge ?? null,
+      hasUrgency: plan.extractedInfo.hasUrgency ?? null,
+      preferredSchedule: plan.extractedInfo.preferredSchedule ?? null,
+    },
+    reasoningText: `${plan.reasoningText} | stage=${plan.stage} | needs=${needHints}${
+      riskHints ? ` | risks=${riskHints}` : ""
+    }`,
+  };
+}
+
+export type TurnPlanningOutput = z.infer<typeof TurnPlanningOutputSchema>;
+export type ClassificationOutput = TurnPlanningOutput;
 export { ClassificationOptionsSchema, BrandDataSchema };

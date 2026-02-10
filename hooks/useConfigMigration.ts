@@ -117,8 +117,8 @@ export function useConfigMigration() {
           console.log("📊 当前配置状态:", {
             hasConfig: !!currentConfig,
             version: currentConfig?.metadata?.version,
-            replyPromptsCount: currentConfig
-              ? Object.keys(currentConfig.replyPrompts || {}).length
+            replyPolicyCount: currentConfig
+              ? Object.keys(currentConfig.replyPolicy || {}).length
               : 0,
             storesCount: currentConfig?.brandData?.stores?.length || 0,
           });
