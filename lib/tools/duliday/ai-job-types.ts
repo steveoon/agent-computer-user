@@ -76,19 +76,29 @@ export const customSalarySchema = z.object({
   salary: z.string().nullable(),
 });
 
+// 基本薪资对象
+export const basicSalaryObjectSchema = z.object({
+  basicSalary: z.number().nullable(),
+  basicSalaryUnit: z.string().nullable(),
+});
+
+// 综合薪资对象
+export const comprehensiveSalaryObjectSchema = z.object({
+  minComprehensiveSalary: z.number().nullable(),
+  maxComprehensiveSalary: z.number().nullable(),
+  comprehensiveSalaryUnit: z.string().nullable(),
+});
+
 export const salaryScenarioSchema = z.object({
   salaryType: z.string().nullable(),
   salaryPeriod: z.string().nullable(),
-  basicSalary: z.number().nullable(),
-  basicSalaryUnit: z.string().nullable(),
+  basicSalary: basicSalaryObjectSchema.nullable(),
   hasStairSalary: z.string().nullable(),
   stairSalaries: z.array(stairSalarySchema).nullable(),
   holidaySalary: holidaySalarySchema.nullable(),
   overtimeSalary: overtimeSalarySchema.nullable(),
   otherSalary: otherSalarySchema.nullable(),
-  minComprehensiveSalary: z.number().nullable(),
-  maxComprehensiveSalary: z.number().nullable(),
-  comprehensiveSalaryUnit: z.string().nullable(),
+  comprehensiveSalary: comprehensiveSalaryObjectSchema.nullable(),
   payday: z.string().nullable(),
   customSalaries: z.array(customSalarySchema).nullable(),
 });
@@ -96,9 +106,7 @@ export const salaryScenarioSchema = z.object({
 export const probationSalarySchema = z.object({
   salary: z.number().nullable(),
   salaryUnit: z.string().nullable(),
-  description: z.string().nullable(),
-  noProbationSalaryTypes: z.string().nullable(),
-  otherProbationSalaryDescription: z.string().nullable(),
+  salaryDescription: z.string().nullable(),
 });
 
 export const jobSalarySchema = z.object({

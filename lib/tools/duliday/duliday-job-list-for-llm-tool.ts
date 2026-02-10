@@ -1,5 +1,5 @@
 import { tool } from "ai";
-import { z } from 'zod/v3';
+import { z } from "zod/v3";
 import { aiJobListResponseSchema, type AIJobItem } from "./ai-job-types";
 
 /**
@@ -57,10 +57,32 @@ function joinParts(parts: (string | null | undefined)[], separator = " "): strin
 }
 
 /**
+ * 清洗文本（去除内部指令、多余标点、空白等）
+ */
+function cleanText(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/辛苦跟.*?[。！？]/g, "") // 去除 "辛苦跟候选人讲清楚" 等
+    .replace(/务必.*?[。！？]/g, "") // 去除 "务必..." 等
+    .replace(/手动输入/g, "")
+    .replace(/！{2,}/g, "！") // 降噪感叹号
+    .replace(/[\n\r]+/g, "；") // 换行转分号
+    .replace(/；{2,}/g, "；") // 去重分号
+    .replace(/^；+|；+$/g, ""); // 去除首尾分号
+}
+
+/**
  * 添加一行输出（如果值有效）
  */
 function addLine(lines: string[], label: string, value: string | null | undefined): void {
-  if (hasValue(value)) {
+  // 确保 value 是非空字符串
+  if (hasValue(value) && typeof value === "string") {
+    const cleaned = cleanText(value);
+    if (cleaned) {
+      lines.push(`- **${label}**: ${cleaned}`);
+    }
+  } else if (hasValue(value)) {
+    // 处理可能的非字符串情况（虽然类型定义限制了 string | null | undefined）
     lines.push(`- **${label}**: ${value}`);
   }
 }
@@ -78,34 +100,33 @@ function formatSalaryInfo(job: AIJobItem): string {
 
   const lines: string[] = [];
 
-  // 处理所有薪资场景（不只是第一个）
-  salary.salaryScenarioList?.forEach((scenario, idx) => {
-    const scenarioPrefix = (salary.salaryScenarioList?.length || 0) > 1 ? `场景${idx + 1} ` : "";
+  // 处理所有薪资场景（正式/试用期/培训期）
+  salary.salaryScenarioList?.forEach((scenario) => {
+    // 统一使用阶段前缀格式：正式期、试用期、培训期
+    const salaryType = scenario.salaryType;
+    const stagePrefix = salaryType ? `${salaryType}期` : "";
 
-    // 薪资类型
-    if (hasValue(scenario.salaryType)) {
-      addLine(lines, `${scenarioPrefix}薪资类型`, scenario.salaryType);
+    // 基本薪资（新结构：嵌套对象）
+    const basicSalaryObj = scenario.basicSalary;
+    if (basicSalaryObj && hasValue(basicSalaryObj.basicSalary)) {
+      const basicStr = `${basicSalaryObj.basicSalary}${basicSalaryObj.basicSalaryUnit || "元"}`;
+      addLine(lines, `${stagePrefix}基本薪资`, basicStr);
     }
 
-    // 基本薪资
-    if (hasValue(scenario.basicSalary)) {
-      const basicStr = `${scenario.basicSalary}${scenario.basicSalaryUnit || "元"}`;
-      addLine(lines, `${scenarioPrefix}基本薪资`, basicStr);
-    }
-
-    // 综合薪资（范围）
-    if (hasValue(scenario.minComprehensiveSalary) || hasValue(scenario.maxComprehensiveSalary)) {
-      const min = scenario.minComprehensiveSalary ?? "?";
-      const max = scenario.maxComprehensiveSalary ?? "?";
-      const unit = scenario.comprehensiveSalaryUnit || "元/月";
-      addLine(lines, `${scenarioPrefix}综合薪资`, `${min}-${max} ${unit}`);
+    // 综合薪资（新结构：嵌套对象）
+    const compSalaryObj = scenario.comprehensiveSalary;
+    if (compSalaryObj && (hasValue(compSalaryObj.minComprehensiveSalary) || hasValue(compSalaryObj.maxComprehensiveSalary))) {
+      const min = compSalaryObj.minComprehensiveSalary ?? "?";
+      const max = compSalaryObj.maxComprehensiveSalary ?? "?";
+      const unit = compSalaryObj.comprehensiveSalaryUnit || "元/月";
+      addLine(lines, `${stagePrefix}综合薪资`, `${min}-${max} ${unit}`);
     }
 
     // 结算周期 + 发薪日
     const periodParts = [scenario.salaryPeriod, scenario.payday ? `${scenario.payday}发薪` : null];
     const periodStr = joinParts(periodParts, "，");
     if (periodStr) {
-      addLine(lines, `${scenarioPrefix}结算周期`, periodStr);
+      addLine(lines, `${stagePrefix}结算周期`, periodStr);
     }
 
     // 阶梯薪资
@@ -113,12 +134,16 @@ function formatSalaryInfo(job: AIJobItem): string {
       const stairInfo = scenario.stairSalaries
         .filter(s => hasValue(s.salary))
         .map(s => {
-          const desc = s.description || `${s.fullWorkTime || ""}${s.fullWorkTimeUnit || ""}后`;
-          return `${desc}${s.salary}${s.salaryUnit || "元"}`;
+          // 强制显示阈值，避免 "超出后" 无上下文
+          const threshold = hasValue(s.fullWorkTime)
+            ? `超过${s.fullWorkTime}${s.fullWorkTimeUnit || ""} `
+            : "";
+          const desc = s.description ? `(${s.description})` : "";
+          return `${threshold}${desc}按 ${s.salary}${s.salaryUnit || "元"} 结算`;
         })
         .join("；");
       if (stairInfo) {
-        addLine(lines, `${scenarioPrefix}阶梯薪资`, stairInfo);
+        addLine(lines, `${stagePrefix}阶梯薪资`, stairInfo);
       }
     }
 
@@ -135,7 +160,7 @@ function formatSalaryInfo(job: AIJobItem): string {
         holidayStr = joinParts([holidayStr, `(${holiday.holidaySalaryDesc})`]);
       }
       if (holidayStr) {
-        addLine(lines, `${scenarioPrefix}节假日薪资`, holidayStr);
+        addLine(lines, `${stagePrefix}节假日薪资`, holidayStr);
       }
     }
 
@@ -152,7 +177,7 @@ function formatSalaryInfo(job: AIJobItem): string {
         overtimeStr = joinParts([overtimeStr, `(${overtime.overtimeSalaryDesc})`]);
       }
       if (overtimeStr) {
-        addLine(lines, `${scenarioPrefix}加班薪资`, overtimeStr);
+        addLine(lines, `${stagePrefix}加班薪资`, overtimeStr);
       }
     }
 
@@ -160,38 +185,39 @@ function formatSalaryInfo(job: AIJobItem): string {
     const other = scenario.otherSalary;
     if (other) {
       if (hasValue(other.commission)) {
-        addLine(lines, `${scenarioPrefix}提成`, other.commission);
+        addLine(lines, `${stagePrefix}提成`, other.commission);
       }
       if (hasValue(other.attendanceSalary)) {
-        addLine(lines, `${scenarioPrefix}全勤奖`, `${other.attendanceSalary}${other.attendanceSalaryUnit || "元"}`);
+        addLine(
+          lines,
+          `${stagePrefix}全勤奖`,
+          `${other.attendanceSalary}${other.attendanceSalaryUnit || "元"}`
+        );
       }
       if (hasValue(other.performance)) {
-        addLine(lines, `${scenarioPrefix}绩效`, other.performance);
+        addLine(lines, `${stagePrefix}绩效`, other.performance);
       }
     }
 
     // 自定义薪资项
     scenario.customSalaries?.forEach(custom => {
       if (hasValue(custom.name) && hasValue(custom.salary)) {
-        addLine(lines, `${scenarioPrefix}${custom.name}`, custom.salary);
+        addLine(lines, `${stagePrefix}${custom.name}`, custom.salary);
       }
     });
   });
 
-  // 试用期薪资
+  // 试工期薪资（注意：不是试用期，试用期薪资在 salaryScenarioList 中 salaryType="试用期" 的场景）
   const probation = salary.probationSalary;
   if (probation) {
     if (hasValue(probation.salary)) {
       let probStr = `${probation.salary}${probation.salaryUnit || "元"}`;
-      if (hasValue(probation.description)) {
-        probStr += `（${probation.description}）`;
+      if (hasValue(probation.salaryDescription)) {
+        probStr += `（${probation.salaryDescription}）`;
       }
-      addLine(lines, "试用期薪资", probStr);
-    } else if (hasValue(probation.noProbationSalaryTypes)) {
-      addLine(lines, "试用期薪资", probation.noProbationSalaryTypes);
-    }
-    if (hasValue(probation.otherProbationSalaryDescription)) {
-      addLine(lines, "试用期说明", probation.otherProbationSalaryDescription);
+      addLine(lines, "试工期薪资", probStr);
+    } else if (hasValue(probation.salaryDescription)) {
+      addLine(lines, "试工期说明", probation.salaryDescription);
     }
   }
 
@@ -235,7 +261,11 @@ function formatWelfareInfo(job: AIJobItem): string {
 
   // 交通补贴
   if (hasValue(welfare.trafficAllowanceSalary)) {
-    addLine(lines, "交通补贴", `${welfare.trafficAllowanceSalary}${welfare.trafficAllowanceSalaryUnit || "元"}`);
+    addLine(
+      lines,
+      "交通补贴",
+      `${welfare.trafficAllowanceSalary}${welfare.trafficAllowanceSalaryUnit || "元"}`
+    );
   }
 
   // 保险
@@ -292,17 +322,23 @@ function formatRequirements(job: AIJobItem): string {
     // 身高要求（男/女分开）
     const heightParts: string[] = [];
     if (hasValue(basic.manMinHeight) || hasValue(basic.manMaxHeight)) {
-      const manHeight = joinParts([
-        basic.manMinHeight ? `${basic.manMinHeight}cm` : null,
-        basic.manMaxHeight ? `${basic.manMaxHeight}cm` : null,
-      ], "-");
+      const manHeight = joinParts(
+        [
+          basic.manMinHeight ? `${basic.manMinHeight}cm` : null,
+          basic.manMaxHeight ? `${basic.manMaxHeight}cm` : null,
+        ],
+        "-"
+      );
       if (manHeight) heightParts.push(`男${manHeight}`);
     }
     if (hasValue(basic.womanMinHeight) || hasValue(basic.womanMaxHeight)) {
-      const womanHeight = joinParts([
-        basic.womanMinHeight ? `${basic.womanMinHeight}cm` : null,
-        basic.womanMaxHeight ? `${basic.womanMaxHeight}cm` : null,
-      ], "-");
+      const womanHeight = joinParts(
+        [
+          basic.womanMinHeight ? `${basic.womanMinHeight}cm` : null,
+          basic.womanMaxHeight ? `${basic.womanMaxHeight}cm` : null,
+        ],
+        "-"
+      );
       if (womanHeight) heightParts.push(`女${womanHeight}`);
     }
     if (heightParts.length > 0) {
@@ -350,7 +386,10 @@ function formatRequirements(job: AIJobItem): string {
       addLine(lines, "民族", nationStr);
     }
 
-    if (hasValue(hometown.nativePlaceRequirementType) && hometown.nativePlaceRequirementType !== "不限") {
+    if (
+      hasValue(hometown.nativePlaceRequirementType) &&
+      hometown.nativePlaceRequirementType !== "不限"
+    ) {
       let placeStr = hometown.nativePlaceRequirementType;
       if (hometown.nativePlaces?.length) {
         placeStr += `：${hometown.nativePlaces.join("、")}`;
@@ -373,7 +412,10 @@ function formatRequirements(job: AIJobItem): string {
       }
     }
 
-    if (hasValue(marriage.socialSecurityRequirementType) && marriage.socialSecurityRequirementType !== "不限") {
+    if (
+      hasValue(marriage.socialSecurityRequirementType) &&
+      marriage.socialSecurityRequirementType !== "不限"
+    ) {
       let ssStr = marriage.socialSecurityRequirementType;
       if (hasValue(marriage.socialSecurityList)) {
         ssStr += `：${marriage.socialSecurityList}`;
@@ -411,7 +453,7 @@ function formatRequirements(job: AIJobItem): string {
 
   // === 招聘要求备注（重要！）===
   if (req.remark) {
-    addLine(lines, "其他要求", req.remark.replace(/\n/g, "；"));
+    addLine(lines, "其他要求", req.remark);
   }
 
   return lines.length > 0 ? lines.join("\n") + "\n" : "";
@@ -466,7 +508,7 @@ function formatWorkTime(job: AIJobItem): string {
       weekParts.push(week.workSingleDouble);
     }
     if (hasValue(week.perWeekNeedWorkDays)) {
-      weekParts.push(`需工作${week.perWeekNeedWorkDays}`);
+      weekParts.push(`需工作${week.perWeekNeedWorkDays}天`);
     }
     if (week.weekWorkTimeRequirement) {
       weekParts.push(week.weekWorkTimeRequirement);
@@ -479,9 +521,10 @@ function formatWorkTime(job: AIJobItem): string {
     week.customnWorkTimeList?.forEach(custom => {
       if (custom.customWorkWeekdays?.length) {
         const daysStr = custom.customWorkWeekdays.join("、");
-        const rangeStr = hasValue(custom.customMinWorkDays) && hasValue(custom.customMaxWorkDays)
-          ? `（${custom.customMinWorkDays}-${custom.customMaxWorkDays}天）`
-          : "";
+        const rangeStr =
+          hasValue(custom.customMinWorkDays) && hasValue(custom.customMaxWorkDays)
+            ? `（${custom.customMinWorkDays}-${custom.customMaxWorkDays}天）`
+            : "";
         addLine(lines, "可选工作日", `${daysStr}${rangeStr}`);
       }
     });
@@ -491,13 +534,12 @@ function formatWorkTime(job: AIJobItem): string {
   const month = wt.monthWorkTime;
   if (month) {
     if (hasValue(month.perMonthMinWorkTime)) {
-      const unitMap: Record<number, string> = { 1: "天", 2: "小时" };
-      const unitKey = typeof month.perMonthMinWorkTimeUnit === "number" ? month.perMonthMinWorkTimeUnit : 1;
-      const unit = unitMap[unitKey] ?? "天";
-      addLine(lines, "每月最少", `${month.perMonthMinWorkTime}${unit}`);
+      // 直接使用 API 返回的原始单位，不做防御性转换，暴露数据问题
+      const unit = month.perMonthMinWorkTimeUnit ?? "";
+      addLine(lines, "每月最少出勤", `${month.perMonthMinWorkTime}${unit}`);
     }
     if (hasValue(month.perMonthMaxRestTime)) {
-      addLine(lines, "每月最多休", `${month.perMonthMaxRestTime}天`);
+      addLine(lines, "每月最多休息", `${month.perMonthMaxRestTime}天`);
     }
     if (month.monthWorkTimeRequirement) {
       addLine(lines, "月工时要求", month.monthWorkTimeRequirement);
@@ -516,41 +558,51 @@ function formatWorkTime(job: AIJobItem): string {
   }
 
   // 排班安排
+  // 覆盖逻辑：如果工时备注有值，优先使用工时备注，跳过班次详情
+  const hasWorkTimeRemark = hasValue(wt.workTimeRemark);
+
   const schedule = wt.dailyShiftSchedule;
   if (schedule) {
     if (hasValue(schedule.arrangementType)) {
       addLine(lines, "排班类型", schedule.arrangementType);
     }
 
-    // 固定班次
-    if (schedule.fixedScheduleList?.length) {
-      const shifts = schedule.fixedScheduleList
-        .filter(s => hasValue(s.fixedShiftStartTime) && hasValue(s.fixedShiftEndTime))
-        .map(s => `${s.fixedShiftStartTime}-${s.fixedShiftEndTime}`)
-        .join("、");
-      if (shifts) {
-        addLine(lines, "固定班次", shifts);
+    // 仅当没有工时备注时，才显示班次详情
+    if (!hasWorkTimeRemark) {
+      // 固定班次
+      if (schedule.fixedScheduleList?.length) {
+        const shifts = schedule.fixedScheduleList
+          .filter(s => hasValue(s.fixedShiftStartTime) && hasValue(s.fixedShiftEndTime))
+          .map(s => `${s.fixedShiftStartTime}-${s.fixedShiftEndTime}`)
+          .join("、");
+        if (shifts) {
+          addLine(lines, "固定班次", shifts);
+        }
       }
-    }
 
-    // 组合班次
-    if (schedule.combinedArrangement?.combinedArrangementList?.length) {
-      const combined = schedule.combinedArrangement.combinedArrangementList
-        .filter(s => hasValue(s.combinedShiftStartTime) && hasValue(s.combinedShiftEndTime))
-        .map(s => `${s.combinedShiftStartTime}-${s.combinedShiftEndTime}`)
-        .join("、");
-      if (combined) {
-        addLine(lines, "组合班次", combined);
+      // 组合班次
+      if (schedule.combinedArrangement?.combinedArrangementList?.length) {
+        const combined = schedule.combinedArrangement.combinedArrangementList
+          .filter(s => hasValue(s.combinedShiftStartTime) && hasValue(s.combinedShiftEndTime))
+          .map(s => `${s.combinedShiftStartTime}-${s.combinedShiftEndTime}`)
+          .join("、");
+        if (combined) {
+          addLine(lines, "组合班次", combined);
+        }
       }
-    }
 
-    // 弹性上下班
-    const fixed = schedule.fixedTime;
-    if (fixed) {
-      const goWork = joinParts([fixed.goToWorkStartTime, fixed.goToWorkEndTime], "-");
-      const goOff = joinParts([fixed.goOffWorkStartTime, fixed.goOffWorkEndTime], "-");
-      if (goWork || goOff) {
-        addLine(lines, "弹性时间", joinParts([goWork ? `上班${goWork}` : null, goOff ? `下班${goOff}` : null], "，"));
+      // 弹性上下班
+      const fixed = schedule.fixedTime;
+      if (fixed) {
+        const goWork = joinParts([fixed.goToWorkStartTime, fixed.goToWorkEndTime], "-");
+        const goOff = joinParts([fixed.goOffWorkStartTime, fixed.goOffWorkEndTime], "-");
+        if (goWork || goOff) {
+          addLine(
+            lines,
+            "弹性时间",
+            joinParts([goWork ? `上班${goWork}` : null, goOff ? `下班${goOff}` : null], "，")
+          );
+        }
       }
     }
   }
@@ -560,9 +612,9 @@ function formatWorkTime(job: AIJobItem): string {
     addLine(lines, "休息说明", wt.restTimeDesc);
   }
 
-  // 工作时间备注（重要！）
-  if (wt.workTimeRemark) {
-    addLine(lines, "工时备注", wt.workTimeRemark.replace(/\n/g, "；"));
+  // 工时备注（覆盖班次详情，作为权威时间信息）
+  if (hasWorkTimeRemark) {
+    addLine(lines, "工时备注", wt.workTimeRemark);
   }
 
   return lines.length > 0 ? lines.join("\n") + "\n" : "";
@@ -624,10 +676,11 @@ function formatInterviewInfo(job: AIJobItem): string {
       lines.push("- **面试时间**:");
       first.fixedInterviewTimes.slice(0, 5).forEach(ft => {
         if (hasValue(ft.interviewDate)) {
-          const times = ft.interviewTimes
-            ?.filter(t => hasValue(t.interviewStartTime) && hasValue(t.interviewEndTime))
-            .map(t => `${t.interviewStartTime}-${t.interviewEndTime}`)
-            .join("、") || "";
+          const times =
+            ft.interviewTimes
+              ?.filter(t => hasValue(t.interviewStartTime) && hasValue(t.interviewEndTime))
+              .map(t => `${t.interviewStartTime}-${t.interviewEndTime}`)
+              .join("、") || "";
           lines.push(`  - ${ft.interviewDate} ${times}`);
         }
       });
@@ -641,10 +694,11 @@ function formatInterviewInfo(job: AIJobItem): string {
       lines.push("- **周期面试时间**:");
       first.periodicInterviewTimes.forEach(pt => {
         if (hasValue(pt.interviewWeekday)) {
-          const times = pt.interviewTimes
-            ?.filter(t => hasValue(t.interviewStartTime) && hasValue(t.interviewEndTime))
-            .map(t => `${t.interviewStartTime}-${t.interviewEndTime}`)
-            .join("、") || "";
+          const times =
+            pt.interviewTimes
+              ?.filter(t => hasValue(t.interviewStartTime) && hasValue(t.interviewEndTime))
+              .map(t => `${t.interviewStartTime}-${t.interviewEndTime}`)
+              .join("、") || "";
           lines.push(`  - ${pt.interviewWeekday} ${times}`);
         }
       });
@@ -691,7 +745,9 @@ function formatInterviewInfo(job: AIJobItem): string {
   if (probation) {
     const probParts: string[] = [];
     if (hasValue(probation.probationWorkPeriod)) {
-      probParts.push(`${probation.probationWorkPeriod}${probation.probationWorkPeriodUnit || "天"}`);
+      probParts.push(
+        `${probation.probationWorkPeriod}${probation.probationWorkPeriodUnit || "天"}`
+      );
     }
     if (probation.probationWorkAssessment) {
       probParts.push(probation.probationWorkAssessment);
@@ -727,12 +783,12 @@ function formatInterviewInfo(job: AIJobItem): string {
 
   // === 流程说明（重要！）===
   if (ip.processDesc) {
-    addLine(lines, "流程说明", ip.processDesc.replace(/\n/g, "；"));
+    addLine(lines, "流程说明", ip.processDesc);
   }
 
   // === 面试备注（重要！）===
   if (ip.remark) {
-    addLine(lines, "面试备注", ip.remark.replace(/\n/g, "；"));
+    addLine(lines, "面试备注", ip.remark);
   }
 
   return lines.length > 0 ? lines.join("\n") + "\n" : "";
@@ -769,10 +825,8 @@ function formatJobToMarkdown(job: AIJobItem, index: number): string {
     if (hasValue(store.storeName)) {
       addLine(basicLines, "门店", store.storeName);
     }
-    // 完整地址：城市 + 区域 + 详细地址
-    const addressParts = [store.storeCityName, store.storeRegionName, store.storeAddress].filter(p => hasValue(p));
-    if (addressParts.length > 0) {
-      addLine(basicLines, "地址", addressParts.join(" "));
+    if (hasValue(store.storeAddress)) {
+      addLine(basicLines, "地址", store.storeAddress);
     }
   }
 
@@ -788,7 +842,7 @@ function formatJobToMarkdown(job: AIJobItem, index: number): string {
 
   // 工作内容（完整显示，不截断）
   if (basicInfo.jobContent) {
-    addLine(basicLines, "工作内容", basicInfo.jobContent.replace(/\n/g, "；"));
+    addLine(basicLines, "工作内容", basicInfo.jobContent);
   }
 
   // 试用期
@@ -857,7 +911,12 @@ function formatJobToMarkdown(job: AIJobItem, index: number): string {
 /**
  * 格式化岗位列表为 Markdown
  */
-function formatJobsToMarkdown(jobs: AIJobItem[], total: number, pageNum: number, pageSize: number): string {
+function formatJobsToMarkdown(
+  jobs: AIJobItem[],
+  total: number,
+  pageNum: number,
+  pageSize: number
+): string {
   const start = (pageNum - 1) * pageSize + 1;
   const end = Math.min(start + jobs.length - 1, total);
 
@@ -886,7 +945,7 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
 返回结构化的岗位信息，包含薪资、招聘要求、工作时间、面试安排等完整信息。
 适用于自动回复求职者场景，帮助 LLM 了解岗位详情以生成个性化回复。`,
     inputSchema,
-    execute: async ({ cityNameList, regionNameList, brandAliasList }) => {
+    execute: async ({ cityNameList = [], regionNameList = [], brandAliasList = [] }) => {
       console.log("🔍 duliday_job_list_for_llm tool called with:", {
         cityNameList,
         regionNameList,
@@ -957,7 +1016,11 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
           if (cityNameList.length > 0) filterMsg += `\n- 城市：${cityNameList.join("、")}`;
           if (regionNameList.length > 0) filterMsg += `\n- 区域：${regionNameList.join("、")}`;
           if (brandAliasList.length > 0) filterMsg += `\n- 品牌：${brandAliasList.join("、")}`;
-          if (cityNameList.length === 0 && regionNameList.length === 0 && brandAliasList.length === 0) {
+          if (
+            cityNameList.length === 0 &&
+            regionNameList.length === 0 &&
+            brandAliasList.length === 0
+          ) {
             filterMsg += "\n- 无筛选条件（查询全部）";
           }
           return {
