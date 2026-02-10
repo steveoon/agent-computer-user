@@ -10,6 +10,10 @@ import { SyncResponseSchema, SyncStreamMessageSchema } from "@/types/duliday-syn
  * 确保数据库中的所有品牌都被同步到本地 IndexedDB
  */
 export class BrandSyncManager {
+  private static isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+  }
+
   private static async parseSyncResponse(response: Response): Promise<SyncRecord> {
     const contentType = response.headers.get("content-type") || "";
 
@@ -102,6 +106,8 @@ export class BrandSyncManager {
     errors: Record<string, string>;
     /** Token 缺失标志，调用方可据此显示提示 */
     tokenMissing?: boolean;
+    /** 未登录/无权限（避免在未登录场景下自动同步导致控制台报错） */
+    unauthorized?: boolean;
   }> {
     const syncedBrands: string[] = [];
     const failedBrands: string[] = [];
@@ -160,8 +166,38 @@ export class BrandSyncManager {
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "同步请求失败");
+          // ✅ 产品化处理：未登录时跳过（/api/sync 在 middleware 中属于受保护 API）
+          if (response.status === 401) {
+            let errorMessage: string | undefined;
+            try {
+              const data: unknown = await response.json();
+              if (BrandSyncManager.isRecord(data)) {
+                const message = data.message;
+                if (typeof message === "string") errorMessage = message;
+              }
+            } catch {
+              // ignore
+            }
+
+            console.info(
+              `[BrandSyncManager] 未登录或无权限，跳过自动同步品牌` +
+                (errorMessage ? `（${errorMessage}）` : "")
+            );
+            return { syncedBrands, failedBrands, errors, unauthorized: true };
+          }
+
+          let serverError: string | undefined;
+          try {
+            const data: unknown = await response.json();
+            if (BrandSyncManager.isRecord(data)) {
+              const error = data.error;
+              if (typeof error === "string") serverError = error;
+            }
+          } catch {
+            // ignore
+          }
+
+          throw new Error(serverError || "同步请求失败");
         }
 
         const syncRecord = await BrandSyncManager.parseSyncResponse(response);

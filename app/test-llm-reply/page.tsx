@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Settings } from "lucide-react";
 import { BrandSelector } from "@/components/brand-selector";
@@ -11,7 +11,7 @@ import { useConfigDataForChat } from "@/hooks/useConfigDataForChat";
 import { Button } from "@/components/ui/button";
 import type { MessageClassification } from "@/types/zhipin";
 import type { StoreWithDistance } from "@/types/geocoding";
-import type { FunnelStage, ReplyNeed, RiskFlag } from "@/types/reply-policy";
+import type { FunnelStage, ReplyNeed, RiskFlag, ReplyPolicyConfig } from "@/types/reply-policy";
 
 // Components
 import { ModelConfigCard } from "./components/model-config-card";
@@ -20,6 +20,7 @@ import { BrandStatsCard } from "./components/brand-stats-card";
 import { TestInputCard } from "./components/test-input-card";
 import { ConversationHistoryCard } from "./components/conversation-history-card";
 import { ReplyResult } from "./components/reply-result";
+import { PolicyEditorCard } from "./components/policy-editor-card";
 
 export default function TestLLMReplyPage() {
   const { currentBrand } = useBrand();
@@ -52,6 +53,18 @@ export default function TestLLMReplyPage() {
     currentBrand: string | null;
   } | null>(null);
   const [conversationHistory, setConversationHistory] = useState<string[]>([]);
+  const [editablePolicy, setEditablePolicy] = useState<ReplyPolicyConfig | null>(null);
+
+  // 当 replyPolicy 加载后初始化可编辑副本
+  useEffect(() => {
+    if (replyPolicy && !editablePolicy) {
+      setEditablePolicy(structuredClone(replyPolicy));
+    }
+  }, [replyPolicy, editablePolicy]);
+
+  const handleResetPolicy = (): void => {
+    if (replyPolicy) setEditablePolicy(structuredClone(replyPolicy));
+  };
 
   // 🗑️ 清除品牌偏好
   const handleClearPreferences = async () => {
@@ -92,7 +105,7 @@ export default function TestLLMReplyPage() {
       return;
     }
 
-    if (!configData || !replyPolicy) {
+    if (!configData || !editablePolicy) {
       setError("配置数据未加载，请刷新页面重试");
       return;
     }
@@ -123,7 +136,7 @@ export default function TestLLMReplyPage() {
             providerConfigs,
           },
           configData, // 🔧 传递配置数据
-          replyPolicy, // 🔧 传递回复策略
+          replyPolicy: editablePolicy, // 传递可编辑的回复策略
           conversationHistory, // 传递对话历史
         }),
       });
@@ -198,6 +211,15 @@ export default function TestLLMReplyPage() {
             </Link>
           </div>
         </div>
+
+        {/* 策略编辑器 - 全宽 */}
+        {editablePolicy && (
+          <PolicyEditorCard
+            policy={editablePolicy}
+            onChange={setEditablePolicy}
+            onReset={handleResetPolicy}
+          />
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 左侧栏：配置与历史 */}
