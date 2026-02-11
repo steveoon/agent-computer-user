@@ -33,6 +33,7 @@ export default function TestLLMReplyPage() {
   const {
     configData,
     replyPolicy,
+    brandPriorityStrategy,
     isLoading: configLoading,
     error: configError,
   } = useConfigDataForChat();
@@ -144,6 +145,7 @@ export default function TestLLMReplyPage() {
           },
           configData, // 🔧 传递配置数据
           replyPolicy: editablePolicy, // 传递可编辑的回复策略
+          brandPriorityStrategy, // 传递品牌优先级策略
           conversationHistory, // 传递对话历史
         }),
       });

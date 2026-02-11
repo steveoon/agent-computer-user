@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
       modelConfig,
       configData,
       replyPolicy,
+      brandPriorityStrategy,
       conversationHistory,
     } = await request.json();
 
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest) {
       },
       configData,
       replyPolicy,
+      brandPriorityStrategy,
     });
 
     return NextResponse.json({

@@ -628,6 +628,188 @@ function ConstraintsTab({
           </div>
         </div>
       </div>
+
+      <Separator className="bg-indigo-100" />
+
+      {/* Qualification Policy (Age) */}
+      <div className="space-y-4">
+        <Label className="text-sm font-semibold text-indigo-900">年龄资格策略（QualificationPolicy.age）</Label>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-indigo-800">启用年龄 Gate</Label>
+            <Select
+              value={policy.qualificationPolicy.age.enabled ? "true" : "false"}
+              onValueChange={(v) =>
+                onChange({
+                  ...policy,
+                  qualificationPolicy: {
+                    ...policy.qualificationPolicy,
+                    age: {
+                      ...policy.qualificationPolicy.age,
+                      enabled: v === "true",
+                    },
+                  },
+                })
+              }
+            >
+              <SelectTrigger className="h-9 text-sm bg-white/70 border-indigo-200">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">启用</SelectItem>
+                <SelectItem value="false">禁用</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-indigo-800">是否允许透露年龄区间</Label>
+            <Select
+              value={policy.qualificationPolicy.age.revealRange ? "true" : "false"}
+              onValueChange={(v) =>
+                onChange({
+                  ...policy,
+                  qualificationPolicy: {
+                    ...policy.qualificationPolicy,
+                    age: {
+                      ...policy.qualificationPolicy.age,
+                      revealRange: v === "true",
+                    },
+                  },
+                })
+              }
+            >
+              <SelectTrigger className="h-9 text-sm bg-white/70 border-indigo-200">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="false">不允许（推荐）</SelectItem>
+                <SelectItem value="true">允许</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-indigo-800">不匹配时策略（failStrategy）</Label>
+            <Input
+              value={policy.qualificationPolicy.age.failStrategy}
+              onChange={(e) =>
+                onChange({
+                  ...policy,
+                  qualificationPolicy: {
+                    ...policy.qualificationPolicy,
+                    age: {
+                      ...policy.qualificationPolicy.age,
+                      failStrategy: e.target.value,
+                    },
+                  },
+                })
+              }
+              className="text-sm bg-white/70 border-indigo-200 focus:border-indigo-400"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-indigo-800">信息不足时策略（unknownStrategy）</Label>
+            <Input
+              value={policy.qualificationPolicy.age.unknownStrategy}
+              onChange={(e) =>
+                onChange({
+                  ...policy,
+                  qualificationPolicy: {
+                    ...policy.qualificationPolicy,
+                    age: {
+                      ...policy.qualificationPolicy.age,
+                      unknownStrategy: e.target.value,
+                    },
+                  },
+                })
+              }
+              className="text-sm bg-white/70 border-indigo-200 focus:border-indigo-400"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-indigo-800">匹配通过策略（passStrategy）</Label>
+            <Input
+              value={policy.qualificationPolicy.age.passStrategy}
+              onChange={(e) =>
+                onChange({
+                  ...policy,
+                  qualificationPolicy: {
+                    ...policy.qualificationPolicy,
+                    age: {
+                      ...policy.qualificationPolicy.age,
+                      passStrategy: e.target.value,
+                    },
+                  },
+                })
+              }
+              className="text-sm bg-white/70 border-indigo-200 focus:border-indigo-400"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-indigo-800">不匹配时允许转推荐</Label>
+            <Select
+              value={policy.qualificationPolicy.age.allowRedirect ? "true" : "false"}
+              onValueChange={(v) =>
+                onChange({
+                  ...policy,
+                  qualificationPolicy: {
+                    ...policy.qualificationPolicy,
+                    age: {
+                      ...policy.qualificationPolicy.age,
+                      allowRedirect: v === "true",
+                    },
+                  },
+                })
+              }
+            >
+              <SelectTrigger className="h-9 text-sm bg-white/70 border-indigo-200">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">允许</SelectItem>
+                <SelectItem value="false">不允许</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="space-y-1.5 md:max-w-xs">
+          <Label className="text-xs font-medium text-indigo-800">转推荐优先级（redirectPriority）</Label>
+          <Select
+            value={policy.qualificationPolicy.age.redirectPriority}
+            onValueChange={(v) =>
+              onChange({
+                ...policy,
+                qualificationPolicy: {
+                  ...policy.qualificationPolicy,
+                  age: {
+                    ...policy.qualificationPolicy.age,
+                    redirectPriority: v as "low" | "medium" | "high",
+                  },
+                },
+              })
+            }
+          >
+            <SelectTrigger className="h-9 text-sm bg-white/70 border-indigo-200">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">low</SelectItem>
+              <SelectItem value="medium">medium</SelectItem>
+              <SelectItem value="high">high</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
     </div>
   );
 }

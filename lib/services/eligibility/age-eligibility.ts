@@ -54,6 +54,10 @@ const jobListResponseSchema = z.object({
   result: z.array(z.unknown()).optional(),
 });
 
+const JOB_LIST_CACHE_TTL_MS = 60_000;
+let jobListCache: { token: string; payload: unknown; fetchedAt: number } | null = null;
+let inflightJobListRequest: Promise<unknown> | null = null;
+
 function normalizeText(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
 }
@@ -130,47 +134,73 @@ function extractResults(payload: unknown): { items: unknown[]; total: number } {
 }
 
 async function fetchJobList(token: string): Promise<unknown> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20000);
-  const requestBody = {
-    // Duliday 接口从 1 开始分页；传 0 会返回 50000
-    pageNum: 1,
-    pageSize: 200,
-  };
-
-  try {
-    let response = await fetch(DULIDAY_JOB_LIST_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Duliday-Token": token,
-      },
-      body: JSON.stringify(requestBody),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      if ([400, 405, 415].includes(response.status)) {
-        const url = new URL(DULIDAY_JOB_LIST_ENDPOINT);
-        url.searchParams.set("pageNum", "0");
-        url.searchParams.set("pageSize", "200");
-        response = await fetch(url.toString(), {
-          headers: {
-            "Duliday-Token": token,
-          },
-          signal: controller.signal,
-        });
-      }
-    }
-
-    if (!response.ok) {
-      throw new Error(`Duliday job list fetch failed: ${response.status}`);
-    }
-
-    return await response.json();
-  } finally {
-    clearTimeout(timeoutId);
+  const shouldUseCache = process.env.NODE_ENV !== "test";
+  const now = Date.now();
+  if (
+    shouldUseCache &&
+    jobListCache &&
+    jobListCache.token === token &&
+    now - jobListCache.fetchedAt < JOB_LIST_CACHE_TTL_MS
+  ) {
+    return jobListCache.payload;
   }
+
+  if (shouldUseCache && inflightJobListRequest) {
+    return inflightJobListRequest;
+  }
+
+  inflightJobListRequest = (async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const requestBody = {
+      // Duliday 接口从 1 开始分页；传 0 会返回 50000
+      pageNum: 1,
+      pageSize: 200,
+    };
+
+    try {
+      let response = await fetch(DULIDAY_JOB_LIST_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Duliday-Token": token,
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        if ([400, 405, 415].includes(response.status)) {
+          const url = new URL(DULIDAY_JOB_LIST_ENDPOINT);
+          url.searchParams.set("pageNum", "0");
+          url.searchParams.set("pageSize", "200");
+          response = await fetch(url.toString(), {
+            headers: {
+              "Duliday-Token": token,
+            },
+            signal: controller.signal,
+          });
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(`Duliday job list fetch failed: ${response.status}`);
+      }
+
+      const payload = await response.json();
+      jobListCache = {
+        token,
+        payload,
+        fetchedAt: Date.now(),
+      };
+      return payload;
+    } finally {
+      clearTimeout(timeoutId);
+      inflightJobListRequest = null;
+    }
+  })();
+
+  return inflightJobListRequest;
 }
 
 export async function evaluateAgeEligibility({
