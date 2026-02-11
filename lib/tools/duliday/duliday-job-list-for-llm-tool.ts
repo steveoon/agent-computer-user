@@ -15,8 +15,13 @@ const DEFAULT_PAGE_SIZE = 15;
 
 /**
  * 输入参数 Schema
+ *
+ * 渐进式披露设计：通过 6 个布尔开关控制返回的数据字段
+ * - 默认只返回基本信息（极简模式），Token 消耗极低
+ * - 按需开启其他开关，获取更详细的信息
  */
 const inputSchema = z.object({
+  // ========== 筛选条件 ==========
   cityNameList: z
     .array(z.string())
     .optional()
@@ -31,8 +36,71 @@ const inputSchema = z.object({
     .array(z.string())
     .optional()
     .default([])
-    .describe('品牌别名列表，如 ["肯德基", "必胜客"]'),
+    .describe('品牌别名列表，如 ["肯德基", "KFC"]'),
+  storeNameList: z
+    .array(z.string())
+    .optional()
+    .default([])
+    .describe('门店名称列表，如 ["浦东陆家嘴店"]，支持模糊匹配'),
+  jobCategoryList: z
+    .array(z.string())
+    .optional()
+    .default([])
+    .describe('岗位类型列表，如 ["服务员", "收银员"]'),
+  jobIdList: z
+    .array(z.string())
+    .optional()
+    .default([])
+    .describe('岗位ID列表，用于查询特定岗位'),
+
+  // ========== 渐进式披露：布尔开关 ==========
+  includeBasicInfo: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe('返回基本信息（品牌、门店、岗位名、地址等）- 默认true'),
+  includeJobSalary: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe('返回薪资信息（基本薪资、综合薪资、结算周期等）'),
+  includeWelfare: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe('返回福利信息（餐饮、住宿、保险等）'),
+  includeHiringRequirement: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe('返回招聘要求（性别、年龄、身高、学历等）'),
+  includeWorkTime: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe('返回工作时间/班次（就业形式、每周工时、排班等）'),
+  includeInterviewProcess: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe('返回面试流程（面试轮数、时间、地址、试工、培训等）'),
 });
+
+// ============================================================================
+// 类型定义
+// ============================================================================
+
+/**
+ * 渐进式披露布尔开关
+ */
+interface ProgressiveDisclosureFlags {
+  includeBasicInfo: boolean;
+  includeJobSalary: boolean;
+  includeWelfare: boolean;
+  includeHiringRequirement: boolean;
+  includeWorkTime: boolean;
+  includeInterviewProcess: boolean;
+}
 
 // ============================================================================
 // 工具函数
@@ -799,11 +867,83 @@ function formatInterviewInfo(job: AIJobItem): string {
 // ============================================================================
 
 /**
- * 格式化单个岗位为 Markdown - 完整版
+ * 格式化单个岗位为极简一行（仅基本信息模式）
+ * 用于快速概览，Token 消耗极低
  */
-function formatJobToMarkdown(job: AIJobItem, index: number): string {
+function formatJobToOneLine(job: AIJobItem, index: number): string {
   const basicInfo = job.basicInfo;
   const store = basicInfo.storeInfo;
+
+  const brand = basicInfo.brandName || "";
+  const jobName = basicInfo.jobName || "未命名岗位";
+  const storeName = store?.storeName || "";
+  const address = store?.storeAddress || "";
+
+  // 格式：序号. **品牌 - 岗位名** | 门店 | 地址
+  const parts = [`${index + 1}. **${brand} - ${jobName}**`];
+  if (storeName) parts.push(storeName);
+  if (address) parts.push(address);
+
+  return parts.join(" | ");
+}
+
+/**
+ * 格式化单个岗位的基本信息部分
+ */
+function formatBasicInfoSection(job: AIJobItem): string {
+  const basicInfo = job.basicInfo;
+  const store = basicInfo.storeInfo;
+  const lines: string[] = [];
+
+  if (hasValue(basicInfo.brandName)) {
+    addLine(lines, "品牌", basicInfo.brandName);
+  }
+
+  if (store) {
+    if (hasValue(store.storeName)) {
+      addLine(lines, "门店", store.storeName);
+    }
+    if (hasValue(store.storeAddress)) {
+      addLine(lines, "地址", store.storeAddress);
+    }
+  }
+
+  if (hasValue(basicInfo.jobCategoryName)) {
+    addLine(lines, "岗位类型", basicInfo.jobCategoryName);
+  }
+
+  if (hasValue(basicInfo.laborForm)) {
+    addLine(lines, "用工形式", basicInfo.laborForm);
+  }
+
+  if (basicInfo.jobContent) {
+    addLine(lines, "工作内容", basicInfo.jobContent);
+  }
+
+  if (hasValue(basicInfo.haveProbation) && basicInfo.haveProbation !== "无试用期") {
+    addLine(lines, "试用期", basicInfo.haveProbation);
+  }
+
+  if (hasValue(basicInfo.needProbationWork) && basicInfo.needProbationWork !== "不需要试工") {
+    addLine(lines, "试工", basicInfo.needProbationWork);
+  }
+
+  if (hasValue(basicInfo.needTraining) && basicInfo.needTraining !== "不需要培训") {
+    addLine(lines, "培训", basicInfo.needTraining);
+  }
+
+  return lines.length > 0 ? "### 基本信息\n" + lines.join("\n") + "\n\n" : "";
+}
+
+/**
+ * 格式化单个岗位为 Markdown - 根据布尔开关选择性返回
+ */
+function formatJobToMarkdown(
+  job: AIJobItem,
+  index: number,
+  flags: ProgressiveDisclosureFlags
+): string {
+  const basicInfo = job.basicInfo;
 
   // 标题：岗位名称 + 岗位别名
   const titleParts = [basicInfo.jobName || "未命名岗位"];
@@ -812,95 +952,64 @@ function formatJobToMarkdown(job: AIJobItem, index: number): string {
   }
   let md = `## ${index + 1}. ${titleParts.join(" ")}\n\n`;
 
-  // 基本信息
-  const basicLines: string[] = [];
+  // 根据布尔开关选择性添加各部分
 
-  // 品牌
-  if (hasValue(basicInfo.brandName)) {
-    addLine(basicLines, "品牌", basicInfo.brandName);
+  // 基本信息（默认包含）
+  if (flags.includeBasicInfo) {
+    md += formatBasicInfoSection(job);
   }
 
-  // 门店信息
-  if (store) {
-    if (hasValue(store.storeName)) {
-      addLine(basicLines, "门店", store.storeName);
+  // 薪资信息
+  if (flags.includeJobSalary) {
+    const salaryInfo = formatSalaryInfo(job);
+    if (salaryInfo) {
+      md += "### 薪资信息\n";
+      md += salaryInfo;
+      md += "\n";
     }
-    if (hasValue(store.storeAddress)) {
-      addLine(basicLines, "地址", store.storeAddress);
+  }
+
+  // 福利信息
+  if (flags.includeWelfare) {
+    const welfareInfo = formatWelfareInfo(job);
+    if (welfareInfo) {
+      md += "### 福利信息\n";
+      md += welfareInfo;
+      md += "\n";
     }
-  }
-
-  // 岗位类型
-  if (hasValue(basicInfo.jobCategoryName)) {
-    addLine(basicLines, "岗位类型", basicInfo.jobCategoryName);
-  }
-
-  // 用工形式
-  if (hasValue(basicInfo.laborForm)) {
-    addLine(basicLines, "用工形式", basicInfo.laborForm);
-  }
-
-  // 工作内容（完整显示，不截断）
-  if (basicInfo.jobContent) {
-    addLine(basicLines, "工作内容", basicInfo.jobContent);
-  }
-
-  // 试用期
-  if (hasValue(basicInfo.haveProbation) && basicInfo.haveProbation !== "无试用期") {
-    addLine(basicLines, "试用期", basicInfo.haveProbation);
-  }
-
-  // 是否需要试工
-  if (hasValue(basicInfo.needProbationWork) && basicInfo.needProbationWork !== "不需要试工") {
-    addLine(basicLines, "试工", basicInfo.needProbationWork);
-  }
-
-  // 是否需要培训
-  if (hasValue(basicInfo.needTraining) && basicInfo.needTraining !== "不需要培训") {
-    addLine(basicLines, "培训", basicInfo.needTraining);
-  }
-
-  if (basicLines.length > 0) {
-    md += "### 基本信息\n";
-    md += basicLines.join("\n") + "\n";
-    md += "\n";
-  }
-
-  // 薪资福利
-  const salaryInfo = formatSalaryInfo(job);
-  const welfareInfo = formatWelfareInfo(job);
-  if (salaryInfo || welfareInfo) {
-    md += "### 薪资福利\n";
-    md += salaryInfo;
-    md += welfareInfo;
-    md += "\n";
   }
 
   // 招聘要求
-  const requirements = formatRequirements(job);
-  if (requirements) {
-    md += "### 招聘要求\n";
-    md += requirements;
-    md += "\n";
+  if (flags.includeHiringRequirement) {
+    const requirements = formatRequirements(job);
+    if (requirements) {
+      md += "### 招聘要求\n";
+      md += requirements;
+      md += "\n";
+    }
   }
 
   // 工作时间
-  const workTime = formatWorkTime(job);
-  if (workTime) {
-    md += "### 工作时间\n";
-    md += workTime;
-    md += "\n";
+  if (flags.includeWorkTime) {
+    const workTime = formatWorkTime(job);
+    if (workTime) {
+      md += "### 工作时间\n";
+      md += workTime;
+      md += "\n";
+    }
   }
 
-  // 面试信息
-  const interview = formatInterviewInfo(job);
-  if (interview) {
-    md += "### 面试流程\n";
-    md += interview;
-    md += "\n";
+  // 面试流程
+  if (flags.includeInterviewProcess) {
+    const interview = formatInterviewInfo(job);
+    if (interview) {
+      md += "### 面试流程\n";
+      md += interview;
+      md += "\n";
+    }
   }
 
-  // 岗位标识（用于预约）
+  // 岗位标识（始终包含，用于后续预约等操作）
   md += "### 岗位标识\n";
   md += `- **jobId**: ${basicInfo.jobId}\n`;
   md += "\n";
@@ -909,23 +1018,54 @@ function formatJobToMarkdown(job: AIJobItem, index: number): string {
 }
 
 /**
+ * 判断是否为极简模式（仅基本信息，无其他开关）
+ */
+function isMinimalMode(flags: ProgressiveDisclosureFlags): boolean {
+  return (
+    flags.includeBasicInfo &&
+    !flags.includeJobSalary &&
+    !flags.includeWelfare &&
+    !flags.includeHiringRequirement &&
+    !flags.includeWorkTime &&
+    !flags.includeInterviewProcess
+  );
+}
+
+/**
  * 格式化岗位列表为 Markdown
+ *
+ * 极简模式：仅基本信息开关时，返回一行一个岗位的列表
+ * 详细模式：开启其他开关时，返回完整的分段格式
  */
 function formatJobsToMarkdown(
   jobs: AIJobItem[],
   total: number,
   pageNum: number,
-  pageSize: number
+  pageSize: number,
+  flags: ProgressiveDisclosureFlags
 ): string {
   const start = (pageNum - 1) * pageSize + 1;
   const end = Math.min(start + jobs.length - 1, total);
 
-  let md = "# 岗位查询结果\n\n";
-  md += `共找到 ${total} 个岗位，当前显示第 ${start}-${end} 条\n\n`;
+  let md = `# 在招岗位（共 ${total} 个）\n\n`;
+
+  // 极简模式：一行一个岗位
+  if (isMinimalMode(flags)) {
+    jobs.forEach((job, index) => {
+      md += formatJobToOneLine(job, start + index - 1) + "\n";
+    });
+    if (total > end) {
+      md += `\n_还有 ${total - end} 个岗位未显示，可通过筛选条件缩小范围_\n`;
+    }
+    return md;
+  }
+
+  // 详细模式：完整分段格式
+  md += `当前显示第 ${start}-${end} 条\n\n`;
   md += "---\n\n";
 
   jobs.forEach((job, index) => {
-    md += formatJobToMarkdown(job, index);
+    md += formatJobToMarkdown(job, index, flags);
     md += "---\n\n";
   });
 
@@ -935,21 +1075,51 @@ function formatJobsToMarkdown(
 /**
  * Duliday 获取岗位列表工具 (LLM 优化版)
  *
+ * 渐进式数据返回：根据对话阶段和用户问题，按需返回所需字段
+ * - 默认仅返回基本信息（极简模式），Token 消耗极低
+ * - 按需开启布尔开关，获取薪资、福利、要求、工时、面试等详细信息
+ *
  * @description 调用清洗后的 API 获取岗位列表，返回 Markdown 格式化文本
  * @param customToken 自定义的 Duliday token
  * @returns AI SDK tool instance
  */
 export const dulidayJobListForLlmTool = (customToken?: string) =>
   tool({
-    description: `查询在招岗位列表。根据求职者的城市、区域、品牌偏好筛选匹配的岗位。
-返回结构化的岗位信息，包含薪资、招聘要求、工作时间、面试安排等完整信息。
-适用于自动回复求职者场景，帮助 LLM 了解岗位详情以生成个性化回复。`,
+    description: `查询在招岗位列表。支持渐进式数据返回，按需获取岗位信息。
+
+筛选条件：城市、区域、品牌、门店、岗位类型、岗位ID
+数据开关：
+- includeBasicInfo（默认true）：品牌、门店、地址等基本信息
+- includeJobSalary：薪资信息（基本薪资、综合薪资、结算周期等）
+- includeWelfare：福利信息（餐饮、住宿、保险等）
+- includeHiringRequirement：招聘要求（年龄、身高、学历等）
+- includeWorkTime：工作时间（排班、班次、每周工时等）
+- includeInterviewProcess：面试流程（面试轮数、地址、试工、培训等）
+
+使用示例：
+- 初次接触：无额外开关（仅基本信息）
+- 用户问薪资：开启 includeJobSalary
+- 面试安排：开启 includeInterviewProcess`,
     inputSchema,
-    execute: async ({ cityNameList = [], regionNameList = [], brandAliasList = [] }) => {
+    execute: async ({
+      // 筛选条件
+      cityNameList = [],
+      regionNameList = [],
+      brandAliasList = [],
+      storeNameList = [],
+      jobCategoryList = [],
+      jobIdList = [],
+      // 渐进式披露开关
+      includeBasicInfo = true,
+      includeJobSalary = false,
+      includeWelfare = false,
+      includeHiringRequirement = false,
+      includeWorkTime = false,
+      includeInterviewProcess = false,
+    }) => {
       console.log("🔍 duliday_job_list_for_llm tool called with:", {
-        cityNameList,
-        regionNameList,
-        brandAliasList,
+        filters: { cityNameList, regionNameList, brandAliasList, storeNameList, jobCategoryList, jobIdList },
+        flags: { includeBasicInfo, includeJobSalary, includeWelfare, includeHiringRequirement, includeWorkTime, includeInterviewProcess },
       });
 
       try {
@@ -962,13 +1132,16 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
           };
         }
 
-        // 构建请求体
+        // 构建请求体（筛选条件透传后端 API）
         const requestBody = {
           pageNum: DEFAULT_PAGE_NUM,
           pageSize: DEFAULT_PAGE_SIZE,
           cityNameList,
           regionNameList,
           brandAliasList,
+          storeNameList,
+          jobCategoryList,
+          jobIdList,
         };
 
         // 调用 API
@@ -1016,11 +1189,17 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
           if (cityNameList.length > 0) filterMsg += `\n- 城市：${cityNameList.join("、")}`;
           if (regionNameList.length > 0) filterMsg += `\n- 区域：${regionNameList.join("、")}`;
           if (brandAliasList.length > 0) filterMsg += `\n- 品牌：${brandAliasList.join("、")}`;
-          if (
+          if (storeNameList.length > 0) filterMsg += `\n- 门店：${storeNameList.join("、")}`;
+          if (jobCategoryList.length > 0) filterMsg += `\n- 岗位类型：${jobCategoryList.join("、")}`;
+          if (jobIdList.length > 0) filterMsg += `\n- 岗位ID：${jobIdList.join("、")}`;
+          const hasNoFilters =
             cityNameList.length === 0 &&
             regionNameList.length === 0 &&
-            brandAliasList.length === 0
-          ) {
+            brandAliasList.length === 0 &&
+            storeNameList.length === 0 &&
+            jobCategoryList.length === 0 &&
+            jobIdList.length === 0;
+          if (hasNoFilters) {
             filterMsg += "\n- 无筛选条件（查询全部）";
           }
           return {
@@ -1029,8 +1208,18 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
           };
         }
 
-        // 格式化为 Markdown
-        const markdown = formatJobsToMarkdown(jobs, total, DEFAULT_PAGE_NUM, DEFAULT_PAGE_SIZE);
+        // 构建布尔开关对象
+        const flags: ProgressiveDisclosureFlags = {
+          includeBasicInfo,
+          includeJobSalary,
+          includeWelfare,
+          includeHiringRequirement,
+          includeWorkTime,
+          includeInterviewProcess,
+        };
+
+        // 格式化为 Markdown（根据布尔开关选择性返回）
+        const markdown = formatJobsToMarkdown(jobs, total, DEFAULT_PAGE_NUM, DEFAULT_PAGE_SIZE, flags);
 
         return {
           type: "text" as const,
