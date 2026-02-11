@@ -10,6 +10,11 @@ import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/mod
 import { CandidateInfoSchema } from "@/lib/tools/zhipin/types";
 import type { SafeGenerateTextUsage } from "@/lib/ai";
 import type { TurnPlan } from "@/types/reply-policy";
+import type {
+  AgeEligibilityAppliedStrategy,
+  AgeEligibilityStatus,
+  AgeEligibilitySummary,
+} from "@/lib/services/eligibility/age-eligibility";
 
 /**
  * 调试信息类型
@@ -20,6 +25,9 @@ type ReplyDebugInfo = {
   detailLevel: string;
   turnPlan: TurnPlan;
   classification: MessageClassification;
+  gateStatus: AgeEligibilityStatus;
+  appliedStrategy: AgeEligibilityAppliedStrategy;
+  ageRangeSummary: AgeEligibilitySummary;
 };
 
 /**

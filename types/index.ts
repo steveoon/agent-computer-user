@@ -53,6 +53,8 @@ export type {
   HardConstraintRule,
   HardConstraintsPolicy,
   FactGatePolicy,
+  AgeQualificationPolicy,
+  QualificationPolicy,
 } from "./reply-policy";
 
 export {
@@ -67,6 +69,8 @@ export {
   HardConstraintRuleSchema,
   HardConstraintsPolicySchema,
   FactGatePolicySchema,
+  AgeQualificationPolicySchema,
+  QualificationPolicySchema,
   ReplyPolicyConfigSchema,
   DEFAULT_REPLY_POLICY,
 } from "./reply-policy";

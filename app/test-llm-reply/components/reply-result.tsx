@@ -5,6 +5,11 @@ import { Label } from "@/components/ui/label";
 import type { MessageClassification } from "@/types/zhipin";
 import type { FunnelStage, ReplyNeed, RiskFlag } from "@/types/reply-policy";
 import type { StoreWithDistance } from "@/types/geocoding";
+import type {
+  AgeEligibilityAppliedStrategy,
+  AgeEligibilityStatus,
+  AgeEligibilitySummary,
+} from "@/lib/services/eligibility/age-eligibility";
 import { MatchedStoresCard } from "@/components/tool-messages/matched-stores-card";
 
 interface DebugInfo {
@@ -12,6 +17,9 @@ interface DebugInfo {
   storeCount: number;
   detailLevel: string;
   classification: MessageClassification;
+  gateStatus: AgeEligibilityStatus;
+  appliedStrategy: AgeEligibilityAppliedStrategy;
+  ageRangeSummary: AgeEligibilitySummary;
 }
 
 interface ReplyResultProps {
@@ -63,6 +71,13 @@ export function ReplyResult({
   if (!reply || loading) {
     return null;
   }
+
+  const ageRangeText =
+    debugInfo?.ageRangeSummary &&
+    (debugInfo.ageRangeSummary.minAgeObserved !== null ||
+      debugInfo.ageRangeSummary.maxAgeObserved !== null)
+      ? `${debugInfo.ageRangeSummary.minAgeObserved ?? "?"}-${debugInfo.ageRangeSummary.maxAgeObserved ?? "?"}`
+      : "未知";
 
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
@@ -156,6 +171,40 @@ export function ReplyResult({
                   {debugInfo.relevantStores.length}
                 </div>
               </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-white/60 p-3 rounded-lg border text-center shadow-sm">
+                <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                  Gate Status
+                </div>
+                <div className="font-bold text-xl text-indigo-600 uppercase">
+                  {debugInfo.gateStatus}
+                </div>
+              </div>
+              <div className="bg-white/60 p-3 rounded-lg border text-center shadow-sm">
+                <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                  匹配/总数
+                </div>
+                <div className="font-bold text-xl text-indigo-600">
+                  {debugInfo.ageRangeSummary.matchedCount}/{debugInfo.ageRangeSummary.total}
+                </div>
+              </div>
+              <div className="bg-white/60 p-3 rounded-lg border text-center shadow-sm">
+                <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                  观测年龄区间
+                </div>
+                <div className="font-bold text-xl text-indigo-600">{ageRangeText}</div>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs mb-2 block text-muted-foreground">
+                Eligibility Strategy
+              </Label>
+              <pre className="bg-slate-950 text-green-400 p-4 rounded-lg overflow-x-auto text-xs font-mono shadow-inner">
+                {JSON.stringify(debugInfo.appliedStrategy, null, 2)}
+              </pre>
             </div>
 
             <div>

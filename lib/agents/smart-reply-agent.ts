@@ -16,6 +16,13 @@ import { planTurn } from "./classification-agent";
 import { buildContextInfoByNeeds } from "@/lib/loaders/zhipin-data.loader";
 import { safeGenerateText, type SafeGenerateTextUsage } from "@/lib/ai";
 import { logError, type AppError } from "@/lib/errors";
+import {
+  evaluateAgeEligibility,
+  type AgeEligibilityAppliedStrategy,
+  type AgeEligibilityResult,
+  type AgeEligibilityStatus,
+  type AgeEligibilitySummary,
+} from "@/lib/services/eligibility/age-eligibility";
 
 export interface SmartReplyAgentOptions {
   modelConfig?: {
@@ -42,6 +49,9 @@ export interface SmartReplyDebugInfo {
   detailLevel: string;
   turnPlan: TurnPlan;
   classification: MessageClassification;
+  gateStatus: AgeEligibilityStatus;
+  appliedStrategy: AgeEligibilityAppliedStrategy;
+  ageRangeSummary: AgeEligibilitySummary;
 }
 
 export interface SmartReplyAgentResult {
@@ -78,6 +88,74 @@ function toClassification(turnPlan: TurnPlan): MessageClassification {
   };
 }
 
+function resolveCandidateAge(turnPlan: TurnPlan, candidateInfo?: CandidateInfo): number | undefined {
+  if (typeof candidateInfo?.age === "number") {
+    return candidateInfo.age;
+  }
+  if (typeof turnPlan.extractedInfo.specificAge === "number") {
+    return turnPlan.extractedInfo.specificAge;
+  }
+  return undefined;
+}
+
+function resolveRegionName(turnPlan: TurnPlan, candidateInfo?: CandidateInfo): string | undefined {
+  const district = turnPlan.extractedInfo.mentionedDistricts?.[0]?.district;
+  if (district) return district;
+  const location = turnPlan.extractedInfo.mentionedLocations?.[0]?.location;
+  if (location) return location;
+  if (candidateInfo?.jobAddress) return candidateInfo.jobAddress;
+  return undefined;
+}
+
+function formatAgeRange(summary: AgeEligibilitySummary): string | null {
+  if (summary.minAgeObserved === null && summary.maxAgeObserved === null) return null;
+  const min = summary.minAgeObserved ?? "?";
+  const max = summary.maxAgeObserved ?? "?";
+  return `${min}-${max}`;
+}
+
+function buildAgeQualificationConstraints(
+  eligibility: AgeEligibilityResult | undefined,
+  policy: ReplyPolicyConfig | undefined
+): string[] {
+  const agePolicy = policy?.qualificationPolicy?.age;
+  if (!eligibility || !agePolicy || !agePolicy.enabled) {
+    return [];
+  }
+
+  const lines: string[] = ["[QualificationPolicy:Age]"];
+  const rangeText = formatAgeRange(eligibility.summary);
+
+  lines.push(`- gateStatus: ${eligibility.status}`);
+  lines.push(`- expressionStrategy: ${eligibility.appliedStrategy.strategy}`);
+  lines.push(
+    `- redirect: ${agePolicy.allowRedirect ? `allowed priority=${agePolicy.redirectPriority}` : "not allowed"}`
+  );
+  lines.push(`- revealRange: ${agePolicy.revealRange ? "allowed" : "not allowed"}`);
+  if (agePolicy.revealRange && rangeText) {
+    lines.push(`- rangeObserved: ${rangeText}`);
+  }
+
+  if (eligibility.status === "pass") {
+    lines.push(
+      `- writingConstraint: ${eligibility.appliedStrategy.strategy}；匹配通过后推进下一步，避免强调年龄筛选`
+    );
+  } else if (eligibility.status === "fail") {
+    lines.push(
+      `- writingConstraint: ${eligibility.appliedStrategy.strategy}；礼貌说明不匹配，避免承诺或争辩`
+    );
+    if (agePolicy.allowRedirect) {
+      lines.push("- writingConstraint: 可提示其他岗位或门店选项");
+    }
+  } else {
+    lines.push(
+      `- writingConstraint: ${eligibility.appliedStrategy.strategy}；先核实年龄或关键资格信息，再给出结论`
+    );
+  }
+
+  return lines;
+}
+
 function buildPolicyPrompt(
   policy: ReplyPolicyConfig | undefined,
   turnPlan: TurnPlan,
@@ -85,7 +163,8 @@ function buildPolicyPrompt(
   message: string,
   conversationHistory: string[],
   industryVoiceId?: string,
-  defaultWechatId?: string
+  defaultWechatId?: string,
+  ageEligibility?: AgeEligibilityResult
 ): { system: string; prompt: string } {
   if (!policy) {
     return {
@@ -113,6 +192,7 @@ function buildPolicyPrompt(
       : "",
     `红线规则：${policy.hardConstraints.rules.map(rule => rule.rule).join("；")}`,
     `FactGate模式：${policy.factGate.mode}；缺事实回退=${policy.factGate.fallbackBehavior}`,
+    ...buildAgeQualificationConstraints(ageEligibility, policy),
     defaultWechatId
       ? `如涉及换微信，优先引导平台交换，必要时可提供默认微信号：${defaultWechatId}`
       : "如涉及换微信，优先引导平台交换，不编造联系方式。",
@@ -252,6 +332,14 @@ export async function generateSmartReply(
     industryVoiceId
   );
 
+  const ageEligibility = await evaluateAgeEligibility({
+    age: resolveCandidateAge(turnPlan, candidateInfo),
+    brandAlias: resolvedBrand,
+    cityName: turnPlan.extractedInfo.city ?? configData.city,
+    regionName: resolveRegionName(turnPlan, candidateInfo),
+    strategy: replyPolicy?.qualificationPolicy?.age,
+  });
+
   const registry = getDynamicRegistry(providerConfigs);
   const replyModel = (modelConfig?.replyModel || DEFAULT_MODEL_CONFIG.replyModel) as ModelId;
   const model = registry.languageModel(replyModel);
@@ -263,7 +351,8 @@ export async function generateSmartReply(
     candidateMessage,
     conversationHistory,
     industryVoiceId,
-    defaultWechatId
+    defaultWechatId,
+    ageEligibility
   );
 
   const replyResult = await safeGenerateText({
@@ -287,6 +376,9 @@ export async function generateSmartReply(
       debugInfo: {
         ...debugInfo,
         classification,
+        gateStatus: ageEligibility.status,
+        appliedStrategy: ageEligibility.appliedStrategy,
+        ageRangeSummary: ageEligibility.summary,
       },
       error: replyResult.error,
     };
@@ -323,6 +415,9 @@ export async function generateSmartReply(
     debugInfo: {
       ...debugInfo,
       classification,
+      gateStatus: ageEligibility.status,
+      appliedStrategy: ageEligibility.appliedStrategy,
+      ageRangeSummary: ageEligibility.summary,
     },
     usage: finalUsage,
     latencyMs: finalLatencyMs,

@@ -112,6 +112,40 @@ export const FactGatePolicySchema = z.object({
   forbiddenWhenMissingFacts: z.array(z.string()),
 });
 
+export const AgeQualificationPolicySchema = z.object({
+  enabled: z.boolean().default(true),
+  revealRange: z.boolean().default(false),
+  failStrategy: z.string().default("礼貌说明不匹配，避免承诺"),
+  unknownStrategy: z.string().default("先核实年龄或资格条件"),
+  passStrategy: z.string().default("确认匹配后推进下一步"),
+  allowRedirect: z.boolean().default(true),
+  redirectPriority: z.enum(["low", "medium", "high"]).default("medium"),
+});
+
+export const QualificationPolicySchema = z
+  .object({
+    age: AgeQualificationPolicySchema.default({
+      enabled: true,
+      revealRange: false,
+      failStrategy: "礼貌说明不匹配，避免承诺",
+      unknownStrategy: "先核实年龄或资格条件",
+      passStrategy: "确认匹配后推进下一步",
+      allowRedirect: true,
+      redirectPriority: "medium",
+    }),
+  })
+  .default({
+    age: {
+      enabled: true,
+      revealRange: false,
+      failStrategy: "礼貌说明不匹配，避免承诺",
+      unknownStrategy: "先核实年龄或资格条件",
+      passStrategy: "确认匹配后推进下一步",
+      allowRedirect: true,
+      redirectPriority: "medium",
+    },
+  });
+
 const StageGoalsSchema = z.object({
   trust_building: StageGoalPolicySchema,
   private_channel: StageGoalPolicySchema,
@@ -128,6 +162,7 @@ export const ReplyPolicyConfigSchema = z.object({
   defaultIndustryVoiceId: z.string(),
   hardConstraints: HardConstraintsPolicySchema,
   factGate: FactGatePolicySchema,
+  qualificationPolicy: QualificationPolicySchema,
 });
 
 export type FunnelStage = z.infer<typeof FunnelStageSchema>;
@@ -141,6 +176,8 @@ export type IndustryVoicePolicy = z.infer<typeof IndustryVoicePolicySchema>;
 export type HardConstraintRule = z.infer<typeof HardConstraintRuleSchema>;
 export type HardConstraintsPolicy = z.infer<typeof HardConstraintsPolicySchema>;
 export type FactGatePolicy = z.infer<typeof FactGatePolicySchema>;
+export type AgeQualificationPolicy = z.infer<typeof AgeQualificationPolicySchema>;
+export type QualificationPolicy = z.infer<typeof QualificationPolicySchema>;
 export type ReplyPolicyConfig = z.infer<typeof ReplyPolicyConfigSchema>;
 
 export const DEFAULT_REPLY_POLICY: ReplyPolicyConfig = {
@@ -228,5 +265,16 @@ export const DEFAULT_REPLY_POLICY: ReplyPolicyConfig = {
     verifiableClaimTypes: ["salary", "location", "schedule", "policy", "availability"],
     fallbackBehavior: "generic_answer",
     forbiddenWhenMissingFacts: ["具体数字", "具体门店承诺", "明确福利承诺"],
+  },
+  qualificationPolicy: {
+    age: {
+      enabled: true,
+      revealRange: false,
+      failStrategy: "礼貌说明不匹配，避免承诺",
+      unknownStrategy: "先核实年龄或资格条件",
+      passStrategy: "确认匹配后推进下一步",
+      allowRedirect: true,
+      redirectPriority: "medium",
+    },
   },
 };

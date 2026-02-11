@@ -74,6 +74,9 @@ function cloneDefaultReplyPolicy(): ReplyPolicyConfig {
       rules: DEFAULT_REPLY_POLICY.hardConstraints.rules.map(rule => ({ ...rule })),
     },
     factGate: { ...DEFAULT_REPLY_POLICY.factGate },
+    qualificationPolicy: {
+      age: { ...DEFAULT_REPLY_POLICY.qualificationPolicy.age },
+    },
   };
 }
 

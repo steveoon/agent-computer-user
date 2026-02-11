@@ -12,6 +12,11 @@ import { Button } from "@/components/ui/button";
 import type { MessageClassification } from "@/types/zhipin";
 import type { StoreWithDistance } from "@/types/geocoding";
 import type { FunnelStage, ReplyNeed, RiskFlag, ReplyPolicyConfig } from "@/types/reply-policy";
+import type {
+  AgeEligibilityAppliedStrategy,
+  AgeEligibilityStatus,
+  AgeEligibilitySummary,
+} from "@/lib/services/eligibility/age-eligibility";
 
 // Components
 import { ModelConfigCard } from "./components/model-config-card";
@@ -43,11 +48,13 @@ export default function TestLLMReplyPage() {
     storeCount: number;
     detailLevel: string;
     classification: MessageClassification;
+    gateStatus: AgeEligibilityStatus;
+    appliedStrategy: AgeEligibilityAppliedStrategy;
+    ageRangeSummary: AgeEligibilitySummary;
   } | null>(null); // 🆕 调试信息
   const [contextInfo, setContextInfo] = useState<string>(""); // 🆕 上下文信息
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [brandStats, setBrandStats] = useState<{
     historyCount: number;
     currentBrand: string | null;
