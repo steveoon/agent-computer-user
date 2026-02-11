@@ -55,8 +55,12 @@ const jobListResponseSchema = z.object({
 });
 
 const JOB_LIST_CACHE_TTL_MS = 60_000;
-let jobListCache: { token: string; payload: unknown; fetchedAt: number } | null = null;
-let inflightJobListRequest: Promise<unknown> | null = null;
+let jobListCache: {
+  cacheKey: string;
+  payload: unknown;
+  fetchedAt: number;
+} | null = null;
+let inflightJobListRequest: { cacheKey: string; promise: Promise<unknown> } | null = null;
 
 function normalizeText(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
@@ -133,30 +137,79 @@ function extractResults(payload: unknown): { items: unknown[]; total: number } {
   };
 }
 
-async function fetchJobList(token: string): Promise<unknown> {
+function normalizeName(value: string | null | undefined): string {
+  return (value ?? "").trim();
+}
+
+function buildCityCandidates(cityName?: string | null): string[] {
+  const city = normalizeName(cityName);
+  if (!city) return [];
+
+  const candidates = new Set<string>([city]);
+  if (city.endsWith("市")) {
+    candidates.add(city.slice(0, -1));
+  } else {
+    candidates.add(`${city}市`);
+  }
+
+  return Array.from(candidates).filter(Boolean);
+}
+
+function buildBrandCandidates(brandAlias?: string | null, cityName?: string | null): string[] {
+  const brand = normalizeName(brandAlias);
+  if (!brand) return [];
+
+  const candidates = new Set<string>([brand]);
+  const cityCandidates = buildCityCandidates(cityName);
+
+  for (const city of cityCandidates) {
+    if (brand.startsWith(city)) {
+      const stripped = brand.slice(city.length).trim();
+      if (stripped) candidates.add(stripped);
+    }
+  }
+
+  return Array.from(candidates).filter(Boolean);
+}
+
+async function fetchJobList(
+  token: string,
+  options?: { brandAlias?: string | null; cityName?: string | null }
+): Promise<unknown> {
   const shouldUseCache = process.env.NODE_ENV !== "test";
+  const brandCandidates = buildBrandCandidates(options?.brandAlias, options?.cityName);
+  const cityCandidates = buildCityCandidates(options?.cityName);
+  const cacheKey = JSON.stringify({ token, brandCandidates, cityCandidates });
+
   const now = Date.now();
   if (
     shouldUseCache &&
     jobListCache &&
-    jobListCache.token === token &&
+    jobListCache.cacheKey === cacheKey &&
     now - jobListCache.fetchedAt < JOB_LIST_CACHE_TTL_MS
   ) {
     return jobListCache.payload;
   }
 
-  if (shouldUseCache && inflightJobListRequest) {
-    return inflightJobListRequest;
+  if (shouldUseCache && inflightJobListRequest?.cacheKey === cacheKey) {
+    return inflightJobListRequest.promise;
   }
 
-  inflightJobListRequest = (async () => {
+  const requestPromise = (async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 20000);
-    const requestBody = {
+    const requestBody: Record<string, unknown> = {
       // Duliday 接口从 1 开始分页；传 0 会返回 50000
       pageNum: 1,
       pageSize: 200,
     };
+
+    if (brandCandidates.length > 0) {
+      requestBody.brandNameList = brandCandidates;
+    }
+    if (cityCandidates.length > 0) {
+      requestBody.cityNameList = cityCandidates;
+    }
 
     try {
       let response = await fetch(DULIDAY_JOB_LIST_ENDPOINT, {
@@ -189,7 +242,7 @@ async function fetchJobList(token: string): Promise<unknown> {
 
       const payload = await response.json();
       jobListCache = {
-        token,
+        cacheKey,
         payload,
         fetchedAt: Date.now(),
       };
@@ -200,7 +253,11 @@ async function fetchJobList(token: string): Promise<unknown> {
     }
   })();
 
-  return inflightJobListRequest;
+  if (shouldUseCache) {
+    inflightJobListRequest = { cacheKey, promise: requestPromise };
+  }
+
+  return requestPromise;
 }
 
 export async function evaluateAgeEligibility({
@@ -233,13 +290,20 @@ export async function evaluateAgeEligibility({
   }
 
   try {
-    const payload = await fetchJobList(token);
+    const payload = await fetchJobList(token, {
+      brandAlias,
+      cityName,
+    });
     const { items, total } = extractResults(payload);
 
     summary.total = total;
 
-    const brandFilter = normalizeText(brandAlias);
-    const cityFilter = normalizeText(cityName);
+    const brandFilters = buildBrandCandidates(brandAlias, cityName)
+      .map(candidate => normalizeText(candidate))
+      .filter(Boolean);
+    const cityFilters = buildCityCandidates(cityName)
+      .map(candidate => normalizeText(candidate))
+      .filter(Boolean);
     const regionFilter = normalizeText(regionName);
 
     let anyRange = false;
@@ -273,10 +337,13 @@ export async function evaluateAgeEligibility({
           (storeInfo ? pickText(storeInfo, ["storeAddress", "storeExactAddress", "address"]) : "")
       );
 
-      if (brandFilter && !itemBrand.includes(brandFilter)) {
+      if (
+        brandFilters.length > 0 &&
+        !brandFilters.some(filter => itemBrand.includes(filter) || filter.includes(itemBrand))
+      ) {
         continue;
       }
-      if (cityFilter && !itemCity.includes(cityFilter)) {
+      if (cityFilters.length > 0 && !cityFilters.some(filter => itemCity.includes(filter))) {
         continue;
       }
       if (regionFilter && !itemRegion.includes(regionFilter) && !itemAddress.includes(regionFilter)) {
