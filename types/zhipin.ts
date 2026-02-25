@@ -143,7 +143,7 @@ export namespace DulidayRaw {
       }
     );
 
-  export const PositionSchema = z.object({
+  const LegacyPositionSchema = z.object({
     jobBasicInfoId: z.number(),
     jobStoreId: z.number(),
     storeId: z.number(),
@@ -173,6 +173,59 @@ export namespace DulidayRaw {
     successNameStr: z.string(),
     storeAddress: z.string(),
   });
+
+  const NewBasicInfoSchema = z
+    .object({
+      jobBasicInfoId: z.number(),
+      jobStoreId: z.number(),
+      storeId: z.number(),
+      storeName: z.string(),
+      storeCityId: z.number(),
+      storeRegionId: z.number(),
+      jobName: z.string(),
+      jobId: z.number(),
+      cityName: z.array(z.string()),
+      postTime: z.string(),
+      successDuliriUserId: z.number(),
+      successNameStr: z.string(),
+      storeAddress: z.string(),
+      organizationId: z.number().optional(),
+      organizationName: z.string().optional(),
+      brandId: z.number().optional(),
+      brandName: z.string().optional(),
+      projectId: z.number().optional(),
+      projectName: z.string().optional(),
+    })
+    .passthrough();
+
+  const NewJobSalarySchema = z
+    .object({
+      salary: z.number(),
+      salaryUnitStr: z.string(),
+    })
+    .passthrough();
+
+  const NewHiringRequirementSchema = z
+    .object({
+      cooperationMode: z.number(),
+      requirementNum: z.number(),
+      thresholdNum: z.number(),
+      signUpNum: z.number().nullable(),
+    })
+    .passthrough();
+
+  const NewPositionSchema = z
+    .object({
+      basicInfo: NewBasicInfoSchema,
+      jobSalary: NewJobSalarySchema,
+      welfare: WelfareSchema,
+      hiringRequirement: NewHiringRequirementSchema,
+      workTime: WorkTimeArrangementSchema,
+      interviewProcess: z.unknown().optional(),
+    })
+    .passthrough();
+
+  export const PositionSchema = z.union([LegacyPositionSchema, NewPositionSchema]);
 
   export const ListResponseSchema = z.object({
     code: z.number(),

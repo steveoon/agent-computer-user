@@ -81,8 +81,10 @@ export async function convertDulidayListToZhipinData(
   // Note: 地理编码在 API route 中进行，此处只做数据转换
   const storeList = Array.from(stores.values());
 
+  const firstPosition = dulidayResponse.data.result[0];
+
   return {
-    city: dulidayResponse.data.result[0]?.cityName[0] || "上海市",
+    city: firstPosition ? normalizePosition(firstPosition).cityName[0] || "上海市" : "上海市",
     stores: storeList,
     brands: {
       [brandName]: brandConfig,
@@ -91,17 +93,117 @@ export async function convertDulidayListToZhipinData(
   };
 }
 
+type NormalizedDulidayPosition = {
+  jobBasicInfoId: number;
+  jobStoreId: number;
+  storeId: number;
+  storeName: string;
+  storeCityId: number;
+  storeRegionId: number;
+  jobName: string;
+  jobId: number;
+  organizationId?: number;
+  organizationName?: string;
+  brandId?: number;
+  brandName?: string;
+  projectId?: number;
+  projectName?: string;
+  cityName: string[];
+  salary: number;
+  salaryUnitStr: string;
+  workTimeArrangement: DulidayRaw.WorkTimeArrangement;
+  welfare: DulidayRaw.Welfare;
+  cooperationMode: number;
+  requirementNum: number;
+  thresholdNum: number;
+  signUpNum: number | null;
+  postTime: string;
+  successDuliriUserId: number;
+  successNameStr: string;
+  storeAddress: string;
+};
+
+function normalizePosition(dulidayData: DulidayRaw.Position | undefined): NormalizedDulidayPosition {
+  if (!dulidayData) {
+    throw new Error("空岗位数据，无法转换");
+  }
+
+  const newFormat = dulidayData as unknown as {
+    basicInfo?: Partial<NormalizedDulidayPosition>;
+    jobSalary?: { salary?: number; salaryUnitStr?: string };
+    welfare?: DulidayRaw.Welfare;
+    hiringRequirement?: {
+      cooperationMode?: number;
+      requirementNum?: number;
+      thresholdNum?: number;
+      signUpNum?: number | null;
+    };
+    workTime?: DulidayRaw.WorkTimeArrangement;
+  };
+
+  const basic = newFormat.basicInfo;
+  const salary = newFormat.jobSalary;
+  const hiring = newFormat.hiringRequirement;
+
+  return {
+    jobBasicInfoId: (dulidayData as { jobBasicInfoId?: number }).jobBasicInfoId ?? basic?.jobBasicInfoId ?? 0,
+    jobStoreId: (dulidayData as { jobStoreId?: number }).jobStoreId ?? basic?.jobStoreId ?? 0,
+    storeId: (dulidayData as { storeId?: number }).storeId ?? basic?.storeId ?? 0,
+    storeName: (dulidayData as { storeName?: string }).storeName ?? basic?.storeName ?? "未知门店",
+    storeCityId: (dulidayData as { storeCityId?: number }).storeCityId ?? basic?.storeCityId ?? 0,
+    storeRegionId:
+      (dulidayData as { storeRegionId?: number }).storeRegionId ?? basic?.storeRegionId ?? 0,
+    jobName: (dulidayData as { jobName?: string }).jobName ?? basic?.jobName ?? "未知岗位",
+    jobId: (dulidayData as { jobId?: number }).jobId ?? basic?.jobId ?? 0,
+    organizationId: (dulidayData as { organizationId?: number }).organizationId ?? basic?.organizationId,
+    organizationName:
+      (dulidayData as { organizationName?: string }).organizationName ?? basic?.organizationName,
+    brandId: (dulidayData as { brandId?: number }).brandId ?? basic?.brandId,
+    brandName: (dulidayData as { brandName?: string }).brandName ?? basic?.brandName,
+    projectId: (dulidayData as { projectId?: number }).projectId ?? basic?.projectId,
+    projectName: (dulidayData as { projectName?: string }).projectName ?? basic?.projectName,
+    cityName: (dulidayData as { cityName?: string[] }).cityName ?? basic?.cityName ?? ["上海市"],
+    salary: (dulidayData as { salary?: number }).salary ?? salary?.salary ?? 0,
+    salaryUnitStr: (dulidayData as { salaryUnitStr?: string }).salaryUnitStr ?? salary?.salaryUnitStr ?? "元/小时",
+    workTimeArrangement:
+      (dulidayData as { workTimeArrangement?: DulidayRaw.WorkTimeArrangement }).workTimeArrangement ??
+      newFormat.workTime ??
+      ({} as DulidayRaw.WorkTimeArrangement),
+    welfare:
+      (dulidayData as { welfare?: DulidayRaw.Welfare }).welfare ??
+      newFormat.welfare ??
+      ({} as DulidayRaw.Welfare),
+    cooperationMode:
+      (dulidayData as { cooperationMode?: number }).cooperationMode ?? hiring?.cooperationMode ?? 0,
+    requirementNum:
+      (dulidayData as { requirementNum?: number }).requirementNum ?? hiring?.requirementNum ?? 0,
+    thresholdNum: (dulidayData as { thresholdNum?: number }).thresholdNum ?? hiring?.thresholdNum ?? 0,
+    signUpNum: (dulidayData as { signUpNum?: number | null }).signUpNum ?? hiring?.signUpNum ?? null,
+    postTime: (dulidayData as { postTime?: string }).postTime ?? basic?.postTime ?? "",
+    successDuliriUserId:
+      (dulidayData as { successDuliriUserId?: number }).successDuliriUserId ??
+      basic?.successDuliriUserId ??
+      0,
+    successNameStr:
+      (dulidayData as { successNameStr?: string }).successNameStr ?? basic?.successNameStr ?? "",
+    storeAddress:
+      (dulidayData as { storeAddress?: string }).storeAddress ?? basic?.storeAddress ?? "",
+  };
+}
+
 /**
  * 转换为门店数据
  */
 function convertToStore(dulidayData: DulidayRaw.Position, brandName: string): Store {
+  const normalized = normalizePosition(dulidayData);
+
   return {
-    id: `store_${dulidayData.storeId}`,
-    name: dulidayData.storeName,
-    city: dulidayData.cityName[0], // 门店所在城市（从 API cityName 获取）
-    location: dulidayData.storeAddress,
-    district: extractDistrict(dulidayData.storeAddress, dulidayData.storeRegionId),
-    subarea: extractSubarea(dulidayData.storeName),
+    id: `store_${normalized.storeId}`,
+    name: normalized.storeName,
+    city: normalized.cityName[0], // 门店所在城市（从 API cityName 获取）
+    location: normalized.storeAddress,
+    district: extractDistrict(normalized.storeAddress, normalized.storeRegionId),
+    subarea: extractSubarea(normalized.storeName),
     coordinates: { lat: 0, lng: 0 }, // 默认值，需要后续地理编码
     transportation: "交通便利", // 默认值
     brand: brandName,
@@ -113,11 +215,12 @@ function convertToStore(dulidayData: DulidayRaw.Position, brandName: string): St
  * 转换为岗位数据
  */
 function convertToPosition(dulidayData: DulidayRaw.Position): Position {
-  const workTimeArrangement = dulidayData.workTimeArrangement;
-  const normalizedProjectId = dulidayData.projectId ?? dulidayData.organizationId;
-  const normalizedProjectName = dulidayData.projectName ?? dulidayData.organizationName;
-  const normalizedBrandId = dulidayData.brandId ?? normalizedProjectId;
-  const normalizedBrandName = dulidayData.brandName ?? normalizedProjectName;
+  const normalized = normalizePosition(dulidayData);
+  const workTimeArrangement = normalized.workTimeArrangement;
+  const normalizedProjectId = normalized.projectId ?? normalized.organizationId;
+  const normalizedProjectName = normalized.projectName ?? normalized.organizationName;
+  const normalizedBrandId = normalized.brandId ?? normalizedProjectId;
+  const normalizedBrandName = normalized.brandName ?? normalizedProjectName;
 
   // 获取时间段数据（添加备用逻辑，与 availableSlots 保持一致）
   let timeSlots: string[] = [];
@@ -128,22 +231,22 @@ function convertToPosition(dulidayData: DulidayRaw.Position): Position {
   }
 
   return {
-    id: `pos_${dulidayData.jobId}`,
-    name: extractPositionType(dulidayData.jobName),
+    id: `pos_${normalized.jobId}`,
+    name: extractPositionType(normalized.jobName),
     brandId: normalizedBrandId !== undefined ? String(normalizedBrandId) : undefined,
     brandName: normalizedBrandName,
     projectId: normalizedProjectId !== undefined ? String(normalizedProjectId) : undefined,
     projectName: normalizedProjectName,
     timeSlots,
-    salary: parseSalaryDetails(dulidayData.salary, dulidayData.welfare),
+    salary: parseSalaryDetails(normalized.salary, normalized.welfare),
     workHours: String(workTimeArrangement.perDayMinWorkHours ?? 8),
-    benefits: parseBenefits(dulidayData.welfare),
-    requirements: generateDefaultRequirements(dulidayData.jobName),
-    urgent: dulidayData.requirementNum > 3,
-    scheduleType: dulidayData.cooperationMode === 2 ? "flexible" : "fixed",
-    attendancePolicy: generateAttendancePolicy(dulidayData.cooperationMode),
-    availableSlots: generateAvailableSlots(dulidayData),
-    schedulingFlexibility: generateSchedulingFlexibility(dulidayData),
+    benefits: parseBenefits(normalized.welfare),
+    requirements: generateDefaultRequirements(normalized.jobName),
+    urgent: normalized.requirementNum > 3,
+    scheduleType: normalized.cooperationMode === 2 ? "flexible" : "fixed",
+    attendancePolicy: generateAttendancePolicy(normalized.cooperationMode),
+    availableSlots: generateAvailableSlots(normalized),
+    schedulingFlexibility: generateSchedulingFlexibility(normalized),
     minHoursPerWeek: calculateMinHoursPerWeek(workTimeArrangement),
     maxHoursPerWeek: calculateMaxHoursPerWeek(workTimeArrangement),
     attendanceRequirement: generateAttendanceRequirement(workTimeArrangement),
@@ -326,7 +429,7 @@ function generateAttendancePolicy(cooperationMode: number): AttendancePolicy {
 /**
  * 生成可用时段
  */
-function generateAvailableSlots(dulidayData: DulidayRaw.Position): TimeSlotAvailability[] {
+function generateAvailableSlots(dulidayData: NormalizedDulidayPosition): TimeSlotAvailability[] {
   const slots: TimeSlotAvailability[] = [];
   let timeSlots: string[] = [];
 
@@ -355,7 +458,7 @@ function generateAvailableSlots(dulidayData: DulidayRaw.Position): TimeSlotAvail
 /**
  * 生成排班灵活性
  */
-function generateSchedulingFlexibility(dulidayData: DulidayRaw.Position): SchedulingFlexibility {
+function generateSchedulingFlexibility(dulidayData: NormalizedDulidayPosition): SchedulingFlexibility {
   const isFlexible = dulidayData.cooperationMode === 2;
   const arrangementType = dulidayData.workTimeArrangement.arrangementType;
 
