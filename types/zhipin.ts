@@ -152,6 +152,13 @@ export namespace DulidayRaw {
     storeRegionId: z.number(),
     jobName: z.string(),
     jobId: z.number(),
+    // 兼容新旧品牌/项目追踪字段
+    organizationId: z.number().optional(),
+    organizationName: z.string().optional(),
+    brandId: z.number().optional(),
+    brandName: z.string().optional(),
+    projectId: z.number().optional(),
+    projectName: z.string().optional(),
     cityName: z.array(z.string()),
     salary: z.number(),
     salaryUnitStr: z.string(),
@@ -237,6 +244,11 @@ export const SchedulingFlexibilitySchema = z.object({
 export const PositionSchema = z.object({
   id: z.string(),
   name: z.string(),
+  // 新增：品牌/项目追踪字段（IndexedDB 持久化）
+  brandId: z.string().optional(),
+  brandName: z.string().optional(),
+  projectId: z.string().optional(),
+  projectName: z.string().optional(),
   timeSlots: z.array(z.string()),
   // 🔧 使用结构化的薪资模型替代原有的 baseSalary 和 levelSalary
   salary: SalaryDetailsSchema,

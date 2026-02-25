@@ -143,6 +143,9 @@ export const useSyncStore = create<SyncState>()(
             });
           }
 
+          const normalizedCityName = (existingData?.city || "上海市").trim();
+          const cityNameList = normalizedCityName ? [normalizedCityName] : ["上海市"];
+
           // 调用 API 端点进行同步 (流式响应)
           const response = await fetch("/api/sync", {
             method: "POST",
@@ -151,6 +154,7 @@ export const useSyncStore = create<SyncState>()(
             },
             body: JSON.stringify({
               organizationIds: selectedBrands,
+              cityNameList,
               token: localToken,
               existingCoordinates, // 发送已知坐标
             }),
