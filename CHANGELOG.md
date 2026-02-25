@@ -2,6 +2,20 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.28.1...v1.29.0-develop.1) (2026-02-25)
+
+
+### Bug Fixes
+
+* **eligibility:** filter duliday job list by brand/city candidates ([e71eb88](https://github.com/steveoon/agent-computer-user/commit/e71eb880455f10c585cadad2b0364deae854d05d))
+* **test-reply:** expose age policy editor and pass brand strategy ([de02776](https://github.com/steveoon/agent-computer-user/commit/de027765effe1d119acd21203f80ec4238372ea3))
+
+
+### Features
+
+* refactor zhipin reply system with replyPolicy and planning builder ([77298a8](https://github.com/steveoon/agent-computer-user/commit/77298a834343592508db11ebaab17faeac45183e))
+* **replyPolicy:** deterministic age eligibility gate ([1097964](https://github.com/steveoon/agent-computer-user/commit/109796421dd8f5861fa44e7155f95b603577cc1a))
+
 ## [1.28.1](https://github.com/steveoon/agent-computer-user/compare/v1.28.0...v1.28.1) (2026-02-02)
 
 
