@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Settings } from "lucide-react";
 import { BrandSelector } from "@/components/brand-selector";
@@ -11,6 +11,12 @@ import { useConfigDataForChat } from "@/hooks/useConfigDataForChat";
 import { Button } from "@/components/ui/button";
 import type { MessageClassification } from "@/types/zhipin";
 import type { StoreWithDistance } from "@/types/geocoding";
+import type { FunnelStage, ReplyNeed, RiskFlag, ReplyPolicyConfig } from "@/types/reply-policy";
+import type {
+  AgeEligibilityAppliedStrategy,
+  AgeEligibilityStatus,
+  AgeEligibilitySummary,
+} from "@/lib/services/eligibility/age-eligibility";
 
 // Components
 import { ModelConfigCard } from "./components/model-config-card";
@@ -19,36 +25,54 @@ import { BrandStatsCard } from "./components/brand-stats-card";
 import { TestInputCard } from "./components/test-input-card";
 import { ConversationHistoryCard } from "./components/conversation-history-card";
 import { ReplyResult } from "./components/reply-result";
+import { PolicyEditorCard } from "./components/policy-editor-card";
 
 export default function TestLLMReplyPage() {
   const { currentBrand } = useBrand();
   const { classifyModel, replyModel, providerConfigs } = useModelConfig();
   const {
     configData,
-    replyPrompts,
+    replyPolicy,
+    brandPriorityStrategy,
     isLoading: configLoading,
     error: configError,
   } = useConfigDataForChat();
   const [message, setMessage] = useState("");
   const [toolBrand, setToolBrand] = useState(""); // 🆕 模拟工具识别的品牌
   const [reply, setReply] = useState("");
-  const [replyType, setReplyType] = useState("");
+  const [stage, setStage] = useState<FunnelStage | "">("");
+  const [needs, setNeeds] = useState<ReplyNeed[]>([]);
+  const [riskFlags, setRiskFlags] = useState<RiskFlag[]>([]);
   const [reasoning, setReasoning] = useState("");
   const [debugInfo, setDebugInfo] = useState<{
     relevantStores: StoreWithDistance[];
     storeCount: number;
     detailLevel: string;
     classification: MessageClassification;
+    gateStatus: AgeEligibilityStatus;
+    appliedStrategy: AgeEligibilityAppliedStrategy;
+    ageRangeSummary: AgeEligibilitySummary;
   } | null>(null); // 🆕 调试信息
   const [contextInfo, setContextInfo] = useState<string>(""); // 🆕 上下文信息
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [brandStats, setBrandStats] = useState<{
     historyCount: number;
     currentBrand: string | null;
   } | null>(null);
   const [conversationHistory, setConversationHistory] = useState<string[]>([]);
+  const [editablePolicy, setEditablePolicy] = useState<ReplyPolicyConfig | null>(null);
+
+  // 当 replyPolicy 加载后初始化可编辑副本
+  useEffect(() => {
+    if (replyPolicy && !editablePolicy) {
+      setEditablePolicy(structuredClone(replyPolicy));
+    }
+  }, [replyPolicy, editablePolicy]);
+
+  const handleResetPolicy = (): void => {
+    if (replyPolicy) setEditablePolicy(structuredClone(replyPolicy));
+  };
 
   // 🗑️ 清除品牌偏好
   const handleClearPreferences = async () => {
@@ -89,7 +113,7 @@ export default function TestLLMReplyPage() {
       return;
     }
 
-    if (!configData || !replyPrompts) {
+    if (!configData || !editablePolicy) {
       setError("配置数据未加载，请刷新页面重试");
       return;
     }
@@ -97,7 +121,9 @@ export default function TestLLMReplyPage() {
     setLoading(true);
     setError("");
     setReply("");
-    setReplyType("");
+    setStage("");
+    setNeeds([]);
+    setRiskFlags([]);
     setReasoning("");
     setDebugInfo(null); // 重置调试信息
     setContextInfo(""); // 重置上下文信息
@@ -118,7 +144,8 @@ export default function TestLLMReplyPage() {
             providerConfigs,
           },
           configData, // 🔧 传递配置数据
-          replyPrompts, // 🔧 传递回复指令
+          replyPolicy: editablePolicy, // 传递可编辑的回复策略
+          brandPriorityStrategy, // 传递品牌优先级策略
           conversationHistory, // 传递对话历史
         }),
       });
@@ -131,7 +158,9 @@ export default function TestLLMReplyPage() {
       // 确保只存储文本内容，避免渲染对象
       const replyText = typeof data.reply === "string" ? data.reply : data.reply?.text || "";
       setReply(replyText);
-      setReplyType(data.replyType || "");
+      setStage(data.stage || "");
+      setNeeds(Array.isArray(data.needs) ? data.needs : []);
+      setRiskFlags(Array.isArray(data.riskFlags) ? data.riskFlags : []);
       setReasoning(data.reasoningText || "");
       if (data.debugInfo) {
         setDebugInfo(data.debugInfo);
@@ -192,6 +221,15 @@ export default function TestLLMReplyPage() {
           </div>
         </div>
 
+        {/* 策略编辑器 - 全宽 */}
+        {editablePolicy && (
+          <PolicyEditorCard
+            policy={editablePolicy}
+            onChange={setEditablePolicy}
+            onReset={handleResetPolicy}
+          />
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 左侧栏：配置与历史 */}
           <div className="space-y-6 lg:col-span-1">
@@ -228,7 +266,9 @@ export default function TestLLMReplyPage() {
             {/* 结果展示区 */}
             <ReplyResult
               reply={reply}
-              replyType={replyType}
+              stage={stage}
+              needs={needs}
+              riskFlags={riskFlags}
               reasoning={reasoning}
               debugInfo={debugInfo}
               contextInfo={contextInfo}

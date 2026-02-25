@@ -100,7 +100,7 @@ export function createLLMError(
  * throw createConfigError(
  *   ErrorCode.CONFIG_MISSING_FIELD,
  *   'Missing required config fields',
- *   { missingFields: ['configData', 'replyPrompts'] }
+ *   { missingFields: ['configData', 'replyPolicy'] }
  * );
  */
 export function createConfigError(

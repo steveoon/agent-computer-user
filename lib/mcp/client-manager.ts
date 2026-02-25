@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter } from "events";
-import { createMCPClient } from "@ai-sdk/mcp";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { experimental_createMCPClient as createMCPClient } from "@ai-sdk/mcp";
+// @ts-expect-error - MCP SDK ESM export resolution issues in Next.js environment
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/dist/esm/client/stdio.js";
 import {
   MCPClientConfig,
   MCPManagerStatus,
@@ -152,7 +153,13 @@ class MCPClientManager {
     if (chromePort) {
       const cdpEndpoint = `http://${chromeHost}:${chromePort}`;
       return {
-        args: ["-y", "@playwright/mcp@latest", "--cdp-endpoint", cdpEndpoint, "--image-responses=allow"],
+        args: [
+          "-y",
+          "@playwright/mcp@latest",
+          "--cdp-endpoint",
+          cdpEndpoint,
+          "--image-responses=allow",
+        ],
         mode: `CDP (${cdpEndpoint})`,
       };
     }
@@ -323,7 +330,10 @@ class MCPClientManager {
         }
 
         const config = this.clientConfigs.get(clientName);
-        console.error(`❌ 获取 ${config?.description} 工具失败 (尝试 ${attempts + 1} 次后):`, error);
+        console.error(
+          `❌ 获取 ${config?.description} 工具失败 (尝试 ${attempts + 1} 次后):`,
+          error
+        );
         return {};
       }
     }

@@ -37,7 +37,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
   const {
     configData,
     systemPrompts,
-    replyPrompts,
+    replyPolicy,
     activeSystemPrompt,
     brandPriorityStrategy,
     isLoading: configLoading,
@@ -175,7 +175,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       if (modelConfig) requestBody.modelConfig = modelConfig;
       if (configData) requestBody.configData = configData;
       if (systemPrompts) requestBody.systemPrompts = systemPrompts;
-      if (replyPrompts) requestBody.replyPrompts = replyPrompts;
+      if (replyPolicy) requestBody.replyPolicy = replyPolicy;
       if (activeSystemPrompt) requestBody.activeSystemPrompt = activeSystemPrompt;
       if (dulidayToken) requestBody.dulidayToken = dulidayToken;
       if (defaultWechatId) requestBody.defaultWechatId = defaultWechatId;
@@ -410,7 +410,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       if (modelConfig) requestBody.modelConfig = modelConfig;
       if (configData) requestBody.configData = configData;
       if (systemPrompts) requestBody.systemPrompts = systemPrompts;
-      if (replyPrompts) requestBody.replyPrompts = replyPrompts;
+      if (replyPolicy) requestBody.replyPolicy = replyPolicy;
       if (activeSystemPrompt) requestBody.activeSystemPrompt = activeSystemPrompt;
       if (dulidayToken) requestBody.dulidayToken = dulidayToken;
       if (defaultWechatId) requestBody.defaultWechatId = defaultWechatId;
@@ -441,7 +441,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       providerConfigs,
       configData,
       systemPrompts,
-      replyPrompts,
+      replyPolicy,
       activeSystemPrompt,
       dulidayToken,
       defaultWechatId,
@@ -472,7 +472,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
         if (modelConfig) requestBody.modelConfig = modelConfig;
         if (configData) requestBody.configData = configData;
         if (systemPrompts) requestBody.systemPrompts = systemPrompts;
-        if (replyPrompts) requestBody.replyPrompts = replyPrompts;
+        if (replyPolicy) requestBody.replyPolicy = replyPolicy;
         if (activeSystemPrompt) requestBody.activeSystemPrompt = activeSystemPrompt;
         if (dulidayToken) requestBody.dulidayToken = dulidayToken;
         if (maxSteps) requestBody.maxSteps = maxSteps;
@@ -513,7 +513,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       providerConfigs,
       configData,
       systemPrompts,
-      replyPrompts,
+      replyPolicy,
       activeSystemPrompt,
       dulidayToken,
       defaultWechatId,

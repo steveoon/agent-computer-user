@@ -13,56 +13,7 @@ import {
   getGeneralComputerSystemPrompt,
   getBossZhipinLocalSystemPrompt,
 } from "../lib/system-prompts";
-import type { AppConfigData, ReplyPromptsConfig } from "@/types";
-
-/**
- * 智能回复指令配置
- * 从 zhipin-data-loader.ts 中的 replySystemPrompts 提取
- */
-const replyPromptsConfig: ReplyPromptsConfig = {
-  initial_inquiry: `作为招聘助手，参考这个模板回复: "你好，{city}各区有{brand}门店在招人，排班{hours}小时，时薪{salary}元，{level_salary}"。语气要自然，突出薪资。`,
-
-  location_inquiry: `候选人咨询某个位置是否有门店，用这个模板回复: "离你比较近在{location}，空缺{schedule}"。强调距离近和具体班次。`,
-
-  no_location_match: `附近无门店，按这个话术处理: "你附近暂时没岗位，{alternative_location}的门店考虑吗？"。同时，主动询问是否可以加微信，告知以后有其他机会可以推荐。`,
-
-  salary_inquiry: `薪资咨询，按这个模板提供信息: "基本薪资{salary}元/小时，{level_salary}"。需要包含阶梯薪资说明。`,
-
-  schedule_inquiry: `时间安排咨询，参考这个话术: "门店除了{time1}空缺，还有{time2}也空缺呢，可以和店长商量"。强调时间灵活性。`,
-
-  interview_request: `面试邀约，严格按照这个话术: "可以帮你和店长约面试，方便加下微信吗，需要几项简单的个人信息"。必须主动要微信。`,
-
-  age_concern: `年龄问题，严格按运营指南处理：
-  - 符合要求(18-45岁): "你的年龄没问题的"
-  - 超出要求: "你附近目前没有岗位空缺了"
-  绝不透露具体年龄限制。`,
-
-  insurance_inquiry: `保险咨询，使用固定话术:
-  - 标准回复: "有商业保险"
-  简洁明确，不展开说明。`,
-
-  followup_chat: `跟进聊天，参考这个话术模板保持联系: "门店除了{position1}还有{position2}也空缺的，可以和店长商量"。营造机会丰富的感觉。`,
-
-  general_chat: `通用回复，引导到具体咨询。重新询问位置或工作意向，保持专业。`,
-
-  // 新增：出勤要求相关回复
-  attendance_inquiry: `出勤要求咨询，参考话术: "出勤要求{attendance_description}，{minimum_days}天起"。强调灵活性。`,
-
-  // 新增：排班灵活性相关回复
-  flexibility_inquiry: `排班灵活性咨询，参考话术: "排班{schedule_type}，{can_swap_shifts}换班"。强调人性化。`,
-
-  // 新增：考勤政策相关回复
-  attendance_policy_inquiry: `考勤政策咨询，参考话术: "考勤要求{punctuality_required}准时到岗"。说明迟到政策。`,
-
-  // 新增：工时要求相关回复
-  work_hours_inquiry: `工时要求咨询，参考话术: "每周工作{min_hours_per_week}-{max_hours_per_week}小时"。强调灵活安排。`,
-
-  // 新增：时间段可用性相关回复
-  availability_inquiry: `时间段可用性咨询，参考话术: "{time_slot}班次还有{available_spots}个位置"。说明优先级。`,
-
-  // 新增：兼职支持相关回复
-  part_time_support: `兼职支持咨询，参考话术: "完全支持兼职，{part_time_allowed}"。强调时间错开安排。`,
-};
+import { DEFAULT_REPLY_POLICY, type AppConfigData } from "@/types";
 
 /**
  * 执行迁移
@@ -93,7 +44,7 @@ async function migrate() {
       },
 
       // 智能回复指令
-      replyPrompts: replyPromptsConfig,
+      replyPolicy: DEFAULT_REPLY_POLICY,
 
       // 品牌优先级策略（默认智能判断）
       brandPriorityStrategy: "smart",
@@ -117,7 +68,7 @@ async function migrate() {
       console.log(`  - 品牌数量: ${Object.keys(savedConfig.brandData.brands).length}`);
       console.log(`  - 门店数量: ${savedConfig.brandData.stores.length}`);
       console.log(`  - 系统提示词: ${Object.keys(savedConfig.systemPrompts).length} 个`);
-      console.log(`  - 回复指令: ${Object.keys(savedConfig.replyPrompts).length} 个`);
+      console.log(`  - 回复指令: ${Object.keys(savedConfig.replyPolicy).length} 个`);
       console.log(`  - 配置版本: ${savedConfig.metadata.version}`);
       console.log(`  - 迁移时间: ${savedConfig.metadata.migratedAt}`);
     } else {

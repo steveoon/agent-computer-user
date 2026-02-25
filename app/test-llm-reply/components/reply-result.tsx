@@ -2,8 +2,14 @@ import { Bot, Zap, Bug, RotateCw, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { REPLY_TYPE_NAMES, type ReplyContext, type MessageClassification } from "@/types/zhipin";
+import type { MessageClassification } from "@/types/zhipin";
+import type { FunnelStage, ReplyNeed, RiskFlag } from "@/types/reply-policy";
 import type { StoreWithDistance } from "@/types/geocoding";
+import type {
+  AgeEligibilityAppliedStrategy,
+  AgeEligibilityStatus,
+  AgeEligibilitySummary,
+} from "@/lib/services/eligibility/age-eligibility";
 import { MatchedStoresCard } from "@/components/tool-messages/matched-stores-card";
 
 interface DebugInfo {
@@ -11,11 +17,16 @@ interface DebugInfo {
   storeCount: number;
   detailLevel: string;
   classification: MessageClassification;
+  gateStatus: AgeEligibilityStatus;
+  appliedStrategy: AgeEligibilityAppliedStrategy;
+  ageRangeSummary: AgeEligibilitySummary;
 }
 
 interface ReplyResultProps {
   reply: string;
-  replyType: string;
+  stage: FunnelStage | "";
+  needs: ReplyNeed[];
+  riskFlags: RiskFlag[];
   reasoning: string;
   debugInfo: DebugInfo | null;
   contextInfo: string;
@@ -26,7 +37,9 @@ interface ReplyResultProps {
 
 export function ReplyResult({
   reply,
-  replyType,
+  stage,
+  needs,
+  riskFlags,
   reasoning,
   debugInfo,
   contextInfo,
@@ -59,6 +72,13 @@ export function ReplyResult({
     return null;
   }
 
+  const ageRangeText =
+    debugInfo?.ageRangeSummary &&
+    (debugInfo.ageRangeSummary.minAgeObserved !== null ||
+      debugInfo.ageRangeSummary.maxAgeObserved !== null)
+      ? `${debugInfo.ageRangeSummary.minAgeObserved ?? "?"}-${debugInfo.ageRangeSummary.maxAgeObserved ?? "?"}`
+      : "未知";
+
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
       {/* 智能回复结果 */}
@@ -77,29 +97,40 @@ export function ReplyResult({
         </CardContent>
       </Card>
 
-      {/* 分类分析 */}
-      {(replyType || reasoning) && (
+      {/* 回合规划 */}
+      {(stage || reasoning || needs.length > 0 || riskFlags.length > 0) && (
         <Card className="glass-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-base text-blue-700 flex items-center gap-2">
               <Zap className="w-4 h-4" />
-              意图分析
+              回合规划
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
-            {replyType && (
+            {stage && (
               <div className="bg-blue-50/50 p-3 rounded border border-blue-100">
-                <span className="font-medium text-blue-700 block mb-1">识别意图类型</span>
-                <span className="text-gray-700">
-                  {REPLY_TYPE_NAMES[replyType as ReplyContext] || replyType}
-                  <span className="text-xs text-blue-400 ml-2 font-mono">({replyType})</span>
-                </span>
+                <span className="font-medium text-blue-700 block mb-1">阶段</span>
+                <span className="text-gray-700">{stage}</span>
+              </div>
+            )}
+
+            {needs.length > 0 && (
+              <div className="bg-blue-50/50 p-3 rounded border border-blue-100">
+                <span className="font-medium text-blue-700 block mb-1">Needs</span>
+                <span className="text-gray-700">{needs.join("、")}</span>
+              </div>
+            )}
+
+            {riskFlags.length > 0 && (
+              <div className="bg-blue-50/50 p-3 rounded border border-blue-100">
+                <span className="font-medium text-blue-700 block mb-1">风险标记</span>
+                <span className="text-gray-700">{riskFlags.join("、")}</span>
               </div>
             )}
 
             {reasoning && (
               <div className="bg-white/50 p-3 rounded border border-gray-100">
-                <span className="font-medium text-gray-700 block mb-1">推理依据</span>
+                <span className="font-medium text-gray-700 block mb-1">规划依据</span>
                 <span className="text-gray-600 leading-relaxed">{reasoning}</span>
               </div>
             )}
@@ -140,6 +171,40 @@ export function ReplyResult({
                   {debugInfo.relevantStores.length}
                 </div>
               </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-white/60 p-3 rounded-lg border text-center shadow-sm">
+                <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                  Gate Status
+                </div>
+                <div className="font-bold text-xl text-indigo-600 uppercase">
+                  {debugInfo.gateStatus}
+                </div>
+              </div>
+              <div className="bg-white/60 p-3 rounded-lg border text-center shadow-sm">
+                <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                  匹配/总数
+                </div>
+                <div className="font-bold text-xl text-indigo-600">
+                  {debugInfo.ageRangeSummary.matchedCount}/{debugInfo.ageRangeSummary.total}
+                </div>
+              </div>
+              <div className="bg-white/60 p-3 rounded-lg border text-center shadow-sm">
+                <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                  观测年龄区间
+                </div>
+                <div className="font-bold text-xl text-indigo-600">{ageRangeText}</div>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs mb-2 block text-muted-foreground">
+                Eligibility Strategy
+              </Label>
+              <pre className="bg-slate-950 text-green-400 p-4 rounded-lg overflow-x-auto text-xs font-mono shadow-inner">
+                {JSON.stringify(debugInfo.appliedStrategy, null, 2)}
+              </pre>
             </div>
 
             <div>

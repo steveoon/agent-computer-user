@@ -5,6 +5,7 @@ import {
   configService,
 } from "@/lib/services/config.service";
 import { BrandSyncManager } from "@/lib/services/brand-sync-manager";
+import { useAuthStore } from "@/lib/stores/auth-store";
 
 export interface ConfigMigrationState {
   isLoading: boolean;
@@ -71,26 +72,34 @@ export function useConfigMigration() {
             `🔄 发现 ${syncStatus.missingBrands.length} 个缺失的品牌: ${syncStatus.missingBrands.join(", ")}`
           );
 
-          // 尝试自动同步缺失的品牌
-          try {
-            const syncResult = await BrandSyncManager.syncMissingBrands();
+          const { isAuthenticated } = useAuthStore.getState();
+          if (!isAuthenticated) {
+            console.info("ℹ️ 当前未登录，跳过自动同步缺失品牌");
+          } else {
+            // 尝试自动同步缺失的品牌
+            try {
+              const syncResult = await BrandSyncManager.syncMissingBrands();
 
-            // 检查是否因 Token 缺失而跳过同步
-            if (syncResult.tokenMissing) {
-              tokenMissing = true;
-            } else {
-              if (syncResult.syncedBrands.length > 0) {
-                console.log(`✅ 成功同步品牌: ${syncResult.syncedBrands.join(", ")}`);
-              }
+              // 未登录/无权限时不作为错误处理
+              if (syncResult.unauthorized) {
+                console.info("ℹ️ 无权限同步品牌（可能登录态已失效），已跳过");
+              } else if (syncResult.tokenMissing) {
+                // 检查是否因 Token 缺失而跳过同步
+                tokenMissing = true;
+              } else {
+                if (syncResult.syncedBrands.length > 0) {
+                  console.log(`✅ 成功同步品牌: ${syncResult.syncedBrands.join(", ")}`);
+                }
 
-              if (syncResult.failedBrands.length > 0) {
-                console.warn(`⚠️ 部分品牌同步失败: ${syncResult.failedBrands.join(", ")}`);
-                console.warn("失败详情:", syncResult.errors);
+                if (syncResult.failedBrands.length > 0) {
+                  console.warn(`⚠️ 部分品牌同步失败: ${syncResult.failedBrands.join(", ")}`);
+                  console.warn("失败详情:", syncResult.errors);
+                }
               }
+            } catch (syncError) {
+              console.error("❌ 品牌同步失败:", syncError);
+              // 品牌同步失败不应该阻止应用启动
             }
-          } catch (syncError) {
-            console.error("❌ 品牌同步失败:", syncError);
-            // 品牌同步失败不应该阻止应用启动
           }
         } else {
           console.log("✅ 所有映射的品牌都已存在");
@@ -117,8 +126,8 @@ export function useConfigMigration() {
           console.log("📊 当前配置状态:", {
             hasConfig: !!currentConfig,
             version: currentConfig?.metadata?.version,
-            replyPromptsCount: currentConfig
-              ? Object.keys(currentConfig.replyPrompts || {}).length
+            replyPolicyCount: currentConfig
+              ? Object.keys(currentConfig.replyPolicy || {}).length
               : 0,
             storesCount: currentConfig?.brandData?.stores?.length || 0,
           });

@@ -106,7 +106,7 @@ describe("品牌同步和导入功能测试", () => {
       // Mock 返回现有配置
       mockGetConfig.mockResolvedValue({
         brandData: existingBrandData,
-        replyPrompts: {} as any,
+        replyPolicy: {} as any,
         systemPrompts: {} as any,
         activeSystemPrompt: "bossZhipinSystemPrompt",
         brandPriorityStrategy: "smart",
@@ -240,7 +240,7 @@ describe("品牌同步和导入功能测试", () => {
 
       mockGetConfig.mockResolvedValue({
         brandData: existingBrandData,
-        replyPrompts: {} as any,
+        replyPolicy: {} as any,
         systemPrompts: {} as any,
         activeSystemPrompt: "bossZhipinSystemPrompt",
         brandPriorityStrategy: "smart",
@@ -480,7 +480,7 @@ describe("品牌同步和导入功能测试", () => {
 
       mockGetConfig.mockResolvedValue({
         brandData: existingBrandData,
-        replyPrompts: {} as any,
+        replyPolicy: {} as any,
         systemPrompts: {} as any,
         activeSystemPrompt: "bossZhipinSystemPrompt",
         brandPriorityStrategy: "smart",
@@ -766,7 +766,7 @@ describe("品牌同步和导入功能测试", () => {
 
       mockGetConfig.mockResolvedValue({
         brandData: existingBrandData,
-        replyPrompts: {} as any,
+        replyPolicy: {} as any,
         systemPrompts: {} as any,
         activeSystemPrompt: "bossZhipinSystemPrompt",
         brandPriorityStrategy: "smart",
@@ -939,7 +939,7 @@ describe("品牌同步和导入功能测试", () => {
 
       mockGetConfig.mockResolvedValue({
         brandData: existingBrandData,
-        replyPrompts: {} as any,
+        replyPolicy: {} as any,
         systemPrompts: {} as any,
         activeSystemPrompt: "bossZhipinSystemPrompt",
         brandPriorityStrategy: "smart",

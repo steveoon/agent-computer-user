@@ -66,11 +66,7 @@ export const screenshotTool = () =>
         .describe("CSS 选择器，指定要截图的元素（仅 Puppeteer 模式支持）"),
 
       // 图片格式
-      type: z
-        .enum(["png", "jpeg"])
-        .optional()
-        .default("jpeg")
-        .describe("图片格式"),
+      type: z.enum(["png", "jpeg"]).optional().default("jpeg").describe("图片格式"),
 
       // 视口尺寸（仅 Puppeteer）
       width: z.number().optional().default(1440).describe("视口宽度（仅 Puppeteer 模式）"),
@@ -80,7 +76,7 @@ export const screenshotTool = () =>
       name: z.string().optional().describe("截图名称，用于日志追踪"),
     }),
 
-    execute: async (params) => {
+    execute: async params => {
       const { fullPage, selector, type, width, height, name } = params;
       const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
 
@@ -315,7 +311,7 @@ async function executePuppeteerScreenshot(params: {
   const mcpResult = result as PuppeteerMCPResult;
 
   // 从 Puppeteer MCP 结果中提取 base64 数据
-  const imageContent = mcpResult?.content?.find((c) => c.type === "image");
+  const imageContent = mcpResult?.content?.find(c => c.type === "image");
 
   if (imageContent && imageContent.type === "image") {
     return imageContent.data;

@@ -1,5 +1,5 @@
 import { tool } from "ai";
-import { z } from 'zod/v3';
+import { z } from "zod/v3";
 import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
 import {
   PuppeteerResult,
@@ -322,11 +322,7 @@ export const puppeteerTool = () =>
         return PuppeteerResultSchema.parse(errorResult);
       }
     },
-    toModelOutput(
-      {
-        output
-      }
-    ) {
+    toModelOutput({ output }) {
       try {
         // 如果result是字符串，将其包装为text类型的结果
         if (typeof output === "string") {

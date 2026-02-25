@@ -7,6 +7,8 @@
 
 import { z } from "zod/v3";
 import type { ProviderConfig, ModelConfig } from "@/lib/config/models";
+import type { FunnelStage } from "@/types/reply-policy";
+import type { ReplyContext } from "@/types/zhipin";
 
 // ========== 基础 Schema 定义 ==========
 
@@ -60,6 +62,25 @@ export const ClassificationOptionsSchema = z.object({
   // 品牌数据
   brandData: BrandDataSchema,
 });
+
+// ========== 共享工具函数 ==========
+
+const STAGE_TO_REPLY_TYPE: Record<FunnelStage, ReplyContext> = {
+  trust_building: "general_chat",
+  private_channel: "followup_chat",
+  qualify_candidate: "attendance_inquiry",
+  job_consultation: "salary_inquiry",
+  interview_scheduling: "interview_request",
+  onboard_followup: "followup_chat",
+};
+
+/**
+ * 将 FunnelStage 映射为旧版 ReplyContext（兼容旧路径）
+ */
+export function stageToLegacyReplyType(stage?: FunnelStage): ReplyContext {
+  if (!stage) return "general_chat";
+  return STAGE_TO_REPLY_TYPE[stage];
+}
 
 // ========== 类型导出 ==========
 

@@ -7,7 +7,7 @@ import { z } from 'zod/v3';
 import type { UIMessagePart, UIDataTypes, UITools, Tool } from "ai";
 import type { ModelConfig } from "@/lib/config/models";
 import type { ZhipinData } from "./zhipin";
-import type { SystemPromptsConfig, ReplyPromptsConfig, BrandPriorityStrategy } from "./config";
+import type { SystemPromptsConfig, ReplyPolicyConfig, BrandPriorityStrategy } from "./config";
 
 // ========== 工具注册表类型定义 ==========
 
@@ -21,7 +21,8 @@ export interface ToolCreationContext {
   brandPriorityStrategy?: BrandPriorityStrategy; // 品牌冲突处理策略
   modelConfig?: ModelConfig;
   configData?: ZhipinData;
-  replyPrompts?: ReplyPromptsConfig;
+  replyPolicy?: ReplyPolicyConfig;
+  industryVoiceId?: string;
   dulidayToken?: string;
   defaultWechatId?: string; // 默认微信号
 }
@@ -63,14 +64,14 @@ export interface ToolDefinition {
    * 键为 requiredContext 中的字段名，值为对应的 Zod Schema
    * 在 contextStrategy === "error" 时会进行结构验证
    *
-   * @example
-   * ```typescript
-   * contextSchemas: {
-   *   configData: ZhipinDataSchema,
-   *   replyPrompts: ReplyPromptsSchema,
-   * }
-   * ```
-   */
+ * @example
+ * ```typescript
+ * contextSchemas: {
+ *   configData: ZhipinDataSchema,
+ *   replyPolicy: ReplyPolicyConfigSchema,
+ * }
+ * ```
+ */
   contextSchemas?: Record<string, z.ZodSchema>;
 }
 

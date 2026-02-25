@@ -82,3 +82,6 @@ dist/
 
 # Compiled Electron code
 build/
+
+# Codex
+.codex/
