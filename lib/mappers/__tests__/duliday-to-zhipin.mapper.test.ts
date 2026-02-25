@@ -835,6 +835,124 @@ describe("Duliday to Zhipin Mapper", () => {
       expect(position.projectName).toBe("项目名称");
     });
 
+    it("支持新 Duliday 分段结构并正确映射追踪字段", async () => {
+      const newFormatData = {
+        basicInfo: {
+          jobBasicInfoId: 5001,
+          jobStoreId: 5001,
+          storeId: 5001,
+          storeName: "新结构门店",
+          storeCityId: 310100,
+          storeRegionId: 310101,
+          jobName: "新品牌-新结构门店-服务员-兼职",
+          jobId: 5001,
+          cityName: ["上海市"],
+          postTime: "2026.02.25 10:00",
+          successDuliriUserId: 5001,
+          successNameStr: "测试",
+          storeAddress: "上海市-黄浦区-测试路",
+          organizationId: 700,
+          organizationName: "组织-新",
+          brandId: 701,
+          brandName: "品牌-新",
+          projectId: 702,
+          projectName: "项目-新",
+        },
+        jobSalary: {
+          salary: 28,
+          salaryUnitStr: "元/小时",
+        },
+        welfare: {
+          id: 5001,
+          jobBasicInfoId: 5001,
+          haveInsurance: 1,
+          accommodation: 0,
+          accommodationSalary: null,
+          accommodationSalaryUnit: null,
+          probationAccommodationSalaryReceive: null,
+          catering: 0,
+          cateringImage: null,
+          cateringSalary: null,
+          cateringSalaryUnit: null,
+          trafficAllowanceSalary: null,
+          trafficAllowanceSalaryUnit: null,
+          otherWelfare: null,
+          moreWelfares: null,
+          insuranceFund: null,
+          insuranceFundCityId: null,
+          insuranceFundCityStr: null,
+          insuranceFundAmount: null,
+          memo: "",
+          promotionWelfare: null,
+          accommodationNum: null,
+          commuteDistance: null,
+          accommodationEnv: null,
+          imagesDTOList: null,
+        },
+        hiringRequirement: {
+          cooperationMode: 2,
+          requirementNum: 4,
+          thresholdNum: 10,
+          signUpNum: 1,
+        },
+        workTime: {
+          id: 5001,
+          jobBasicInfoId: 5001,
+          employmentForm: 2,
+          minWorkMonths: 1,
+          temporaryEmploymentStartTime: null,
+          temporaryEmploymentEndTime: null,
+          employmentDescription: null,
+          monthWorkTimeRequirement: 0,
+          perMonthMinWorkTime: null,
+          perMonthMinWorkTimeUnit: null,
+          perMonthMaxRestTime: null,
+          perMonthMaxRestTimeUnit: null,
+          weekWorkTimeRequirement: 3,
+          perWeekNeedWorkDays: 3,
+          perWeekWorkDays: null,
+          perWeekRestDays: null,
+          evenOddType: null,
+          customWorkTimes: null,
+          dayWorkTimeRequirement: 1,
+          perDayMinWorkHours: 4,
+          arrangementType: 2,
+          fixedArrangementTimes: null,
+          combinedArrangementTimes: null,
+          goToWorkStartTime: null,
+          goToWorkEndTime: null,
+          goOffWorkStartTime: null,
+          goOffWorkEndTime: null,
+          maxWorkTakingTime: 30,
+          restTimeDesc: null,
+          workTimeRemark: "新结构测试",
+        },
+        interviewProcess: {},
+      } as unknown as DulidayRaw.Position;
+
+      expect(() => {
+        DulidayRaw.PositionSchema.parse(newFormatData);
+      }).not.toThrow();
+
+      const mockResponse: DulidayRaw.ListResponse = {
+        code: 0,
+        message: "操作成功",
+        data: {
+          result: [newFormatData],
+          total: 1,
+        },
+      };
+
+      const result = await convertDulidayListToZhipinData(mockResponse, 100);
+      const position = result.stores![0].positions[0];
+
+      expect(position.brandId).toBe("701");
+      expect(position.brandName).toBe("品牌-新");
+      expect(position.projectId).toBe("702");
+      expect(position.projectName).toBe("项目-新");
+      expect(position.minHoursPerWeek).toBe(12);
+    });
+
     it("当缺少新追踪字段时，应该回退到 organizationId/organizationName", async () => {
       const basePosition: DulidayRaw.Position = {
         jobBasicInfoId: 9002,

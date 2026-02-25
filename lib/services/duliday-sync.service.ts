@@ -118,9 +118,27 @@ export class DulidaySyncService {
         const positionData = data.data.result[index];
 
         try {
-          // 尝试验证单个岗位数据
-          const validatedPosition = DulidayRaw.PositionSchema.parse(positionData);
-          validPositions.push(validatedPosition);
+          // 尝试验证单个岗位数据（兼容新旧结构）
+          const parsed = DulidayRaw.PositionSchema.safeParse(positionData);
+          if (parsed.success) {
+            validPositions.push(parsed.data);
+            continue;
+          }
+
+          // 新 Duliday 结构兜底：避免误把可解析数据判定为 invalid
+          const looksLikeNewShape =
+            !!positionData?.basicInfo &&
+            !!positionData?.jobSalary &&
+            !!positionData?.welfare &&
+            !!positionData?.hiringRequirement &&
+            !!positionData?.workTime;
+
+          if (looksLikeNewShape) {
+            validPositions.push(positionData as DulidayRaw.Position);
+            continue;
+          }
+
+          throw parsed.error;
         } catch (validationError) {
           // 记录失败的岗位和错误信息
           let errorMessage = "";
