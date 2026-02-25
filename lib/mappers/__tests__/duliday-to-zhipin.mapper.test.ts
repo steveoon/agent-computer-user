@@ -728,5 +728,213 @@ describe("Duliday to Zhipin Mapper", () => {
       expect(position.attendanceRequirement?.minimumDays).toBe(5);
       expect(position.minHoursPerWeek).toBe(20); // 4小时 * 5天
     });
+
+    it("应该保留品牌/项目追踪字段并优先使用新字段", async () => {
+      const basePosition: DulidayRaw.Position = {
+        jobBasicInfoId: 9001,
+        jobStoreId: 9001,
+        storeId: 9001,
+        storeName: "追踪门店",
+        storeCityId: 310100,
+        storeRegionId: 310101,
+        jobName: "追踪品牌-追踪门店-服务员-兼职",
+        jobId: 9001,
+        organizationId: 101,
+        organizationName: "组织名称",
+        brandId: 202,
+        brandName: "品牌名称",
+        projectId: 303,
+        projectName: "项目名称",
+        cityName: ["上海市"],
+        salary: 25,
+        salaryUnitStr: "元/小时",
+        workTimeArrangement: {
+          id: 9001,
+          jobBasicInfoId: 9001,
+          employmentForm: 2,
+          minWorkMonths: 1,
+          temporaryEmploymentStartTime: null,
+          temporaryEmploymentEndTime: null,
+          employmentDescription: null,
+          monthWorkTimeRequirement: 0,
+          perMonthMinWorkTime: null,
+          perMonthMinWorkTimeUnit: null,
+          perMonthMaxRestTime: null,
+          perMonthMaxRestTimeUnit: null,
+          weekWorkTimeRequirement: 3,
+          perWeekNeedWorkDays: null,
+          perWeekWorkDays: 4,
+          perWeekRestDays: null,
+          evenOddType: null,
+          customWorkTimes: null,
+          dayWorkTimeRequirement: 1,
+          perDayMinWorkHours: 5,
+          arrangementType: 2,
+          fixedArrangementTimes: null,
+          combinedArrangementTimes: null,
+          goToWorkStartTime: null,
+          goToWorkEndTime: null,
+          goOffWorkStartTime: null,
+          goOffWorkEndTime: null,
+          maxWorkTakingTime: 30,
+          restTimeDesc: null,
+          workTimeRemark: "追踪测试",
+        },
+        welfare: {
+          id: 9001,
+          jobBasicInfoId: 9001,
+          haveInsurance: 0,
+          accommodation: 0,
+          accommodationSalary: null,
+          accommodationSalaryUnit: null,
+          probationAccommodationSalaryReceive: null,
+          catering: 0,
+          cateringImage: null,
+          cateringSalary: null,
+          cateringSalaryUnit: null,
+          trafficAllowanceSalary: null,
+          trafficAllowanceSalaryUnit: null,
+          otherWelfare: null,
+          moreWelfares: null,
+          insuranceFund: [],
+          insuranceFundCityId: null,
+          insuranceFundCityStr: null,
+          insuranceFundAmount: null,
+          memo: "",
+          promotionWelfare: null,
+          accommodationNum: null,
+          commuteDistance: null,
+          accommodationEnv: null,
+          imagesDTOList: null,
+        },
+        cooperationMode: 2,
+        requirementNum: 1,
+        thresholdNum: 10,
+        signUpNum: 0,
+        postTime: "2025.08.25 12:00",
+        successDuliriUserId: 9999,
+        successNameStr: "测试",
+        storeAddress: "上海市-浦东新区-测试",
+      };
+
+      const mockResponse: DulidayRaw.ListResponse = {
+        code: 0,
+        message: "操作成功",
+        data: {
+          result: [basePosition],
+          total: 1,
+        },
+      };
+
+      const result = await convertDulidayListToZhipinData(mockResponse, 100);
+      const position = result.stores![0].positions[0];
+
+      expect(position.brandId).toBe("202");
+      expect(position.brandName).toBe("品牌名称");
+      expect(position.projectId).toBe("303");
+      expect(position.projectName).toBe("项目名称");
+    });
+
+    it("当缺少新追踪字段时，应该回退到 organizationId/organizationName", async () => {
+      const basePosition: DulidayRaw.Position = {
+        jobBasicInfoId: 9002,
+        jobStoreId: 9002,
+        storeId: 9002,
+        storeName: "追踪门店2",
+        storeCityId: 310100,
+        storeRegionId: 310101,
+        jobName: "追踪品牌-追踪门店2-服务员-兼职",
+        jobId: 9002,
+        organizationId: 404,
+        organizationName: "旧组织名称",
+        cityName: ["上海市"],
+        salary: 25,
+        salaryUnitStr: "元/小时",
+        workTimeArrangement: {
+          id: 9002,
+          jobBasicInfoId: 9002,
+          employmentForm: 2,
+          minWorkMonths: 1,
+          temporaryEmploymentStartTime: null,
+          temporaryEmploymentEndTime: null,
+          employmentDescription: null,
+          monthWorkTimeRequirement: 0,
+          perMonthMinWorkTime: null,
+          perMonthMinWorkTimeUnit: null,
+          perMonthMaxRestTime: null,
+          perMonthMaxRestTimeUnit: null,
+          weekWorkTimeRequirement: 3,
+          perWeekNeedWorkDays: null,
+          perWeekWorkDays: 4,
+          perWeekRestDays: null,
+          evenOddType: null,
+          customWorkTimes: null,
+          dayWorkTimeRequirement: 1,
+          perDayMinWorkHours: 5,
+          arrangementType: 2,
+          fixedArrangementTimes: null,
+          combinedArrangementTimes: null,
+          goToWorkStartTime: null,
+          goToWorkEndTime: null,
+          goOffWorkStartTime: null,
+          goOffWorkEndTime: null,
+          maxWorkTakingTime: 30,
+          restTimeDesc: null,
+          workTimeRemark: "追踪测试",
+        },
+        welfare: {
+          id: 9002,
+          jobBasicInfoId: 9002,
+          haveInsurance: 0,
+          accommodation: 0,
+          accommodationSalary: null,
+          accommodationSalaryUnit: null,
+          probationAccommodationSalaryReceive: null,
+          catering: 0,
+          cateringImage: null,
+          cateringSalary: null,
+          cateringSalaryUnit: null,
+          trafficAllowanceSalary: null,
+          trafficAllowanceSalaryUnit: null,
+          otherWelfare: null,
+          moreWelfares: null,
+          insuranceFund: [],
+          insuranceFundCityId: null,
+          insuranceFundCityStr: null,
+          insuranceFundAmount: null,
+          memo: "",
+          promotionWelfare: null,
+          accommodationNum: null,
+          commuteDistance: null,
+          accommodationEnv: null,
+          imagesDTOList: null,
+        },
+        cooperationMode: 2,
+        requirementNum: 1,
+        thresholdNum: 10,
+        signUpNum: 0,
+        postTime: "2025.08.25 12:00",
+        successDuliriUserId: 9999,
+        successNameStr: "测试",
+        storeAddress: "上海市-浦东新区-测试",
+      };
+
+      const mockResponse: DulidayRaw.ListResponse = {
+        code: 0,
+        message: "操作成功",
+        data: {
+          result: [basePosition],
+          total: 1,
+        },
+      };
+
+      const result = await convertDulidayListToZhipinData(mockResponse, 100);
+      const position = result.stores![0].positions[0];
+
+      expect(position.brandId).toBe("404");
+      expect(position.brandName).toBe("旧组织名称");
+      expect(position.projectId).toBe("404");
+      expect(position.projectName).toBe("旧组织名称");
+    });
   });
 });

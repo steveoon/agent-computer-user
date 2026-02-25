@@ -10,6 +10,7 @@ const SyncRequestSchema = z.object({
   organizationIds: z.array(z.union([z.number(), z.string()])).min(1, "至少需要选择一个组织ID"),
   pageSize: z.number().optional().default(100),
   validateOnly: z.boolean().optional().default(false),
+  cityNameList: z.array(z.string().min(1)).min(1, "至少需要提供一个城市"),
   token: z.string().optional(), // 支持从客户端传递token
   existingCoordinates: z
     .record(z.string(), z.object({ lat: z.number(), lng: z.number() }))
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
     const {
       organizationIds,
       validateOnly,
+      cityNameList,
       token: clientToken,
       existingCoordinates,
     } = SyncRequestSchema.parse(body);
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 执行数据同步
-    console.log(`[SYNC API] 开始同步组织: ${numericOrgIds.join(", ")}`);
+    console.log(`[SYNC API] 开始同步组织: ${numericOrgIds.join(", ")}，城市: ${cityNameList.join(", ")}`);
 
     // 创建流式响应
     const encoder = new TextEncoder();
@@ -109,6 +111,7 @@ export async function POST(request: NextRequest) {
 
           const syncRecord = await syncService.syncMultipleOrganizations(
             numericOrgIds,
+            cityNameList,
             (progress, currentOrg, message) => {
               // 这里的 progress 是同步阶段的进度 (0-100)
               // 我们将其映射到总体进度的 0-50%

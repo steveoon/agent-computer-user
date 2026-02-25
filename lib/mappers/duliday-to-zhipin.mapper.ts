@@ -114,6 +114,10 @@ function convertToStore(dulidayData: DulidayRaw.Position, brandName: string): St
  */
 function convertToPosition(dulidayData: DulidayRaw.Position): Position {
   const workTimeArrangement = dulidayData.workTimeArrangement;
+  const normalizedProjectId = dulidayData.projectId ?? dulidayData.organizationId;
+  const normalizedProjectName = dulidayData.projectName ?? dulidayData.organizationName;
+  const normalizedBrandId = dulidayData.brandId ?? normalizedProjectId;
+  const normalizedBrandName = dulidayData.brandName ?? normalizedProjectName;
 
   // 获取时间段数据（添加备用逻辑，与 availableSlots 保持一致）
   let timeSlots: string[] = [];
@@ -126,6 +130,10 @@ function convertToPosition(dulidayData: DulidayRaw.Position): Position {
   return {
     id: `pos_${dulidayData.jobId}`,
     name: extractPositionType(dulidayData.jobName),
+    brandId: normalizedBrandId !== undefined ? String(normalizedBrandId) : undefined,
+    brandName: normalizedBrandName,
+    projectId: normalizedProjectId !== undefined ? String(normalizedProjectId) : undefined,
+    projectName: normalizedProjectName,
     timeSlots,
     salary: parseSalaryDetails(dulidayData.salary, dulidayData.welfare),
     workHours: String(workTimeArrangement.perDayMinWorkHours ?? 8),
