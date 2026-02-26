@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod/v3";
+import { encode } from "@toon-format/toon";
 import { aiJobListResponseSchema, type AIJobItem } from "./ai-job-types";
 
 /**
@@ -102,6 +103,21 @@ interface ProgressiveDisclosureFlags {
   includeInterviewProcess: boolean;
 }
 
+/**
+ * 工具返回结果
+ */
+export interface JobListForLlmResult {
+  /** 格式化后的 Markdown 文本，适合直接展示给 LLM */
+  markdown: string;
+  /** API 返回的原始 JSON 数据 */
+  rawData: {
+    result: AIJobItem[];
+    total: number;
+  } | null;
+  /** 使用 TOON 格式压缩后的数据（Token 消耗约减少 40%） */
+  toon: string;
+}
+
 // ============================================================================
 // 工具函数
 // ============================================================================
@@ -143,14 +159,12 @@ function cleanText(text: string): string {
  * 添加一行输出（如果值有效）
  */
 function addLine(lines: string[], label: string, value: string | null | undefined): void {
-  // 确保 value 是非空字符串
   if (hasValue(value) && typeof value === "string") {
     const cleaned = cleanText(value);
     if (cleaned) {
       lines.push(`- **${label}**: ${cleaned}`);
     }
   } else if (hasValue(value)) {
-    // 处理可能的非字符串情况（虽然类型定义限制了 string | null | undefined）
     lines.push(`- **${label}**: ${value}`);
   }
 }
@@ -159,29 +173,22 @@ function addLine(lines: string[], label: string, value: string | null | undefine
 // 薪资信息格式化
 // ============================================================================
 
-/**
- * 格式化薪资信息 - 完整版
- */
 function formatSalaryInfo(job: AIJobItem): string {
   const salary = job.jobSalary;
   if (!salary) return "";
 
   const lines: string[] = [];
 
-  // 处理所有薪资场景（正式/试用期/培训期）
   salary.salaryScenarioList?.forEach((scenario) => {
-    // 统一使用阶段前缀格式：正式期、试用期、培训期
     const salaryType = scenario.salaryType;
     const stagePrefix = salaryType ? `${salaryType}期` : "";
 
-    // 基本薪资（新结构：嵌套对象）
     const basicSalaryObj = scenario.basicSalary;
     if (basicSalaryObj && hasValue(basicSalaryObj.basicSalary)) {
       const basicStr = `${basicSalaryObj.basicSalary}${basicSalaryObj.basicSalaryUnit || "元"}`;
       addLine(lines, `${stagePrefix}基本薪资`, basicStr);
     }
 
-    // 综合薪资（新结构：嵌套对象）
     const compSalaryObj = scenario.comprehensiveSalary;
     if (compSalaryObj && (hasValue(compSalaryObj.minComprehensiveSalary) || hasValue(compSalaryObj.maxComprehensiveSalary))) {
       const min = compSalaryObj.minComprehensiveSalary ?? "?";
@@ -190,19 +197,16 @@ function formatSalaryInfo(job: AIJobItem): string {
       addLine(lines, `${stagePrefix}综合薪资`, `${min}-${max} ${unit}`);
     }
 
-    // 结算周期 + 发薪日
     const periodParts = [scenario.salaryPeriod, scenario.payday ? `${scenario.payday}发薪` : null];
     const periodStr = joinParts(periodParts, "，");
     if (periodStr) {
       addLine(lines, `${stagePrefix}结算周期`, periodStr);
     }
 
-    // 阶梯薪资
     if (scenario.stairSalaries?.length) {
       const stairInfo = scenario.stairSalaries
         .filter(s => hasValue(s.salary))
         .map(s => {
-          // 强制显示阈值，避免 "超出后" 无上下文
           const threshold = hasValue(s.fullWorkTime)
             ? `超过${s.fullWorkTime}${s.fullWorkTimeUnit || ""} `
             : "";
@@ -215,7 +219,6 @@ function formatSalaryInfo(job: AIJobItem): string {
       }
     }
 
-    // 节假日薪资
     const holiday = scenario.holidaySalary;
     if (holiday && holiday.holidaySalaryType !== "无薪资") {
       let holidayStr = "";
@@ -232,7 +235,6 @@ function formatSalaryInfo(job: AIJobItem): string {
       }
     }
 
-    // 加班薪资
     const overtime = scenario.overtimeSalary;
     if (overtime && overtime.overtimeSalaryType !== "无薪资") {
       let overtimeStr = "";
@@ -249,7 +251,6 @@ function formatSalaryInfo(job: AIJobItem): string {
       }
     }
 
-    // 其他薪资（提成、全勤、绩效）
     const other = scenario.otherSalary;
     if (other) {
       if (hasValue(other.commission)) {
@@ -267,7 +268,6 @@ function formatSalaryInfo(job: AIJobItem): string {
       }
     }
 
-    // 自定义薪资项
     scenario.customSalaries?.forEach(custom => {
       if (hasValue(custom.name) && hasValue(custom.salary)) {
         addLine(lines, `${stagePrefix}${custom.name}`, custom.salary);
@@ -275,7 +275,6 @@ function formatSalaryInfo(job: AIJobItem): string {
     });
   });
 
-  // 试工期薪资（注意：不是试用期，试用期薪资在 salaryScenarioList 中 salaryType="试用期" 的场景）
   const probation = salary.probationSalary;
   if (probation) {
     if (hasValue(probation.salary)) {
@@ -296,16 +295,12 @@ function formatSalaryInfo(job: AIJobItem): string {
 // 福利信息格式化
 // ============================================================================
 
-/**
- * 格式化福利信息 - 完整版
- */
 function formatWelfareInfo(job: AIJobItem): string {
   const welfare = job.welfare;
   if (!welfare) return "";
 
   const lines: string[] = [];
 
-  // 餐饮福利 + 餐补金额
   if (hasValue(welfare.catering) && welfare.catering !== "无餐饮福利") {
     let cateringStr = welfare.catering;
     if (hasValue(welfare.cateringSalary)) {
@@ -314,7 +309,6 @@ function formatWelfareInfo(job: AIJobItem): string {
     addLine(lines, "餐饮", cateringStr);
   }
 
-  // 住宿福利 + 住宿补贴
   if (hasValue(welfare.accommodation) && welfare.accommodation !== "无住宿福利") {
     let accStr = welfare.accommodation;
     if (hasValue(welfare.accommodationAllowance)) {
@@ -327,7 +321,6 @@ function formatWelfareInfo(job: AIJobItem): string {
     addLine(lines, "住宿", accStr);
   }
 
-  // 交通补贴
   if (hasValue(welfare.trafficAllowanceSalary)) {
     addLine(
       lines,
@@ -336,23 +329,19 @@ function formatWelfareInfo(job: AIJobItem): string {
     );
   }
 
-  // 保险
   if (hasValue(welfare.haveInsurance)) {
     addLine(lines, "保险", welfare.haveInsurance);
   }
 
-  // 晋升福利
   if (hasValue(welfare.promotionWelfare)) {
     addLine(lines, "晋升", welfare.promotionWelfare);
   }
 
-  // 其他福利
   const otherWelfareItems = welfare.otherWelfare?.filter(w => hasValue(w));
   if (otherWelfareItems?.length) {
     addLine(lines, "其他福利", otherWelfareItems.join("、"));
   }
 
-  // 福利备注（重要！）
   if (hasValue(welfare.memo)) {
     addLine(lines, "福利说明", welfare.memo);
   }
@@ -364,30 +353,23 @@ function formatWelfareInfo(job: AIJobItem): string {
 // 招聘要求格式化
 // ============================================================================
 
-/**
- * 格式化招聘要求 - 完整版
- */
 function formatRequirements(job: AIJobItem): string {
   const req = job.hiringRequirement;
   if (!req) return "";
 
   const lines: string[] = [];
 
-  // === 基本个人要求 ===
   const basic = req.basicPersonalRequirements;
   if (basic) {
-    // 性别要求
     if (hasValue(basic.genderRequirement) && basic.genderRequirement !== "不限") {
       addLine(lines, "性别", basic.genderRequirement);
     }
 
-    // 年龄要求
     if (hasValue(basic.minAge) || hasValue(basic.maxAge)) {
       const ageStr = `${basic.minAge ?? "不限"}-${basic.maxAge ?? "不限"}岁`;
       addLine(lines, "年龄", ageStr);
     }
 
-    // 身高要求（男/女分开）
     const heightParts: string[] = [];
     if (hasValue(basic.manMinHeight) || hasValue(basic.manMaxHeight)) {
       const manHeight = joinParts(
@@ -414,36 +396,26 @@ function formatRequirements(job: AIJobItem): string {
     }
   }
 
-  // 形象要求
   if (hasValue(req.figure)) {
     addLine(lines, "形象", req.figure);
   }
 
-  // === 证书要求 ===
   const cert = req.certificate;
   if (cert) {
-    // 学历
     if (hasValue(cert.education) && cert.education !== "不限") {
       addLine(lines, "学历", `${cert.education}及以上`);
     }
-
-    // 健康证
     if (hasValue(cert.healthCertificate)) {
       addLine(lines, "健康证", cert.healthCertificate);
     }
-
-    // 其他证书
     if (hasValue(cert.certificates)) {
       addLine(lines, "证书", cert.certificates);
     }
-
-    // 驾照
     if (hasValue(cert.driverLicenseType)) {
       addLine(lines, "驾照", cert.driverLicenseType);
     }
   }
 
-  // === 籍贯/民族要求 ===
   const hometown = req.requirementsForHometown;
   if (hometown) {
     if (hasValue(hometown.nationRequirementType) && hometown.nationRequirementType !== "不限") {
@@ -470,7 +442,6 @@ function formatRequirements(job: AIJobItem): string {
     }
   }
 
-  // === 婚育/社保要求 ===
   const marriage = req.marriageBearingAndSocialSecurity;
   if (marriage) {
     if (hasValue(marriage.marriageBearing) || hasValue(marriage.marriageBearingType)) {
@@ -492,13 +463,11 @@ function formatRequirements(job: AIJobItem): string {
     }
   }
 
-  // === 能力/经验要求 ===
   const comp = req.competencyRequirements;
   if (comp) {
     if (hasValue(comp.workExperienceJobType)) {
       let expStr = comp.workExperienceJobType;
       if (hasValue(comp.minWorkTime)) {
-        // minWorkTimeUnit 是数字类型，需要映射
         const unitMap: Record<number, string> = { 1: "月", 2: "年" };
         const unit = comp.minWorkTimeUnit ? unitMap[comp.minWorkTimeUnit] || "" : "";
         expStr += `（至少${comp.minWorkTime}${unit}）`;
@@ -507,7 +476,6 @@ function formatRequirements(job: AIJobItem): string {
     }
   }
 
-  // === 语言要求 ===
   const lang = req.language;
   if (lang) {
     if (hasValue(lang.languages)) {
@@ -519,7 +487,6 @@ function formatRequirements(job: AIJobItem): string {
     }
   }
 
-  // === 招聘要求备注（重要！）===
   if (req.remark) {
     addLine(lines, "其他要求", req.remark);
   }
@@ -531,16 +498,12 @@ function formatRequirements(job: AIJobItem): string {
 // 工作时间格式化
 // ============================================================================
 
-/**
- * 格式化工作时间 - 完整版
- */
 function formatWorkTime(job: AIJobItem): string {
   const wt = job.workTime;
   if (!wt) return "";
 
   const lines: string[] = [];
 
-  // 就业形式 + 说明
   if (hasValue(wt.employmentForm)) {
     let formStr = wt.employmentForm;
     if (hasValue(wt.employmentDescription)) {
@@ -549,12 +512,10 @@ function formatWorkTime(job: AIJobItem): string {
     addLine(lines, "就业形式", formStr);
   }
 
-  // 最少工作月数
   if (hasValue(wt.minWorkMonths)) {
     addLine(lines, "最少工作", `${wt.minWorkMonths}个月`);
   }
 
-  // 临时工/短期工周期
   const temp = wt.temporaryEmployment;
   if (temp && hasValue(temp.temporaryEmploymentStartTime)) {
     const start = temp.temporaryEmploymentStartTime?.split("T")[0] || "";
@@ -562,7 +523,6 @@ function formatWorkTime(job: AIJobItem): string {
     addLine(lines, "工作周期", `${start} 至 ${end}`);
   }
 
-  // 每周工作时间
   const week = wt.weekWorkTime;
   if (week) {
     const weekParts: string[] = [];
@@ -585,7 +545,6 @@ function formatWorkTime(job: AIJobItem): string {
       addLine(lines, "每周工时", weekParts.join("，"));
     }
 
-    // 自定义工作时间
     week.customnWorkTimeList?.forEach(custom => {
       if (custom.customWorkWeekdays?.length) {
         const daysStr = custom.customWorkWeekdays.join("、");
@@ -598,11 +557,9 @@ function formatWorkTime(job: AIJobItem): string {
     });
   }
 
-  // 每月工作时间
   const month = wt.monthWorkTime;
   if (month) {
     if (hasValue(month.perMonthMinWorkTime)) {
-      // 直接使用 API 返回的原始单位，不做防御性转换，暴露数据问题
       const unit = month.perMonthMinWorkTimeUnit ?? "";
       addLine(lines, "每月最少出勤", `${month.perMonthMinWorkTime}${unit}`);
     }
@@ -614,7 +571,6 @@ function formatWorkTime(job: AIJobItem): string {
     }
   }
 
-  // 每日工时
   const day = wt.dayWorkTime;
   if (day) {
     if (hasValue(day.perDayMinWorkHours)) {
@@ -625,8 +581,6 @@ function formatWorkTime(job: AIJobItem): string {
     }
   }
 
-  // 排班安排
-  // 覆盖逻辑：如果工时备注有值，优先使用工时备注，跳过班次详情
   const hasWorkTimeRemark = hasValue(wt.workTimeRemark);
 
   const schedule = wt.dailyShiftSchedule;
@@ -635,9 +589,7 @@ function formatWorkTime(job: AIJobItem): string {
       addLine(lines, "排班类型", schedule.arrangementType);
     }
 
-    // 仅当没有工时备注时，才显示班次详情
     if (!hasWorkTimeRemark) {
-      // 固定班次
       if (schedule.fixedScheduleList?.length) {
         const shifts = schedule.fixedScheduleList
           .filter(s => hasValue(s.fixedShiftStartTime) && hasValue(s.fixedShiftEndTime))
@@ -648,7 +600,6 @@ function formatWorkTime(job: AIJobItem): string {
         }
       }
 
-      // 组合班次
       if (schedule.combinedArrangement?.combinedArrangementList?.length) {
         const combined = schedule.combinedArrangement.combinedArrangementList
           .filter(s => hasValue(s.combinedShiftStartTime) && hasValue(s.combinedShiftEndTime))
@@ -659,7 +610,6 @@ function formatWorkTime(job: AIJobItem): string {
         }
       }
 
-      // 弹性上下班
       const fixed = schedule.fixedTime;
       if (fixed) {
         const goWork = joinParts([fixed.goToWorkStartTime, fixed.goToWorkEndTime], "-");
@@ -675,12 +625,10 @@ function formatWorkTime(job: AIJobItem): string {
     }
   }
 
-  // 休息时间说明
   if (hasValue(wt.restTimeDesc)) {
     addLine(lines, "休息说明", wt.restTimeDesc);
   }
 
-  // 工时备注（覆盖班次详情，作为权威时间信息）
   if (hasWorkTimeRemark) {
     addLine(lines, "工时备注", wt.workTimeRemark);
   }
@@ -692,54 +640,37 @@ function formatWorkTime(job: AIJobItem): string {
 // 面试信息格式化
 // ============================================================================
 
-/**
- * 格式化面试信息 - 完整版
- */
 function formatInterviewInfo(job: AIJobItem): string {
   const ip = job.interviewProcess;
   if (!ip) return "";
 
   const lines: string[] = [];
 
-  // 面试轮数
   if (hasValue(ip.interviewTotal)) {
     addLine(lines, "面试轮数", `${ip.interviewTotal}轮`);
   }
 
-  // === 一面信息 ===
   const first = ip.firstInterview;
   if (first) {
-    // 面试方式
     if (hasValue(first.firstInterviewWay)) {
       addLine(lines, "一面方式", first.firstInterviewWay);
     }
-
-    // 面试地址
     if (hasValue(first.interviewAddress)) {
       addLine(lines, "一面地址", first.interviewAddress);
     }
-
-    // 面试要求
     if (hasValue(first.interviewDemand)) {
       addLine(lines, "面试要求", first.interviewDemand);
     }
-
-    // 面试说明
     if (hasValue(first.firstInterviewDesc)) {
       addLine(lines, "一面说明", first.firstInterviewDesc);
     }
-
-    // 截止日期
     if (hasValue(first.fixedDeadline)) {
       addLine(lines, "报名截止", first.fixedDeadline);
     }
-
-    // 面试时间模式
     if (hasValue(first.interviewTimeMode)) {
       addLine(lines, "时间模式", first.interviewTimeMode);
     }
 
-    // 固定面试时间
     if (first.fixedInterviewTimes?.length) {
       lines.push("- **面试时间**:");
       first.fixedInterviewTimes.slice(0, 5).forEach(ft => {
@@ -757,7 +688,6 @@ function formatInterviewInfo(job: AIJobItem): string {
       }
     }
 
-    // 周期性面试时间
     if (first.periodicInterviewTimes?.length) {
       lines.push("- **周期面试时间**:");
       first.periodicInterviewTimes.forEach(pt => {
@@ -773,7 +703,6 @@ function formatInterviewInfo(job: AIJobItem): string {
     }
   }
 
-  // === 二面信息 ===
   const second = ip.secondInterview;
   if (second) {
     if (hasValue(second.secondInterviewWay)) {
@@ -787,7 +716,6 @@ function formatInterviewInfo(job: AIJobItem): string {
     }
   }
 
-  // === 三面信息 ===
   const third = ip.thirdInterview;
   if (third) {
     if (hasValue(third.thirdInterviewWay)) {
@@ -801,14 +729,12 @@ function formatInterviewInfo(job: AIJobItem): string {
     }
   }
 
-  // === 面试补充说明 ===
   ip.interviewSupplement?.forEach(supp => {
     if (hasValue(supp.interviewSupplement)) {
       addLine(lines, "面试补充", supp.interviewSupplement);
     }
   });
 
-  // === 试工信息 ===
   const probation = ip.probationWork;
   if (probation) {
     const probParts: string[] = [];
@@ -831,7 +757,6 @@ function formatInterviewInfo(job: AIJobItem): string {
     }
   }
 
-  // === 培训信息 ===
   const training = ip.training;
   if (training) {
     const trainParts: string[] = [];
@@ -849,12 +774,10 @@ function formatInterviewInfo(job: AIJobItem): string {
     }
   }
 
-  // === 流程说明（重要！）===
   if (ip.processDesc) {
     addLine(lines, "流程说明", ip.processDesc);
   }
 
-  // === 面试备注（重要！）===
   if (ip.remark) {
     addLine(lines, "面试备注", ip.remark);
   }
@@ -866,10 +789,6 @@ function formatInterviewInfo(job: AIJobItem): string {
 // 岗位格式化
 // ============================================================================
 
-/**
- * 格式化单个岗位为极简一行（仅基本信息模式）
- * 用于快速概览，Token 消耗极低
- */
 function formatJobToOneLine(job: AIJobItem, index: number): string {
   const basicInfo = job.basicInfo;
   const store = basicInfo.storeInfo;
@@ -879,7 +798,6 @@ function formatJobToOneLine(job: AIJobItem, index: number): string {
   const storeName = store?.storeName || "";
   const address = store?.storeAddress || "";
 
-  // 格式：序号. **品牌 - 岗位名** | 门店 | 地址
   const parts = [`${index + 1}. **${brand} - ${jobName}**`];
   if (storeName) parts.push(storeName);
   if (address) parts.push(address);
@@ -887,9 +805,6 @@ function formatJobToOneLine(job: AIJobItem, index: number): string {
   return parts.join(" | ");
 }
 
-/**
- * 格式化单个岗位的基本信息部分
- */
 function formatBasicInfoSection(job: AIJobItem): string {
   const basicInfo = job.basicInfo;
   const store = basicInfo.storeInfo;
@@ -935,9 +850,6 @@ function formatBasicInfoSection(job: AIJobItem): string {
   return lines.length > 0 ? "### 基本信息\n" + lines.join("\n") + "\n\n" : "";
 }
 
-/**
- * 格式化单个岗位为 Markdown - 根据布尔开关选择性返回
- */
 function formatJobToMarkdown(
   job: AIJobItem,
   index: number,
@@ -945,21 +857,16 @@ function formatJobToMarkdown(
 ): string {
   const basicInfo = job.basicInfo;
 
-  // 标题：岗位名称 + 岗位别名
   const titleParts = [basicInfo.jobName || "未命名岗位"];
   if (hasValue(basicInfo.jobNickName) && basicInfo.jobNickName !== basicInfo.jobName) {
     titleParts.push(`(${basicInfo.jobNickName})`);
   }
   let md = `## ${index + 1}. ${titleParts.join(" ")}\n\n`;
 
-  // 根据布尔开关选择性添加各部分
-
-  // 基本信息（默认包含）
   if (flags.includeBasicInfo) {
     md += formatBasicInfoSection(job);
   }
 
-  // 薪资信息
   if (flags.includeJobSalary) {
     const salaryInfo = formatSalaryInfo(job);
     if (salaryInfo) {
@@ -969,7 +876,6 @@ function formatJobToMarkdown(
     }
   }
 
-  // 福利信息
   if (flags.includeWelfare) {
     const welfareInfo = formatWelfareInfo(job);
     if (welfareInfo) {
@@ -979,7 +885,6 @@ function formatJobToMarkdown(
     }
   }
 
-  // 招聘要求
   if (flags.includeHiringRequirement) {
     const requirements = formatRequirements(job);
     if (requirements) {
@@ -989,7 +894,6 @@ function formatJobToMarkdown(
     }
   }
 
-  // 工作时间
   if (flags.includeWorkTime) {
     const workTime = formatWorkTime(job);
     if (workTime) {
@@ -999,7 +903,6 @@ function formatJobToMarkdown(
     }
   }
 
-  // 面试流程
   if (flags.includeInterviewProcess) {
     const interview = formatInterviewInfo(job);
     if (interview) {
@@ -1009,7 +912,6 @@ function formatJobToMarkdown(
     }
   }
 
-  // 岗位标识（始终包含，用于后续预约等操作）
   md += "### 岗位标识\n";
   md += `- **jobId**: ${basicInfo.jobId}\n`;
   md += "\n";
@@ -1017,9 +919,6 @@ function formatJobToMarkdown(
   return md;
 }
 
-/**
- * 判断是否为极简模式（仅基本信息，无其他开关）
- */
 function isMinimalMode(flags: ProgressiveDisclosureFlags): boolean {
   return (
     flags.includeBasicInfo &&
@@ -1031,12 +930,6 @@ function isMinimalMode(flags: ProgressiveDisclosureFlags): boolean {
   );
 }
 
-/**
- * 格式化岗位列表为 Markdown
- *
- * 极简模式：仅基本信息开关时，返回一行一个岗位的列表
- * 详细模式：开启其他开关时，返回完整的分段格式
- */
 function formatJobsToMarkdown(
   jobs: AIJobItem[],
   total: number,
@@ -1049,7 +942,6 @@ function formatJobsToMarkdown(
 
   let md = `# 在招岗位（共 ${total} 个）\n\n`;
 
-  // 极简模式：一行一个岗位
   if (isMinimalMode(flags)) {
     jobs.forEach((job, index) => {
       md += formatJobToOneLine(job, start + index - 1) + "\n";
@@ -1060,7 +952,6 @@ function formatJobsToMarkdown(
     return md;
   }
 
-  // 详细模式：完整分段格式
   md += `当前显示第 ${start}-${end} 条\n\n`;
   md += "---\n\n";
 
@@ -1072,18 +963,24 @@ function formatJobsToMarkdown(
   return md;
 }
 
+// ============================================================================
+// 工具导出
+// ============================================================================
+
 /**
- * Duliday 获取岗位列表工具 (LLM 优化版)
+ * Duliday 获取岗位列表工具（公共版，LLM 优化）
  *
  * 渐进式数据返回：根据对话阶段和用户问题，按需返回所需字段
- * - 默认仅返回基本信息（极简模式），Token 消耗极低
- * - 按需开启布尔开关，获取薪资、福利、要求、工时、面试等详细信息
  *
- * @description 调用清洗后的 API 获取岗位列表，返回 Markdown 格式化文本
+ * 返回三种格式：
+ * - markdown: 格式化 Markdown 文本，适合 LLM 直接阅读
+ * - rawData: API 返回的原始 JSON 数据，供程序化访问
+ * - toon: TOON 格式压缩数据（Token 消耗约减少 40%），参见 https://github.com/toon-format/toon
+ *
  * @param customToken 自定义的 Duliday token
  * @returns AI SDK tool instance
  */
-export const weworkJobListForLlmTool = (customToken?: string) =>
+export const dulidayJobListForLlmTool = (customToken?: string) =>
   tool({
     description: `查询在招岗位列表。支持渐进式数据返回，按需获取岗位信息。
 
@@ -1102,37 +999,30 @@ export const weworkJobListForLlmTool = (customToken?: string) =>
 - 面试安排：开启 includeInterviewProcess`,
     inputSchema,
     execute: async ({
-      // 筛选条件
       cityNameList = [],
       regionNameList = [],
       brandAliasList = [],
       storeNameList = [],
       jobCategoryList = [],
       jobIdList = [],
-      // 渐进式披露开关
       includeBasicInfo = true,
       includeJobSalary = false,
       includeWelfare = false,
       includeHiringRequirement = false,
       includeWorkTime = false,
       includeInterviewProcess = false,
-    }) => {
+    }): Promise<JobListForLlmResult | { error: string }> => {
       console.log("🔍 duliday_job_list_for_llm tool called with:", {
         filters: { cityNameList, regionNameList, brandAliasList, storeNameList, jobCategoryList, jobIdList },
         flags: { includeBasicInfo, includeJobSalary, includeWelfare, includeHiringRequirement, includeWorkTime, includeInterviewProcess },
       });
 
       try {
-        // 获取 token
         const dulidayToken = customToken || process.env.DULIDAY_TOKEN;
         if (!dulidayToken) {
-          return {
-            type: "text" as const,
-            text: "❌ 缺少 DULIDAY_TOKEN，请在设置中配置或设置环境变量",
-          };
+          return { error: "❌ 缺少 DULIDAY_TOKEN，请在设置中配置或设置环境变量" };
         }
 
-        // 构建请求体（筛选条件透传后端 API）
         const requestBody = {
           pageNum: DEFAULT_PAGE_NUM,
           pageSize: DEFAULT_PAGE_SIZE,
@@ -1144,7 +1034,6 @@ export const weworkJobListForLlmTool = (customToken?: string) =>
           jobIdList,
         };
 
-        // 调用 API
         const response = await fetch(API_URL, {
           method: "POST",
           headers: {
@@ -1160,27 +1049,18 @@ export const weworkJobListForLlmTool = (customToken?: string) =>
 
         const rawData = await response.json();
 
-        // 使用 Zod 验证响应数据
         const parseResult = aiJobListResponseSchema.safeParse(rawData);
         if (!parseResult.success) {
           console.error("响应数据格式错误:", parseResult.error);
-          return {
-            type: "text" as const,
-            text: "❌ API 响应格式错误，请联系管理员",
-          };
+          return { error: "❌ API 响应格式错误，请联系管理员" };
         }
 
         const data = parseResult.data;
 
-        // 检查响应状态
         if (data.code !== 0) {
-          return {
-            type: "text" as const,
-            text: `❌ API 返回错误: ${data.message || "未知错误"}`,
-          };
+          return { error: `❌ API 返回错误: ${data.message || "未知错误"}` };
         }
 
-        // 检查数据
         const jobs = data.data?.result || [];
         const total = data.data?.total || 0;
 
@@ -1202,13 +1082,9 @@ export const weworkJobListForLlmTool = (customToken?: string) =>
           if (hasNoFilters) {
             filterMsg += "\n- 无筛选条件（查询全部）";
           }
-          return {
-            type: "text" as const,
-            text: filterMsg,
-          };
+          return { error: filterMsg };
         }
 
-        // 构建布尔开关对象
         const flags: ProgressiveDisclosureFlags = {
           includeBasicInfo,
           includeJobSalary,
@@ -1218,18 +1094,17 @@ export const weworkJobListForLlmTool = (customToken?: string) =>
           includeInterviewProcess,
         };
 
-        // 格式化为 Markdown（根据布尔开关选择性返回）
         const markdown = formatJobsToMarkdown(jobs, total, DEFAULT_PAGE_NUM, DEFAULT_PAGE_SIZE, flags);
 
         return {
-          type: "text" as const,
-          text: markdown,
+          markdown,
+          rawData: data.data,
+          toon: encode(data.data),
         };
       } catch (error) {
         console.error("获取岗位列表失败:", error);
         return {
-          type: "text" as const,
-          text: `❌ 获取岗位列表失败: ${error instanceof Error ? error.message : "未知错误"}`,
+          error: `❌ 获取岗位列表失败: ${error instanceof Error ? error.message : "未知错误"}`,
         };
       }
     },

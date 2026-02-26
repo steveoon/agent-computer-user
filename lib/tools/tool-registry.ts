@@ -18,7 +18,9 @@ import { dulidayJobDetailsTool } from "./duliday/duliday-job-details-tool";
 import { dulidayInterviewBookingTool } from "./duliday/duliday-interview-booking-tool";
 import { dulidayBiReportTool } from "./duliday/bi-report-tool";
 import { dulidayBiRefreshTool } from "./duliday/bi-refresh-tool";
-import { dulidayJobListForLlmTool } from "./duliday/duliday-job-list-for-llm-tool";
+import { dulidayJobListForLlmTool } from "./duliday-job-list-for-llm.tool";
+import { weworkPlanTurnTool } from "./wework/plan_turn.tool";
+import { weworkExtractFactsTool } from "./wework/extract_facts.tool";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import { ZhipinDataSchema } from "@/types/zhipin";
 import { ReplyPolicyConfigSchema } from "@/types/reply-policy";
@@ -349,6 +351,22 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     requiresSandbox: false,
     requiredContext: ["dulidayToken"],
     create: ctx => dulidayJobListForLlmTool(ctx.dulidayToken),
+  }),
+
+  wework_plan_turn: createToolDefinition({
+    name: "wework_plan_turn",
+    description: "企微智能化：识别当前对话阶段、检测回复需求、标记风险因子，并返回当前阶段的运营目标配置",
+    category: "business",
+    requiresSandbox: false,
+    create: () => weworkPlanTurnTool,
+  }),
+
+  wework_extract_facts: createToolDefinition({
+    name: "wework_extract_facts",
+    description: "企微智能化：从对话历史中累积提取候选人事实信息（面试信息 + 意向信息），与对话阶段无关，全面客观",
+    category: "business",
+    requiresSandbox: false,
+    create: () => weworkExtractFactsTool,
   }),
 };
 

@@ -87,6 +87,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.76.1
         version: 2.76.1
+      '@toon-format/toon':
+        specifier: ^2.1.0
+        version: 2.1.0
       '@tremor/react':
         specifier: ^3.18.7
         version: 3.18.7(react-dom@19.1.4(react@19.1.4))(react@19.1.4)
@@ -2346,6 +2349,9 @@ packages:
     engines: {node: '>=12', npm: '>=6'}
     peerDependencies:
       '@testing-library/dom': '>=7.21.4'
+
+  '@toon-format/toon@2.1.0':
+    resolution: {integrity: sha512-JwWptdF5eOA0HaQxbKAzkpQtR4wSWTEfDlEy/y3/4okmOAX1qwnpLZMmtEWr+ncAhTTY1raCKH0kteHhSXnQqg==}
 
   '@tootallnate/quickjs-emscripten@0.23.0':
     resolution: {integrity: sha512-C5Mc6rdnsaJDjO3UpGW/CQTHtCKaYlScZTly4JIu97Jxo/odCiH0ITnDXSJPTOrEKk/ycSZ0AOgTmkDtkOsvIA==}
@@ -9206,6 +9212,8 @@ snapshots:
   '@testing-library/user-event@14.6.1(@testing-library/dom@10.4.0)':
     dependencies:
       '@testing-library/dom': 10.4.0
+
+  '@toon-format/toon@2.1.0': {}
 
   '@tootallnate/quickjs-emscripten@0.23.0': {}
 
