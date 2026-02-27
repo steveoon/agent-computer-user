@@ -41,10 +41,13 @@ export const AppConfigDataSchema = z.object({
     migratedAt: z.string().optional(),
     upgradedAt: z.string().optional(),
     repairedAt: z.string().optional(),
+    needsFullResync: z.boolean().optional(),
     backup: z
       .object({
         replyPrompts: z.record(z.string(), z.string()).optional(),
         brandTemplates: z.record(z.string(), z.record(z.string(), z.array(z.string()))).optional(),
+        replyPolicy: ReplyPolicyConfigSchema.optional(),
+        brandPriorityStrategy: BrandPriorityStrategySchema.optional(),
         createdAt: z.string().optional(),
       })
       .optional(),
@@ -60,6 +63,7 @@ export interface ConfigService {
   getConfig(): Promise<AppConfigData | null>;
   saveConfig(data: AppConfigData): Promise<void>;
   updateBrandData(brandData: ZhipinData): Promise<void>;
+  clearBrandData(): Promise<void>;
   updateSystemPrompts(prompts: SystemPromptsConfig): Promise<void>;
   updateReplyPolicy(policy: ReplyPolicyConfig): Promise<void>;
   updateActiveSystemPrompt(promptType: keyof SystemPromptsConfig): Promise<void>;

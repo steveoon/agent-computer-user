@@ -79,9 +79,27 @@ export type SyncResponse = z.infer<typeof SyncResponseSchema>;
 
 /**
  * 同步流消息 Schema
- * 用于 NDJSON 流式响应的解析
+ * 用于 NDJSON 流式响应的解析，覆盖所有消息类型
  */
 export const SyncStreamMessageSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("progress"),
+      progress: z.number(),
+      currentOrg: z.number().optional(),
+      message: z.string(),
+    })
+    .passthrough(),
+  z
+    .object({
+      type: z.literal("geocoding_progress"),
+      brandName: z.string(),
+      processed: z.number(),
+      total: z.number(),
+      overallProgress: z.number(),
+      stats: z.unknown().optional(),
+    })
+    .passthrough(),
   z
     .object({
       type: z.literal("result"),

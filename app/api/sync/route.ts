@@ -10,12 +10,21 @@ const SyncRequestSchema = z.object({
   organizationIds: z.array(z.union([z.number(), z.string()])).min(1, "至少需要选择一个组织ID"),
   pageSize: z.number().optional().default(100),
   validateOnly: z.boolean().optional().default(false),
-  cityNameList: z.array(z.string().min(1)).min(1, "至少需要提供一个城市"),
+  // 未传 cityNameList 视为“全量城市同步”（默认允许）
+  cityNameList: z.array(z.string().min(1)).min(1, "至少需要提供一个城市").optional(),
   token: z.string().optional(), // 支持从客户端传递token
   existingCoordinates: z
     .record(z.string(), z.object({ lat: z.number(), lng: z.number() }))
     .optional(),
 });
+
+const hasNumericCoordinates = (coords?: { lat?: unknown; lng?: unknown } | null): boolean =>
+  typeof coords?.lat === "number" &&
+  Number.isFinite(coords.lat) &&
+  typeof coords?.lng === "number" &&
+  Number.isFinite(coords.lng) &&
+  coords.lat !== 0 &&
+  coords.lng !== 0;
 
 /**
  * POST /api/sync
@@ -96,7 +105,16 @@ export async function POST(request: NextRequest) {
     });
 
     // 执行数据同步
-    console.log(`[SYNC API] 开始同步组织: ${numericOrgIds.join(", ")}，城市: ${cityNameList.join(", ")}`);
+    console.log(
+      `[SYNC API] 开始同步组织: ${numericOrgIds.join(", ")}，城市: ${
+        cityNameList?.join(", ") || "<未传>"
+      }`
+    );
+
+    const hasCityFilter = !!cityNameList && cityNameList.length > 0;
+    if (!hasCityFilter) {
+      console.warn("[SYNC API] 未传 cityNameList，默认全量城市同步");
+    }
 
     // 创建流式响应
     const encoder = new TextEncoder();
@@ -136,7 +154,10 @@ export async function POST(request: NextRequest) {
 
           // 计算总共需要处理的门店数（用于日志）
           const totalStoresToGeocode = syncRecord.results.reduce(
-            (sum, r) => sum + (r.convertedData?.stores?.length || 0),
+            (sum, r) =>
+              sum +
+              (r.convertedData?.stores?.filter(s => !hasNumericCoordinates(s.coordinates))
+                .length || 0),
             0
           );
           console.log(`[SYNC API] 共 ${totalStoresToGeocode} 个门店需要地理编码`);
@@ -164,49 +185,61 @@ export async function POST(request: NextRequest) {
                   }
                 }
 
-                const { stores: geocodedStores, stats } =
-                  await geocodingService.batchGeocodeStoresWithStats(
-                    result.convertedData.stores,
-                    (processed, total, currentStats) => {
-                      const previousProgress = geocodingProgressByBrand.get(result.brandName);
-                      const previousProcessed = previousProgress?.processed ?? 0;
-                      const nextProcessed = Math.max(previousProcessed, processed);
-                      totalGeocodingProcessed += nextProcessed - previousProcessed;
-                      geocodingProgressByBrand.set(result.brandName, {
-                        processed: nextProcessed,
-                        total,
-                      });
-                      const geocodingProgress =
-                        totalStoresToGeocode > 0
-                          ? roundToOneDecimal(
-                              50 + (totalGeocodingProcessed / totalStoresToGeocode) * 40
-                            )
-                          : 50;
-                      const overallProgress = Math.min(90, Math.max(50, geocodingProgress));
-                      // 计算总体进度 (50% - 90%)
-                      // 简化计算：每次更新都发送消息
-                      send({
-                        type: "geocoding_progress",
-                        brandName: result.brandName,
-                        processed,
-                        total,
-                        overallProgress,
-                        stats: currentStats,
-                      });
-                    }
-                  );
+                const storesNeedGeocoding = result.convertedData.stores.filter(
+                  s => !hasNumericCoordinates(s.coordinates)
+                );
 
-                result.convertedData.stores = geocodedStores;
-                // 添加地理编码统计到结果中
-                result.geocodingStats = {
-                  total: stats.needsGeocoding,
-                  success: stats.success,
-                  failed: stats.failed,
-                  skipped: stats.skipped,
-                  failedStores: stats.failedStores,
-                };
+                if (storesNeedGeocoding.length === 0) {
+                  result.geocodingStats = {
+                    total: result.convertedData.stores.length,
+                    success: 0,
+                    failed: 0,
+                    skipped: result.convertedData.stores.length,
+                    failedStores: [],
+                  };
+                } else {
+                  const { stores: geocodedStores, stats } =
+                    await geocodingService.batchGeocodeStoresWithStats(
+                      result.convertedData.stores,
+                      (processed, total, currentStats) => {
+                        const previousProgress = geocodingProgressByBrand.get(result.brandName);
+                        const previousProcessed = previousProgress?.processed ?? 0;
+                        const nextProcessed = Math.max(previousProcessed, processed);
+                        totalGeocodingProcessed += nextProcessed - previousProcessed;
+                        geocodingProgressByBrand.set(result.brandName, {
+                          processed: nextProcessed,
+                          total,
+                        });
+                        const geocodingProgress =
+                          totalStoresToGeocode > 0
+                            ? roundToOneDecimal(
+                                50 + (totalGeocodingProcessed / totalStoresToGeocode) * 40
+                              )
+                            : 50;
+                        const overallProgress = Math.min(90, Math.max(50, geocodingProgress));
+                        send({
+                          type: "geocoding_progress",
+                          brandName: result.brandName,
+                          processed,
+                          total,
+                          overallProgress,
+                          stats: currentStats,
+                        });
+                      }
+                    );
+
+                  result.convertedData.stores = geocodedStores;
+                  // 添加地理编码统计到结果中
+                  result.geocodingStats = {
+                    total: stats.needsGeocoding,
+                    success: stats.success,
+                    failed: stats.failed,
+                    skipped: stats.skipped,
+                    failedStores: stats.failedStores,
+                  };
+                }
                 console.log(
-                  `[SYNC API] ${result.brandName} 地理编码完成: 成功 ${stats.success}，失败 ${stats.failed}，跳过 ${stats.skipped}`
+                  `[SYNC API] ${result.brandName} 地理编码完成: 成功 ${result.geocodingStats?.success ?? 0}，失败 ${result.geocodingStats?.failed ?? 0}，跳过 ${result.geocodingStats?.skipped ?? 0}`
                 );
               } catch (geocodeError) {
                 console.warn(`[SYNC API] ${result.brandName} 地理编码失败，跳过:`, geocodeError);
