@@ -176,41 +176,58 @@ export namespace DulidayRaw {
 
   const NewBasicInfoSchema = z
     .object({
-      jobBasicInfoId: z.number(),
-      jobStoreId: z.number(),
-      storeId: z.number(),
-      storeName: z.string(),
-      storeCityId: z.number(),
-      storeRegionId: z.number(),
-      jobName: z.string(),
-      jobId: z.number(),
-      cityName: z.array(z.string()),
-      postTime: z.string(),
-      successDuliriUserId: z.number(),
-      successNameStr: z.string(),
-      storeAddress: z.string(),
-      organizationId: z.number().optional(),
-      organizationName: z.string().optional(),
+      // 真实新接口字段（允许额外字段）
+      jobId: z.number().optional(),
+      createTime: z.string().optional(),
+      jobName: z.string().optional(),
       brandId: z.number().optional(),
       brandName: z.string().optional(),
       projectId: z.number().optional(),
       projectName: z.string().optional(),
+      storeInfo: z
+        .object({
+          storeId: z.number().optional(),
+          storeName: z.string().optional(),
+          storeCityId: z.number().optional(),
+          storeRegionId: z.number().optional(),
+          storeCityName: z.string().optional(),
+          storeRegionName: z.string().optional(),
+          storeAddress: z.string().optional(),
+          longitude: z.number().optional(),
+          latitude: z.number().optional(),
+        })
+        .optional(),
+
+      // 兼容历史新结构样例中的字段
+      jobBasicInfoId: z.number().optional(),
+      jobStoreId: z.number().optional(),
+      storeId: z.number().optional(),
+      storeName: z.string().optional(),
+      storeCityId: z.number().optional(),
+      storeRegionId: z.number().optional(),
+      cityName: z.array(z.string()).optional(),
+      postTime: z.string().optional(),
+      successDuliriUserId: z.number().optional(),
+      successNameStr: z.string().optional(),
+      storeAddress: z.string().optional(),
+      organizationId: z.number().optional(),
+      organizationName: z.string().optional(),
     })
     .passthrough();
 
   const NewJobSalarySchema = z
     .object({
-      salary: z.number(),
-      salaryUnitStr: z.string(),
+      salary: z.number().optional(),
+      salaryUnitStr: z.string().optional(),
     })
     .passthrough();
 
   const NewHiringRequirementSchema = z
     .object({
-      cooperationMode: z.number(),
-      requirementNum: z.number(),
-      thresholdNum: z.number(),
-      signUpNum: z.number().nullable(),
+      cooperationMode: z.number().optional(),
+      requirementNum: z.number().optional(),
+      thresholdNum: z.number().optional(),
+      signUpNum: z.number().nullable().optional(),
     })
     .passthrough();
 

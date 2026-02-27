@@ -25,16 +25,21 @@ export async function convertDulidayListToZhipinData(
   const stores = new Map<string, Store>();
   const brandName = (await getBrandNameByOrgId(organizationId)) || "未知品牌";
 
-  // 遍历所有岗位数据，聚合成门店
-  dulidayResponse.data.result.forEach(item => {
-    const storeId = `store_${item.storeId}`;
+  // 遍历所有岗位数据，聚合成门店（每条数据只 normalize 一次）
+  let firstCity = "上海市";
+  dulidayResponse.data.result.forEach((item, index) => {
+    const normalized = normalizePosition(item);
+    if (index === 0) {
+      firstCity = normalized.cityName[0] || "上海市";
+    }
+    const storeKey = `store_${normalized.storeId}`;
 
-    if (!stores.has(storeId)) {
-      stores.set(storeId, convertToStore(item, brandName));
+    if (!stores.has(storeKey)) {
+      stores.set(storeKey, convertToStore(normalized, brandName));
     }
 
-    const position = convertToPosition(item);
-    const store = stores.get(storeId);
+    const position = convertToPosition(normalized);
+    const store = stores.get(storeKey);
     if (store) {
       store.positions.push(position);
     }
@@ -81,10 +86,8 @@ export async function convertDulidayListToZhipinData(
   // Note: 地理编码在 API route 中进行，此处只做数据转换
   const storeList = Array.from(stores.values());
 
-  const firstPosition = dulidayResponse.data.result[0];
-
   return {
-    city: firstPosition ? normalizePosition(firstPosition).cityName[0] || "上海市" : "上海市",
+    city: firstCity,
     stores: storeList,
     brands: {
       [brandName]: brandConfig,
@@ -121,6 +124,8 @@ type NormalizedDulidayPosition = {
   successDuliriUserId: number;
   successNameStr: string;
   storeAddress: string;
+  longitude?: number;
+  latitude?: number;
 };
 
 function normalizePosition(dulidayData: DulidayRaw.Position | undefined): NormalizedDulidayPosition {
@@ -129,7 +134,21 @@ function normalizePosition(dulidayData: DulidayRaw.Position | undefined): Normal
   }
 
   const newFormat = dulidayData as unknown as {
-    basicInfo?: Partial<NormalizedDulidayPosition>;
+    basicInfo?: Partial<NormalizedDulidayPosition> & {
+      jobId?: number;
+      createTime?: string;
+      storeInfo?: {
+        storeId?: number;
+        storeName?: string;
+        storeCityId?: number;
+        storeRegionId?: number;
+        storeCityName?: string;
+        storeRegionName?: string;
+        storeAddress?: string;
+        longitude?: number;
+        latitude?: number;
+      };
+    };
     jobSalary?: { salary?: number; salaryUnitStr?: string };
     welfare?: DulidayRaw.Welfare;
     hiringRequirement?: {
@@ -144,15 +163,51 @@ function normalizePosition(dulidayData: DulidayRaw.Position | undefined): Normal
   const basic = newFormat.basicInfo;
   const salary = newFormat.jobSalary;
   const hiring = newFormat.hiringRequirement;
+  const storeInfo = basic?.storeInfo;
+  const storeName =
+    (dulidayData as { storeName?: string }).storeName ??
+    basic?.storeName ??
+    storeInfo?.storeName ??
+    "未知门店";
+  const storeAddress =
+    (dulidayData as { storeAddress?: string }).storeAddress ??
+    basic?.storeAddress ??
+    storeInfo?.storeAddress ??
+    "";
+  const rawStoreId =
+    (dulidayData as { storeId?: number }).storeId ??
+    basic?.storeId ??
+    storeInfo?.storeId;
+
+  let resolvedStoreId: number;
+  if (rawStoreId != null) {
+    resolvedStoreId = rawStoreId;
+  } else {
+    const storeIdFallbackSource = `${storeName}|${storeAddress}`;
+    resolvedStoreId = Array.from(storeIdFallbackSource).reduce(
+      (acc, char) => ((acc * 31 + char.charCodeAt(0)) >>> 0),
+      7
+    );
+    console.warn(
+      `[normalizePosition] storeId 缺失，使用派生值 ${resolvedStoreId}（来源: ${storeIdFallbackSource}）`
+    );
+  }
 
   return {
     jobBasicInfoId: (dulidayData as { jobBasicInfoId?: number }).jobBasicInfoId ?? basic?.jobBasicInfoId ?? 0,
     jobStoreId: (dulidayData as { jobStoreId?: number }).jobStoreId ?? basic?.jobStoreId ?? 0,
-    storeId: (dulidayData as { storeId?: number }).storeId ?? basic?.storeId ?? 0,
-    storeName: (dulidayData as { storeName?: string }).storeName ?? basic?.storeName ?? "未知门店",
-    storeCityId: (dulidayData as { storeCityId?: number }).storeCityId ?? basic?.storeCityId ?? 0,
+    storeId: resolvedStoreId,
+    storeName,
+    storeCityId:
+      (dulidayData as { storeCityId?: number }).storeCityId ??
+      basic?.storeCityId ??
+      storeInfo?.storeCityId ??
+      0,
     storeRegionId:
-      (dulidayData as { storeRegionId?: number }).storeRegionId ?? basic?.storeRegionId ?? 0,
+      (dulidayData as { storeRegionId?: number }).storeRegionId ??
+      basic?.storeRegionId ??
+      storeInfo?.storeRegionId ??
+      0,
     jobName: (dulidayData as { jobName?: string }).jobName ?? basic?.jobName ?? "未知岗位",
     jobId: (dulidayData as { jobId?: number }).jobId ?? basic?.jobId ?? 0,
     organizationId: (dulidayData as { organizationId?: number }).organizationId ?? basic?.organizationId,
@@ -162,7 +217,10 @@ function normalizePosition(dulidayData: DulidayRaw.Position | undefined): Normal
     brandName: (dulidayData as { brandName?: string }).brandName ?? basic?.brandName,
     projectId: (dulidayData as { projectId?: number }).projectId ?? basic?.projectId,
     projectName: (dulidayData as { projectName?: string }).projectName ?? basic?.projectName,
-    cityName: (dulidayData as { cityName?: string[] }).cityName ?? basic?.cityName ?? ["上海市"],
+    cityName:
+      (dulidayData as { cityName?: string[] }).cityName ??
+      basic?.cityName ??
+      (storeInfo?.storeCityName ? [storeInfo.storeCityName] : ["上海市"]),
     salary: (dulidayData as { salary?: number }).salary ?? salary?.salary ?? 0,
     salaryUnitStr: (dulidayData as { salaryUnitStr?: string }).salaryUnitStr ?? salary?.salaryUnitStr ?? "元/小时",
     workTimeArrangement:
@@ -179,24 +237,27 @@ function normalizePosition(dulidayData: DulidayRaw.Position | undefined): Normal
       (dulidayData as { requirementNum?: number }).requirementNum ?? hiring?.requirementNum ?? 0,
     thresholdNum: (dulidayData as { thresholdNum?: number }).thresholdNum ?? hiring?.thresholdNum ?? 0,
     signUpNum: (dulidayData as { signUpNum?: number | null }).signUpNum ?? hiring?.signUpNum ?? null,
-    postTime: (dulidayData as { postTime?: string }).postTime ?? basic?.postTime ?? "",
+    postTime:
+      (dulidayData as { postTime?: string }).postTime ??
+      basic?.postTime ??
+      basic?.createTime ??
+      "",
     successDuliriUserId:
       (dulidayData as { successDuliriUserId?: number }).successDuliriUserId ??
       basic?.successDuliriUserId ??
       0,
     successNameStr:
       (dulidayData as { successNameStr?: string }).successNameStr ?? basic?.successNameStr ?? "",
-    storeAddress:
-      (dulidayData as { storeAddress?: string }).storeAddress ?? basic?.storeAddress ?? "",
+    storeAddress,
+    longitude: storeInfo?.longitude,
+    latitude: storeInfo?.latitude,
   };
 }
 
 /**
  * 转换为门店数据
  */
-function convertToStore(dulidayData: DulidayRaw.Position, brandName: string): Store {
-  const normalized = normalizePosition(dulidayData);
-
+function convertToStore(normalized: NormalizedDulidayPosition, brandName: string): Store {
   return {
     id: `store_${normalized.storeId}`,
     name: normalized.storeName,
@@ -204,7 +265,10 @@ function convertToStore(dulidayData: DulidayRaw.Position, brandName: string): St
     location: normalized.storeAddress,
     district: extractDistrict(normalized.storeAddress, normalized.storeRegionId),
     subarea: extractSubarea(normalized.storeName),
-    coordinates: { lat: 0, lng: 0 }, // 默认值，需要后续地理编码
+    coordinates:
+      typeof normalized.latitude === "number" && typeof normalized.longitude === "number"
+        ? { lat: normalized.latitude, lng: normalized.longitude }
+        : { lat: 0, lng: 0 },
     transportation: "交通便利", // 默认值
     brand: brandName,
     positions: [], // 将在后续添加
@@ -214,8 +278,7 @@ function convertToStore(dulidayData: DulidayRaw.Position, brandName: string): St
 /**
  * 转换为岗位数据
  */
-function convertToPosition(dulidayData: DulidayRaw.Position): Position {
-  const normalized = normalizePosition(dulidayData);
+function convertToPosition(normalized: NormalizedDulidayPosition): Position {
   const workTimeArrangement = normalized.workTimeArrangement;
   const normalizedProjectId = normalized.projectId ?? normalized.organizationId;
   const normalizedProjectName = normalized.projectName ?? normalized.organizationName;

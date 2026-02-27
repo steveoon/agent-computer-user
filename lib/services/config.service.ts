@@ -36,6 +36,36 @@ const SYSTEM_PROMPT_KEYS = [
   "bossZhipinLocalSystemPrompt",
 ] as const;
 
+function parseVersionNumber(version: string): number[] {
+  const parts = version.split(".").map(part => Number.parseInt(part, 10));
+  if (parts.some(part => Number.isNaN(part))) {
+    return [];
+  }
+  while (parts.length < 3) {
+    parts.push(0);
+  }
+  return parts.slice(0, 3);
+}
+
+function isLegacyConfigVersion(version: string | undefined): boolean {
+  if (!version) {
+    return true;
+  }
+
+  const current = parseVersionNumber(version);
+  const target = parseVersionNumber(CONFIG_VERSION);
+  if (current.length === 0 || target.length === 0) {
+    return true;
+  }
+
+  for (let i = 0; i < 3; i += 1) {
+    if (current[i] < target[i]) return true;
+    if (current[i] > target[i]) return false;
+  }
+
+  return false;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
 }
@@ -156,6 +186,38 @@ function extractBrandTemplatesBackup(brandData: unknown): Record<string, Record<
   }
 
   return backup;
+}
+
+function normalizeBrandTemplatesBackup(
+  value: unknown
+): Record<string, Record<string, string[]>> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const backup: Record<string, Record<string, string[]>> = {};
+
+  for (const [brandName, templates] of Object.entries(value)) {
+    if (!isRecord(templates)) {
+      continue;
+    }
+
+    const templateRecord: Record<string, string[]> = {};
+    for (const [templateKey, templateVal] of Object.entries(templates)) {
+      if (Array.isArray(templateVal)) {
+        const values = templateVal.filter(item => typeof item === "string");
+        if (values.length > 0) {
+          templateRecord[templateKey] = values;
+        }
+      }
+    }
+
+    if (Object.keys(templateRecord).length > 0) {
+      backup[brandName] = templateRecord;
+    }
+  }
+
+  return Object.keys(backup).length > 0 ? backup : undefined;
 }
 
 function buildReplyPolicyFromLegacy(
@@ -337,6 +399,41 @@ async function normalizeToLatestConfig(
     typeof rawMetadata.version === "string" && rawMetadata.version.length > 0
       ? rawMetadata.version
       : CONFIG_VERSION;
+  const needsFullResync =
+    (typeof rawMetadata.needsFullResync === "boolean" && rawMetadata.needsFullResync) ||
+    isLegacyConfigVersion(currentVersion);
+
+  const backupBase = isRecord(rawMetadata.backup) ? rawMetadata.backup : undefined;
+  const backupReplyPrompts = (() => {
+    if (backupBase && isRecord(backupBase.replyPrompts)) {
+      const record = toStringRecord(backupBase.replyPrompts);
+      if (Object.keys(record).length > 0) {
+        return record;
+      }
+    }
+    return legacyReplyPrompts;
+  })();
+  const backupBrandTemplates =
+    normalizeBrandTemplatesBackup(backupBase?.brandTemplates) ||
+    (Object.keys(brandTemplates).length > 0 ? brandTemplates : undefined);
+  const backupReplyPolicy = (() => {
+    if (backupBase && "replyPolicy" in backupBase) {
+      const parsed = ReplyPolicyConfigSchema.safeParse(backupBase.replyPolicy);
+      if (parsed.success) {
+        return parsed.data;
+      }
+    }
+    return needsFullResync ? replyPolicy : undefined;
+  })();
+  const backupBrandPriorityStrategy = (() => {
+    if (backupBase && "brandPriorityStrategy" in backupBase) {
+      const value = backupBase.brandPriorityStrategy;
+      if (value !== undefined) {
+        return resolveBrandPriorityStrategy(value);
+      }
+    }
+    return needsFullResync ? resolveBrandPriorityStrategy(raw.brandPriorityStrategy) : undefined;
+  })();
 
   const metadata: AppConfigData["metadata"] = {
     version: forceRepair && currentVersion === CONFIG_VERSION ? currentVersion : CONFIG_VERSION,
@@ -344,15 +441,29 @@ async function normalizeToLatestConfig(
       typeof rawMetadata.lastUpdated === "string"
         ? rawMetadata.lastUpdated
         : new Date().toISOString(),
-    migratedAt: typeof rawMetadata.migratedAt === "string" ? rawMetadata.migratedAt : undefined,
+    migratedAt:
+      typeof rawMetadata.migratedAt === "string"
+        ? rawMetadata.migratedAt
+        : needsFullResync
+          ? new Date().toISOString()
+          : undefined,
     upgradedAt: new Date().toISOString(),
     repairedAt: forceRepair ? new Date().toISOString() : undefined,
+    needsFullResync,
     backup:
-      legacyReplyPrompts || Object.keys(brandTemplates).length > 0
+      backupReplyPrompts ||
+      backupBrandTemplates ||
+      backupReplyPolicy ||
+      backupBrandPriorityStrategy
         ? {
-            replyPrompts: legacyReplyPrompts,
-            brandTemplates: Object.keys(brandTemplates).length > 0 ? brandTemplates : undefined,
-            createdAt: new Date().toISOString(),
+            replyPrompts: backupReplyPrompts,
+            brandTemplates: backupBrandTemplates,
+            replyPolicy: backupReplyPolicy,
+            brandPriorityStrategy: backupBrandPriorityStrategy,
+            createdAt:
+              typeof backupBase?.createdAt === "string"
+                ? backupBase.createdAt
+                : new Date().toISOString(),
           }
         : undefined,
   };
@@ -434,6 +545,29 @@ class AppConfigService implements ConfigService {
     await this.saveConfig({
       ...currentConfig,
       brandData,
+    });
+  }
+
+  async clearBrandData(): Promise<void> {
+    const currentConfig = await this.getConfig();
+    if (!currentConfig) {
+      throw new Error("配置数据不存在，请先初始化");
+    }
+
+    const clearedBrandData: ZhipinData = {
+      city: currentConfig.brandData?.city || "上海市",
+      stores: [],
+      brands: {},
+      defaultBrand: undefined,
+    };
+
+    await this.saveConfig({
+      ...currentConfig,
+      brandData: clearedBrandData,
+      metadata: {
+        ...currentConfig.metadata,
+        needsFullResync: true,
+      },
     });
   }
 
@@ -621,6 +755,7 @@ export async function migrateFromHardcodedData(): Promise<void> {
       version: CONFIG_VERSION,
       lastUpdated: new Date().toISOString(),
       migratedAt: new Date().toISOString(),
+      needsFullResync: false,
     },
   };
 
