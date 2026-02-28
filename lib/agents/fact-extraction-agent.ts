@@ -93,14 +93,8 @@ export async function extractFacts<T>(
   conversationHistory: string[],
   options: FactExtractionOptions<T>
 ): Promise<T> {
-  const {
-    extractionSchemaOutput,
-    schemaName,
-    buildUserPrompt,
-    fallback,
-    modelConfig,
-    cache,
-  } = options;
+  const { extractionSchemaOutput, schemaName, buildUserPrompt, fallback, modelConfig, cache } =
+    options;
 
   // 1. 本地增量缓存策略（仅启用 cache 时生效）
   let previousFacts: T | null = null;
@@ -128,8 +122,7 @@ export async function extractFacts<T>(
 
   // 3. 选择模型
   const registry = getDynamicRegistry(DEFAULT_PROVIDER_CONFIGS);
-  const extractModel = (modelConfig?.extractModel ||
-    DEFAULT_MODEL_CONFIG.classifyModel) as ModelId;
+  const extractModel = (modelConfig?.extractModel || DEFAULT_MODEL_CONFIG.extractModel) as ModelId;
 
   // 4. LLM 推理
   const result = await safeGenerateObject({
@@ -143,7 +136,7 @@ export async function extractFacts<T>(
   const newFacts = result.success
     ? result.data
     : (console.warn(`[extractFacts:${schemaName}] LLM extraction failed, using fallback`),
-       fallback);
+      fallback);
 
   // 5. 合并 + 异步更新本地缓存（滑动 TTL）
   if (cache && cacheKey) {

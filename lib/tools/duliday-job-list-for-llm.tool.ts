@@ -12,7 +12,7 @@ const API_URL = "https://k8s.duliday.com/persistence/ai/api/job/list";
  * 固定分页参数
  */
 const DEFAULT_PAGE_NUM = 1;
-const DEFAULT_PAGE_SIZE = 15;
+const DEFAULT_PAGE_SIZE = 20;
 
 /**
  * 输入参数 Schema
@@ -48,43 +48,48 @@ const inputSchema = z.object({
     .optional()
     .default([])
     .describe('岗位类型列表，如 ["服务员", "收银员"]'),
-  jobIdList: z
-    .array(z.string())
+  jobIdList: z.array(z.string()).optional().default([]).describe("岗位ID列表，用于查询特定岗位"),
+
+  // ========== 返回格式选择 ==========
+  responseFormat: z
+    .array(z.enum(["markdown", "rawData", "toon"]))
     .optional()
-    .default([])
-    .describe('岗位ID列表，用于查询特定岗位'),
+    .default(["toon"])
+    .describe(
+      '返回数据格式，可多选。"markdown"=格式化文本，"rawData"=原始JSON，"toon"=压缩格式(省约40% Token)。默认 ["toon"]'
+    ),
 
   // ========== 渐进式披露：布尔开关 ==========
   includeBasicInfo: z
     .boolean()
     .optional()
     .default(true)
-    .describe('返回基本信息（品牌、门店、岗位名、地址等）- 默认true'),
+    .describe("返回基本信息（品牌、门店、岗位名、地址等）- 默认true"),
   includeJobSalary: z
     .boolean()
     .optional()
     .default(false)
-    .describe('返回薪资信息（基本薪资、综合薪资、结算周期等）'),
+    .describe("返回薪资信息（基本薪资、综合薪资、结算周期等）"),
   includeWelfare: z
     .boolean()
     .optional()
     .default(false)
-    .describe('返回福利信息（餐饮、住宿、保险等）'),
+    .describe("返回福利信息（餐饮、住宿、保险等）"),
   includeHiringRequirement: z
     .boolean()
     .optional()
     .default(false)
-    .describe('返回招聘要求（性别、年龄、身高、学历等）'),
+    .describe("返回招聘要求（性别、年龄、身高、学历等）"),
   includeWorkTime: z
     .boolean()
     .optional()
     .default(false)
-    .describe('返回工作时间/班次（就业形式、每周工时、排班等）'),
+    .describe("返回工作时间/班次（就业形式、每周工时、排班等）"),
   includeInterviewProcess: z
     .boolean()
     .optional()
     .default(false)
-    .describe('返回面试流程（面试轮数、时间、地址、试工、培训等）'),
+    .describe("返回面试流程（面试轮数、时间、地址、试工、培训等）"),
 });
 
 // ============================================================================
@@ -108,14 +113,14 @@ interface ProgressiveDisclosureFlags {
  */
 export interface JobListForLlmResult {
   /** 格式化后的 Markdown 文本，适合直接展示给 LLM */
-  markdown: string;
+  markdown?: string;
   /** API 返回的原始 JSON 数据 */
-  rawData: {
+  rawData?: {
     result: AIJobItem[];
     total: number;
   } | null;
   /** 使用 TOON 格式压缩后的数据（Token 消耗约减少 40%） */
-  toon: string;
+  toon?: string;
 }
 
 // ============================================================================
@@ -179,7 +184,7 @@ function formatSalaryInfo(job: AIJobItem): string {
 
   const lines: string[] = [];
 
-  salary.salaryScenarioList?.forEach((scenario) => {
+  salary.salaryScenarioList?.forEach(scenario => {
     const salaryType = scenario.salaryType;
     const stagePrefix = salaryType ? `${salaryType}期` : "";
 
@@ -190,7 +195,11 @@ function formatSalaryInfo(job: AIJobItem): string {
     }
 
     const compSalaryObj = scenario.comprehensiveSalary;
-    if (compSalaryObj && (hasValue(compSalaryObj.minComprehensiveSalary) || hasValue(compSalaryObj.maxComprehensiveSalary))) {
+    if (
+      compSalaryObj &&
+      (hasValue(compSalaryObj.minComprehensiveSalary) ||
+        hasValue(compSalaryObj.maxComprehensiveSalary))
+    ) {
       const min = compSalaryObj.minComprehensiveSalary ?? "?";
       const max = compSalaryObj.maxComprehensiveSalary ?? "?";
       const unit = compSalaryObj.comprehensiveSalaryUnit || "元/月";
@@ -972,7 +981,7 @@ function formatJobsToMarkdown(
  *
  * 渐进式数据返回：根据对话阶段和用户问题，按需返回所需字段
  *
- * 返回三种格式：
+ * 通过 responseFormat 参数选择返回格式（可多选，默认 ["toon"]）：
  * - markdown: 格式化 Markdown 文本，适合 LLM 直接阅读
  * - rawData: API 返回的原始 JSON 数据，供程序化访问
  * - toon: TOON 格式压缩数据（Token 消耗约减少 40%），参见 https://github.com/toon-format/toon
@@ -985,6 +994,10 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
     description: `查询在招岗位列表。支持渐进式数据返回，按需获取岗位信息。
 
 筛选条件：城市、区域、品牌、门店、岗位类型、岗位ID
+返回格式（responseFormat，可多选，默认 ["toon"]）：
+- "markdown"：格式化 Markdown 文本，适合直接展示
+- "rawData"：原始 JSON 数据，供程序化访问
+- "toon"：TOON 压缩格式，Token 消耗约减少 40%
 数据开关：
 - includeBasicInfo（默认true）：品牌、门店、地址等基本信息
 - includeJobSalary：薪资信息（基本薪资、综合薪资、结算周期等）
@@ -1005,6 +1018,7 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
       storeNameList = [],
       jobCategoryList = [],
       jobIdList = [],
+      responseFormat = ["toon"],
       includeBasicInfo = true,
       includeJobSalary = false,
       includeWelfare = false,
@@ -1013,8 +1027,22 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
       includeInterviewProcess = false,
     }): Promise<JobListForLlmResult | { error: string }> => {
       console.log("🔍 duliday_job_list_for_llm tool called with:", {
-        filters: { cityNameList, regionNameList, brandAliasList, storeNameList, jobCategoryList, jobIdList },
-        flags: { includeBasicInfo, includeJobSalary, includeWelfare, includeHiringRequirement, includeWorkTime, includeInterviewProcess },
+        filters: {
+          cityNameList,
+          regionNameList,
+          brandAliasList,
+          storeNameList,
+          jobCategoryList,
+          jobIdList,
+        },
+        flags: {
+          includeBasicInfo,
+          includeJobSalary,
+          includeWelfare,
+          includeHiringRequirement,
+          includeWorkTime,
+          includeInterviewProcess,
+        },
       });
 
       try {
@@ -1070,7 +1098,8 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
           if (regionNameList.length > 0) filterMsg += `\n- 区域：${regionNameList.join("、")}`;
           if (brandAliasList.length > 0) filterMsg += `\n- 品牌：${brandAliasList.join("、")}`;
           if (storeNameList.length > 0) filterMsg += `\n- 门店：${storeNameList.join("、")}`;
-          if (jobCategoryList.length > 0) filterMsg += `\n- 岗位类型：${jobCategoryList.join("、")}`;
+          if (jobCategoryList.length > 0)
+            filterMsg += `\n- 岗位类型：${jobCategoryList.join("、")}`;
           if (jobIdList.length > 0) filterMsg += `\n- 岗位ID：${jobIdList.join("、")}`;
           const hasNoFilters =
             cityNameList.length === 0 &&
@@ -1094,13 +1123,26 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
           includeInterviewProcess,
         };
 
-        const markdown = formatJobsToMarkdown(jobs, total, DEFAULT_PAGE_NUM, DEFAULT_PAGE_SIZE, flags);
+        const formatSet = new Set(responseFormat);
+        const result: JobListForLlmResult = {};
 
-        return {
-          markdown,
-          rawData: data.data,
-          toon: encode(data.data),
-        };
+        if (formatSet.has("markdown")) {
+          result.markdown = formatJobsToMarkdown(
+            jobs,
+            total,
+            DEFAULT_PAGE_NUM,
+            DEFAULT_PAGE_SIZE,
+            flags
+          );
+        }
+        if (formatSet.has("rawData")) {
+          result.rawData = data.data;
+        }
+        if (formatSet.has("toon")) {
+          result.toon = encode(data.data);
+        }
+
+        return result;
       } catch (error) {
         console.error("获取岗位列表失败:", error);
         return {

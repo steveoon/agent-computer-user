@@ -310,7 +310,7 @@ catch (error) {
 
 ## Key Data Flows
 
-1. **Config**: `ConfigInitializer` → `configService.getConfig()` → Components
+1. **Config**: 企微智能bot平台通过 `/api/v1/chat` context 传入 → Components (本地开发: `ConfigInitializer` → `configService.getConfig()`)
 2. **Smart Reply**: Message → Classification → Reply generation
 3. **Computer Use**: Action → E2B tools → Desktop → Screenshot/result
 4. **Brand Management**: Database → Server Actions → Zustand → Admin UI

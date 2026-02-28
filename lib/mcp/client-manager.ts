@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter } from "events";
 import { experimental_createMCPClient as createMCPClient } from "@ai-sdk/mcp";
-// @ts-expect-error - MCP SDK ESM export resolution issues in Next.js environment
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/dist/esm/client/stdio.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio";
 import {
   MCPClientConfig,
   MCPManagerStatus,
