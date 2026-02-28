@@ -184,7 +184,7 @@ function buildReplyPolicyFromLegacy(
     next.stageGoals.trust_building.primaryGoal = `建立信任并持续沟通（来源于旧模板）`;
     next.stageGoals.trust_building.ctaStrategy = trustPrompt;
   }
-  if (privatePrompt) {
+  if (privatePrompt && next.stageGoals.private_channel) {
     next.stageGoals.private_channel.ctaStrategy = privatePrompt;
   }
   if (qualifyPrompt) {

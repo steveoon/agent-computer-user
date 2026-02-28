@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { StageGoalPolicy, ReplyPolicyConfig } from "@/types/reply-policy";
+import type { StageGoalPolicy, FunnelStage } from "@/types/reply-policy";
 import type { WeworkPlanTurnOutput } from "../types";
 
 // ========== Mock planTurn ==========
@@ -60,13 +60,11 @@ const allStageGoals = {
   onboard_followup: mockStageGoal,
 };
 
-const mockReplyPolicy = { stageGoals: allStageGoals } as unknown as ReplyPolicyConfig;
-
 // ========== 导入被测模块 ==========
 
 const { createWeworkPlanTurnTool } = await import("../plan_turn.tool");
 
-const weworkPlanTurnTool = createWeworkPlanTurnTool(mockReplyPolicy);
+const weworkPlanTurnTool = createWeworkPlanTurnTool(allStageGoals);
 
 // AI SDK tool().execute 是可选属性，且返回联合类型；用辅助函数提升可读性
 async function executeTool(
@@ -87,10 +85,7 @@ describe("weworkPlanTurnTool", () => {
   });
 
   it("应返回正确的输出结构", async () => {
-    const result = await executeTool(weworkPlanTurnTool, {
-      message: "你们薪资怎么样，在哪个区？",
-      conversationHistory: ["候选人: 你好"],
-    });
+    const result = await executeTool(weworkPlanTurnTool, {});
 
     expect(result.stage).toBe("job_consultation");
     expect(result.needs).toContain("salary");
@@ -100,45 +95,47 @@ describe("weworkPlanTurnTool", () => {
     expect(result.stageGoal).toEqual(mockStageGoal);
   });
 
-  it("工厂注入 classifyModel 后应正确透传给 planTurn", async () => {
-    const toolWithModel = createWeworkPlanTurnTool(mockReplyPolicy, "qwen-plus");
-    const history = ["msg1", "msg2"];
+  it("工厂注入 classifyModel + history 后应正确透传给 planTurn", async () => {
+    const processedMessages = [
+      { id: "1", role: "user" as const, parts: [{ type: "text" as const, text: "msg1" }] },
+      { id: "2", role: "assistant" as const, parts: [{ type: "text" as const, text: "msg2" }] },
+      { id: "3", role: "user" as const, parts: [{ type: "text" as const, text: "消息" }] },
+    ];
+    const toolWithModel = createWeworkPlanTurnTool(allStageGoals, "qwen-plus", processedMessages);
 
-    await executeTool(toolWithModel, { message: "消息", conversationHistory: history });
+    await executeTool(toolWithModel, {});
 
     expect(mockPlanTurn).toHaveBeenCalledWith(
-      "消息",
+      "用户: 消息",
       expect.objectContaining({
-        conversationHistory: history,
+        conversationHistory: ["用户: msg1", "助手: msg2"],
         modelConfig: expect.objectContaining({ classifyModel: "qwen-plus" }),
       })
     );
   });
 
   it("不传 classifyModel 时 planTurn 应以空 modelConfig 调用", async () => {
-    await executeTool(weworkPlanTurnTool, { message: "你好", conversationHistory: [] });
+    await executeTool(weworkPlanTurnTool, {});
 
     expect(mockPlanTurn).toHaveBeenCalledWith(
-      "你好",
+      "",
       expect.objectContaining({ modelConfig: {} })
     );
   });
 
   it("stageGoals 中缺少当前 stage 时应抛出 ConfigError", async () => {
-    const partialPolicy = {
-      stageGoals: {
-        trust_building: mockStageGoal,
-        private_channel: mockStageGoal,
-        qualify_candidate: mockStageGoal,
-        interview_scheduling: mockStageGoal,
-        onboard_followup: mockStageGoal,
-      },
-    } as unknown as ReplyPolicyConfig;
+    const partialStageGoals = {
+      trust_building: mockStageGoal,
+      private_channel: mockStageGoal,
+      qualify_candidate: mockStageGoal,
+      interview_scheduling: mockStageGoal,
+      onboard_followup: mockStageGoal,
+    } as unknown as Record<FunnelStage, StageGoalPolicy>;
 
-    const toolWithPartialGoals = createWeworkPlanTurnTool(partialPolicy);
+    const toolWithPartialGoals = createWeworkPlanTurnTool(partialStageGoals);
 
     await expect(
-      toolWithPartialGoals.execute?.({ message: "薪资怎么样", conversationHistory: [] }, {} as never)
+      toolWithPartialGoals.execute?.({}, {} as never)
     ).rejects.toThrow();
   });
 });

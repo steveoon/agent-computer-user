@@ -4,6 +4,7 @@ import {
   type ReplyNeed,
   type RiskFlag,
   type StageGoalPolicy,
+  type StageGoals,
 } from "@/types/reply-policy";
 
 // ========== 实体提取 Schema ==========
@@ -56,7 +57,7 @@ export type BrandDataList = z.infer<typeof BrandDataListSchema>;
 export type WeworkPlanTurnInput = {
   message: string;
   conversationHistory: string[];
-  stageGoals: Record<FunnelStage, StageGoalPolicy>;
+  stageGoals: StageGoals;
   modelConfig?: {
     classifyModel?: string;
   };

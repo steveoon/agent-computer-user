@@ -1,4 +1,5 @@
 import { tool } from "ai";
+import type { UIMessage } from "ai";
 import { z } from "zod/v3";
 import { extractFacts } from "@/lib/agents/fact-extraction-agent";
 import {
@@ -205,20 +206,24 @@ const FALLBACK: EntityExtractionResult = {
   reasoning: "实体提取失败，使用空值降级",
 };
 
-export function createWeworkExtractFactsTool(extractModel?: string) {
+export function createWeworkExtractFactsTool(extractModel?: string, processedMessages?: UIMessage[], userId?: string, sessionId?: string) {
   return tool({
     description:
       "企微智能化：从对话历史中累积提取候选人事实信息（面试信息 + 意向信息），与对话阶段无关，全面客观",
-    inputSchema: z.object({
-      message: z.string().describe("候选人当前消息"),
-      conversationHistory: z
-        .array(z.string())
-        .default([])
-        .describe("完整对话历史（引擎内部按增量策略裁剪）"),
-      userId: z.string().optional().describe("用户 ID，与 sessionId 同时传入时启用本地缓存"),
-      sessionId: z.string().optional().describe("会话 ID，与 userId 同时传入时启用本地缓存"),
-    }),
-    execute: async ({ message, conversationHistory, userId, sessionId }) => {
+    inputSchema: z.object({}),
+    execute: async () => {
+      const allHistory = (processedMessages ?? [])
+        .filter(m => m.role === "user" || m.role === "assistant")
+        .map(m => {
+          const text = m.parts
+            .filter((p): p is { type: "text"; text: string } => p.type === "text")
+            .map(p => p.text)
+            .join("");
+          return `${m.role === "user" ? "用户" : "助手"}: ${text}`;
+        })
+        .filter(s => s.trim().length > 0);
+      const message = allHistory.at(-1) ?? "";
+      const conversationHistory = allHistory.slice(0, -1);
       const brandData = await fetchBrandData();
 
       const cache: FactCacheOptions | undefined =

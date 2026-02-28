@@ -303,7 +303,7 @@ export const OpenChatRequestSchema = z.object({
 
   // 工具控制
   allowedTools: z.array(z.string()).optional().describe("允许使用的工具名称列表"),
-  toolContext: z.record(z.string(), z.unknown()).optional().describe("工具特定上下文"),
+  toolContext: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe("工具特定上下文，键为工具名，值为该工具的上下文覆盖"),
   contextStrategy: z
     .enum(["error", "skip", "report"])
     .optional()

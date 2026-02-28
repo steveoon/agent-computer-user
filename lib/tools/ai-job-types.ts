@@ -364,6 +364,7 @@ export const aiJobItemSchema = z.object({
 export const aiJobListResponseSchema = z.object({
   code: z.number(),
   message: z.string(),
+  errorParamMessage: z.string().optional(),
   data: z
     .object({
       result: z.array(aiJobItemSchema),

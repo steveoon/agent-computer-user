@@ -3,6 +3,7 @@
  * 集中管理所有AI工具的创建、注册和过滤
  */
 
+import { z } from "zod/v3";
 import { bashTool, computerTool } from "@/lib/e2b/tool";
 import { feishuBotTool } from "./feishu-bot-tool";
 import { puppeteerTool } from "./puppeteer-tool";
@@ -23,7 +24,7 @@ import { createWeworkPlanTurnTool } from "./wework/plan_turn.tool";
 import { createWeworkExtractFactsTool } from "./wework/extract_facts.tool";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import { ZhipinDataSchema } from "@/types/zhipin";
-import { ReplyPolicyConfigSchema } from "@/types/reply-policy";
+import { ReplyPolicyConfigSchema, StageGoalsSchema } from "@/types/reply-policy";
 
 // Import types from centralized location
 import type {
@@ -358,11 +359,11 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     description: "企微智能化：识别当前对话阶段、检测回复需求、标记风险因子，并返回当前阶段的运营目标配置",
     category: "business",
     requiresSandbox: false,
-    requiredContext: ["replyPolicy"],
+    requiredContext: ["stageGoals"],
     contextSchemas: {
-      replyPolicy: ReplyPolicyConfigSchema,
+      stageGoals: StageGoalsSchema,
     },
-    create: ctx => createWeworkPlanTurnTool(ctx.replyPolicy!, ctx.modelConfig?.classifyModel),
+    create: ctx => ctx.stageGoals ? createWeworkPlanTurnTool(ctx.stageGoals, ctx.modelConfig?.classifyModel, ctx.processedMessages) : null,
   }),
 
   wework_extract_facts: createToolDefinition({
@@ -370,7 +371,12 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     description: "企微智能化：从对话历史中累积提取候选人事实信息（面试信息 + 意向信息），与对话阶段无关，全面客观",
     category: "business",
     requiresSandbox: false,
-    create: ctx => createWeworkExtractFactsTool(ctx.modelConfig?.extractModel),
+    requiredContext: ["userId", "sessionId"],
+    contextSchemas: {
+      userId: z.string(),
+      sessionId: z.string(),
+    },
+    create: ctx => createWeworkExtractFactsTool(ctx.modelConfig?.extractModel, ctx.processedMessages, ctx.userId, ctx.sessionId),
   }),
 };
 

@@ -13,6 +13,8 @@ const API_URL = "https://k8s.duliday.com/persistence/ai/api/job/list";
  */
 const DEFAULT_PAGE_NUM = 1;
 const DEFAULT_PAGE_SIZE = 20;
+const DEFAULT_SORT = "desc";
+const DEFAULT_SORT_FIELD = "create_time";
 
 /**
  * 输入参数 Schema
@@ -48,7 +50,14 @@ const inputSchema = z.object({
     .optional()
     .default([])
     .describe('岗位类型列表，如 ["服务员", "收银员"]'),
-  jobIdList: z.array(z.string()).optional().default([]).describe("岗位ID列表，用于查询特定岗位"),
+  brandIdList: z.array(z.number().int()).optional().default([]).describe("品牌ID列表（整数），与 brandAliasList 二选一"),
+  projectNameList: z
+    .array(z.string())
+    .optional()
+    .default([])
+    .describe('项目名称列表，如 ["XX项目"]'),
+  projectIdList: z.array(z.number().int()).optional().default([]).describe("项目ID列表（整数）"),
+  jobIdList: z.array(z.number().int()).optional().default([]).describe("岗位ID列表（整数），用于查询特定岗位"),
 
   // ========== 返回格式选择 ==========
   responseFormat: z
@@ -1015,6 +1024,9 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
       cityNameList = [],
       regionNameList = [],
       brandAliasList = [],
+      brandIdList = [],
+      projectNameList = [],
+      projectIdList = [],
       storeNameList = [],
       jobCategoryList = [],
       jobIdList = [],
@@ -1026,25 +1038,6 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
       includeWorkTime = false,
       includeInterviewProcess = false,
     }): Promise<JobListForLlmResult | { error: string }> => {
-      console.log("🔍 duliday_job_list_for_llm tool called with:", {
-        filters: {
-          cityNameList,
-          regionNameList,
-          brandAliasList,
-          storeNameList,
-          jobCategoryList,
-          jobIdList,
-        },
-        flags: {
-          includeBasicInfo,
-          includeJobSalary,
-          includeWelfare,
-          includeHiringRequirement,
-          includeWorkTime,
-          includeInterviewProcess,
-        },
-      });
-
       try {
         const dulidayToken = customToken || process.env.DULIDAY_TOKEN;
         if (!dulidayToken) {
@@ -1054,12 +1047,27 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
         const requestBody = {
           pageNum: DEFAULT_PAGE_NUM,
           pageSize: DEFAULT_PAGE_SIZE,
-          cityNameList,
-          regionNameList,
-          brandAliasList,
-          storeNameList,
-          jobCategoryList,
-          jobIdList,
+          sort: DEFAULT_SORT,
+          sortField: DEFAULT_SORT_FIELD,
+          queryParam: {
+            ...(cityNameList.length > 0 && { cityNameList }),
+            ...(regionNameList.length > 0 && { regionNameList }),
+            ...(brandAliasList.length > 0 && { brandAliasList }),
+            ...(brandIdList.length > 0 && { brandIdList }),
+            ...(projectNameList.length > 0 && { projectNameLIst: projectNameList }),
+            ...(projectIdList.length > 0 && { projectIdList }),
+            ...(storeNameList.length > 0 && { storeNameList }),
+            ...(jobCategoryList.length > 0 && { jobCategoryList }),
+            ...(jobIdList.length > 0 && { jobIdList }),
+          },
+          options: {
+            includeBasicInfo,
+            includeJobSalary,
+            includeWelfare,
+            includeHiringRequirement,
+            includeWorkTime,
+            includeInterviewProcess,
+          },
         };
 
         const response = await fetch(API_URL, {
@@ -1086,32 +1094,14 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
         const data = parseResult.data;
 
         if (data.code !== 0) {
-          return { error: `❌ API 返回错误: ${data.message || "未知错误"}` };
+          return { error: `❌ API 返回错误: ${data.errorParamMessage || data.message || "未知错误"}` };
         }
 
         const jobs = data.data?.result || [];
         const total = data.data?.total || 0;
 
         if (jobs.length === 0) {
-          let filterMsg = "未找到符合条件的岗位\n\n查询条件：";
-          if (cityNameList.length > 0) filterMsg += `\n- 城市：${cityNameList.join("、")}`;
-          if (regionNameList.length > 0) filterMsg += `\n- 区域：${regionNameList.join("、")}`;
-          if (brandAliasList.length > 0) filterMsg += `\n- 品牌：${brandAliasList.join("、")}`;
-          if (storeNameList.length > 0) filterMsg += `\n- 门店：${storeNameList.join("、")}`;
-          if (jobCategoryList.length > 0)
-            filterMsg += `\n- 岗位类型：${jobCategoryList.join("、")}`;
-          if (jobIdList.length > 0) filterMsg += `\n- 岗位ID：${jobIdList.join("、")}`;
-          const hasNoFilters =
-            cityNameList.length === 0 &&
-            regionNameList.length === 0 &&
-            brandAliasList.length === 0 &&
-            storeNameList.length === 0 &&
-            jobCategoryList.length === 0 &&
-            jobIdList.length === 0;
-          if (hasNoFilters) {
-            filterMsg += "\n- 无筛选条件（查询全部）";
-          }
-          return { error: filterMsg };
+          return { error: data.errorParamMessage || "未找到符合条件的岗位" };
         }
 
         const flags: ProgressiveDisclosureFlags = {

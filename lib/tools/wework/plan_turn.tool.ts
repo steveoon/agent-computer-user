@@ -1,9 +1,9 @@
 import { tool } from "ai";
+import type { UIMessage } from "ai";
 import { z } from "zod/v3";
 import { planTurn } from "@/lib/agents/classification-agent";
 import { ErrorCode, createConfigError } from "@/lib/errors";
-import type { ReplyPolicyConfig } from "@/types/config";
-import type { FunnelStage } from "@/types/reply-policy";
+import type { FunnelStage, StageGoals } from "@/types/reply-policy";
 import type { WeworkPlanTurnOutput } from "./types";
 
 /**
@@ -21,20 +21,26 @@ const STAGE_FALLBACK: Partial<Record<FunnelStage, FunnelStage>> = {
  * 并从 stageGoals 配置中查找当前阶段的运营目标（stageGoal）。
  * 规则层 + LLM 层双重保障，阶段目标和模型配置均从运营后台动态注入。
  *
- * stageGoals 通过 context.replyPolicy 注入，classifyModel 通过 context.modelConfig 注入。
+ * stageGoals 通过 toolContext.wework_plan_turn.stageGoals 注入，classifyModel 通过 context.modelConfig 注入。
  */
-export function createWeworkPlanTurnTool(replyPolicy: ReplyPolicyConfig, classifyModel?: string) {
+export function createWeworkPlanTurnTool(stageGoal: StageGoals, classifyModel?: string, processedMessages?: UIMessage[]) {
   return tool({
     description:
       "企微智能化：识别当前对话阶段、检测回复需求、标记风险因子，并返回当前阶段的运营目标配置",
-    inputSchema: z.object({
-      message: z.string().describe("候选人当前消息"),
-      conversationHistory: z
-        .array(z.string())
-        .default([])
-        .describe("对话历史（最近 10 轮）"),
-    }),
-    execute: async ({ message, conversationHistory }): Promise<WeworkPlanTurnOutput> => {
+    inputSchema: z.object({}),
+    execute: async (): Promise<WeworkPlanTurnOutput> => {
+      const allHistory = (processedMessages ?? [])
+        .filter(m => m.role === "user" || m.role === "assistant")
+        .map(m => {
+          const text = m.parts
+            .filter((p): p is { type: "text"; text: string } => p.type === "text")
+            .map(p => p.text)
+            .join("");
+          return `${m.role === "user" ? "用户" : "助手"}: ${text}`;
+        })
+        .filter(s => s.trim().length > 0);
+      const message = allHistory.at(-1) ?? "";
+      const conversationHistory = allHistory.slice(0, -1);
       const fullPlan = await planTurn(message, {
         conversationHistory,
         modelConfig: {
@@ -43,7 +49,7 @@ export function createWeworkPlanTurnTool(replyPolicy: ReplyPolicyConfig, classif
       });
 
       const effectiveStage = STAGE_FALLBACK[fullPlan.stage] ?? fullPlan.stage;
-      const currentStageGoal = replyPolicy.stageGoals[effectiveStage];
+      const currentStageGoal = stageGoal[effectiveStage];
 
       if (!currentStageGoal) {
         throw createConfigError(
