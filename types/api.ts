@@ -295,10 +295,10 @@ export const OpenChatRequestSchema = z.object({
   // 系统提示词
   systemPrompt: z.string().optional().describe("直接指定系统提示词，优先级高于 promptType"),
   promptType: z
-    .enum(["bossZhipinSystemPrompt", "bossZhipinLocalSystemPrompt", "generalComputerSystemPrompt"])
+    .enum(["bossZhipinSystemPrompt", "bossZhipinLocalSystemPrompt", "generalComputerSystemPrompt", "weworkSystemPrompt"])
     .optional()
     .describe(
-      `系统提示词类型，从 context.systemPrompts 中查找。可选值: bossZhipinSystemPrompt, bossZhipinLocalSystemPrompt, generalComputerSystemPrompt`
+      `系统提示词类型，从 context.systemPrompts 中查找。可选值: bossZhipinSystemPrompt, bossZhipinLocalSystemPrompt, generalComputerSystemPrompt, weworkSystemPrompt`
     ),
 
   // 工具控制

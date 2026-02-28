@@ -46,6 +46,6 @@ describe("GET /api/v1/prompt-types", () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(data.data.promptTypes).toHaveLength(3);
+    expect(data.data.promptTypes).toHaveLength(4);
   });
 });

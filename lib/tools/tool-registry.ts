@@ -19,8 +19,8 @@ import { dulidayInterviewBookingTool } from "./duliday/duliday-interview-booking
 import { dulidayBiReportTool } from "./duliday/bi-report-tool";
 import { dulidayBiRefreshTool } from "./duliday/bi-refresh-tool";
 import { dulidayJobListForLlmTool } from "./duliday-job-list-for-llm.tool";
-import { weworkPlanTurnTool } from "./wework/plan_turn.tool";
-import { weworkExtractFactsTool } from "./wework/extract_facts.tool";
+import { createWeworkPlanTurnTool } from "./wework/plan_turn.tool";
+import { createWeworkExtractFactsTool } from "./wework/extract_facts.tool";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import { ZhipinDataSchema } from "@/types/zhipin";
 import { ReplyPolicyConfigSchema } from "@/types/reply-policy";
@@ -358,7 +358,11 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     description: "企微智能化：识别当前对话阶段、检测回复需求、标记风险因子，并返回当前阶段的运营目标配置",
     category: "business",
     requiresSandbox: false,
-    create: () => weworkPlanTurnTool,
+    requiredContext: ["replyPolicy"],
+    contextSchemas: {
+      replyPolicy: ReplyPolicyConfigSchema,
+    },
+    create: ctx => createWeworkPlanTurnTool(ctx.replyPolicy!, ctx.modelConfig?.classifyModel),
   }),
 
   wework_extract_facts: createToolDefinition({
@@ -366,7 +370,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     description: "企微智能化：从对话历史中累积提取候选人事实信息（面试信息 + 意向信息），与对话阶段无关，全面客观",
     category: "business",
     requiresSandbox: false,
-    create: () => weworkExtractFactsTool,
+    create: ctx => createWeworkExtractFactsTool(ctx.modelConfig?.extractModel),
   }),
 };
 
@@ -379,6 +383,7 @@ export const OPEN_API_PROMPT_TYPES = [
   "bossZhipinSystemPrompt",
   "bossZhipinLocalSystemPrompt",
   "generalComputerSystemPrompt",
+  "weworkSystemPrompt",
 ] as const;
 
 export type OpenApiPromptType = typeof OPEN_API_PROMPT_TYPES[number];
@@ -444,6 +449,13 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "yupao_get_username",
     "yupao_get_candidate_list",
     "yupao_say_hello",
+  ],
+
+  // 企微智能化 - 对话阶段规划 + 事实提取 + 岗位信息
+  weworkSystemPrompt: [
+    "wework_plan_turn",
+    "wework_extract_facts",
+    "duliday_job_list_for_llm",
   ],
 
   // 通用计算机使用 - 包含E2B和Puppeteer，但不包含Boss直聘业务工具

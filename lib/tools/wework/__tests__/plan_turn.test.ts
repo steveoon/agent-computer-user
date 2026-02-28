@@ -4,11 +4,11 @@
  * 覆盖：
  * - 正常路径：返回 stage/needs/riskFlags/confidence/reasoning/stageGoal
  * - stageGoal 缺失：抛出 ConfigError
- * - modelConfig 透传：classifyModel 正确传给 planTurn
+ * - classifyModel 通过工厂注入后正确透传给 planTurn
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { StageGoalPolicy } from "@/types/reply-policy";
+import type { StageGoalPolicy, ReplyPolicyConfig } from "@/types/reply-policy";
 import type { WeworkPlanTurnOutput } from "../types";
 
 // ========== Mock planTurn ==========
@@ -60,17 +60,21 @@ const allStageGoals = {
   onboard_followup: mockStageGoal,
 };
 
+const mockReplyPolicy = { stageGoals: allStageGoals } as unknown as ReplyPolicyConfig;
+
 // ========== 导入被测模块 ==========
 
-const { weworkPlanTurnTool } = await import("../plan_turn.tool");
+const { createWeworkPlanTurnTool } = await import("../plan_turn.tool");
+
+const weworkPlanTurnTool = createWeworkPlanTurnTool(mockReplyPolicy);
 
 // AI SDK tool().execute 是可选属性，且返回联合类型；用辅助函数提升可读性
 async function executeTool(
+  tool: typeof weworkPlanTurnTool,
   input: Parameters<NonNullable<typeof weworkPlanTurnTool.execute>>[0]
 ): Promise<WeworkPlanTurnOutput> {
-  if (!weworkPlanTurnTool.execute) throw new Error("execute not defined");
-  const result = await weworkPlanTurnTool.execute(input, {} as never);
-  // execute 返回 T | AsyncIterable<T>，同步路径返回 T
+  if (!tool.execute) throw new Error("execute not defined");
+  const result = await tool.execute(input, {} as never);
   return result as WeworkPlanTurnOutput;
 }
 
@@ -83,10 +87,9 @@ describe("weworkPlanTurnTool", () => {
   });
 
   it("应返回正确的输出结构", async () => {
-    const result = await executeTool({
+    const result = await executeTool(weworkPlanTurnTool, {
       message: "你们薪资怎么样，在哪个区？",
       conversationHistory: ["候选人: 你好"],
-      stageGoals: allStageGoals,
     });
 
     expect(result.stage).toBe("job_consultation");
@@ -97,14 +100,11 @@ describe("weworkPlanTurnTool", () => {
     expect(result.stageGoal).toEqual(mockStageGoal);
   });
 
-  it("应将 conversationHistory 和 modelConfig 透传给 planTurn", async () => {
+  it("工厂注入 classifyModel 后应正确透传给 planTurn", async () => {
+    const toolWithModel = createWeworkPlanTurnTool(mockReplyPolicy, "qwen-plus");
     const history = ["msg1", "msg2"];
-    await executeTool({
-      message: "消息",
-      conversationHistory: history,
-      stageGoals: allStageGoals,
-      modelConfig: { classifyModel: "qwen-plus" },
-    });
+
+    await executeTool(toolWithModel, { message: "消息", conversationHistory: history });
 
     expect(mockPlanTurn).toHaveBeenCalledWith(
       "消息",
@@ -115,27 +115,30 @@ describe("weworkPlanTurnTool", () => {
     );
   });
 
-  it("stageGoals 中缺少当前 stage 时应抛出 ConfigError", async () => {
-    // 只提供部分阶段，缺少 job_consultation
-    const partialGoals = {
-      trust_building: mockStageGoal,
-      private_channel: mockStageGoal,
-      qualify_candidate: mockStageGoal,
-      interview_scheduling: mockStageGoal,
-      onboard_followup: mockStageGoal,
-    } as typeof allStageGoals;
-
-    await expect(
-      executeTool({ message: "薪资怎么样", conversationHistory: [], stageGoals: partialGoals })
-    ).rejects.toThrow();
-  });
-
-  it("不传 modelConfig 时 planTurn 也应被正常调用", async () => {
-    await executeTool({ message: "你好", conversationHistory: [], stageGoals: allStageGoals });
+  it("不传 classifyModel 时 planTurn 应以空 modelConfig 调用", async () => {
+    await executeTool(weworkPlanTurnTool, { message: "你好", conversationHistory: [] });
 
     expect(mockPlanTurn).toHaveBeenCalledWith(
       "你好",
       expect.objectContaining({ modelConfig: {} })
     );
+  });
+
+  it("stageGoals 中缺少当前 stage 时应抛出 ConfigError", async () => {
+    const partialPolicy = {
+      stageGoals: {
+        trust_building: mockStageGoal,
+        private_channel: mockStageGoal,
+        qualify_candidate: mockStageGoal,
+        interview_scheduling: mockStageGoal,
+        onboard_followup: mockStageGoal,
+      },
+    } as unknown as ReplyPolicyConfig;
+
+    const toolWithPartialGoals = createWeworkPlanTurnTool(partialPolicy);
+
+    await expect(
+      toolWithPartialGoals.execute?.({ message: "薪资怎么样", conversationHistory: [] }, {} as never)
+    ).rejects.toThrow();
   });
 });

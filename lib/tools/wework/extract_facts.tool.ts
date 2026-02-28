@@ -128,7 +128,10 @@ async function fetchBrandData(): Promise<BrandDataList> {
     const response = await fetch(BRAND_LIST_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Duliday-Token": dulidayToken },
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        page: 1,
+        pageSize: 1000,
+      }),
     });
 
     if (!response.ok) {
@@ -202,39 +205,35 @@ const FALLBACK: EntityExtractionResult = {
   reasoning: "实体提取失败，使用空值降级",
 };
 
-export const weworkExtractFactsTool = tool({
-  description:
-    "企微智能化：从对话历史中累积提取候选人事实信息（面试信息 + 意向信息），与对话阶段无关，全面客观",
-  inputSchema: z.object({
-    message: z.string().describe("候选人当前消息"),
-    conversationHistory: z
-      .array(z.string())
-      .default([])
-      .describe("完整对话历史（引擎内部按增量策略裁剪）"),
-    userId: z.string().optional().describe("用户 ID，与 sessionId 同时传入时启用本地缓存"),
-    sessionId: z.string().optional().describe("会话 ID，与 userId 同时传入时启用本地缓存"),
-    modelConfig: z
-      .object({
-        extractModel: z.string().optional().describe("实体提取模型"),
-      })
-      .optional()
-      .describe("模型配置"),
-  }),
-  execute: async ({ message, conversationHistory, userId, sessionId, modelConfig }) => {
-    const brandData = await fetchBrandData();
+export function createWeworkExtractFactsTool(extractModel?: string) {
+  return tool({
+    description:
+      "企微智能化：从对话历史中累积提取候选人事实信息（面试信息 + 意向信息），与对话阶段无关，全面客观",
+    inputSchema: z.object({
+      message: z.string().describe("候选人当前消息"),
+      conversationHistory: z
+        .array(z.string())
+        .default([])
+        .describe("完整对话历史（引擎内部按增量策略裁剪）"),
+      userId: z.string().optional().describe("用户 ID，与 sessionId 同时传入时启用本地缓存"),
+      sessionId: z.string().optional().describe("会话 ID，与 userId 同时传入时启用本地缓存"),
+    }),
+    execute: async ({ message, conversationHistory, userId, sessionId }) => {
+      const brandData = await fetchBrandData();
 
-    const cache: FactCacheOptions | undefined =
-      userId && sessionId ? { userId, sessionId } : undefined;
+      const cache: FactCacheOptions | undefined =
+        userId && sessionId ? { userId, sessionId } : undefined;
 
-    return extractFacts(message, conversationHistory, {
-      extractionSchemaOutput: EntityExtractionResultSchema,
-      schemaName: "WeworkCandidateFacts",
-      buildUserPrompt: buildWeworkUserPrompt(brandData),
-      fallback: FALLBACK,
-      cache,
-      ...(modelConfig?.extractModel && {
-        modelConfig: { extractModel: modelConfig.extractModel },
-      }),
-    });
-  },
-});
+      return extractFacts(message, conversationHistory, {
+        extractionSchemaOutput: EntityExtractionResultSchema,
+        schemaName: "WeworkCandidateFacts",
+        buildUserPrompt: buildWeworkUserPrompt(brandData),
+        fallback: FALLBACK,
+        cache,
+        ...(extractModel && {
+          modelConfig: { extractModel },
+        }),
+      });
+    },
+  });
+}
