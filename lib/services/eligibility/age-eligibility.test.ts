@@ -96,6 +96,51 @@ describe("evaluateAgeEligibility", () => {
     expect(res.summary.maxAgeObserved).toBe(60);
   });
 
+  it("sends new API format with queryParam and options", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      makeResponse({
+        data: {
+          result: [
+            {
+              basicInfo: {
+                brandName: "成都你六姐",
+                storeInfo: { storeCityName: "上海市" },
+              },
+              hiringRequirement: {
+                basicPersonalRequirements: { minAge: 30, maxAge: 50 },
+              },
+            },
+          ],
+          total: 1,
+        },
+      })
+    );
+    globalThis.fetch = fetchMock;
+
+    await evaluateAgeEligibility({
+      age: 45,
+      brandAlias: "成都你六姐",
+      cityName: "上海",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, requestInit] = fetchMock.mock.calls[0];
+    const body = JSON.parse(requestInit.body as string);
+
+    // 验证新版嵌套格式
+    expect(body.queryParam).toBeDefined();
+    expect(body.queryParam.brandAliasList).toEqual(["成都你六姐"]);
+    expect(body.queryParam.cityNameList).toEqual(["上海", "上海市"]);
+    expect(body.options).toEqual({
+      includeBasicInfo: true,
+      includeHiringRequirement: true,
+    });
+
+    // 旧格式字段不应存在
+    expect(body.brandNameList).toBeUndefined();
+    expect(body.cityNameList).toBeUndefined();
+  });
+
   it("returns fail when matched jobs exist but none include age", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue(
       makeResponse({

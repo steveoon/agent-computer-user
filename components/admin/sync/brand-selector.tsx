@@ -43,6 +43,9 @@ export const BrandSelector = () => {
     }
   }, [availableBrands, selectedBrands, setSelectedBrands]);
 
+  // 构建选中品牌 Set，避免循环内 O(n) includes()
+  const selectedBrandSet = useMemo(() => new Set(selectedBrands), [selectedBrands]);
+
   // 过滤品牌
   const filteredBrands = useMemo(() => {
     if (!searchQuery.trim()) return availableBrands;
@@ -141,7 +144,7 @@ export const BrandSelector = () => {
               </div>
             ) : (
               filteredBrands.map(brand => {
-                const isSelected = selectedBrands.includes(brand.id);
+                const isSelected = selectedBrandSet.has(brand.id);
                 return (
                   <div
                     key={brand.id}

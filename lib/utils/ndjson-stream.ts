@@ -66,7 +66,7 @@ export async function consumeNdjsonStream<T>(
     }
   }
 
-  if (!streamError && buffer.trim()) {
+  if (buffer.trim()) {
     processLine(buffer);
   }
 

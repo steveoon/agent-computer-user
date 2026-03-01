@@ -59,6 +59,11 @@ function buildSalaryDescription(salary: SalaryDetails): string {
     }
   }
 
+  // 追加场景摘要（阶梯薪资/综合薪资/节假日倍数等）
+  if (salary.scenarioSummary) {
+    description += `（${salary.scenarioSummary}）`;
+  }
+
   return description;
 }
 
@@ -844,12 +849,7 @@ function buildPositionInfo(
       info += `  每周工时：${position.minHoursPerWeek || 0}-${position.maxHoursPerWeek || "不限"}小时\n`;
     }
 
-    // 7. 工作日偏好
-    if (position.preferredDays && position.preferredDays.length > 0) {
-      info += `  工作日偏好：${position.preferredDays.map(day => getDayText(day)).join("、")}\n`;
-    }
-
-    // 8. 出勤要求
+    // 7. 出勤要求
     if (position.attendanceRequirement) {
       const req = position.attendanceRequirement;
       let reqText = `出勤要求：${req.description}`;
@@ -1306,8 +1306,25 @@ export async function buildContextInfoByNeeds(
             context += `  可用时段：${slots.map(slot => slot.slot).join("、")}\n`;
           }
         }
-        if (needs.has("requirements") && position.requirements?.length) {
-          context += `  要求：${position.requirements.filter(req => req !== "无").join("、")}\n`;
+        if (needs.has("requirements")) {
+          if (position.hiringRequirements) {
+            const hr = position.hiringRequirements;
+            const parts: string[] = [];
+            if (hr.minAge != null || hr.maxAge != null) {
+              parts.push(`年龄${hr.minAge ?? "不限"}-${hr.maxAge ?? "不限"}岁`);
+            }
+            if (hr.genderRequirement && hr.genderRequirement !== "0") {
+              parts.push(`性别:${hr.genderRequirement}`);
+            }
+            if (hr.education && hr.education !== "1") {
+              parts.push(`学历:${hr.education}`);
+            }
+            if (parts.length > 0) {
+              context += `  要求：${parts.join("、")}\n`;
+            }
+          } else if (position.requirements?.length) {
+            context += `  要求：${position.requirements.filter(req => req !== "无").join("、")}\n`;
+          }
         }
       });
     });
@@ -1343,22 +1360,6 @@ function getScheduleTypeText(
     on_call: "随叫随到",
   };
   return typeMap[scheduleType] || "灵活排班";
-}
-
-/**
- * 获取工作日的中文描述
- */
-function getDayText(day: string): string {
-  const dayMap: { [key: string]: string } = {
-    Monday: "周一",
-    Tuesday: "周二",
-    Wednesday: "周三",
-    Thursday: "周四",
-    Friday: "周五",
-    Saturday: "周六",
-    Sunday: "周日",
-  };
-  return dayMap[day] || day;
 }
 
 /**

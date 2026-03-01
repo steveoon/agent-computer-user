@@ -220,9 +220,6 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
                         模板：
                         {brandConfig.templates ? Object.keys(brandConfig.templates).length : 0} 类
                       </div>
-                      <div>
-                        筛选：年龄 {brandConfig.screening.age.min}-{brandConfig.screening.age.max}
-                      </div>
                     </div>
                     <div className="flex gap-2 mt-3">
                       <Button
@@ -286,7 +283,6 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
                   </div>
                   <div className="text-sm text-muted-foreground">
                     <div>岗位：{store.positions.length} 个</div>
-                    <div>交通：{store.transportation}</div>
                   </div>
                 </div>
               )}

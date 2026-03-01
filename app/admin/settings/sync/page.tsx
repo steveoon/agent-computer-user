@@ -13,18 +13,39 @@ import { SyncProgress } from "@/components/admin/sync/sync-progress";
 import { SyncHistory } from "@/components/admin/sync/sync-history";
 import { SyncErrorDisplay } from "@/components/sync/sync-error-display";
 
+/**
+ * 左侧迷你进度条 — 独立订阅高频变化的 store 字段，
+ * 避免 currentStep/overallProgress 变化时触发整个 SyncPage re-render。
+ */
+function SidebarSyncProgress() {
+  const isSyncing = useSyncStore(s => s.isSyncing);
+  const overallProgress = useSyncStore(s => s.overallProgress);
+  const currentStep = useSyncStore(s => s.currentStep);
+
+  if (!isSyncing) return null;
+
+  return (
+    <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>总进度</span>
+        <span>{overallProgress.toFixed(1)}%</span>
+      </div>
+      <Progress value={overallProgress} className="h-2" />
+      <p className="text-xs text-muted-foreground truncate">{currentStep}</p>
+    </div>
+  );
+}
+
 export default function SyncPage() {
-  const {
-    isSyncing,
-    currentStep,
-    overallProgress,
-    selectedBrands,
-    currentSyncResult,
-    error,
-    startSync,
-    loadSyncHistory,
-    reset,
-  } = useSyncStore();
+  // 只订阅必要的字段；用派生 boolean 避免数组引用变化触发 re-render
+  const isSyncing = useSyncStore(s => s.isSyncing);
+  const hasSelectedBrands = useSyncStore(s => s.selectedBrands.length > 0);
+  const selectedBrandsCount = useSyncStore(s => s.selectedBrands.length);
+  const currentSyncResult = useSyncStore(s => s.currentSyncResult);
+  const error = useSyncStore(s => s.error);
+  const startSync = useSyncStore(s => s.startSync);
+  const loadSyncHistory = useSyncStore(s => s.loadSyncHistory);
+  const reset = useSyncStore(s => s.reset);
 
   // 加载同步历史
   useEffect(() => {
@@ -78,7 +99,7 @@ export default function SyncPage() {
                 <div className="space-y-4">
                   <Button
                     onClick={handleStartSync}
-                    disabled={isSyncing || selectedBrands.length === 0}
+                    disabled={isSyncing || !hasSelectedBrands}
                     className="w-full"
                     size="lg"
                   >
@@ -95,16 +116,7 @@ export default function SyncPage() {
                     )}
                   </Button>
 
-                  {isSyncing && (
-                    <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>总进度</span>
-                        <span>{overallProgress.toFixed(1)}%</span>
-                      </div>
-                      <Progress value={overallProgress} className="h-2" />
-                      <p className="text-xs text-muted-foreground truncate">{currentStep}</p>
-                    </div>
-                  )}
+                  <SidebarSyncProgress />
                 </div>
 
                 <div className="text-xs text-muted-foreground space-y-2 pt-2 border-t">
@@ -160,7 +172,7 @@ export default function SyncPage() {
                     </CardTitle>
                     <div className="text-sm text-muted-foreground">
                       {isSyncing
-                        ? `正在处理 ${selectedBrands.length} 个品牌`
+                        ? `正在处理 ${selectedBrandsCount} 个品牌`
                         : formatDuration(currentSyncResult?.totalDuration || 0)}
                     </div>
                   </div>

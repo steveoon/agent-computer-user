@@ -12,15 +12,9 @@ import { CONFIG_VERSION } from "@/types";
 import { ZhipinData } from "@/types/zhipin";
 import { toast } from "sonner";
 import { configStore } from "@/hooks/useConfigManager";
+import { hasNumericCoordinates } from "@/lib/utils/coordinates";
 import { consumeNdjsonStream } from "@/lib/utils/ndjson-stream";
 import { createSyncStreamHandler } from "@/lib/utils/sync-stream";
-
-const hasNumericCoordinates = (coords?: { lat?: unknown; lng?: unknown } | null): boolean =>
-  typeof coords?.lat === "number" &&
-  Number.isFinite(coords.lat) &&
-  typeof coords?.lng === "number" &&
-  Number.isFinite(coords.lng) &&
-  !(coords.lat === 0 && coords.lng === 0);
 
 const buildFullResyncSelectionMessage = (
   totalBrands: number,
@@ -315,14 +309,24 @@ export const useSyncStore = create<SyncState>()(
             await configStore.getState().loadConfig();
             console.log("✅ 配置已重新加载，所有组件将看到最新数据");
           } catch (saveError) {
-            console.warn("数据保存失败，但同步已完成:", saveError);
+            const saveErrorMsg =
+              saveError instanceof Error ? saveError.message : "未知保存错误";
+            console.error(
+              "❌ 数据保存到 IndexedDB 失败（同步数据已获取但未持久化）:",
+              saveError
+            );
+
             if (needsFullResync) {
               throw new Error(
-                `全量重同步保存失败，原有数据未被覆盖，可重试。` +
-                  (saveError instanceof Error ? ` ${saveError.message}` : "")
+                `全量重同步保存失败，原有数据未被覆盖，可重试。 ${saveErrorMsg}`
               );
             }
-            // 非强制重同步场景保持原有成功状态
+
+            // 非全量重同步：向用户显示保存失败警告（不再静默忽略）
+            toast.error("数据保存失败", {
+              description: `同步数据已获取但保存到本地失败: ${saveErrorMsg}`,
+              duration: 8000,
+            });
           }
 
           // 保存同步记录
@@ -522,11 +526,52 @@ export async function mergeAndSaveSyncData(
     .map(result => result.convertedData)
     .filter((data): data is Partial<ZhipinData> => data !== undefined && data !== null);
 
-  if (allConvertedData.length === 0) {
+  // 收集 API 正常返回 0 岗位的品牌（需清理旧数据）
+  // 区分：errors 为空 = API 正常返回空数据；errors 非空 = 网络/API 异常，保留旧数据
+  const emptyBrandNames = new Set<string>();
+  for (const result of syncResults) {
+    if (
+      !result.success &&
+      !result.convertedData &&
+      result.errors.length === 0 &&
+      result.brandName
+    ) {
+      emptyBrandNames.add(result.brandName);
+    }
+  }
+
+  if (allConvertedData.length === 0 && emptyBrandNames.size === 0) {
     console.log("没有需要保存的转换数据");
     if (mode === "replace") {
       throw new Error("全量重同步未返回可保存的数据");
     }
+    return;
+  }
+
+  // 仅有空品牌需要清理（无新数据）
+  if (allConvertedData.length === 0 && emptyBrandNames.size > 0) {
+    console.log(
+      `没有新数据，但需清理 ${emptyBrandNames.size} 个已无在招岗位的品牌: ${Array.from(emptyBrandNames).join(", ")}`
+    );
+
+    const mergedBrands = { ...(existingData?.brands || {}) };
+    let mergedStores = [...(existingData?.stores || [])];
+
+    mergedStores = mergedStores.filter(store => !emptyBrandNames.has(store.brand));
+    for (const brandName of emptyBrandNames) {
+      delete mergedBrands[brandName];
+      console.log(`🗑️ 已清理品牌 "${brandName}" 的本地门店和配置`);
+    }
+
+    const finalData: ZhipinData = {
+      city: existingData?.city || "上海市",
+      stores: mergedStores,
+      brands: mergedBrands,
+      defaultBrand: existingData?.defaultBrand,
+    };
+
+    await configService.updateBrandData(finalData);
+    console.log(`✅ 空品牌清理完成，剩余门店: ${mergedStores.length} 个，品牌: ${Object.keys(mergedBrands).length} 个`);
     return;
   }
 
@@ -598,7 +643,13 @@ export async function mergeAndSaveSyncData(
     }
   }
 
-  console.log(`🔄 开始合并数据，将替换品牌: ${Array.from(syncedBrandNames).join(", ")}`);
+  if (emptyBrandNames.size > 0) {
+    console.log(
+      `🔄 开始合并数据，将替换品牌: ${Array.from(syncedBrandNames).join(", ")}；将清理空品牌: ${Array.from(emptyBrandNames).join(", ")}`
+    );
+  } else {
+    console.log(`🔄 开始合并数据，将替换品牌: ${Array.from(syncedBrandNames).join(", ")}`);
+  }
 
   // 基础数据保持不变
   let mergedCity = existingData?.city || "上海市";
@@ -607,11 +658,21 @@ export async function mergeAndSaveSyncData(
   // 品牌数据：保留现有品牌 + 完全替换同步的品牌
   const mergedBrands = { ...(existingData?.brands || {}) };
 
-  // 门店数据：移除被同步品牌的现有门店，然后添加新门店
+  // 清理 API 正常返回 0 岗位的品牌配置
+  for (const brandName of emptyBrandNames) {
+    if (mergedBrands[brandName]) {
+      delete mergedBrands[brandName];
+      console.log(`🗑️ 已清理品牌 "${brandName}" 的本地配置（API 返回 0 岗位）`);
+    }
+  }
+
+  // 门店数据：移除被同步品牌 + 空品牌的现有门店，然后添加新门店
   let mergedStores = [...(existingData?.stores || [])];
 
-  // 第一步：移除所有即将被同步品牌的现有门店
-  mergedStores = mergedStores.filter(store => !syncedBrandNames.has(store.brand));
+  // 第一步：移除所有即将被同步品牌和空品牌的现有门店
+  mergedStores = mergedStores.filter(
+    store => !syncedBrandNames.has(store.brand) && !emptyBrandNames.has(store.brand)
+  );
 
   console.log(`🗑️ 移除现有门店数据，剩余门店: ${mergedStores.length} 个`);
 

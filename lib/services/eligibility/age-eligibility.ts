@@ -198,21 +198,28 @@ async function fetchJobList(
   const requestPromise = (async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 20000);
-    const requestBody: Record<string, unknown> = {
-      // Duliday 接口从 1 开始分页；传 0 会返回 50000
-      pageNum: 1,
-      pageSize: 200,
-    };
 
+    // 构建新版 Duliday API 请求格式
+    const queryParam: Record<string, unknown> = {};
     if (brandCandidates.length > 0) {
-      requestBody.brandNameList = brandCandidates;
+      queryParam.brandAliasList = brandCandidates;
     }
     if (cityCandidates.length > 0) {
-      requestBody.cityNameList = cityCandidates;
+      queryParam.cityNameList = cityCandidates;
     }
 
+    const requestBody = {
+      pageNum: 1,
+      pageSize: 200,
+      queryParam,
+      options: {
+        includeBasicInfo: true,
+        includeHiringRequirement: true,
+      },
+    };
+
     try {
-      let response = await fetch(DULIDAY_JOB_LIST_ENDPOINT, {
+      const response = await fetch(DULIDAY_JOB_LIST_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -221,20 +228,6 @@ async function fetchJobList(
         body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
-
-      if (!response.ok) {
-        if ([400, 405, 415].includes(response.status)) {
-          const url = new URL(DULIDAY_JOB_LIST_ENDPOINT);
-          url.searchParams.set("pageNum", "0");
-          url.searchParams.set("pageSize", "200");
-          response = await fetch(url.toString(), {
-            headers: {
-              "Duliday-Token": token,
-            },
-            signal: controller.signal,
-          });
-        }
-      }
 
       if (!response.ok) {
         throw new Error(`Duliday job list fetch failed: ${response.status}`);

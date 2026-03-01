@@ -80,4 +80,24 @@ describe("consumeNdjsonStream", () => {
     expect(result).toBe("ok");
     expect(error?.message).toBe("partial");
   });
+
+  it("processes buffer result even when error precedes it (no trailing newline)", async () => {
+    const stream = streamFromChunks([
+      '{"type":"error","error":"partial failure"}\n',
+      '{"type":"result","value":"recovered"}', // no trailing \n — stays in buffer
+    ]);
+
+    const { result, error } = await consumeNdjsonStream<string>(stream.getReader(), data => {
+      if (isRecord(data) && data.type === "result" && typeof data.value === "string") {
+        return { action: "result", value: data.value };
+      }
+      if (isRecord(data) && data.type === "error" && typeof data.error === "string") {
+        return { action: "error", message: data.error };
+      }
+      return { action: "skip" };
+    });
+
+    expect(result).toBe("recovered");
+    expect(error?.message).toBe("partial failure");
+  });
 });

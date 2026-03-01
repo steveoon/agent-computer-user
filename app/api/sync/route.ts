@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSyncService } from "@/lib/services/duliday-sync.service";
 import { geocodingService } from "@/lib/services/geocoding.service";
+import { hasNumericCoordinates } from "@/lib/utils/coordinates";
 import { z } from "zod/v3";
 
 /**
@@ -17,14 +18,6 @@ const SyncRequestSchema = z.object({
     .record(z.string(), z.object({ lat: z.number(), lng: z.number() }))
     .optional(),
 });
-
-const hasNumericCoordinates = (coords?: { lat?: unknown; lng?: unknown } | null): boolean =>
-  typeof coords?.lat === "number" &&
-  Number.isFinite(coords.lat) &&
-  typeof coords?.lng === "number" &&
-  Number.isFinite(coords.lng) &&
-  coords.lat !== 0 &&
-  coords.lng !== 0;
 
 /**
  * POST /api/sync

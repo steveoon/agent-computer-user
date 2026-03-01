@@ -27,11 +27,6 @@ function createBrandData(): ZhipinData {
           availability_inquiry: ["可约时段"],
           part_time_support: ["支持兼职"],
         },
-        screening: {
-          age: { min: 18, max: 45, preferred: [22, 25] },
-          blacklistKeywords: [],
-          preferredKeywords: [],
-        },
       },
     },
     stores: [
@@ -43,7 +38,6 @@ function createBrandData(): ZhipinData {
         district: "浦东新区",
         subarea: "世纪大道",
         coordinates: { lat: 31.23, lng: 121.47 },
-        transportation: "2号线",
         positions: [
           {
             id: "pos-1",

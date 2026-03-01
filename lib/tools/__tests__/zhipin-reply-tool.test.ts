@@ -39,11 +39,6 @@ describe("zhipinReplyTool - 创建期 Schema 验证", () => {
             availability_inquiry: ["目前有空缺..."],
             part_time_support: ["支持兼职"],
           },
-          screening: {
-            age: { min: 18, max: 50, preferred: [25, 30, 35] },
-            blacklistKeywords: ["不合适"],
-            preferredKeywords: ["有经验"],
-          },
         },
       },
     };
@@ -116,11 +111,6 @@ describe("zhipinReplyTool - 创建期 Schema 验证", () => {
         brands: {
           测试品牌: {
             // 缺少 templates
-            screening: {
-              age: { min: 18, max: 50, preferred: [25, 30, 35] },
-              blacklistKeywords: ["不合适"],
-              preferredKeywords: ["有经验"],
-            },
           } as never,
         },
       };
