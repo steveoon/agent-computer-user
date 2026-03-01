@@ -56,11 +56,6 @@ describe("品牌同步和导入功能测试", () => {
               location_inquiry: ["旧的位置询问模板"],
               // ... 其他必要的模板
             } as any,
-            screening: {
-              age: { min: 18, max: 50, preferred: [25] },
-              blacklistKeywords: [],
-              preferredKeywords: [],
-            },
           },
           // 非映射品牌（应该保持不变）
           测试品牌: {
@@ -68,11 +63,6 @@ describe("品牌同步和导入功能测试", () => {
               initial_inquiry: ["测试品牌的自定义话术模板"],
               location_inquiry: ["测试品牌的位置询问模板"],
             } as any,
-            screening: {
-              age: { min: 20, max: 45, preferred: [30] },
-              blacklistKeywords: ["测试黑名单"],
-              preferredKeywords: ["测试关键词"],
-            },
           },
         },
         stores: [
@@ -85,7 +75,6 @@ describe("品牌同步和导入功能测试", () => {
             district: "浦东新区",
             subarea: "陆家嘴",
             coordinates: { lat: 0, lng: 0 },
-            transportation: "地铁2号线",
             positions: [],
           },
           // 非映射品牌的门店（应该保持不变）
@@ -97,7 +86,6 @@ describe("品牌同步和导入功能测试", () => {
             district: "静安区",
             subarea: "南京西路",
             coordinates: { lat: 0, lng: 0 },
-            transportation: "地铁2号线",
             positions: [],
           },
         ],
@@ -137,11 +125,6 @@ describe("品牌同步和导入功能测试", () => {
                 templates: {
                   initial_inquiry: ["新的肯德基话术模板（应该被保留）"],
                 } as any,
-                screening: {
-                  age: { min: 18, max: 60, preferred: [25, 30] },
-                  blacklistKeywords: ["新黑名单"],
-                  preferredKeywords: ["新关键词"],
-                },
               },
             },
             stores: [
@@ -153,7 +136,6 @@ describe("品牌同步和导入功能测试", () => {
                 district: "浦东新区",
                 subarea: "张江",
                 coordinates: { lat: 0, lng: 0 },
-                transportation: "地铁2号线",
                 positions: [],
               },
               {
@@ -164,7 +146,6 @@ describe("品牌同步和导入功能测试", () => {
                 district: "徐汇区",
                 subarea: "徐家汇",
                 coordinates: { lat: 0, lng: 0 },
-                transportation: "地铁1号线",
                 positions: [],
               },
             ],
@@ -191,9 +172,6 @@ describe("品牌同步和导入功能测试", () => {
       expect(updatedData.brands["肯德基"].templates.initial_inquiry).toEqual([
         "旧的肯德基话术模板",
       ]);
-      // 但其他配置应该更新
-      expect(updatedData.brands["肯德基"].screening.age.max).toBe(60);
-
       // 验证门店数据
       const testBrandStores = updatedData.stores.filter((s: Store) => s.brand === "测试品牌");
       const kfcStores = updatedData.stores.filter((s: Store) => s.brand === "肯德基");
@@ -216,11 +194,6 @@ describe("品牌同步和导入功能测试", () => {
             templates: {
               initial_inquiry: ["测试品牌话术"],
             } as any,
-            screening: {
-              age: { min: 18, max: 50, preferred: [25] },
-              blacklistKeywords: [],
-              preferredKeywords: [],
-            },
           },
         },
         stores: [
@@ -232,7 +205,6 @@ describe("品牌同步和导入功能测试", () => {
             district: "静安区",
             subarea: "测试",
             coordinates: { lat: 0, lng: 0 },
-            transportation: "测试",
             positions: [],
           },
         ],
@@ -271,11 +243,6 @@ describe("品牌同步和导入功能测试", () => {
                 templates: {
                   initial_inquiry: ["必胜客默认话术"],
                 } as any,
-                screening: {
-                  age: { min: 18, max: 50, preferred: [25] },
-                  blacklistKeywords: [],
-                  preferredKeywords: [],
-                },
               },
             },
             stores: [
@@ -287,7 +254,6 @@ describe("品牌同步和导入功能测试", () => {
                 district: "徐汇区",
                 subarea: "徐家汇",
                 coordinates: { lat: 0, lng: 0 },
-                transportation: "地铁1号线",
                 positions: [],
               },
             ],
@@ -343,11 +309,6 @@ describe("品牌同步和导入功能测试", () => {
               availability_inquiry: ["可用性询问模板"],
               part_time_support: ["兼职支持模板"],
             },
-            screening: {
-              age: { min: 18, max: 60, preferred: [25, 30, 35] },
-              blacklistKeywords: ["新黑名单词"],
-              preferredKeywords: ["新优选词"],
-            },
           },
           扩展品牌: {
             templates: {
@@ -368,11 +329,6 @@ describe("品牌同步和导入功能测试", () => {
               availability_inquiry: ["可用性询问"],
               part_time_support: ["兼职支持"],
             },
-            screening: {
-              age: { min: 20, max: 50, preferred: [28] },
-              blacklistKeywords: [],
-              preferredKeywords: [],
-            },
           },
         },
         stores: [
@@ -384,7 +340,6 @@ describe("品牌同步和导入功能测试", () => {
             district: "朝阳区",
             subarea: "三里屯",
             coordinates: { lat: 0, lng: 0 },
-            transportation: "地铁10号线",
             positions: [],
           },
           {
@@ -395,7 +350,6 @@ describe("品牌同步和导入功能测试", () => {
             district: "海淀区",
             subarea: "中关村",
             coordinates: { lat: 0, lng: 0 },
-            transportation: "地铁4号线",
             positions: [],
           },
         ],
@@ -468,11 +422,6 @@ describe("品牌同步和导入功能测试", () => {
             templates: {
               initial_inquiry: ["肯德基话术模板"],
             } as any,
-            screening: {
-              age: { min: 18, max: 50, preferred: [25] },
-              blacklistKeywords: [],
-              preferredKeywords: [],
-            },
           },
         },
         stores: [],
@@ -511,11 +460,6 @@ describe("品牌同步和导入功能测试", () => {
             brands: {
               肯德基: {
                 templates: {} as any,
-                screening: {
-                  age: { min: 18, max: 60, preferred: [25, 30] },
-                  blacklistKeywords: [],
-                  preferredKeywords: [],
-                },
               },
             },
             stores: [
@@ -527,7 +471,6 @@ describe("品牌同步和导入功能测试", () => {
                 district: "浦东新区",
                 subarea: "陆家嘴",
                 coordinates: { lat: 0, lng: 0 },
-                transportation: "地铁2号线",
                 positions: [
                   {
                     id: "pos_002",
@@ -572,7 +515,6 @@ describe("品牌同步和导入功能测试", () => {
                 district: "徐汇区",
                 subarea: "徐家汇",
                 coordinates: { lat: 0, lng: 0 },
-                transportation: "地铁1号线",
                 positions: [
                   {
                     id: "pos_004",
@@ -708,11 +650,6 @@ describe("品牌同步和导入功能测试", () => {
             templates: {
               initial_inquiry: ["肯德基话术"],
             } as any,
-            screening: {
-              age: { min: 18, max: 50, preferred: [25] },
-              blacklistKeywords: [],
-              preferredKeywords: [],
-            },
           },
         },
         stores: [
@@ -724,7 +661,6 @@ describe("品牌同步和导入功能测试", () => {
             district: "浦东新区",
             subarea: "陆家嘴",
             coordinates: { lat: 0, lng: 0 },
-            transportation: "地铁2号线",
             positions: [
               {
                 id: "pos_002",
@@ -794,11 +730,6 @@ describe("品牌同步和导入功能测试", () => {
             brands: {
               肯德基: {
                 templates: {} as any,
-                screening: {
-                  age: { min: 18, max: 60, preferred: [25, 30] },
-                  blacklistKeywords: [],
-                  preferredKeywords: [],
-                },
               },
             },
             stores: [
@@ -810,7 +741,6 @@ describe("品牌同步和导入功能测试", () => {
                 district: "浦东新区",
                 subarea: "陆家嘴",
                 coordinates: { lat: 0, lng: 0 },
-                transportation: "地铁2号线",
                 positions: [
                   {
                     id: "pos_001", // 之前失败的岗位
@@ -915,11 +845,6 @@ describe("品牌同步和导入功能测试", () => {
             templates: {
               initial_inquiry: ["必胜客话术"],
             } as any,
-            screening: {
-              age: { min: 18, max: 50, preferred: [25] },
-              blacklistKeywords: [],
-              preferredKeywords: [],
-            },
           },
         },
         stores: [
@@ -931,7 +856,6 @@ describe("品牌同步和导入功能测试", () => {
             district: "徐汇区",
             subarea: "徐家汇",
             coordinates: { lat: 0, lng: 0 },
-            transportation: "地铁1号线",
             positions: [],
           },
         ],

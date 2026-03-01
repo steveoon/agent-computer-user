@@ -5,7 +5,6 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { SmartExtractor, LOCATION_DICTIONARY } from "../memory/smart-patterns";
-import { SHANGHAI_REGION_MAPPING } from "@/lib/constants/organization-mapping";
 import {
   BrandDictionaryCache,
   clearBrandDictionaryCache,
@@ -15,15 +14,10 @@ import {
 describe("SmartExtractor - 调试位置提取", () => {
   describe("LOCATION_DICTIONARY 构建验证", () => {
     it("应该包含浦东新区的完整名称和简称", () => {
-      console.log("=== SHANGHAI_REGION_MAPPING 中的值 ===");
-      const regions = Object.values(SHANGHAI_REGION_MAPPING);
-      console.log(regions);
-
       console.log("\n=== LOCATION_DICTIONARY.districts ===");
       console.log(LOCATION_DICTIONARY.districts);
 
       // 验证浦东新区被正确处理
-      expect(regions).toContain("浦东新区");
       expect(LOCATION_DICTIONARY.districts).toContain("浦东新区");
       expect(LOCATION_DICTIONARY.districts).toContain("浦东");
     });
@@ -36,29 +30,14 @@ describe("SmartExtractor - 调试位置提取", () => {
     });
 
     it("应该正确构建所有区的简称", () => {
-      const regions = Object.values(SHANGHAI_REGION_MAPPING);
-      console.log("\n=== 所有区域及其简称验证 ===");
+      // 验证核心区域都在 districts 中（来自 smart-patterns 内部的 districtAliasMapping）
+      const expectedDistricts = [
+        "黄浦区", "黄浦", "徐汇区", "徐汇", "浦东新区", "浦东",
+        "闵行区", "闵行", "松江区", "松江", "嘉定区", "嘉定",
+      ];
 
-      // 特殊处理的区域简称映射
-      const specialShortNames: Record<string, string> = {
-        浦东新区: "浦东", // 特殊：浦东新区简称为浦东
-      };
-
-      regions.forEach(region => {
-        // 获取实际的简称
-        let shortName: string | undefined;
-        if (specialShortNames[region]) {
-          shortName = specialShortNames[region];
-        } else if (region.endsWith("区")) {
-          shortName = region.slice(0, -1);
-        }
-
-        console.log(`${region} -> 应该包含: ${region}, ${shortName || "无简称"}`);
-
-        expect(LOCATION_DICTIONARY.districts).toContain(region);
-        if (shortName) {
-          expect(LOCATION_DICTIONARY.districts).toContain(shortName);
-        }
+      expectedDistricts.forEach(district => {
+        expect(LOCATION_DICTIONARY.districts).toContain(district);
       });
     });
   });

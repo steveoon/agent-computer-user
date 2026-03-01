@@ -521,7 +521,29 @@ class AppConfigService implements ConfigService {
 
     const parsed = AppConfigDataSchema.safeParse(data);
     if (!parsed.success) {
-      throw new Error(`配置数据格式错误: ${parsed.error.issues[0]?.message || "unknown"}`);
+      // 输出详细的校验失败信息便于排查
+      const allIssues = parsed.error.issues.map(
+        (i: { path: (string | number)[]; message: string; code: string }) =>
+          `  [${i.code}] ${i.path.join(".")}: ${i.message}`
+      );
+      console.error(
+        `[configService.saveConfig] AppConfigDataSchema 验证失败 (${parsed.error.issues.length} 个问题):\n${allIssues.join("\n")}`
+      );
+
+      // 降级策略：跳过严格验证直接保存（保留数据比丢弃更重要）
+      console.warn(
+        "[configService.saveConfig] 降级写入：跳过 schema 验证直接保存到 IndexedDB"
+      );
+      const configWithMetadata = {
+        ...data,
+        metadata: {
+          ...data.metadata,
+          version: data.metadata.version || CONFIG_VERSION,
+          lastUpdated: new Date().toISOString(),
+        },
+      };
+      await configStorage.setItem(this.storageKey, configWithMetadata);
+      return;
     }
 
     const configWithMetadata: AppConfigData = {

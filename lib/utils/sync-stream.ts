@@ -68,14 +68,35 @@ function normalizeConvertedData(rawData: unknown, context: string): {
   }
 
   const parsed = ZhipinDataSchema.partial().safeParse(rawData);
-  if (!parsed.success) {
+  if (parsed.success) {
+    return { convertedData: parsed.data };
+  }
+
+  // 严格验证失败 —— 记录详细错误并尝试宽松降级
+  const issues = parsed.error.issues.map(
+    (i: { path: (string | number)[]; message: string; code: string }) =>
+      `  [${i.code}] ${i.path.join(".")}: ${i.message}`
+  );
+  console.error(
+    `[sync-stream] ${context} convertedData ZhipinDataSchema 验证失败 (${parsed.error.issues.length} 个问题):\n${issues.join("\n")}`
+  );
+
+  // 降级策略：直接使用原始数据（保留门店信息比丢弃更重要）
+  const raw = rawData as Record<string, unknown>;
+  if (raw.stores && Array.isArray(raw.stores) && raw.stores.length > 0) {
+    console.warn(
+      `[sync-stream] 降级使用原始 convertedData（${raw.stores.length} 个门店），跳过严格 schema 验证`
+    );
     return {
-      convertedData: undefined,
-      warning: `${context} convertedData 格式异常，已忽略`,
+      convertedData: rawData as SyncResult["convertedData"],
+      warning: `${context} convertedData 未通过严格验证，已降级使用原始数据（${parsed.error.issues.length} 个字段问题）`,
     };
   }
 
-  return { convertedData: parsed.data };
+  return {
+    convertedData: undefined,
+    warning: `${context} convertedData 格式异常且无有效门店数据，已忽略`,
+  };
 }
 
 function normalizeGeocodingStats(rawStats: unknown): SyncResult["geocodingStats"] {

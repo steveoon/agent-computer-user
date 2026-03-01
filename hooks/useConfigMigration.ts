@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   needsMigration,
   migrateFromHardcodedData,
@@ -33,14 +33,12 @@ export function useConfigMigration() {
     needsFullResync: false,
     tokenMissingWarning: false,
   });
-  const setMigrationBlocked = useSyncStore(state => state.setMigrationBlocked);
-  const clearMigrationBlocked = useSyncStore(state => state.clearMigrationBlocked);
-
   useEffect(() => {
     let isMounted = true;
 
     async function checkAndMigrate() {
       try {
+        const { setMigrationBlocked, clearMigrationBlocked } = useSyncStore.getState();
         console.log("🔍 检查配置迁移状态...");
 
         // 🚀 并行执行迁移检查和品牌状态检查，减少瀑布流等待
@@ -168,7 +166,7 @@ export function useConfigMigration() {
 
         if (!isMounted) return;
 
-        setMigrationBlocked(
+        useSyncStore.getState().setMigrationBlocked(
           `配置迁移失败，已阻断核心功能使用。请清空本地品牌数据并重新同步。` +
             (error instanceof Error ? `（${error.message}）` : "")
         );
@@ -190,12 +188,13 @@ export function useConfigMigration() {
     return () => {
       isMounted = false;
     };
-  }, [clearMigrationBlocked, setMigrationBlocked]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- actions via getState() are stable
+  }, []);
 
   /**
    * 手动重试迁移
    */
-  const retryMigration = async () => {
+  const retryMigration = useCallback(async () => {
     setState(prev => ({
       ...prev,
       isLoading: true,
@@ -207,6 +206,7 @@ export function useConfigMigration() {
       await migrateFromHardcodedData();
       const currentConfig = await configService.getConfig();
       const needsFullResync = currentConfig?.metadata?.needsFullResync === true;
+      const { setMigrationBlocked, clearMigrationBlocked } = useSyncStore.getState();
       if (needsFullResync) {
         setMigrationBlocked(
           "检测到旧版本配置，需要完成全量同步后才能继续使用。请前往同步管理选择全部品牌进行同步。"
@@ -234,14 +234,14 @@ export function useConfigMigration() {
         tokenMissingWarning: false,
       });
     }
-  };
+  }, []);
 
   /**
    * 获取配置状态
    */
-  const getConfigStats = async () => {
-    return await configService.getConfigStats();
-  };
+  const getConfigStats = useCallback(async () => {
+    return configService.getConfigStats();
+  }, []);
 
   return {
     ...state,

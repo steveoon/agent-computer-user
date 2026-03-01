@@ -16,22 +16,15 @@ const DISMISS_KEY = "duliday_token_warning_dismissed";
  */
 export function ConfigInitializer() {
   const { isSuccess, isError, error, tokenMissingWarning } = useConfigMigration();
-  const [isDismissed, setIsDismissed] = useState(true); // 默认隐藏，避免闪烁
+  const [isDismissed, setIsDismissed] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem(DISMISS_KEY) === "true";
+  });
   const router = useRouter();
   const pathname = usePathname();
-  const { isMigrationBlocked, migrationBlockReason, resetLocalBrandDataAndSync, isSyncing } =
-    useSyncStore(state => ({
-      isMigrationBlocked: state.isMigrationBlocked,
-      migrationBlockReason: state.migrationBlockReason,
-      resetLocalBrandDataAndSync: state.resetLocalBrandDataAndSync,
-      isSyncing: state.isSyncing,
-    }));
-
-  // 检查是否已关闭过提示
-  useEffect(() => {
-    const dismissed = localStorage.getItem(DISMISS_KEY);
-    setIsDismissed(dismissed === "true");
-  }, []);
+  const isMigrationBlocked = useSyncStore(state => state.isMigrationBlocked);
+  const migrationBlockReason = useSyncStore(state => state.migrationBlockReason);
+  const isSyncing = useSyncStore(state => state.isSyncing);
 
   useEffect(() => {
     if (isSuccess) {
@@ -49,7 +42,7 @@ export function ConfigInitializer() {
   };
 
   const handleResetAndSync = () => {
-    resetLocalBrandDataAndSync().catch(() => undefined);
+    useSyncStore.getState().resetLocalBrandDataAndSync().catch(() => undefined);
     router.push("/admin/settings/sync");
   };
 

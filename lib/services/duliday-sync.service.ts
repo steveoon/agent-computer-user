@@ -135,6 +135,19 @@ export class DulidaySyncService {
             !!positionData?.workTime;
 
           if (looksLikeNewShape) {
+            const jobLabel =
+              positionData?.basicInfo?.jobName ||
+              positionData?.jobName ||
+              `索引${index}`;
+            const issuesSummary = parsed.error.issues
+              .slice(0, 5)
+              .map((i: { path: (string | number)[]; message: string }) =>
+                `${i.path.join(".")}: ${i.message}`
+              )
+              .join("; ");
+            console.warn(
+              `[duliday-sync] 岗位「${jobLabel}」未通过严格校验，使用宽松模式: ${issuesSummary}`
+            );
             validPositions.push(positionData as DulidayRaw.Position);
             continue;
           }
