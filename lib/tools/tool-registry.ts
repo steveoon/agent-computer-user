@@ -3,7 +3,6 @@
  * 集中管理所有AI工具的创建、注册和过滤
  */
 
-import { z } from "zod/v3";
 import { bashTool, computerTool } from "@/lib/e2b/tool";
 import { feishuBotTool } from "./feishu-bot-tool";
 import { puppeteerTool } from "./puppeteer-tool";
@@ -21,7 +20,6 @@ import { dulidayBiReportTool } from "./duliday/bi-report-tool";
 import { dulidayBiRefreshTool } from "./duliday/bi-refresh-tool";
 import { dulidayJobListForLlmTool } from "./duliday-job-list-for-llm.tool";
 import { createWeworkPlanTurnTool } from "./wework/plan_turn.tool";
-import { createWeworkExtractFactsTool } from "./wework/extract_facts.tool";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import { ZhipinDataSchema } from "@/types/zhipin";
 import { ReplyPolicyConfigSchema, StageGoalsSchema } from "@/types/reply-policy";
@@ -351,7 +349,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     category: "business",
     requiresSandbox: false,
     requiredContext: ["dulidayToken"],
-    create: ctx => dulidayJobListForLlmTool(ctx.dulidayToken),
+    create: ctx => dulidayJobListForLlmTool(ctx.dulidayToken, ctx.onJobsFetched),
   }),
 
   wework_plan_turn: createToolDefinition({
@@ -364,19 +362,6 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
       stageGoals: StageGoalsSchema,
     },
     create: ctx => ctx.stageGoals ? createWeworkPlanTurnTool(ctx.stageGoals, ctx.modelConfig?.classifyModel, ctx.processedMessages) : null,
-  }),
-
-  wework_extract_facts: createToolDefinition({
-    name: "wework_extract_facts",
-    description: "企微智能化：从对话历史中累积提取候选人事实信息（面试信息 + 意向信息），与对话阶段无关，全面客观",
-    category: "business",
-    requiresSandbox: false,
-    requiredContext: ["userId", "sessionId"],
-    contextSchemas: {
-      userId: z.string(),
-      sessionId: z.string(),
-    },
-    create: ctx => createWeworkExtractFactsTool(ctx.modelConfig?.extractModel, ctx.processedMessages, ctx.userId, ctx.sessionId),
   }),
 };
 
@@ -457,10 +442,9 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "yupao_say_hello",
   ],
 
-  // 企微智能化 - 对话阶段规划 + 事实提取 + 岗位信息
+  // 企微智能化 - 对话阶段规划 + 岗位信息（事实提取已移至预处理器）
   weworkSystemPrompt: [
     "wework_plan_turn",
-    "wework_extract_facts",
     "duliday_job_list_for_llm",
   ],
 

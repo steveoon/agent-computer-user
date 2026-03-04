@@ -8,10 +8,10 @@ import type { WeworkPlanTurnOutput } from "./types";
 
 /**
  * private_channel 阶段在企微场景中无实际运营目标配置，
- * 自动流转到 trust_building 阶段处理。
+ * 自动流转到 job_consultation 阶段处理。
  */
 const STAGE_FALLBACK: Partial<Record<FunnelStage, FunnelStage>> = {
-  private_channel: "trust_building",
+  private_channel: "job_consultation",
 };
 
 /**
@@ -23,7 +23,11 @@ const STAGE_FALLBACK: Partial<Record<FunnelStage, FunnelStage>> = {
  *
  * stageGoals 通过 toolContext.wework_plan_turn.stageGoals 注入，classifyModel 通过 context.modelConfig 注入。
  */
-export function createWeworkPlanTurnTool(stageGoal: StageGoals, classifyModel?: string, processedMessages?: UIMessage[]) {
+export function createWeworkPlanTurnTool(
+  stageGoal: StageGoals,
+  classifyModel?: string,
+  processedMessages?: UIMessage[]
+) {
   return tool({
     description:
       "企微智能化：识别当前对话阶段、检测回复需求、标记风险因子，并返回当前阶段的运营目标配置",

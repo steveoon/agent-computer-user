@@ -50,14 +50,22 @@ const inputSchema = z.object({
     .optional()
     .default([])
     .describe('岗位类型列表，如 ["服务员", "收银员"]'),
-  brandIdList: z.array(z.number().int()).optional().default([]).describe("品牌ID列表（整数），与 brandAliasList 二选一"),
+  brandIdList: z
+    .array(z.number().int())
+    .optional()
+    .default([])
+    .describe("品牌ID列表（整数），与 brandAliasList 二选一"),
   projectNameList: z
     .array(z.string())
     .optional()
     .default([])
     .describe('项目名称列表，如 ["XX项目"]'),
   projectIdList: z.array(z.number().int()).optional().default([]).describe("项目ID列表（整数）"),
-  jobIdList: z.array(z.number().int()).optional().default([]).describe("岗位ID列表（整数），用于查询特定岗位"),
+  jobIdList: z
+    .array(z.number().int())
+    .optional()
+    .default([])
+    .describe("岗位ID列表（整数），用于查询特定岗位"),
 
   // ========== 返回格式选择 ==========
   responseFormat: z
@@ -998,7 +1006,10 @@ function formatJobsToMarkdown(
  * @param customToken 自定义的 Duliday token
  * @returns AI SDK tool instance
  */
-export const dulidayJobListForLlmTool = (customToken?: string) =>
+export const dulidayJobListForLlmTool = (
+  customToken?: string,
+  onJobsFetched?: (jobs: unknown[]) => void
+) =>
   tool({
     description: `查询在招岗位列表。支持渐进式数据返回，按需获取岗位信息。
 
@@ -1094,7 +1105,9 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
         const data = parseResult.data;
 
         if (data.code !== 0) {
-          return { error: `❌ API 返回错误: ${data.errorParamMessage || data.message || "未知错误"}` };
+          return {
+            error: `❌ API 返回错误: ${data.errorParamMessage || data.message || "未知错误"}`,
+          };
         }
 
         const jobs = data.data?.result || [];
@@ -1130,6 +1143,11 @@ export const dulidayJobListForLlmTool = (customToken?: string) =>
         }
         if (formatSet.has("toon")) {
           result.toon = encode(data.data);
+        }
+
+        // 通知调用方（如有）已获取到岗位数据
+        if (onJobsFetched && jobs.length > 0) {
+          onJobsFetched(jobs);
         }
 
         return result;

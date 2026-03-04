@@ -325,9 +325,20 @@ export const OpenChatRequestSchema = z.object({
       industryVoiceId: z.string().optional(),
       dulidayToken: z.string().optional(),
       defaultWechatId: z.string().optional(),
+      userId: z.string().optional(),
+      sessionId: z.string().optional(),
     })
     .optional()
     .describe("全局上下文"),
+
+  // 推理思考（仅 Anthropic Claude 3.7+ 模型）
+  thinking: z
+    .object({
+      type: z.enum(["enabled", "disabled"]).default("enabled"),
+      budgetTokens: z.number().min(1024).max(128000).default(8192),
+    })
+    .optional()
+    .describe("启用模型推理思考过程（仅 Anthropic Claude 3.7+ 支持）"),
 
   // 验证模式
   validateOnly: z.boolean().optional().default(false).describe("仅验证，不执行"),
@@ -379,6 +390,14 @@ export interface OpenChatRequest {
     industryVoiceId?: string;
     dulidayToken?: string;
     defaultWechatId?: string;
+    userId?: string;
+    sessionId?: string;
+  };
+
+  // 推理思考
+  thinking?: {
+    type: "enabled" | "disabled";
+    budgetTokens: number;
   };
 
   // 验证模式
