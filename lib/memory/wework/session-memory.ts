@@ -161,13 +161,16 @@ export function formatSessionMemoryForPrompt(state: WeworkSessionState): string 
   // 上轮推荐岗位
   if (state.lastRecommendedJobs?.length) {
     const jobLines = state.lastRecommendedJobs.map((j, i) => {
-      const parts = [`${i + 1}. [jobId:${j.jobId}]`, `${j.brandName ?? ""} - ${j.jobName ?? ""}`];
-      if (j.storeName) parts.push(j.storeName);
+      const parts = [
+        `${i + 1}. [jobId:${j.jobId}]`,
+        `品牌:${j.brandName ?? ""} - 岗位:${j.jobName ?? ""}`,
+      ];
+      if (j.storeName) parts.push(`门店:${j.storeName}`);
       if (j.cityName || j.regionName) {
-        parts.push([j.cityName, j.regionName].filter(Boolean).join(""));
+        parts.push(`地区:${[j.cityName, j.regionName].filter(Boolean).join("")}`);
       }
-      if (j.laborForm) parts.push(j.laborForm);
-      if (j.salaryDesc) parts.push(j.salaryDesc);
+      if (j.laborForm) parts.push(`用工:${j.laborForm}`);
+      if (j.salaryDesc) parts.push(`薪资:${j.salaryDesc}`);
       return parts.join(" | ");
     });
     sections.push(`## 上轮已推荐岗位\n${jobLines.join("\n")}`);

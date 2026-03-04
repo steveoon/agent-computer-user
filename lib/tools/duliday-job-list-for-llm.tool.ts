@@ -1055,7 +1055,16 @@ export const dulidayJobListForLlmTool = (
           return { error: "❌ 缺少 DULIDAY_TOKEN，请在设置中配置或设置环境变量" };
         }
 
-        const requestBody = {
+        const options = {
+          includeBasicInfo,
+          includeJobSalary,
+          includeWelfare,
+          includeHiringRequirement,
+          includeWorkTime,
+          includeInterviewProcess,
+        };
+
+        const buildRequestBody = (storeNames: string[]): Record<string, unknown> => ({
           pageNum: DEFAULT_PAGE_NUM,
           pageSize: DEFAULT_PAGE_SIZE,
           sort: DEFAULT_SORT,
@@ -1067,54 +1076,73 @@ export const dulidayJobListForLlmTool = (
             ...(brandIdList.length > 0 && { brandIdList }),
             ...(projectNameList.length > 0 && { projectNameLIst: projectNameList }),
             ...(projectIdList.length > 0 && { projectIdList }),
-            ...(storeNameList.length > 0 && { storeNameList }),
+            ...(storeNames.length > 0 && { storeNameList: storeNames }),
             ...(jobCategoryList.length > 0 && { jobCategoryList }),
             ...(jobIdList.length > 0 && { jobIdList }),
           },
-          options: {
-            includeBasicInfo,
-            includeJobSalary,
-            includeWelfare,
-            includeHiringRequirement,
-            includeWorkTime,
-            includeInterviewProcess,
-          },
-        };
-
-        const response = await fetch(API_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Duliday-Token": dulidayToken,
-          },
-          body: JSON.stringify(requestBody),
+          options,
         });
 
-        if (!response.ok) {
-          throw new Error(`API 请求失败: ${response.status} ${response.statusText}`);
-        }
+        const fetchJobs = async (
+          requestBody: Record<string, unknown>
+        ): Promise<{ jobs: AIJobItem[]; total: number; errorMsg?: string }> => {
+          const response = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Duliday-Token": dulidayToken,
+            },
+            body: JSON.stringify(requestBody),
+          });
 
-        const rawData = await response.json();
+          if (!response.ok) {
+            throw new Error(`API 请求失败: ${response.status} ${response.statusText}`);
+          }
 
-        const parseResult = aiJobListResponseSchema.safeParse(rawData);
-        if (!parseResult.success) {
-          console.error("响应数据格式错误:", parseResult.error);
-          return { error: "❌ API 响应格式错误，请联系管理员" };
-        }
+          const rawData = await response.json();
+          const parseResult = aiJobListResponseSchema.safeParse(rawData);
+          if (!parseResult.success) {
+            console.error("响应数据格式错误:", parseResult.error);
+            return { jobs: [], total: 0, errorMsg: "❌ API 响应格式错误，请联系管理员" };
+          }
 
-        const data = parseResult.data;
+          const data = parseResult.data;
+          if (data.code !== 0) {
+            return {
+              jobs: [],
+              total: 0,
+              errorMsg: `❌ API 返回错误: ${data.errorParamMessage || data.message || "未知错误"}`,
+            };
+          }
 
-        if (data.code !== 0) {
           return {
-            error: `❌ API 返回错误: ${data.errorParamMessage || data.message || "未知错误"}`,
+            jobs: data.data?.result || [],
+            total: data.data?.total || 0,
+            errorMsg: data.errorParamMessage,
           };
-        }
+        };
 
-        const jobs = data.data?.result || [];
-        const total = data.data?.total || 0;
+        // 首次请求：使用原始参数
+        let { jobs, total } = await fetchJobs(buildRequestBody(storeNameList));
+
+        // 门店名模糊匹配回退：API 精确匹配无结果时，去掉 storeNameList 重新查询后客户端过滤
+        if (jobs.length === 0 && storeNameList.length > 0) {
+          const fallback = await fetchJobs(buildRequestBody([]));
+          if (fallback.jobs.length > 0) {
+            const lowerKeywords = storeNameList.map(s => s.toLowerCase());
+            const filtered = fallback.jobs.filter(job => {
+              const storeName = (job.basicInfo?.storeInfo?.storeName || "").toLowerCase();
+              return lowerKeywords.some(kw => storeName.includes(kw));
+            });
+            if (filtered.length > 0) {
+              jobs = filtered;
+              total = filtered.length;
+            }
+          }
+        }
 
         if (jobs.length === 0) {
-          return { error: data.errorParamMessage || "未找到符合条件的岗位" };
+          return { error: "未找到符合条件的岗位" };
         }
 
         const flags: ProgressiveDisclosureFlags = {
@@ -1139,10 +1167,10 @@ export const dulidayJobListForLlmTool = (
           );
         }
         if (formatSet.has("rawData")) {
-          result.rawData = data.data;
+          result.rawData = { result: jobs, total };
         }
         if (formatSet.has("toon")) {
-          result.toon = encode(data.data);
+          result.toon = encode({ result: jobs, total });
         }
 
         // 通知调用方（如有）已获取到岗位数据
