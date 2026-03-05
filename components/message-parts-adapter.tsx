@@ -68,7 +68,7 @@ interface MessagePartsAdapterProps {
   isLatestMessage?: boolean;
   status?: string;
   // HITL: 工具确认相关
-  addToolOutput?: (params: { toolCallId: string; tool: string; output: string }) => Promise<void>;
+  addToolOutput?: (params: { toolCallId: string; tool: string; output: unknown }) => Promise<void>;
   sendMessage?: () => void;
 }
 

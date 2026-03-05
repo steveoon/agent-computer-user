@@ -1,6 +1,6 @@
 "use client";
 
-import { Settings2, Settings, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Settings2, Settings, FlaskConical, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandSelector } from "@/components/brand-selector";
 import { UserNav } from "@/components/user-nav";
@@ -178,6 +178,17 @@ export function ChatHeader({
                 </div>
               </PopoverContent>
             </Popover>
+
+            <NavLink href="/test-llm-reply">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 hover:bg-white/50 rounded-full transition-colors"
+                title="智能回复测试"
+              >
+                <FlaskConical className="w-3.5 h-3.5 text-slate-600" />
+              </Button>
+            </NavLink>
 
             <NavLink href="/admin/settings">
               <Button
