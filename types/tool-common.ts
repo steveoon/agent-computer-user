@@ -9,6 +9,27 @@ import type { ModelConfig } from "@/lib/config/models";
 import type { ZhipinData } from "./zhipin";
 import type { SystemPromptsConfig, ReplyPolicyConfig, BrandPriorityStrategy } from "./config";
 
+export interface ReplyPolicyPatchChange {
+  module: string;
+  value?: unknown;
+  keepCurrent?: boolean;
+  displayValue?: string;
+}
+
+export interface ReplyPolicyDraftRuntimeContext {
+  hasServedFullPolicy: () => boolean;
+  markFullPolicyServed: () => void;
+  getCurrentPolicy: () => ReplyPolicyConfig | null;
+  getDraftPolicy: () => ReplyPolicyConfig | null;
+  getRevision: () => number;
+  applyPatch: (patch: ReplyPolicyPatchChange) => {
+    applied: boolean;
+    reason?: string;
+    revision: number;
+  };
+  commitPolicy: (policy: ReplyPolicyConfig) => void;
+}
+
 // ========== 工具注册表类型定义 ==========
 
 /**
@@ -25,6 +46,7 @@ export interface ToolCreationContext {
   industryVoiceId?: string;
   dulidayToken?: string;
   defaultWechatId?: string; // 默认微信号
+  replyPolicyDraftContext?: ReplyPolicyDraftRuntimeContext;
 }
 
 /**

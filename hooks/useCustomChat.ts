@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useState, useCallback, useLayoutEffect } from "react";
+import { useEffect, useRef, useState, useCallback, useLayoutEffect } from "react";
 import { toast } from "sonner";
 import { ABORTED } from "@/lib/utils";
 import { useSmartClean } from "./useSmartClean";
@@ -122,6 +122,37 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
   const [stableChatId] = useState(() => `chat-${crypto.randomUUID()}`);
   const chatId = sandboxId || stableChatId;
 
+  // 🔧 HITL 修复：用 ref 存储最新的请求体数据，供 DefaultChatTransport.body 读取
+  // 这样 HITL 恢复（addToolOutput + sendMessage()）时也能带上 modelConfig 等上下文
+  const chatBodyRef = useRef<Record<string, unknown>>({});
+  useEffect(() => {
+    const body: Record<string, unknown> = { sandboxId: sandboxId || null };
+    if (currentBrand) body.preferredBrand = currentBrand;
+    if (brandPriorityStrategy) body.brandPriorityStrategy = brandPriorityStrategy;
+    body.modelConfig = { chatModel, classifyModel, replyModel, providerConfigs };
+    if (configData) body.configData = configData;
+    if (systemPrompts) body.systemPrompts = systemPrompts;
+    if (replyPolicy) body.replyPolicy = replyPolicy;
+    if (activeSystemPrompt) body.activeSystemPrompt = activeSystemPrompt;
+    if (dulidayToken) body.dulidayToken = dulidayToken;
+    if (defaultWechatId) body.defaultWechatId = defaultWechatId;
+    if (maxSteps) body.maxSteps = maxSteps;
+    if (agentId) body.agentId = agentId;
+    chatBodyRef.current = body;
+  }, [
+    sandboxId, currentBrand, brandPriorityStrategy,
+    chatModel, classifyModel, replyModel, providerConfigs,
+    configData, systemPrompts, replyPolicy, activeSystemPrompt,
+    dulidayToken, defaultWechatId, maxSteps, agentId,
+  ]);
+
+  // 🎯 transport 实例需要稳定引用（避免每次 render 重建）
+  const [transport] = useState(() => new DefaultChatTransport({
+    api: "/api/chat",
+    credentials: "include",
+    body: () => chatBodyRef.current,
+  }));
+
   // 🎯 AI SDK v5: 使用 DefaultChatTransport 配置
   const {
     messages,
@@ -133,10 +164,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
     regenerate,
     addToolOutput, // HITL: 用于发送工具确认决策
   } = useChat({
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-      credentials: "include",
-    }),
+    transport,
     id: chatId,
     onFinish: ({finishReason}) => {
       // 保存最后的 finishReason

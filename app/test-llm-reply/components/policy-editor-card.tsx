@@ -4,7 +4,9 @@ import { useState, type KeyboardEvent } from "react";
 import {
   ChevronDown,
   ChevronUp,
+  Loader2,
   RotateCcw,
+  Rocket,
   Sliders,
   User,
   Target,
@@ -820,12 +822,16 @@ interface PolicyEditorCardProps {
   policy: ReplyPolicyConfig;
   onChange: (policy: ReplyPolicyConfig) => void;
   onReset: () => void;
+  onApply?: () => void;
+  isApplying?: boolean;
 }
 
 export function PolicyEditorCard({
   policy,
   onChange,
   onReset,
+  onApply,
+  isApplying,
 }: PolicyEditorCardProps): React.ReactElement {
   const [expanded, setExpanded] = useState(false);
 
@@ -844,6 +850,25 @@ export function PolicyEditorCard({
             </Badge>
           </CardTitle>
           <div className="flex items-center gap-2">
+            {onApply && (
+              <Button
+                variant="default"
+                size="sm"
+                disabled={isApplying}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onApply();
+                }}
+                className="h-8 text-xs gap-1 bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                {isApplying ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Rocket className="h-3.5 w-3.5" />
+                )}
+                一键使用
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"

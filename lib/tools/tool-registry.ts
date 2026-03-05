@@ -18,6 +18,9 @@ import { dulidayJobDetailsTool } from "./duliday/duliday-job-details-tool";
 import { dulidayInterviewBookingTool } from "./duliday/duliday-interview-booking-tool";
 import { dulidayBiReportTool } from "./duliday/bi-report-tool";
 import { dulidayBiRefreshTool } from "./duliday/bi-refresh-tool";
+import { replyPolicyReadTool } from "./reply-policy/reply-policy-read-tool";
+import { replyPolicyAskTool } from "./reply-policy/reply-policy-ask-tool";
+import { replyPolicySaveTool } from "./reply-policy/reply-policy-save-tool";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import { ZhipinDataSchema } from "@/types/zhipin";
 import { ReplyPolicyConfigSchema } from "@/types/reply-policy";
@@ -340,6 +343,31 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     requiresSandbox: false,
     create: () => dulidayBiRefreshTool(),
   }),
+
+  // ===== 策略配置工具 =====
+  reply_policy_read: createToolDefinition({
+    name: "reply_policy_read",
+    description: "读取当前回复策略配置",
+    category: "business",
+    requiresSandbox: false,
+    create: ctx => replyPolicyReadTool(ctx.replyPolicyDraftContext, ctx.replyPolicy),
+  }),
+
+  reply_policy_ask: createToolDefinition({
+    name: "reply_policy_ask",
+    description: "策略配置引导提问（HITL）",
+    category: "business",
+    requiresSandbox: false,
+    create: () => replyPolicyAskTool(),
+  }),
+
+  reply_policy_save: createToolDefinition({
+    name: "reply_policy_save",
+    description: "保存回复策略配置",
+    category: "business",
+    requiresSandbox: false,
+    create: ctx => replyPolicySaveTool(ctx.replyPolicyDraftContext),
+  }),
 };
 
 // ========== 工具分组配置 ==========
@@ -375,6 +403,10 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "duliday_interview_booking",
     "duliday_bi_report",
     "duliday_bi_refresh",
+    // 策略配置
+    "reply_policy_read",
+    "reply_policy_ask",
+    "reply_policy_save",
   ],
 
   // Boss直聘本地版 - 使用Puppeteer自动化
@@ -416,6 +448,10 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "yupao_get_username",
     "yupao_get_candidate_list",
     "yupao_say_hello",
+    // 策略配置
+    "reply_policy_read",
+    "reply_policy_ask",
+    "reply_policy_save",
   ],
 
   // 通用计算机使用 - 包含E2B和Puppeteer，但不包含Boss直聘业务工具
@@ -430,6 +466,10 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "puppeteer",
     "screenshot",
     "analyze_screenshot",
+    // 策略配置
+    "reply_policy_read",
+    "reply_policy_ask",
+    "reply_policy_save",
   ],
 };
 

@@ -32,6 +32,7 @@ import {
 import { ErrorCode } from "@/lib/errors";
 import { DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
 import type { ModelConfig } from "@/lib/config/models";
+import { createReplyPolicyDraftContext } from "@/lib/tools/reply-policy/reply-policy-draft-context";
 import { SourcePlatform, ApiSource } from "@/db/types";
 import {
   recruitmentContext,
@@ -130,6 +131,11 @@ export async function POST(req: Request) {
       modelConfig: effectiveModelConfig,
       configData: context.configData,
       replyPolicy: context.replyPolicy,
+      replyPolicyDraftContext: createReplyPolicyDraftContext({
+        initialPolicy: context.replyPolicy,
+        historyMessages: normalizedMessages,
+        modelVisibleMessages: processedMessages,
+      }),
       industryVoiceId: context.industryVoiceId,
       dulidayToken: context.dulidayToken,
       defaultWechatId: context.defaultWechatId,
