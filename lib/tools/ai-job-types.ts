@@ -256,11 +256,11 @@ export const combinedArrangementSchema = z.object({
  * 2. 数组: [{ combinedArrangementWeekdays, combinedArrangementStartTime, combinedArrangementEndTime }]
  * 使用 preprocess 统一归一化为对象格式
  */
-const combinedArrangementRawItemSchema = z.object({
-  combinedArrangementWeekdays: z.string().nullable().optional(),
-  combinedArrangementStartTime: z.number().nullable().optional(),
-  combinedArrangementEndTime: z.number().nullable().optional(),
-});
+interface CombinedArrangementRawItem {
+  combinedArrangementWeekdays?: string | null;
+  combinedArrangementStartTime?: number | null;
+  combinedArrangementEndTime?: number | null;
+}
 
 function secondsToTimeStr(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -271,7 +271,7 @@ function secondsToTimeStr(seconds: number): string {
 const normalizedCombinedArrangementSchema = z.preprocess((val) => {
   if (Array.isArray(val)) {
     return {
-      combinedArrangementList: val.map((item: z.infer<typeof combinedArrangementRawItemSchema>) => ({
+      combinedArrangementList: val.map((item: CombinedArrangementRawItem) => ({
         combinedShiftStartTime: typeof item.combinedArrangementStartTime === "number"
           ? secondsToTimeStr(item.combinedArrangementStartTime)
           : null,

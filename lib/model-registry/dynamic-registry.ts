@@ -30,7 +30,8 @@ export function createDynamicRegistry(providerConfigs: Record<string, ProviderCo
       openrouter: createCustomOpenRouter({
         baseURL: providerConfigs.openrouter?.baseURL || "https://openrouter.ai/api/v1",
         apiKey: process.env.OPENROUTER_API_KEY,
-      }) as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any,
 
       // OhMyGPT provider
       ohmygpt: createOpenAICompatible({

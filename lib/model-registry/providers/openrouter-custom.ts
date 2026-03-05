@@ -149,6 +149,7 @@ export function createCustomOpenRouter(config: {
       }
 
       // 其他属性直接传递给原始 provider
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (target as any)[prop];
     },
   }) as OpenRouterProvider;
