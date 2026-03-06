@@ -8,6 +8,8 @@ import { useBrand } from "@/lib/contexts/brand-context";
 import { clearBrandStorage, getBrandStorageStatus } from "@/lib/utils/brand-storage";
 import { useModelConfig } from "@/lib/stores/model-config-store";
 import { useConfigDataForChat } from "@/hooks/useConfigDataForChat";
+import { configService } from "@/lib/services/config.service";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { MessageClassification } from "@/types/zhipin";
 import type { StoreWithDistance } from "@/types/geocoding";
@@ -62,6 +64,7 @@ export default function TestLLMReplyPage() {
   } | null>(null);
   const [conversationHistory, setConversationHistory] = useState<string[]>([]);
   const [editablePolicy, setEditablePolicy] = useState<ReplyPolicyConfig | null>(null);
+  const [isApplying, setIsApplying] = useState(false);
 
   // 当 replyPolicy 加载后初始化可编辑副本
   useEffect(() => {
@@ -72,6 +75,23 @@ export default function TestLLMReplyPage() {
 
   const handleResetPolicy = (): void => {
     if (replyPolicy) setEditablePolicy(structuredClone(replyPolicy));
+  };
+
+  const handleApplyPolicy = async (): Promise<void> => {
+    if (!editablePolicy) return;
+    setIsApplying(true);
+    try {
+      await configService.updateReplyPolicy(editablePolicy);
+      toast.success("策略已生效", {
+        description: "配置已保存，智能回复将使用此策略",
+      });
+    } catch (error) {
+      toast.error("保存失败", {
+        description: error instanceof Error ? error.message : "未知错误",
+      });
+    } finally {
+      setIsApplying(false);
+    }
   };
 
   // 🗑️ 清除品牌偏好
@@ -227,6 +247,8 @@ export default function TestLLMReplyPage() {
             policy={editablePolicy}
             onChange={setEditablePolicy}
             onReset={handleResetPolicy}
+            onApply={handleApplyPolicy}
+            isApplying={isApplying}
           />
         )}
 

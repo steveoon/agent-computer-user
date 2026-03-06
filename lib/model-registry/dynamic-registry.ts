@@ -1,6 +1,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createProviderRegistry } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createCustomOpenRouter } from "./providers/openrouter-custom";
 import { createCustomOpenAI } from "./providers/openai-custom";
@@ -46,9 +47,8 @@ export function createDynamicRegistry(providerConfigs: Record<string, ProviderCo
         apiKey: process.env.MOONSHOT_API_KEY,
       }),
 
-      deepseek: createOpenAICompatible({
-        name: "deepseek",
-        baseURL: providerConfigs.deepseek?.baseURL || "https://api.deepseek.com/v1",
+      deepseek: createDeepSeek({
+        baseURL: providerConfigs.deepseek?.baseURL || "https://api.deepseek.com",
         apiKey: process.env.DEEPSEEK_API_KEY,
       }),
 

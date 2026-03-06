@@ -3,8 +3,10 @@
 import { useConfigMigration } from "@/hooks/useConfigMigration";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Info, X } from "lucide-react";
+import { Info, ShieldAlert, X } from "lucide-react";
 import Link from "next/link";
+import { useSyncStore } from "@/lib/stores/sync-store";
+import { usePathname, useRouter } from "next/navigation";
 
 const DISMISS_KEY = "duliday_token_warning_dismissed";
 
@@ -14,13 +16,15 @@ const DISMISS_KEY = "duliday_token_warning_dismissed";
  */
 export function ConfigInitializer() {
   const { isSuccess, isError, error, tokenMissingWarning } = useConfigMigration();
-  const [isDismissed, setIsDismissed] = useState(true); // 默认隐藏，避免闪烁
-
-  // 检查是否已关闭过提示
-  useEffect(() => {
-    const dismissed = localStorage.getItem(DISMISS_KEY);
-    setIsDismissed(dismissed === "true");
-  }, []);
+  const [isDismissed, setIsDismissed] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem(DISMISS_KEY) === "true";
+  });
+  const router = useRouter();
+  const pathname = usePathname();
+  const isMigrationBlocked = useSyncStore(state => state.isMigrationBlocked);
+  const migrationBlockReason = useSyncStore(state => state.migrationBlockReason);
+  const isSyncing = useSyncStore(state => state.isSyncing);
 
   useEffect(() => {
     if (isSuccess) {
@@ -36,6 +40,45 @@ export function ConfigInitializer() {
     setIsDismissed(true);
     localStorage.setItem(DISMISS_KEY, "true");
   };
+
+  const handleResetAndSync = () => {
+    useSyncStore.getState().resetLocalBrandDataAndSync().catch(() => undefined);
+    router.push("/admin/settings/sync");
+  };
+
+  const allowMigrationBypass = pathname?.startsWith("/admin/settings");
+
+  if (isMigrationBlocked && !allowMigrationBypass) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+        <div className="w-full max-w-xl mx-4 rounded-lg border bg-card p-6 shadow-lg">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5 text-red-500" />
+            <h2 className="text-lg font-semibold text-foreground">数据迁移未完成</h2>
+          </div>
+          <p className="mt-3 text-sm text-muted-foreground">
+            {migrationBlockReason ||
+              "检测到旧版本配置，需要完成全量同步后才能继续使用。"}
+          </p>
+          <div className="mt-5 flex flex-col gap-2">
+            <Button onClick={handleResetAndSync} disabled={isSyncing}>
+              {isSyncing ? "同步进行中..." : "清空本地品牌数据并重试同步"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push("/admin/settings/sync")}
+              disabled={isSyncing}
+            >
+              前往同步管理
+            </Button>
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">
+            若仍无法同步，可手动清理浏览器存储（localStorage / IndexedDB）后刷新页面重试。
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // 显示 Token 缺失提示（可关闭的顶部横条）
   if (tokenMissingWarning && !isDismissed) {

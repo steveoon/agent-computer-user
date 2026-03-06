@@ -10,6 +10,27 @@ import type { ZhipinData } from "./zhipin";
 import type { SystemPromptsConfig, ReplyPolicyConfig, BrandPriorityStrategy } from "./config";
 import type { StageGoals } from "./reply-policy";
 
+export interface ReplyPolicyPatchChange {
+  module: string;
+  value?: unknown;
+  keepCurrent?: boolean;
+  displayValue?: string;
+}
+
+export interface ReplyPolicyDraftRuntimeContext {
+  hasServedFullPolicy: () => boolean;
+  markFullPolicyServed: () => void;
+  getCurrentPolicy: () => ReplyPolicyConfig | null;
+  getDraftPolicy: () => ReplyPolicyConfig | null;
+  getRevision: () => number;
+  applyPatch: (patch: ReplyPolicyPatchChange) => {
+    applied: boolean;
+    reason?: string;
+    revision: number;
+  };
+  commitPolicy: (policy: ReplyPolicyConfig) => void;
+}
+
 // ========== 工具注册表类型定义 ==========
 
 /**
@@ -31,6 +52,7 @@ export interface ToolCreationContext {
   sessionId?: string; // 会话 ID，通过 context.sessionId 注入
   stageGoals?: StageGoals; // 企微对话阶段目标，通过 toolContext.wework_plan_turn.stageGoals 注入
   onJobsFetched?: (jobs: unknown[]) => void; // 工具获取到岗位数据后的回调，由预处理器注入
+  replyPolicyDraftContext?: ReplyPolicyDraftRuntimeContext;
 }
 
 /**

@@ -25,6 +25,9 @@ import {
   HandshakeIcon,
   Eye,
   FileSearch,
+  Sliders,
+  MessageSquareDashed,
+  Save,
 } from "lucide-react";
 import { themes, type LazyToolConfig } from "./types";
 
@@ -213,5 +216,24 @@ export const lazyToolRegistry: Record<string, LazyToolConfig> = {
     defaultTheme: themes.zinc,
     loader: () =>
       import("./screenshot-tool-message").then(m => ({ default: m.ScreenshotToolMessage })),
+  },
+  // Reply Policy configuration tools
+  reply_policy_read: {
+    icon: Sliders,
+    defaultTheme: themes.indigo,
+    loader: () =>
+      import("./reply-policy-read-tool").then(m => ({ default: m.ReplyPolicyReadToolMessage })),
+  },
+  reply_policy_ask: {
+    icon: MessageSquareDashed,
+    defaultTheme: themes.indigo,
+    loader: () =>
+      import("./reply-policy-ask-tool").then(m => ({ default: m.ReplyPolicyAskToolMessage })),
+  },
+  reply_policy_save: {
+    icon: Save,
+    defaultTheme: themes.green,
+    loader: () =>
+      import("./reply-policy-save-tool").then(m => ({ default: m.ReplyPolicySaveToolMessage })),
   },
 };

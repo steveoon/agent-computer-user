@@ -2,6 +2,25 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.28.1...v1.29.0-develop.1) (2026-03-05)
+
+
+### Bug Fixes
+
+* **eligibility:** filter duliday job list by brand/city candidates ([e71eb88](https://github.com/steveoon/agent-computer-user/commit/e71eb880455f10c585cadad2b0364deae854d05d))
+* **sync:** support Duliday segmented job list response ([3ca75b5](https://github.com/steveoon/agent-computer-user/commit/3ca75b5001d8871abf948bea198b2aafe684adde))
+* **test-reply:** expose age policy editor and pass brand strategy ([de02776](https://github.com/steveoon/agent-computer-user/commit/de027765effe1d119acd21203f80ec4238372ea3))
+
+
+### Features
+
+* refactor zhipin reply system with replyPolicy and planning builder ([77298a8](https://github.com/steveoon/agent-computer-user/commit/77298a834343592508db11ebaab17faeac45183e))
+* **reply-policy:** add LLM-guided strategy configuration with HITL tools ([dbe9a5e](https://github.com/steveoon/agent-computer-user/commit/dbe9a5e3f59f824aad2aad7af40d8c5f40aceb93))
+* **replyPolicy:** deterministic age eligibility gate ([1097964](https://github.com/steveoon/agent-computer-user/commit/109796421dd8f5861fa44e7155f95b603577cc1a))
+* **sync:** enforce full-resync gating and migration blocking flow ([193c337](https://github.com/steveoon/agent-computer-user/commit/193c337990db1f1a037f556f7ab7852fa9551e49))
+* **sync:** harden sync pipeline and migrate age-eligibility to new Duliday API ([63c559d](https://github.com/steveoon/agent-computer-user/commit/63c559d7ad31316833c69bf4f602a9203fdafff8))
+* **sync:** migrate job/list payload and enforce cityNameList ([42a465d](https://github.com/steveoon/agent-computer-user/commit/42a465dcf9585d3606629cae2f15b1ec27dc912d))
+
 # [1.29.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.28.1...v1.29.0-develop.1) (2026-02-25)
 
 

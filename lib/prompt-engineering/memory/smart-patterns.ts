@@ -8,7 +8,6 @@
 
 import { getAllBrandMappings } from "@/actions/brand-mapping";
 import { BrandDictionaryCache, isCacheValid } from "./brand-dictionary-cache";
-import { SHANGHAI_REGION_MAPPING } from "@/lib/constants/organization-mapping";
 
 /**
  * 品牌字典缓存（延迟初始化）
@@ -34,7 +33,8 @@ async function buildBrandDictionary() {
   const actualBrands = Object.values(brandMapping);
   const actualBrandsSet = new Set(actualBrands); // 用 Set 优化性能
 
-  // 为每个实际品牌定义别名（只包含真正的别名，不包含独立品牌）
+  // TODO: 待 Duliday 提供品牌别名查询接口后，从 API 动态获取别名数据，删除此硬编码。
+  //  需注意：1) 接口数据需走 TTL 缓存；2) API 不可用时降级到品牌名本身；3) 非业务品牌（麦当劳等）可能需保留少量 fallback。
   const brandAliases: Record<string, string[]> = {
     // 基础品牌（只保留真别名，不包含区域品牌）
     肯德基: ["肯德基", "KFC", "kfc"],
@@ -172,13 +172,10 @@ async function findAliasMatches(text: string): Promise<string[]> {
 
 /**
  * 上海地区字典
- * 基于 SHANGHAI_REGION_MAPPING 构建真实的行政区划数据
+ * 用于从用户消息中识别地区关键词
  */
 function buildLocationDictionary() {
-  // 从实际业务数据获取区域列表
-  const actualDistricts = Object.values(SHANGHAI_REGION_MAPPING);
-
-  // 预定义的区域简称映射表（基于实际使用习惯）
+  // 上海各区及其简称（用于 NLP 地区识别）
   const districtAliasMapping: Record<string, string[]> = {
     黄浦区: ["黄浦区", "黄浦"],
     徐汇区: ["徐汇区", "徐汇"],
@@ -201,18 +198,9 @@ function buildLocationDictionary() {
 
   // 构建最终的区域别名列表
   const districtAliases: string[] = [];
-  actualDistricts.forEach(district => {
-    const aliases = districtAliasMapping[district];
-    if (aliases) {
-      districtAliases.push(...aliases);
-    } else {
-      // 如果没有预定义，使用默认规则作为fallback
-      districtAliases.push(district);
-      if (district.endsWith("区")) {
-        districtAliases.push(district.slice(0, -1));
-      }
-    }
-  });
+  for (const aliases of Object.values(districtAliasMapping)) {
+    districtAliases.push(...aliases);
+  }
 
   return {
     // 实际行政区划

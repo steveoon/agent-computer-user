@@ -12,6 +12,10 @@ export const SalaryDetailsSchema = z.object({
   bonus: z.string().optional(),
   // 保留原始文本以供参考
   memo: z.string(),
+  // 从 salaryScenarioList 提炼的可读摘要（阶梯薪资/综合薪资/节假日倍数等）
+  scenarioSummary: z.string().optional(),
+  // 结算周期："日结"/"周结"/"月结" 等
+  settlementCycle: z.string().optional(),
 });
 
 export const BenefitsSchema = z.object({
@@ -56,6 +60,26 @@ export namespace DulidayRaw {
     accommodationEnv: z.string().nullable(),
     imagesDTOList: z.array(z.unknown()).nullable(),
   });
+
+  // 新 API welfare 结构（无 id/jobBasicInfoId，字段为 string 类型）
+  export const NewWelfareSchema = z
+    .object({
+      haveInsurance: z.string(),
+      accommodation: z.string(),
+      catering: z.string().optional(),
+      otherWelfare: z.array(z.string()).nullable().optional(),
+      accommodationAllowance: z.number().nullable().optional(),
+      accommodationAllowanceUnit: z.string().nullable().optional(),
+      probationAccommodationAllowanceReceive: z.string().nullable().optional(),
+      cateringSalary: z.number().nullable().optional(),
+      cateringSalaryUnit: z.string().nullable().optional(),
+      trafficAllowanceSalary: z.number().nullable().optional(),
+      trafficAllowanceSalaryUnit: z.string().nullable().optional(),
+      memo: z.string().nullable().optional(),
+      promotionWelfare: z.string().nullable().optional(),
+      moreWelfares: z.array(MoreWelfareItemSchema).nullable().optional(),
+    })
+    .passthrough();
 
   export const WorkTimeArrangementSlotSchema = z.object({
     jobWorkTimeArrangementId: z.number(),
@@ -143,7 +167,108 @@ export namespace DulidayRaw {
       }
     );
 
-  export const PositionSchema = z.object({
+  // 新 API workTime 嵌套子对象结构
+  export const NewWorkTimeSchema = z
+    .object({
+      employmentForm: z.string(),
+      minWorkMonths: z.number().nullable().optional(),
+      maxWorkTakingTime: z.number().nullable().optional(),
+      restTimeDesc: z.string().nullable().optional(),
+      workTimeRemark: z.string().nullable().optional(),
+      employmentDescription: z.string().nullable().optional(),
+      weekWorkTime: z
+        .object({
+          weekWorkTimeRequirement: z.string().nullable().optional(),
+          perWeekWorkDays: z.number().nullable().optional(),
+          perWeekRestDays: z.number().nullable().optional(),
+          perWeekNeedWorkDays: z.union([z.string(), z.number()]).nullable().optional(),
+          workSingleDouble: z.string().nullable().optional(),
+          customnWorkTimeList: z
+            .array(
+              z.object({
+                customMinWorkDays: z.number().nullable().optional(),
+                customMaxWorkDays: z.number().nullable().optional(),
+                customWorkWeekdays: z.array(z.union([z.string(), z.number()])).nullable().optional(),
+              }).passthrough()
+            )
+            .nullable()
+            .optional(),
+        })
+        .passthrough()
+        .nullable()
+        .optional(),
+      monthWorkTime: z
+        .object({
+          perMonthMinWorkTime: z.number().nullable().optional(),
+          perMonthMinWorkTimeUnit: z.union([z.string(), z.number()]).nullable().optional(),
+          monthWorkTimeRequirement: z.string().nullable().optional(),
+          perMonthMaxRestTime: z.number().nullable().optional(),
+          perMonthMaxRestTimeUnit: z.number().nullable().optional(),
+        })
+        .passthrough()
+        .nullable()
+        .optional(),
+      dayWorkTime: z
+        .object({
+          perDayMinWorkHours: z.union([z.string(), z.number()]).nullable().optional(),
+          dayWorkTimeRequirement: z.string().nullable().optional(),
+        })
+        .passthrough()
+        .nullable()
+        .optional(),
+      dailyShiftSchedule: z
+        .object({
+          arrangementType: z.string().nullable().optional(),
+          fixedScheduleList: z
+            .array(
+              z.object({
+                fixedShiftStartTime: z.union([z.string(), z.number()]).optional(),
+                fixedShiftEndTime: z.union([z.string(), z.number()]).optional(),
+                startTime: z.number().optional(),
+                endTime: z.number().optional(),
+              }).passthrough()
+            )
+            .nullable()
+            .optional(),
+          combinedArrangement: z
+            .array(
+              z.object({
+                CombinedArrangementWeekdays: z.union([z.string(), z.array(z.number())]).optional(),
+                CombinedArrangementStartTime: z.number().optional(),
+                CombinedArrangementEndTime: z.number().optional(),
+                startTime: z.number().optional(),
+                endTime: z.number().optional(),
+                weekdays: z.array(z.number()).optional(),
+              }).passthrough()
+            )
+            .nullable()
+            .optional(),
+          fixedTime: z
+            .object({
+              goToWorkStartTime: z.union([z.string(), z.number()]).nullable().optional(),
+              goToWorkEndTime: z.union([z.string(), z.number()]).nullable().optional(),
+              goOffWorkStartTime: z.union([z.string(), z.number()]).nullable().optional(),
+              goOffWorkEndTime: z.union([z.string(), z.number()]).nullable().optional(),
+            })
+            .passthrough()
+            .nullable()
+            .optional(),
+        })
+        .passthrough()
+        .nullable()
+        .optional(),
+      temporaryEmployment: z
+        .object({
+          temporaryEmploymentStartTime: z.string().nullable().optional(),
+          temporaryEmploymentEndTime: z.string().nullable().optional(),
+        })
+        .passthrough()
+        .nullable()
+        .optional(),
+    })
+    .passthrough();
+
+  const LegacyPositionSchema = z.object({
     jobBasicInfoId: z.number(),
     jobStoreId: z.number(),
     storeId: z.number(),
@@ -152,6 +277,13 @@ export namespace DulidayRaw {
     storeRegionId: z.number(),
     jobName: z.string(),
     jobId: z.number(),
+    // 兼容新旧品牌/项目追踪字段
+    organizationId: z.number().optional(),
+    organizationName: z.string().optional(),
+    brandId: z.number().optional(),
+    brandName: z.string().optional(),
+    projectId: z.number().optional(),
+    projectName: z.string().optional(),
     cityName: z.array(z.string()),
     salary: z.number(),
     salaryUnitStr: z.string(),
@@ -167,6 +299,76 @@ export namespace DulidayRaw {
     storeAddress: z.string(),
   });
 
+  const NewBasicInfoSchema = z
+    .object({
+      // 真实新接口字段（允许额外字段）
+      jobId: z.number().optional(),
+      createTime: z.string().optional(),
+      jobName: z.string().optional(),
+      brandId: z.number().optional(),
+      brandName: z.string().optional(),
+      projectId: z.number().optional(),
+      projectName: z.string().optional(),
+      storeInfo: z
+        .object({
+          storeId: z.number().optional(),
+          storeName: z.string().optional(),
+          storeCityId: z.number().optional(),
+          storeRegionId: z.number().optional(),
+          storeCityName: z.string().optional(),
+          storeRegionName: z.string().optional(),
+          storeAddress: z.string().optional(),
+          longitude: z.number().optional(),
+          latitude: z.number().optional(),
+        })
+        .optional(),
+
+      // 兼容历史新结构样例中的字段
+      jobBasicInfoId: z.number().optional(),
+      jobStoreId: z.number().optional(),
+      storeId: z.number().optional(),
+      storeName: z.string().optional(),
+      storeCityId: z.number().optional(),
+      storeRegionId: z.number().optional(),
+      cityName: z.array(z.string()).optional(),
+      postTime: z.string().optional(),
+      successDuliriUserId: z.number().optional(),
+      successNameStr: z.string().optional(),
+      storeAddress: z.string().optional(),
+      organizationId: z.number().optional(),
+      organizationName: z.string().optional(),
+    })
+    .passthrough();
+
+  const NewJobSalarySchema = z
+    .object({
+      salary: z.number().optional(),
+      salaryUnitStr: z.string().optional(),
+    })
+    .passthrough();
+
+  const NewHiringRequirementSchema = z
+    .object({
+      cooperationMode: z.number().optional(),
+      requirementNum: z.number().optional(),
+      thresholdNum: z.number().optional(),
+      signUpNum: z.number().nullable().optional(),
+    })
+    .passthrough();
+
+  const NewPositionSchema = z
+    .object({
+      basicInfo: NewBasicInfoSchema,
+      jobSalary: NewJobSalarySchema,
+      welfare: z.union([WelfareSchema, NewWelfareSchema]),
+      hiringRequirement: NewHiringRequirementSchema,
+      workTime: z.union([WorkTimeArrangementSchema, NewWorkTimeSchema]),
+      interviewProcess: z.unknown().optional(),
+    })
+    .passthrough();
+
+  export const PositionSchema = z.union([LegacyPositionSchema, NewPositionSchema]);
+
   export const ListResponseSchema = z.object({
     code: z.number(),
     message: z.string(),
@@ -179,7 +381,9 @@ export namespace DulidayRaw {
   // 导出类型
   export type MoreWelfareItem = z.infer<typeof MoreWelfareItemSchema>;
   export type Welfare = z.infer<typeof WelfareSchema>;
+  export type NewWelfare = z.infer<typeof NewWelfareSchema>;
   export type WorkTimeArrangement = z.infer<typeof WorkTimeArrangementSchema>;
+  export type NewWorkTime = z.infer<typeof NewWorkTimeSchema>;
   export type WorkTimeArrangementSlot = z.infer<typeof WorkTimeArrangementSlotSchema>;
   export type FixedTimeSlot = z.infer<typeof FixedTimeSlotSchema>;
   export type CustomWorkTime = z.infer<typeof CustomWorkTimeSchema>;
@@ -233,10 +437,26 @@ export const SchedulingFlexibilitySchema = z.object({
   holidayRequired: z.boolean(),
 });
 
+// 招聘要求Schema（从新 API hiringRequirement.basicPersonalRequirements 提取）
+export const HiringRequirementsSchema = z.object({
+  minAge: z.number().nullable().optional(),
+  maxAge: z.number().nullable().optional(),
+  genderRequirement: z.string().nullable().optional(),
+  education: z.string().nullable().optional(),
+  healthCertificate: z.string().nullable().optional(),
+});
+
+export type HiringRequirements = z.infer<typeof HiringRequirementsSchema>;
+
 // 岗位Schema（使用结构化的薪资与福利模型）
 export const PositionSchema = z.object({
   id: z.string(),
   name: z.string(),
+  // 新增：品牌/项目追踪字段（IndexedDB 持久化）
+  brandId: z.string().optional(),
+  brandName: z.string().optional(),
+  projectId: z.string().optional(),
+  projectName: z.string().optional(),
   timeSlots: z.array(z.string()),
   // 🔧 使用结构化的薪资模型替代原有的 baseSalary 和 levelSalary
   salary: SalaryDetailsSchema,
@@ -251,9 +471,11 @@ export const PositionSchema = z.object({
   schedulingFlexibility: SchedulingFlexibilitySchema,
   minHoursPerWeek: z.number().min(0).optional(),
   maxHoursPerWeek: z.number().min(0).optional(),
-  preferredDays: z.array(z.string()).optional(),
-  blackoutDates: z.array(z.string()).optional(),
   attendanceRequirement: AttendanceRequirementSchema.optional(),
+  // 新增：结构化招聘要求（年龄/性别/学历/健康证）
+  hiringRequirements: HiringRequirementsSchema.optional(),
+  // 新增：岗位描述（来自 basicInfo.jobContent）
+  description: z.string().optional(),
 });
 
 // 门店Schema
@@ -265,7 +487,6 @@ export const StoreSchema = z.object({
   district: z.string(),
   subarea: z.string(),
   coordinates: CoordinatesSchema, // 引用统一的坐标 Schema
-  transportation: z.string(),
   positions: z.array(PositionSchema),
   brand: z.string(),
 });
@@ -327,7 +548,6 @@ export const ScreeningRulesSchema = z.object({
 // 品牌配置Schema
 export const BrandConfigSchema = z.object({
   templates: RequiredTemplatesSchema,
-  screening: ScreeningRulesSchema,
 });
 
 // Boss直聘数据Schema

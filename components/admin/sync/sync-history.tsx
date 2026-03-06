@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +35,7 @@ import { useBrandManagementStore } from "@/lib/stores/brand-management-store";
 export const SyncHistory = () => {
   const { syncHistory, loadSyncHistory, clearHistory } = useSyncStore();
   const [selectedRecord, setSelectedRecord] = useState<string | null>(null);
+  const [showFailedOnly, setShowFailedOnly] = useState(false);
 
   // 从 Brand Management Store 获取品牌列表
   const availableBrands = useBrandManagementStore(state => state.availableBrands);
@@ -47,13 +48,11 @@ export const SyncHistory = () => {
     }
   }, [availableBrands.length, loadAvailableBrands]);
 
-  // 获取品牌名称 (unused for now but may be needed later)
-  // const getBrandNames = (organizationIds: number[]) => {
-  //   return organizationIds
-  //     .map(id => availableBrands.find(b => b.id === id)?.name)
-  //     .filter(Boolean)
-  //     .join(", ");
-  // };
+  // 构建品牌 ID → 名称的 Map，避免循环内 O(n) find()
+  const brandNameMap = useMemo(
+    () => new Map(availableBrands.map(b => [b.id, b.name])),
+    [availableBrands]
+  );
 
   // 格式化时间
   const formatTime = (timestamp: string) => {
@@ -68,6 +67,7 @@ export const SyncHistory = () => {
 
   const handleViewDetails = (recordId: string) => {
     setSelectedRecord(selectedRecord === recordId ? null : recordId);
+    setShowFailedOnly(false);
   };
 
   const selectedRecordData = syncHistory.find(record => record.id === selectedRecord);
@@ -133,14 +133,11 @@ export const SyncHistory = () => {
 
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {record.organizationIds.slice(0, 2).map(id => {
-                          const brand = availableBrands.find(b => b.id === String(id));
-                          return (
+                        {record.organizationIds.slice(0, 2).map(id => (
                             <Badge key={id} variant="outline" className="text-xs">
-                              {brand?.name || `ID:${id}`}
+                              {brandNameMap.get(String(id)) || `ID:${id}`}
                             </Badge>
-                          );
-                        })}
+                        ))}
                         {record.organizationIds.length > 2 && (
                           <Badge variant="outline" className="text-xs">
                             +{record.organizationIds.length - 2}
@@ -249,9 +246,25 @@ export const SyncHistory = () => {
 
                   {/* 各品牌详情 */}
                   <div>
-                    <h4 className="font-medium mb-3">各品牌同步详情</h4>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium">各品牌同步详情</h4>
+                      {selectedRecordData.results.some(r => !r.success) && (
+                        <Button
+                          variant={showFailedOnly ? "destructive" : "outline"}
+                          size="sm"
+                          className="h-7 text-xs px-2.5"
+                          onClick={() => setShowFailedOnly(prev => !prev)}
+                        >
+                          <XCircle className="h-3.5 w-3.5 mr-1" />
+                          仅失败 ({selectedRecordData.results.filter(r => !r.success).length})
+                        </Button>
+                      )}
+                    </div>
                     <div className="space-y-2">
-                      {selectedRecordData.results.map((result, index) => (
+                      {(showFailedOnly
+                        ? selectedRecordData.results.filter(r => !r.success)
+                        : selectedRecordData.results
+                      ).map((result, index) => (
                         <div
                           key={index}
                           className={`p-4 border rounded-lg ${

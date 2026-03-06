@@ -221,8 +221,8 @@ export const DEFAULT_PROVIDER_CONFIGS: Record<string, ProviderConfig> = {
   },
   deepseek: {
     name: "DeepSeek",
-    baseURL: "https://api.deepseek.com/v1",
-    description: "DeepSeek 统一接口",
+    baseURL: "https://api.deepseek.com",
+    description: "DeepSeek 官方接口",
   },
   qwen: {
     name: "Qwen",

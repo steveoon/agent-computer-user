@@ -6,10 +6,42 @@ import {
   saveSyncRecord,
   getSyncHistory,
 } from "@/lib/services/duliday-sync.service";
+import { getAvailableBrands } from "@/actions/brand-mapping";
 import { configService, getBrandData } from "@/lib/services/config.service";
+import { CONFIG_VERSION } from "@/types";
 import { ZhipinData } from "@/types/zhipin";
 import { toast } from "sonner";
 import { configStore } from "@/hooks/useConfigManager";
+import { hasNumericCoordinates } from "@/lib/utils/coordinates";
+import { consumeNdjsonStream } from "@/lib/utils/ndjson-stream";
+import { createSyncStreamHandler } from "@/lib/utils/sync-stream";
+
+const buildFullResyncSelectionMessage = (
+  totalBrands: number,
+  selectedCount: number,
+  missingNames: string[],
+  invalidIds: string[]
+): string => {
+  const missingPreview =
+    missingNames.length > 0
+      ? `缺少：${missingNames.slice(0, 3).join("、")}${missingNames.length > 3 ? "..." : ""}`
+      : "";
+  const invalidPreview =
+    invalidIds.length > 0
+      ? `包含无效ID：${invalidIds.slice(0, 3).join("、")}${invalidIds.length > 3 ? "..." : ""}`
+      : "";
+  const details = [missingPreview, invalidPreview].filter(Boolean).join("；");
+
+  return (
+    `当前配置需要全量重同步，请选择全部 ${totalBrands} 个品牌后再同步。` +
+    `已选 ${selectedCount} 个` +
+    (details ? `，${details}` : "")
+  );
+};
+
+const fetchAvailableBrandIds = async (): Promise<Array<{ id: string; name: string }>> => {
+  return await getAvailableBrands();
+};
 
 /**
  * 同步状态接口
@@ -32,6 +64,8 @@ interface SyncState {
 
   // 错误状态
   error: string | null;
+  isMigrationBlocked: boolean;
+  migrationBlockReason: string | null;
 
   // Actions
   setSelectedBrands: (brands: string[]) => void;
@@ -47,6 +81,9 @@ interface SyncState {
   clearHistory: () => void;
 
   setError: (error: string | null) => void;
+  setMigrationBlocked: (reason: string) => void;
+  clearMigrationBlocked: () => void;
+  resetLocalBrandDataAndSync: () => Promise<void>;
   reset: () => void;
 }
 
@@ -65,6 +102,8 @@ export const useSyncStore = create<SyncState>()(
       syncHistory: [],
       currentSyncResult: null,
       error: null,
+      isMigrationBlocked: false,
+      migrationBlockReason: null,
 
       // 品牌选择相关操作
       setSelectedBrands: brands => {
@@ -90,6 +129,7 @@ export const useSyncStore = create<SyncState>()(
       // 同步操作
       startSync: async () => {
         const { selectedBrands } = get();
+        let needsFullResync = false;
 
         if (selectedBrands.length === 0) {
           set({ error: "请至少选择一个品牌进行同步" });
@@ -97,15 +137,49 @@ export const useSyncStore = create<SyncState>()(
           return;
         }
 
-        set({
-          isSyncing: true,
-          error: null,
-          overallProgress: 0,
-          currentStep: "准备开始同步...",
-          currentSyncResult: null,
-        });
-
         try {
+          const currentConfig = await configService.getConfig();
+          needsFullResync = currentConfig?.metadata?.needsFullResync === true;
+
+          if (needsFullResync) {
+            const availableBrands = await fetchAvailableBrandIds();
+            if (availableBrands.length === 0) {
+              const message = "暂无可同步品牌，请先在品牌管理中添加品牌";
+              set({ error: message });
+              toast.error("全量同步校验失败", { description: message });
+              return;
+            }
+
+            const availableBrandIds = new Set(availableBrands.map(brand => brand.id));
+            const selectedBrandSet = new Set(selectedBrands);
+            const missingBrands = availableBrands
+              .filter(brand => !selectedBrandSet.has(brand.id))
+              .map(brand => brand.name);
+            const invalidSelections = selectedBrands.filter(
+              brandId => !availableBrandIds.has(brandId)
+            );
+
+            if (missingBrands.length > 0 || invalidSelections.length > 0) {
+              const message = buildFullResyncSelectionMessage(
+                availableBrands.length,
+                selectedBrands.length,
+                missingBrands,
+                invalidSelections
+              );
+              set({ error: message });
+              toast.error("全量同步校验失败", { description: message });
+              return;
+            }
+          }
+
+          set({
+            isSyncing: true,
+            error: null,
+            overallProgress: 0,
+            currentStep: "准备开始同步...",
+            currentSyncResult: null,
+          });
+
           // 获取本地存储的Token
           const localToken = localStorage.getItem("duliday_token");
 
@@ -124,6 +198,12 @@ export const useSyncStore = create<SyncState>()(
             );
           }
 
+          if (needsFullResync) {
+            toast.warning("检测到旧版本配置，需要全量重同步", {
+              description: "本次同步将使用新数据完全替换本地品牌数据",
+            });
+          }
+
           toast.info("开始数据同步...", {
             description: `将同步 ${selectedBrands.length} 个品牌的数据`,
           });
@@ -131,12 +211,12 @@ export const useSyncStore = create<SyncState>()(
           set({ currentStep: "正在同步数据...", overallProgress: 10 });
 
           // 获取现有数据以提取已知坐标
-          const existingData = await getBrandData();
+          const existingData = currentConfig?.brandData ?? (await getBrandData());
           const existingCoordinates: Record<string, { lat: number; lng: number }> = {};
 
           if (existingData?.stores) {
             existingData.stores.forEach(store => {
-              if (store.coordinates && store.coordinates.lat !== 0 && store.coordinates.lng !== 0) {
+              if (hasNumericCoordinates(store.coordinates)) {
                 // 使用地址作为键
                 existingCoordinates[store.location] = store.coordinates;
               }
@@ -144,6 +224,7 @@ export const useSyncStore = create<SyncState>()(
           }
 
           // 调用 API 端点进行同步 (流式响应)
+          // ✅ 不传 cityNameList == 全量城市同步（默认允许）
           const response = await fetch("/api/sync", {
             method: "POST",
             headers: {
@@ -166,96 +247,86 @@ export const useSyncStore = create<SyncState>()(
           }
 
           const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let result: SyncRecord | null = null;
-          let buffer = "";
+          const { result, error } = await consumeNdjsonStream<SyncRecord>(
+            reader,
+            createSyncStreamHandler({
+              onProgress: msg => {
+                set({
+                  overallProgress: msg.progress,
+                  currentStep: msg.message,
+                  currentOrganization: msg.currentOrg || 0,
+                });
+              },
+              onGeocodingProgress: msg => {
+                const baseProgress = 50;
+                const maxProgress = 90;
+                const progressRange = maxProgress - baseProgress;
+                const calculatedProgress =
+                  typeof msg.overallProgress === "number"
+                    ? msg.overallProgress
+                    : msg.total > 0
+                      ? baseProgress + (msg.processed / msg.total) * progressRange
+                      : baseProgress;
+                const roundedProgress = Math.round(calculatedProgress * 10) / 10;
+                set(state => ({
+                  currentStep: `正在地理编码 [${msg.brandName}]: ${msg.processed}/${msg.total}`,
+                  overallProgress: Math.min(
+                    maxProgress,
+                    Math.max(baseProgress, Math.max(state.overallProgress, roundedProgress))
+                  ),
+                }));
+              },
+            })
+          );
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-
-            // Keep the last line in the buffer as it might be incomplete
-            // unless the stream is done (which is handled by the loop exit)
-            buffer = lines.pop() || "";
-
-            for (const line of lines) {
-              if (line.trim() === "") continue;
-
-              try {
-                const data = JSON.parse(line);
-
-                if (data.type === "progress") {
-                  set({
-                    overallProgress: data.progress,
-                    currentStep: data.message,
-                    currentOrganization: data.currentOrg || 0,
-                  });
-                } else if (data.type === "geocoding_progress") {
-                  // 地理编码阶段进度 (50% - 90%)
-                  const baseProgress = 50;
-                  const maxProgress = 90;
-                  const progressRange = maxProgress - baseProgress;
-                  const calculatedProgress =
-                    typeof data.overallProgress === "number"
-                      ? data.overallProgress
-                      : data.total > 0
-                        ? baseProgress + (data.processed / data.total) * progressRange
-                        : baseProgress;
-                  const roundedProgress = Math.round(calculatedProgress * 10) / 10;
-                  set(state => ({
-                    currentStep: `正在地理编码 [${data.brandName}]: ${data.processed}/${data.total}`,
-                    overallProgress: Math.min(
-                      maxProgress,
-                      Math.max(
-                        baseProgress,
-                        Math.max(state.overallProgress, roundedProgress)
-                      )
-                    ),
-                  }));
-                } else if (data.type === "result") {
-                  result = data.data;
-                } else if (data.type === "error") {
-                  throw new Error(data.error);
-                }
-              } catch (e) {
-                console.error("解析流数据失败:", e);
-              }
-            }
+          if (error) {
+            console.warn("[sync-store] 同步流返回错误，但已收到结果:", error.message);
+            toast.warning("同步完成但返回错误信息", {
+              description: error.message,
+            });
           }
 
-          // Process any remaining buffer
-          if (buffer.trim()) {
-            try {
-              const data = JSON.parse(buffer);
-              if (data.type === "result") {
-                result = data.data;
-              } else if (data.type === "error") {
-                throw new Error(data.error);
-              }
-            } catch (e) {
-              console.error("解析剩余缓冲数据失败:", e);
-            }
-          }
-
-          if (!result) {
-            throw new Error("未收到同步结果数据");
+          if (needsFullResync && !result.overallSuccess) {
+            const failedBrands = result.results
+              .filter(r => !r.success)
+              .map(r => r.brandName || "未知品牌");
+            const message =
+              failedBrands.length > 0
+                ? `全量重同步要求所有品牌成功，本次失败 ${failedBrands.length} 个品牌：${failedBrands.slice(0, 3).join("、")}${failedBrands.length > 3 ? "..." : ""}`
+                : "全量重同步要求所有品牌成功，但本次同步未全部完成";
+            throw new Error(message);
           }
 
           // 处理转换后的数据并保存到本地配置
           set({ currentStep: "正在保存数据到本地...", overallProgress: 95 });
 
           try {
-            await mergeAndSaveSyncData(result.results);
+            await mergeAndSaveSyncData(result.results, {
+              mode: needsFullResync ? "replace" : "merge",
+            });
 
             // 🔄 重新加载配置以确保所有组件获取最新数据
             await configStore.getState().loadConfig();
             console.log("✅ 配置已重新加载，所有组件将看到最新数据");
           } catch (saveError) {
-            console.warn("数据保存失败，但同步已完成:", saveError);
-            // 即使保存失败，也不影响同步的成功状态
+            const saveErrorMsg =
+              saveError instanceof Error ? saveError.message : "未知保存错误";
+            console.error(
+              "❌ 数据保存到 IndexedDB 失败（同步数据已获取但未持久化）:",
+              saveError
+            );
+
+            if (needsFullResync) {
+              throw new Error(
+                `全量重同步保存失败，原有数据未被覆盖，可重试。 ${saveErrorMsg}`
+              );
+            }
+
+            // 非全量重同步：向用户显示保存失败警告（不再静默忽略）
+            toast.error("数据保存失败", {
+              description: `同步数据已获取但保存到本地失败: ${saveErrorMsg}`,
+              duration: 8000,
+            });
           }
 
           // 保存同步记录
@@ -267,6 +338,10 @@ export const useSyncStore = create<SyncState>()(
             currentStep: "同步完成",
             overallProgress: 100,
           });
+
+          if (needsFullResync && result.overallSuccess) {
+            get().clearMigrationBlocked();
+          }
 
           // 刷新历史记录
           get().loadSyncHistory();
@@ -292,7 +367,10 @@ export const useSyncStore = create<SyncState>()(
             });
           }
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : "同步过程中发生未知错误";
+          const baseMessage = error instanceof Error ? error.message : "同步过程中发生未知错误";
+          const errorMessage = needsFullResync
+            ? `${baseMessage}（可重试，原有数据未被覆盖）`
+            : baseMessage;
 
           set({
             error: errorMessage,
@@ -303,6 +381,10 @@ export const useSyncStore = create<SyncState>()(
           toast.error("数据同步失败", {
             description: errorMessage,
           });
+
+          if (needsFullResync) {
+            get().setMigrationBlocked(errorMessage);
+          }
         }
       },
 
@@ -340,6 +422,37 @@ export const useSyncStore = create<SyncState>()(
       // 错误处理
       setError: error => {
         set({ error });
+      },
+
+      setMigrationBlocked: reason => {
+        set({ isMigrationBlocked: true, migrationBlockReason: reason });
+      },
+
+      clearMigrationBlocked: () => {
+        set({ isMigrationBlocked: false, migrationBlockReason: null });
+      },
+
+      resetLocalBrandDataAndSync: async () => {
+        if (get().isSyncing) {
+          return;
+        }
+
+        try {
+          await configService.clearBrandData();
+
+          const availableBrands = await fetchAvailableBrandIds();
+          if (availableBrands.length === 0) {
+            throw new Error("暂无可同步品牌，请先在品牌管理中添加品牌");
+          }
+
+          set({ selectedBrands: availableBrands.map(brand => brand.id) });
+          await get().startSync();
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "清空本地品牌数据失败，请稍后重试";
+          set({ error: message });
+          toast.error("恢复失败", { description: message });
+        }
       },
 
       // 重置状态
@@ -387,12 +500,25 @@ export function getSyncStatusColor(isSuccess: boolean): string {
   return isSuccess ? "text-green-600" : "text-red-600";
 }
 
+interface SyncSaveOptions {
+  mode?: "merge" | "replace";
+}
+
 /**
  * 合并并保存同步数据到本地配置
  */
-export async function mergeAndSaveSyncData(syncResults: SyncResult[]): Promise<void> {
-  // 获取现有配置
-  const existingData = await getBrandData();
+export async function mergeAndSaveSyncData(
+  syncResults: SyncResult[],
+  options: SyncSaveOptions = {}
+): Promise<void> {
+  const mode = options.mode ?? "merge";
+  const currentConfig = await configService.getConfig();
+
+  if (!currentConfig) {
+    throw new Error("配置数据不存在，请先初始化");
+  }
+
+  const existingData = currentConfig.brandData;
 
   // 合并所有同步结果的数据
   const allConvertedData: Partial<ZhipinData>[] = syncResults
@@ -400,8 +526,112 @@ export async function mergeAndSaveSyncData(syncResults: SyncResult[]): Promise<v
     .map(result => result.convertedData)
     .filter((data): data is Partial<ZhipinData> => data !== undefined && data !== null);
 
-  if (allConvertedData.length === 0) {
+  // 收集 API 正常返回 0 岗位的品牌（需清理旧数据）
+  // 区分：errors 为空 = API 正常返回空数据；errors 非空 = 网络/API 异常，保留旧数据
+  const emptyBrandNames = new Set<string>();
+  for (const result of syncResults) {
+    if (
+      !result.success &&
+      !result.convertedData &&
+      result.errors.length === 0 &&
+      result.brandName
+    ) {
+      emptyBrandNames.add(result.brandName);
+    }
+  }
+
+  if (allConvertedData.length === 0 && emptyBrandNames.size === 0) {
     console.log("没有需要保存的转换数据");
+    if (mode === "replace") {
+      throw new Error("全量重同步未返回可保存的数据");
+    }
+    return;
+  }
+
+  // 仅有空品牌需要清理（无新数据）
+  if (allConvertedData.length === 0 && emptyBrandNames.size > 0) {
+    console.log(
+      `没有新数据，但需清理 ${emptyBrandNames.size} 个已无在招岗位的品牌: ${Array.from(emptyBrandNames).join(", ")}`
+    );
+
+    const mergedBrands = { ...(existingData?.brands || {}) };
+    let mergedStores = [...(existingData?.stores || [])];
+
+    mergedStores = mergedStores.filter(store => !emptyBrandNames.has(store.brand));
+    for (const brandName of emptyBrandNames) {
+      delete mergedBrands[brandName];
+      console.log(`🗑️ 已清理品牌 "${brandName}" 的本地门店和配置`);
+    }
+
+    const finalData: ZhipinData = {
+      city: existingData?.city || "上海市",
+      stores: mergedStores,
+      brands: mergedBrands,
+      defaultBrand: existingData?.defaultBrand,
+    };
+
+    await configService.updateBrandData(finalData);
+    console.log(`✅ 空品牌清理完成，剩余门店: ${mergedStores.length} 个，品牌: ${Object.keys(mergedBrands).length} 个`);
+    return;
+  }
+
+  if (mode === "replace") {
+    const backupTemplates = currentConfig.metadata.backup?.brandTemplates || {};
+
+    let mergedCity =
+      allConvertedData.find(data => data.city)?.city || existingData?.city || "上海市";
+    let mergedDefaultBrand =
+      allConvertedData.find(data => data.defaultBrand)?.defaultBrand || existingData?.defaultBrand;
+
+    const mergedBrands: ZhipinData["brands"] = {};
+    const mergedStores: ZhipinData["stores"] = [];
+
+    for (const data of allConvertedData) {
+      if (data.city && !mergedCity) {
+        mergedCity = data.city;
+      }
+      if (data.defaultBrand && !mergedDefaultBrand) {
+        mergedDefaultBrand = data.defaultBrand;
+      }
+
+      if (data.brands) {
+        const brands = data.brands;
+        Object.keys(brands).forEach(brandName => {
+          const newBrandConfig = brands[brandName];
+          const preservedTemplates = backupTemplates[brandName];
+          mergedBrands[brandName] = preservedTemplates
+            ? { ...newBrandConfig, templates: preservedTemplates }
+            : newBrandConfig;
+        });
+      }
+
+      if (data.stores) {
+        mergedStores.push(...data.stores);
+      }
+    }
+
+    const finalData: ZhipinData = {
+      city: mergedCity,
+      stores: mergedStores,
+      brands: mergedBrands,
+      defaultBrand: mergedDefaultBrand,
+    };
+
+    await configService.saveConfig({
+      ...currentConfig,
+      brandData: finalData,
+      metadata: {
+        ...currentConfig.metadata,
+        version: CONFIG_VERSION,
+        migratedAt: currentConfig.metadata.migratedAt || new Date().toISOString(),
+        upgradedAt: new Date().toISOString(),
+        needsFullResync: false,
+      },
+    });
+
+    console.log(`✅ 数据全量替换完成:`);
+    console.log(`   📊 总门店数: ${mergedStores.length} 个`);
+    console.log(`   🏢 总品牌数: ${Object.keys(mergedBrands).length} 个`);
     return;
   }
 
@@ -413,7 +643,13 @@ export async function mergeAndSaveSyncData(syncResults: SyncResult[]): Promise<v
     }
   }
 
-  console.log(`🔄 开始合并数据，将替换品牌: ${Array.from(syncedBrandNames).join(", ")}`);
+  if (emptyBrandNames.size > 0) {
+    console.log(
+      `🔄 开始合并数据，将替换品牌: ${Array.from(syncedBrandNames).join(", ")}；将清理空品牌: ${Array.from(emptyBrandNames).join(", ")}`
+    );
+  } else {
+    console.log(`🔄 开始合并数据，将替换品牌: ${Array.from(syncedBrandNames).join(", ")}`);
+  }
 
   // 基础数据保持不变
   let mergedCity = existingData?.city || "上海市";
@@ -422,11 +658,21 @@ export async function mergeAndSaveSyncData(syncResults: SyncResult[]): Promise<v
   // 品牌数据：保留现有品牌 + 完全替换同步的品牌
   const mergedBrands = { ...(existingData?.brands || {}) };
 
-  // 门店数据：移除被同步品牌的现有门店，然后添加新门店
+  // 清理 API 正常返回 0 岗位的品牌配置
+  for (const brandName of emptyBrandNames) {
+    if (mergedBrands[brandName]) {
+      delete mergedBrands[brandName];
+      console.log(`🗑️ 已清理品牌 "${brandName}" 的本地配置（API 返回 0 岗位）`);
+    }
+  }
+
+  // 门店数据：移除被同步品牌 + 空品牌的现有门店，然后添加新门店
   let mergedStores = [...(existingData?.stores || [])];
 
-  // 第一步：移除所有即将被同步品牌的现有门店
-  mergedStores = mergedStores.filter(store => !syncedBrandNames.has(store.brand));
+  // 第一步：移除所有即将被同步品牌和空品牌的现有门店
+  mergedStores = mergedStores.filter(
+    store => !syncedBrandNames.has(store.brand) && !emptyBrandNames.has(store.brand)
+  );
 
   console.log(`🗑️ 移除现有门店数据，剩余门店: ${mergedStores.length} 个`);
 

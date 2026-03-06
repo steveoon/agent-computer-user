@@ -1,9 +1,11 @@
 import { getAvailableBrands } from "@/actions/brand-mapping";
 import { configService } from "@/lib/services/config.service";
+import { consumeNdjsonStream } from "@/lib/utils/ndjson-stream";
+import { createSyncStreamHandler } from "@/lib/utils/sync-stream";
 
 // 从统一类型文件导入（Schema-First 原则）
 import type { SyncRecord } from "@/types/duliday-sync";
-import { SyncResponseSchema, SyncStreamMessageSchema } from "@/types/duliday-sync";
+import { SyncResponseSchema } from "@/types/duliday-sync";
 
 /**
  * 品牌同步管理器
@@ -23,57 +25,13 @@ export class BrandSyncManager {
       }
 
       const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let result: SyncRecord | null = null;
+      const { result, error } = await consumeNdjsonStream<SyncRecord>(
+        reader,
+        createSyncStreamHandler()
+      );
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-
-          try {
-            const data = JSON.parse(line);
-            const parsed = SyncStreamMessageSchema.safeParse(data);
-            if (!parsed.success) {
-              continue;
-            }
-
-            if (parsed.data.type === "result") {
-              result = parsed.data.data;
-            } else if (parsed.data.type === "error") {
-              throw new Error(parsed.data.error || "同步请求失败");
-            }
-          } catch (error) {
-            console.warn("解析同步流数据失败:", error);
-          }
-        }
-      }
-
-      if (buffer.trim()) {
-        try {
-          const data = JSON.parse(buffer);
-          const parsed = SyncStreamMessageSchema.safeParse(data);
-          if (parsed.success) {
-            if (parsed.data.type === "result") {
-              result = parsed.data.data;
-            } else if (parsed.data.type === "error") {
-              throw new Error(parsed.data.error || "同步请求失败");
-            }
-          }
-        } catch (error) {
-          console.warn("解析同步流剩余数据失败:", error);
-        }
-      }
-
-      if (!result) {
-        throw new Error("未收到同步结果数据");
+      if (error) {
+        console.warn("[BrandSyncManager] 同步流返回错误，但已收到结果:", error.message);
       }
 
       return result;
@@ -108,6 +66,10 @@ export class BrandSyncManager {
     tokenMissing?: boolean;
     /** 未登录/无权限（避免在未登录场景下自动同步导致控制台报错） */
     unauthorized?: boolean;
+    /** 全量同步要求未满足 */
+    requiresFullResync?: boolean;
+    /** 阻断原因 */
+    blockedReason?: string;
   }> {
     const syncedBrands: string[] = [];
     const failedBrands: string[] = [];
@@ -121,6 +83,18 @@ export class BrandSyncManager {
       // 获取所有映射的品牌（从数据库）
       const mappedBrands = await getAvailableBrands();
       const mappedBrandNames = mappedBrands.map(b => b.name);
+
+      const needsFullResync = config?.metadata?.needsFullResync === true;
+      if (needsFullResync && !forceSync) {
+        return {
+          syncedBrands,
+          failedBrands,
+          errors,
+          requiresFullResync: true,
+          blockedReason:
+            "检测到旧版本配置，需要全量同步所有品牌。请前往同步管理选择全部品牌后再同步。",
+        };
+      }
 
       // 找出缺失的映射品牌（只同步数据库中定义的品牌）
       const missingBrands = forceSync
@@ -224,7 +198,8 @@ export class BrandSyncManager {
             } else {
               failedBrands.push(brand.name);
               errors[brand.name] = result.errors.join(", ") || "同步失败";
-              console.error(`❌ 同步品牌失败: ${brand.name}`, result.errors);
+              // 用 warn 避免在 Next.js dev 中触发 error overlay
+              console.warn(`⚠️ 同步品牌失败: ${brand.name}`, result.errors);
             }
           }
         }

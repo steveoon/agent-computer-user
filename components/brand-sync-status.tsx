@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
 import { BrandSyncManager } from "@/lib/services/brand-sync-manager";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 interface SyncStatus {
   totalMapped: number;
@@ -48,6 +49,15 @@ export function BrandSyncStatus() {
     setIsSyncing(true);
     try {
       const result = await BrandSyncManager.syncMissingBrands();
+
+      if (result.requiresFullResync) {
+        toast.error("需要全量同步", {
+          description:
+            result.blockedReason ||
+            "检测到旧版本配置，请前往同步管理选择全部品牌完成全量同步。",
+        });
+        return;
+      }
 
       if (result.syncedBrands.length > 0) {
         // 重新加载状态
