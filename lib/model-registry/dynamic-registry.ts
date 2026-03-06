@@ -1,6 +1,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createProviderRegistry } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createCustomOpenRouter } from "./providers/openrouter-custom";
 import { createCustomOpenAI } from "./providers/openai-custom";
@@ -27,13 +28,10 @@ export function createDynamicRegistry(providerConfigs: Record<string, ProviderCo
       }),
 
       // OpenRouter provider (使用自定义实现来修复 Kimi K2 的问题)
-      // Note: @openrouter/ai-sdk-provider 尚未完全支持 AI SDK v6
-      // TODO: 待 @openrouter/ai-sdk-provider 更新后移除此类型断言
       openrouter: createCustomOpenRouter({
         baseURL: providerConfigs.openrouter?.baseURL || "https://openrouter.ai/api/v1",
         apiKey: process.env.OPENROUTER_API_KEY,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      }) as any,
+      }),
 
       // OhMyGPT provider
       ohmygpt: createOpenAICompatible({
@@ -48,9 +46,8 @@ export function createDynamicRegistry(providerConfigs: Record<string, ProviderCo
         apiKey: process.env.MOONSHOT_API_KEY,
       }),
 
-      deepseek: createOpenAICompatible({
-        name: "deepseek",
-        baseURL: providerConfigs.deepseek?.baseURL || "https://api.deepseek.com/v1",
+      deepseek: createDeepSeek({
+        baseURL: providerConfigs.deepseek?.baseURL || "https://api.deepseek.com",
         apiKey: process.env.DEEPSEEK_API_KEY,
       }),
 
