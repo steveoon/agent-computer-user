@@ -117,7 +117,8 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
         ctx.replyPolicy,
         ctx.defaultWechatId,
         ctx.brandPriorityStrategy,
-        ctx.industryVoiceId
+        ctx.industryVoiceId,
+        ctx.channelType
       ),
   }),
 

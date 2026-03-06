@@ -46,6 +46,7 @@ export interface ToolCreationContext {
   industryVoiceId?: string;
   dulidayToken?: string;
   defaultWechatId?: string; // 默认微信号
+  channelType?: "public" | "private";
   replyPolicyDraftContext?: ReplyPolicyDraftRuntimeContext;
 }
 

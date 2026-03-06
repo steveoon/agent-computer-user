@@ -136,6 +136,7 @@ z.string({ error: issue => issue.input === undefined ? "Required" : "Invalid" })
 - **duliday** tools - HR system integration (`duliday_job_list`, `duliday_job_details`, `duliday_interview_booking`)
 - **yupao** tools - Yupao recruitment platform (`get_unread_messages`, `exchange_wechat`)
 - **zhipin** tools - BOSS直聘 recruitment automation
+- **reply_policy** tools - LLM-guided strategy configuration (`reply_policy_read`, `reply_policy_ask` HITL, `reply_policy_save`)
 
 ## Testing
 
@@ -218,6 +219,40 @@ DULIDAY_TOKEN, EXA_API_KEY
 - Registry pattern in `components/tool-messages/`
 - Each tool has component with theme configuration
 - Registry maps tool names to render components
+- Lazy loading via `components/tool-messages/lazy-registry.ts` for code splitting
+
+### HITL (Human-in-the-Loop) Tool Pattern
+Tools without `execute` function automatically pause the AI stream (`state: "input-available"`):
+```typescript
+// Tool definition (no execute = HITL mode)
+export const myHitlTool = () => tool({
+  inputSchema: z.object({ question: z.string() }),
+  outputSchema: z.object({ answer: z.string() }),
+  // no execute → stream pauses, waits for frontend
+});
+
+// Frontend component handles user interaction
+if (state === "input-available") {
+  await addToolOutput({ toolCallId, tool: "my_tool", output: { answer } });
+  sendMessage(); // resumes the stream
+}
+```
+- Reference implementation: `lib/tools/reply-policy/reply-policy-ask-tool.ts` + `components/tool-messages/reply-policy-ask-tool.tsx`
+- `addToolOutput` output type is `unknown` (not just `string`) to support structured patches
+- **HITL body loss pitfall**: `sendMessage()` from HITL flow must carry full request body. Use `useRef` + function body on `DefaultChatTransport`:
+  ```typescript
+  const chatBodyRef = useRef<Record<string, unknown>>({});
+  useEffect(() => { chatBodyRef.current = { ...allFields }; }, [deps]);
+  const [transport] = useState(() => new DefaultChatTransport({
+    body: () => chatBodyRef.current, // function form reads latest ref
+  }));
+  ```
+
+### Reply Policy Draft Context (Server-Side)
+- `lib/tools/reply-policy/reply-policy-draft-context.ts` rebuilds draft state from message history on each request
+- `setValueAtPath()` for safe nested property writes with array index support
+- Revision tracking for optimistic UI updates
+- `toModelOutput` on read tool returns full JSON only on first call, cached summary thereafter
 
 ## Development Guidelines
 
@@ -314,6 +349,7 @@ catch (error) {
 2. **Smart Reply**: Message → Classification → Reply generation
 3. **Computer Use**: Action → E2B tools → Desktop → Screenshot/result
 4. **Brand Management**: Database → Server Actions → Zustand → Admin UI
+5. **LLM-Guided Config**: User chat → `reply_policy_read` → `reply_policy_ask` (HITL loop) → `reply_policy_save` → client-side IndexedDB write
 
 ## Important Notes
 
@@ -322,6 +358,9 @@ catch (error) {
 - Test Chinese input when modifying desktop automation
 - Run `npx tsc --noEmit` before committing
 - When tests fail, analyze business logic first (don't just modify tests to pass)
+- **`configService` is client-only** (LocalForage/IndexedDB) — never call from server-side tool `execute`. Use tool message components' `useEffect` for client-side persistence
+- **ESLint `no-assign-module-variable`**: Next.js reserves `module` as a variable name. Use alternatives like `configModule`
+- **Cross-page config sync**: After IndexedDB updates (e.g., "一键使用"), other pages (admin/settings) require manual refresh. BroadcastChannel not yet implemented
 
 ### Known Peer Dependency Warnings
 

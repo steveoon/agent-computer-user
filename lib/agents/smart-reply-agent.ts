@@ -10,7 +10,7 @@ import { type ZhipinData, type MessageClassification } from "@/types/zhipin";
 import type { ReplyPolicyConfig, BrandPriorityStrategy } from "@/types/config";
 import type { CandidateInfo } from "@/lib/tools/zhipin/types";
 import type { StoreWithDistance } from "@/types/geocoding";
-import type { TurnPlan, ReplyNeed, FunnelStage } from "@/types/reply-policy";
+import type { TurnPlan, ReplyNeed, FunnelStage, ChannelType } from "@/types/reply-policy";
 import { stageToLegacyReplyType, type ProviderConfigs } from "./types";
 import { planTurn } from "./classification-agent";
 import { buildContextInfoByNeeds } from "@/lib/loaders/zhipin-data.loader";
@@ -41,6 +41,7 @@ export interface SmartReplyAgentOptions {
   candidateInfo?: CandidateInfo;
   defaultWechatId?: string;
   industryVoiceId?: string;
+  channelType?: ChannelType;
 }
 
 export interface SmartReplyDebugInfo {
@@ -302,6 +303,7 @@ export async function generateSmartReply(
     candidateInfo,
     defaultWechatId,
     industryVoiceId,
+    channelType,
   } = options;
 
   const providerConfigs = modelConfig?.providerConfigs || DEFAULT_PROVIDER_CONFIGS;
@@ -317,6 +319,8 @@ export async function generateSmartReply(
     conversationHistory,
     brandData,
     providerConfigs,
+    channelType,
+    replyPolicy,
   });
 
   const classification = toClassification(turnPlan);

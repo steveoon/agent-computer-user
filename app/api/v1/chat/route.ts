@@ -139,6 +139,7 @@ export async function POST(req: Request) {
       industryVoiceId: context.industryVoiceId,
       dulidayToken: context.dulidayToken,
       defaultWechatId: context.defaultWechatId,
+      channelType: context.channelType,
     };
 
     // 当 validateOnly=true 时，强制使用 "report" 策略避免抛出错误

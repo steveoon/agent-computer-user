@@ -13,10 +13,15 @@ import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS, type ModelId } from "@/
 import { safeGenerateObject } from "@/lib/ai";
 import { type MessageClassification } from "@/types/zhipin";
 import {
+  FunnelStageSchema,
+  ChannelTypeSchema,
   TurnPlanSchema,
+  STAGE_DEFINITIONS,
   type TurnPlan,
   type ReplyNeed,
   type FunnelStage,
+  type ChannelType,
+  type ReplyPolicyConfig,
 } from "@/types/reply-policy";
 import {
   ClassificationOptionsSchema,
@@ -26,15 +31,31 @@ import {
   type ClassificationOptions,
 } from "./types";
 
-const TurnPlanningOutputSchema = z.object({
-  stage: TurnPlanSchema.shape.stage,
-  subGoals: TurnPlanSchema.shape.subGoals,
-  needs: TurnPlanSchema.shape.needs,
-  riskFlags: TurnPlanSchema.shape.riskFlags,
-  confidence: TurnPlanSchema.shape.confidence,
-  extractedInfo: TurnPlanSchema.shape.extractedInfo,
-  reasoningText: TurnPlanSchema.shape.reasoningText,
-});
+function normalizeChannelType(channelType: unknown): ChannelType {
+  const parsed = ChannelTypeSchema.safeParse(channelType);
+  return parsed.success ? parsed.data : "public";
+}
+
+function getActiveStages(channelType: unknown = "public"): FunnelStage[] {
+  const normalizedChannelType = normalizeChannelType(channelType);
+  const activeStages = FunnelStageSchema.options.filter(
+    stage => STAGE_DEFINITIONS[stage].applicableChannels.includes(normalizedChannelType)
+  );
+  // 防止异常输入或配置导致空枚举，避免 z.enum([]) 直接抛错。
+  return activeStages.length > 0 ? activeStages : [...FunnelStageSchema.options];
+}
+
+function buildDynamicPlanningSchema(activeStages: FunnelStage[]): z.ZodObject<Record<string, z.ZodTypeAny>> {
+  return z.object({
+    stage: z.enum(activeStages as [FunnelStage, ...FunnelStage[]]),
+    subGoals: TurnPlanSchema.shape.subGoals,
+    needs: TurnPlanSchema.shape.needs,
+    riskFlags: TurnPlanSchema.shape.riskFlags,
+    confidence: TurnPlanSchema.shape.confidence,
+    extractedInfo: TurnPlanSchema.shape.extractedInfo,
+    reasoningText: TurnPlanSchema.shape.reasoningText,
+  });
+}
 
 const NEED_RULES: Array<{ need: ReplyNeed; patterns: RegExp[] }> = [
   { need: "salary", patterns: [/薪资|工资|时薪|底薪|提成|奖金|补贴|多少钱|收入/i] },
@@ -83,7 +104,9 @@ function sanitizePlan(plan: TurnPlan, ruleNeeds: Set<ReplyNeed>): TurnPlan {
 function buildPlanningPrompt(
   message: string,
   history: string[],
-  brandData?: z.infer<typeof BrandDataSchema>
+  brandData?: z.infer<typeof BrandDataSchema>,
+  channelType: ChannelType = "public",
+  replyPolicy?: ReplyPolicyConfig
 ): { system: string; prompt: string } {
   const system = [
     "你是招聘对话回合规划器，不直接回复候选人。",
@@ -91,17 +114,24 @@ function buildPlanningPrompt(
     "规划目标：确定阶段目标(stage)、子目标(subGoals)、事实需求(needs)、风险标记(riskFlags)。",
   ].join("\n");
 
+  const normalizedChannelType = normalizeChannelType(channelType);
+  const activeStages = getActiveStages(normalizedChannelType);
+  const stageLines = activeStages.map(stage => {
+    const def = STAGE_DEFINITIONS[stage];
+    const desc = replyPolicy?.stageGoals[stage]?.description || def.description;
+    return `- ${stage}: ${desc} (转入条件: ${def.transitionSignal})`;
+  });
+
+  const needsLine = normalizedChannelType === "private"
+    ? "- stores, location, salary, schedule, policy, availability, requirements, interview, none\n- 注意: 当前已在私域渠道，wechat need 仅在候选人主动提及联系方式时使用"
+    : "- stores, location, salary, schedule, policy, availability, requirements, interview, wechat, none";
+
   const prompt = [
-    "[阶段枚举]",
-    "- trust_building",
-    "- private_channel",
-    "- qualify_candidate",
-    "- job_consultation",
-    "- interview_scheduling",
-    "- onboard_followup",
+    "[阶段枚举与定义]",
+    ...stageLines,
     "",
     "[needs枚举]",
-    "- stores, location, salary, schedule, policy, availability, requirements, interview, wechat, none",
+    needsLine,
     "",
     "[riskFlags枚举]",
     "- insurance_promise_risk, age_sensitive, confrontation_emotion, urgency_high, qualification_mismatch",
@@ -110,6 +140,7 @@ function buildPlanningPrompt(
     "- 优先判断本轮主阶段(stage)；subGoals 可多项。",
     "- 候选人追问事实时，必须打开对应 needs。",
     "- 不确定时 confidence 降低，不要臆断。",
+    "- 根据转入条件判断阶段转化，不要停留在不匹配的阶段。",
     "",
     "[品牌数据]",
     JSON.stringify(brandData || {}),
@@ -125,10 +156,10 @@ function buildPlanningPrompt(
 }
 
 
-function stageToFallbackNeeds(stage: FunnelStage): ReplyNeed[] {
+function stageToFallbackNeeds(stage: FunnelStage, channelType: ChannelType = "public"): ReplyNeed[] {
   const map: Record<FunnelStage, ReplyNeed[]> = {
     trust_building: ["none"],
-    private_channel: ["wechat"],
+    private_channel: channelType === "private" ? ["none"] : ["wechat"],
     qualify_candidate: ["requirements"],
     job_consultation: ["salary", "schedule", "location"],
     interview_scheduling: ["interview", "availability"],
@@ -139,22 +170,37 @@ function stageToFallbackNeeds(stage: FunnelStage): ReplyNeed[] {
 
 export async function planTurn(
   message: string,
-  options: Omit<ClassificationOptions, "candidateMessage"> & { providerConfigs?: ProviderConfigs }
+  options: Omit<ClassificationOptions, "candidateMessage"> & {
+    providerConfigs?: ProviderConfigs;
+    replyPolicy?: ReplyPolicyConfig;
+  }
 ): Promise<TurnPlan> {
   const {
     providerConfigs = DEFAULT_PROVIDER_CONFIGS,
     modelConfig,
     conversationHistory = [],
     brandData,
+    channelType,
+    replyPolicy,
   } = options;
 
   const registry = getDynamicRegistry(providerConfigs);
   const classifyModel = (modelConfig?.classifyModel || DEFAULT_MODEL_CONFIG.classifyModel) as ModelId;
-  const prompts = buildPlanningPrompt(message, conversationHistory, brandData);
+
+  const normalizedChannelType = normalizeChannelType(channelType);
+  const activeStages = getActiveStages(normalizedChannelType);
+  const dynamicSchema = buildDynamicPlanningSchema(activeStages);
+  const prompts = buildPlanningPrompt(
+    message,
+    conversationHistory,
+    brandData,
+    normalizedChannelType,
+    replyPolicy
+  );
 
   const result = await safeGenerateObject({
     model: registry.languageModel(classifyModel),
-    schema: TurnPlanningOutputSchema,
+    schema: dynamicSchema,
     schemaName: "TurnPlanningOutput",
     system: prompts.system,
     prompt: prompts.prompt,
@@ -163,7 +209,6 @@ export async function planTurn(
   const ruleNeeds = detectRuleNeeds(message, conversationHistory);
 
   if (!result.success) {
-    // 降级：返回可执行的最小规划
     return {
       stage: "trust_building",
       subGoals: ["保持对话并澄清需求"],
@@ -183,7 +228,7 @@ export async function planTurn(
     };
   }
 
-  return sanitizePlan(result.data, ruleNeeds);
+  return sanitizePlan(result.data as TurnPlan, ruleNeeds);
 }
 
 /**
@@ -192,11 +237,15 @@ export async function planTurn(
  */
 export async function classifyMessage(
   message: string,
-  options: Omit<ClassificationOptions, "candidateMessage"> & { providerConfigs?: ProviderConfigs }
+  options: Omit<ClassificationOptions, "candidateMessage"> & {
+    providerConfigs?: ProviderConfigs;
+    replyPolicy?: ReplyPolicyConfig;
+  }
 ): Promise<MessageClassification> {
   const plan = await planTurn(message, options);
   const replyType = stageToLegacyReplyType(plan.stage);
-  const needs = plan.needs.length > 0 ? plan.needs : stageToFallbackNeeds(plan.stage);
+  const channelType = normalizeChannelType(options.channelType);
+  const needs = plan.needs.length > 0 ? plan.needs : stageToFallbackNeeds(plan.stage, channelType);
 
   const riskHints = plan.riskFlags.join("、");
   const needHints = needs.join("、");
@@ -218,6 +267,6 @@ export async function classifyMessage(
   };
 }
 
-export type TurnPlanningOutput = z.infer<typeof TurnPlanningOutputSchema>;
+export type TurnPlanningOutput = TurnPlan;
 export type ClassificationOutput = TurnPlanningOutput;
 export { ClassificationOptionsSchema, BrandDataSchema };

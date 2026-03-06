@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateSmartReply } from "@/lib/agents";
 import { DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
+import { ChannelTypeSchema } from "@/types/reply-policy";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +14,7 @@ export async function POST(request: NextRequest) {
       replyPolicy,
       brandPriorityStrategy,
       conversationHistory,
+      channelType,
     } = await request.json();
 
     if (!message || typeof message !== "string") {
@@ -30,6 +32,14 @@ export async function POST(request: NextRequest) {
     if (!replyPolicy) {
       return NextResponse.json(
         { error: "缺少回复策略，请确保客户端正确传递 replyPolicy" },
+        { status: 400 }
+      );
+    }
+
+    const parsedChannelType = ChannelTypeSchema.safeParse(channelType);
+    if (channelType !== undefined && !parsedChannelType.success) {
+      return NextResponse.json(
+        { error: "channelType 必须为 public 或 private" },
         { status: 400 }
       );
     }
@@ -54,6 +64,7 @@ export async function POST(request: NextRequest) {
       configData,
       replyPolicy,
       brandPriorityStrategy,
+      channelType: parsedChannelType.success ? parsedChannelType.data : undefined,
     });
 
     return NextResponse.json({

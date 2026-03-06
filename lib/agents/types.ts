@@ -8,6 +8,7 @@
 import { z } from "zod/v3";
 import type { ProviderConfig, ModelConfig } from "@/lib/config/models";
 import type { FunnelStage } from "@/types/reply-policy";
+import { ChannelTypeSchema } from "@/types/reply-policy";
 import type { ReplyContext } from "@/types/zhipin";
 
 // ========== 基础 Schema 定义 ==========
@@ -61,6 +62,8 @@ export const ClassificationOptionsSchema = z.object({
   conversationHistory: z.array(z.string()).default([]),
   // 品牌数据
   brandData: BrandDataSchema,
+  // 渠道类型：public=公域平台（BOSS直聘/鱼泡），private=私域（微信等）
+  channelType: ChannelTypeSchema.optional(),
 });
 
 // ========== 共享工具函数 ==========

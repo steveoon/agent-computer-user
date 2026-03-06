@@ -325,6 +325,7 @@ export const OpenChatRequestSchema = z.object({
       industryVoiceId: z.string().optional(),
       dulidayToken: z.string().optional(),
       defaultWechatId: z.string().optional(),
+      channelType: z.enum(["public", "private"]).optional(),
     })
     .optional()
     .describe("全局上下文"),
@@ -379,6 +380,7 @@ export interface OpenChatRequest {
     industryVoiceId?: string;
     dulidayToken?: string;
     defaultWechatId?: string;
+    channelType?: "public" | "private";
   };
 
   // 验证模式

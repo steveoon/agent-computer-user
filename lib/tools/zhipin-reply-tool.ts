@@ -84,7 +84,8 @@ export const zhipinReplyTool = (
   replyPolicy?: ReplyPolicyConfig,
   defaultWechatId?: string,
   brandPriorityStrategy?: BrandPriorityStrategy,
-  industryVoiceId?: string
+  industryVoiceId?: string,
+  channelType?: "public" | "private"
 ) => {
   // 注意：configData 的验证在工具创建时完成（通过 contextSchemas）
   // 执行时只关注业务逻辑验证
@@ -187,6 +188,7 @@ export const zhipinReplyTool = (
           candidateInfo: candidate_info,
           defaultWechatId,
           industryVoiceId,
+          channelType,
         });
 
         // 检查是否有错误
