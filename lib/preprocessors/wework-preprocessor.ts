@@ -40,7 +40,6 @@ registerPreprocessor("weworkSystemPrompt", async ctx => {
     await extractAndSaveFacts(
       sessionMemory,
       ctx.processedMessages,
-      ctx.modelConfig?.extractModel,
       ctx.dulidayToken
     );
     state = await sessionMemory.load();
@@ -62,7 +61,6 @@ registerPreprocessor("weworkSystemPrompt", async ctx => {
       extractAndSaveFacts(
         sessionMemory,
         ctx.processedMessages,
-        ctx.modelConfig?.extractModel,
         ctx.dulidayToken
       ).catch(err => console.warn(`[${ctx.correlationId}] Wework fact extraction failed:`, err));
     },

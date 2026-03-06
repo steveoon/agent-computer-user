@@ -11,7 +11,7 @@
 import type { UIMessage } from "ai";
 import { z } from "zod/v3";
 import { getDynamicRegistry } from "@/lib/model-registry/dynamic-registry";
-import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS, type ModelId } from "@/lib/config/models";
+import { DEFAULT_PROVIDER_CONFIGS, type ModelId } from "@/lib/config/models";
 import { safeGenerateObject } from "@/lib/ai";
 import {
   EntityExtractionResultSchema,
@@ -320,7 +320,6 @@ const FALLBACK: EntityExtractionResult = {
 export async function extractAndSaveFacts(
   sessionMemory: WeworkSessionMemory,
   processedMessages: UIMessage[],
-  extractModel?: string,
   dulidayToken?: string
 ): Promise<void> {
   // 1. 提取对话历史
@@ -358,7 +357,7 @@ export async function extractAndSaveFacts(
 
   // 5. 选择模型 + LLM 推理
   const registry = getDynamicRegistry(DEFAULT_PROVIDER_CONFIGS);
-  const modelId = (extractModel || DEFAULT_MODEL_CONFIG.extractModel) as ModelId;
+  const modelId = "openai/gpt-5-mini" as ModelId;
 
   const result = await safeGenerateObject({
     model: registry.languageModel(modelId),

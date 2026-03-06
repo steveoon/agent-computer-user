@@ -29,7 +29,6 @@ vi.mock("@/lib/model-registry/dynamic-registry", () => ({
 
 vi.mock("@/lib/config/models", () => ({
   DEFAULT_PROVIDER_CONFIGS: {},
-  DEFAULT_MODEL_CONFIG: { extractModel: "qwen-default" },
 }));
 
 // Mock fetch for brand data API

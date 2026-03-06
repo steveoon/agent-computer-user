@@ -181,7 +181,6 @@ export type ModelConfig = {
   chatModel?: ModelId;
   classifyModel?: ModelId;
   replyModel?: ModelId;
-  extractModel?: ModelId;
   providerConfigs?: Record<string, ProviderConfig>;
 };
 
@@ -284,7 +283,6 @@ export const DEFAULT_MODEL_CONFIG = {
   chatModel: "anthropic/claude-haiku-4-5" as ModelId,
   classifyModel: "openai/gpt-5-mini" as ModelId,
   replyModel: "openai/gpt-5-chat-latest" as ModelId,
-  extractModel: "openai/gpt-5-mini" as ModelId,
 } as const;
 
 // ========== Open API 对外开放模型 ==========
