@@ -2,7 +2,7 @@ import { createOpenRouter, type OpenRouterProvider } from "@openrouter/ai-sdk-pr
 
 /**
  * 自定义 OpenRouter provider
- * 基于官方 @openrouter/ai-sdk-provider v2 (原生支持 AI SDK v6)
+ * 基于官方 @openrouter/ai-sdk-provider 包
  * 为某些模型（如 Kimi K2）提供特殊处理
  */
 
@@ -100,13 +100,23 @@ function createCustomFetch(modelId: string): typeof fetch {
 }
 
 /**
+ * 扩展的 Provider 接口，包含 AI SDK v6 要求的所有方法
+ * AI SDK v6 renamed textEmbeddingModel to embeddingModel and added specificationVersion
+ */
+interface ExtendedProvider extends OpenRouterProvider {
+  specificationVersion: "v3";
+  embeddingModel(modelId: string): never;
+  imageModel(modelId: string): never;
+}
+
+/**
  * 创建自定义的 OpenRouter provider
- * 使用官方包 v2（原生支持 AI SDK v6 ProviderV3），并为特定模型提供自定义处理
+ * 使用官方包，并为特定模型提供自定义处理
  */
 export function createCustomOpenRouter(config: {
   apiKey: string | undefined;
   baseURL?: string;
-}): OpenRouterProvider {
+}): ExtendedProvider {
   // 基础配置
   const baseConfig = {
     apiKey: config.apiKey || "",
@@ -116,7 +126,7 @@ export function createCustomOpenRouter(config: {
   // 创建默认的 OpenRouter provider 实例作为基础
   const defaultProvider = createOpenRouter(baseConfig);
 
-  // 创建代理来拦截模型调用，为 Kimi K2 注入自定义 fetch
+  // 创建代理来拦截模型调用
   return new Proxy(defaultProvider, {
     get(target, prop: string | symbol): unknown {
       if (prop === "languageModel" || prop === "chat" || prop === "completion") {
@@ -141,16 +151,33 @@ export function createCustomOpenRouter(config: {
         };
       }
 
-      // Add dummy properties to satisfy ProviderV2 for registry compatibility
-      if (prop === "textEmbeddingModel" || prop === "imageModel") {
-        return () => {
-          throw new Error(`${String(prop)} is not implemented in this custom OpenRouter provider`);
+      // AI SDK v6: specificationVersion 属性
+      if (prop === "specificationVersion") {
+        return "v3";
+      }
+
+      // OpenRouter 不支持 embeddingModel 和 imageModel，返回会抛出错误的函数
+      // Note: AI SDK v6 renamed textEmbeddingModel to embeddingModel
+      if (prop === "embeddingModel") {
+        return (_modelId: string) => {
+          throw new Error("OpenRouter does not support embedding models");
+        };
+      }
+
+      if (prop === "imageModel") {
+        return (_modelId: string) => {
+          throw new Error("OpenRouter does not support image models");
         };
       }
 
       // 其他属性直接传递给原始 provider
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (target as any)[prop];
+      return target[prop as keyof OpenRouterProvider];
     },
-  }) as OpenRouterProvider;
+  }) as ExtendedProvider;
 }
+
+/**
+ * 导出类型兼容的 Provider（用于向后兼容）
+ * @deprecated 使用 createCustomOpenRouter 替代
+ */
+export const createOpenRouterProvider = createCustomOpenRouter;
