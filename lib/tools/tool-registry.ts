@@ -119,7 +119,8 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
         ctx.replyPolicy,
         ctx.defaultWechatId,
         ctx.brandPriorityStrategy,
-        ctx.industryVoiceId
+        ctx.industryVoiceId,
+        ctx.channelType
       ),
   }),
 
@@ -364,7 +365,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     contextSchemas: {
       stageGoals: StageGoalsSchema,
     },
-    create: ctx => ctx.stageGoals ? createWeworkPlanTurnTool(ctx.stageGoals, ctx.modelConfig?.classifyModel, ctx.processedMessages) : null,
+    create: ctx => ctx.stageGoals ? createWeworkPlanTurnTool(ctx.stageGoals, ctx.modelConfig?.classifyModel, ctx.processedMessages, ctx.channelType) : null,
   }),
 
   // ===== 策略配置工具 =====

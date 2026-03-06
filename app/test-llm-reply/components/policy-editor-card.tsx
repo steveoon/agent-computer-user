@@ -297,6 +297,20 @@ function StageGoalsTab({
             </AccordionTrigger>
             <AccordionContent className="space-y-4 pt-2 pb-4">
               <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-indigo-800">阶段定义</Label>
+                <p className="text-[11px] text-muted-foreground leading-tight -mt-0.5">
+                  向 LLM 解释这个阶段"是什么"，用于阶段分类判断
+                </p>
+                <Input
+                  value={goal.description || ""}
+                  onChange={(e) =>
+                    updateStage(stage, { ...goal, description: e.target.value || undefined })
+                  }
+                  placeholder="留空则使用系统默认定义"
+                  className="text-sm bg-white/70 border-indigo-200 focus:border-indigo-400"
+                />
+              </div>
+              <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-indigo-800">主要目标</Label>
                 <Input
                   value={goal.primaryGoal}

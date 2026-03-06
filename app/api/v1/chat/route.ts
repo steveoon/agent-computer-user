@@ -163,6 +163,7 @@ export async function POST(req: Request) {
       userId: context.userId,
       sessionId: context.sessionId,
       onJobsFetched: preprocessorResult.onJobsFetched,
+      channelType: context.channelType,
     };
 
     // 当 validateOnly=true 时，强制使用 "report" 策略避免抛出错误

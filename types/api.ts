@@ -327,6 +327,7 @@ export const OpenChatRequestSchema = z.object({
       defaultWechatId: z.string().optional(),
       userId: z.string().optional(),
       sessionId: z.string().optional(),
+      channelType: z.enum(["public", "private"]).optional(),
     })
     .optional()
     .describe("全局上下文"),
@@ -392,6 +393,7 @@ export interface OpenChatRequest {
     defaultWechatId?: string;
     userId?: string;
     sessionId?: string;
+    channelType?: "public" | "private";
   };
 
   // 推理思考

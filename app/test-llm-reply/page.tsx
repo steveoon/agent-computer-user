@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { MessageClassification } from "@/types/zhipin";
 import type { StoreWithDistance } from "@/types/geocoding";
-import type { FunnelStage, ReplyNeed, RiskFlag, ReplyPolicyConfig } from "@/types/reply-policy";
+import type { FunnelStage, ReplyNeed, RiskFlag, ReplyPolicyConfig, ChannelType } from "@/types/reply-policy";
 import type {
   AgeEligibilityAppliedStrategy,
   AgeEligibilityStatus,
@@ -40,7 +40,8 @@ export default function TestLLMReplyPage() {
     error: configError,
   } = useConfigDataForChat();
   const [message, setMessage] = useState("");
-  const [toolBrand, setToolBrand] = useState(""); // 🆕 模拟工具识别的品牌
+  const [toolBrand, setToolBrand] = useState("");
+  const [channelType, setChannelType] = useState<ChannelType>("public");
   const [reply, setReply] = useState("");
   const [stage, setStage] = useState<FunnelStage | "">("");
   const [needs, setNeeds] = useState<ReplyNeed[]>([]);
@@ -167,6 +168,7 @@ export default function TestLLMReplyPage() {
           replyPolicy: editablePolicy, // 传递可编辑的回复策略
           brandPriorityStrategy, // 传递品牌优先级策略
           conversationHistory, // 传递对话历史
+          channelType, // 渠道类型
         }),
       });
 
@@ -187,6 +189,15 @@ export default function TestLLMReplyPage() {
       }
       if (data.contextInfo) {
         setContextInfo(data.contextInfo);
+      }
+
+      // 自动追加到对话历史：候选人消息 + 生成的回复
+      if (replyText) {
+        setConversationHistory(prev => [
+          ...prev,
+          `求职者: ${messageToTest.trim()}`,
+          `我: ${replyText}`,
+        ]);
       }
     } catch (error) {
       console.error("测试失败:", error);
@@ -259,7 +270,12 @@ export default function TestLLMReplyPage() {
             <ModelConfigCard />
 
             {/* 模拟环境设置 */}
-            <EnvironmentSimulatorCard toolBrand={toolBrand} setToolBrand={setToolBrand} />
+            <EnvironmentSimulatorCard
+              toolBrand={toolBrand}
+              setToolBrand={setToolBrand}
+              channelType={channelType}
+              setChannelType={setChannelType}
+            />
 
             {/* 功能说明 & 统计 */}
             <BrandStatsCard

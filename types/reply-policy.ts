@@ -9,6 +9,48 @@ export const FunnelStageSchema = z.enum([
   "onboard_followup",
 ]);
 
+export const ChannelTypeSchema = z.enum(["public", "private"]);
+export type ChannelType = z.infer<typeof ChannelTypeSchema>;
+
+export interface StageDefinition {
+  description: string;
+  transitionSignal: string;
+  applicableChannels: readonly ChannelType[];
+}
+
+export const STAGE_DEFINITIONS: Record<FunnelStage, StageDefinition> = {
+  trust_building: {
+    description: "初次接触，建立信任并了解求职意向",
+    transitionSignal: "候选人表达明确兴趣或开始询问具体岗位信息",
+    applicableChannels: ["public", "private"],
+  },
+  private_channel: {
+    description: "引导用户从公域平台（如BOSS直聘/鱼泡）转入微信私聊",
+    transitionSignal: "候选人有继续深入了解的意愿，适合引导到私域",
+    applicableChannels: ["public"],
+  },
+  qualify_candidate: {
+    description: "确认候选人基本匹配度（年龄、时间、岗位条件）",
+    transitionSignal: "候选人表达求职意向后，需要核实基本资格",
+    applicableChannels: ["public", "private"],
+  },
+  job_consultation: {
+    description: "回答岗位相关问题（薪资、排班、地点等）并提升兴趣",
+    transitionSignal: "候选人主动询问岗位细节",
+    applicableChannels: ["public", "private"],
+  },
+  interview_scheduling: {
+    description: "推动面试预约，确认时间和到店安排",
+    transitionSignal: "候选人核心问题已解答，准备推进面试",
+    applicableChannels: ["public", "private"],
+  },
+  onboard_followup: {
+    description: "促进到岗并保持回访",
+    transitionSignal: "候选人确认上岗安排",
+    applicableChannels: ["public", "private"],
+  },
+};
+
 export const ReplyNeedSchema = z.enum([
   "stores",
   "location",
@@ -194,36 +236,42 @@ export type ReplyPolicyConfig = z.infer<typeof ReplyPolicyConfigSchema>;
 export const DEFAULT_REPLY_POLICY: ReplyPolicyConfig = {
   stageGoals: {
     trust_building: {
+      description: "初次接触，建立信任并了解求职意向",
       primaryGoal: "建立信任并了解求职意向",
       successCriteria: ["候选人愿意继续沟通"],
       ctaStrategy: "用轻量提问引导需求细化",
       disallowedActions: ["过早承诺具体待遇"],
     },
     private_channel: {
+      description: "引导用户从公域平台（如BOSS直聘/鱼泡）转入微信私聊",
       primaryGoal: "推动进入私域沟通",
       successCriteria: ["候选人愿意交换联系方式"],
       ctaStrategy: "说明后续沟通效率与资料同步价值",
       disallowedActions: ["强迫式要微信"],
     },
     qualify_candidate: {
+      description: "确认候选人基本匹配度（年龄、时间、岗位条件）",
       primaryGoal: "确认基本匹配度",
       successCriteria: ["完成年龄/时间/岗位匹配确认"],
       ctaStrategy: "逐条确认关键条件",
       disallowedActions: ["直接否定候选人"],
     },
     job_consultation: {
+      description: "回答岗位相关问题（薪资、排班、地点等）并提升兴趣",
       primaryGoal: "回答岗位问题并提升兴趣",
       successCriteria: ["候选人对岗位保持兴趣"],
       ctaStrategy: "先答核心问题，再给下一步建议",
       disallowedActions: ["编造数字或政策"],
     },
     interview_scheduling: {
+      description: "推动面试预约，确认时间和到店安排",
       primaryGoal: "推动面试预约",
       successCriteria: ["候选人给出可面试时间"],
       ctaStrategy: "给出明确时间选项并确认",
       disallowedActions: ["不确认候选人可到店性"],
     },
     onboard_followup: {
+      description: "促进到岗并保持回访",
       primaryGoal: "促进到岗并保持回访",
       successCriteria: ["候选人确认上岗安排"],
       ctaStrategy: "明确下一步动作与提醒",
