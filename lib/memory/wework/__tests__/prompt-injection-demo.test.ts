@@ -128,16 +128,16 @@ describe("提示词注入验证", () => {
 
     // 断言岗位推荐信息完整
     expect(suffix).toContain("[jobId:10001]");
-    expect(suffix).toContain("肯德基 - 前台服务员");
-    expect(suffix).toContain("陆家嘴店");
-    expect(suffix).toContain("22-25 元/时");
+    expect(suffix).toContain("品牌:肯德基 - 岗位:前台服务员");
+    expect(suffix).toContain("门店:陆家嘴店");
+    expect(suffix).toContain("薪资:22-25 元/时");
 
     expect(suffix).toContain("[jobId:10002]");
-    expect(suffix).toContain("麦当劳 - 收银员");
-    expect(suffix).toContain("人民广场店");
+    expect(suffix).toContain("品牌:麦当劳 - 岗位:收银员");
+    expect(suffix).toContain("门店:人民广场店");
 
     expect(suffix).toContain("[jobId:10003]");
-    expect(suffix).toContain("海底捞 - 服务员");
+    expect(suffix).toContain("品牌:海底捞 - 岗位:服务员");
   });
 
   it("空记忆场景：首次对话无注入", async () => {

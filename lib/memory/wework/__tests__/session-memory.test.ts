@@ -216,12 +216,12 @@ describe("formatSessionMemoryForPrompt", () => {
     const result = formatSessionMemoryForPrompt(state);
     expect(result).toContain("上轮已推荐岗位");
     expect(result).toContain("[jobId:100]");
-    expect(result).toContain("海底捞 - 服务员");
-    expect(result).toContain("浦东陆家嘴店");
+    expect(result).toContain("品牌:海底捞 - 岗位:服务员");
+    expect(result).toContain("门店:浦东陆家嘴店");
     expect(result).toContain("上海市浦东新区");
-    expect(result).toContain("4000-5000 元/月");
+    expect(result).toContain("薪资:4000-5000 元/月");
     expect(result).toContain("[jobId:200]");
-    expect(result).toContain("肯德基 - 收银员");
+    expect(result).toContain("品牌:肯德基 - 岗位:收银员");
     expect(result).toContain("北京市");
   });
 
@@ -272,6 +272,6 @@ describe("formatSessionMemoryForPrompt", () => {
     expect(result).toContain("姓名: 王五");
     expect(result).toContain("上轮已推荐岗位");
     expect(result).toContain("[jobId:300]");
-    expect(result).toContain("星巴克 - 咖啡师");
+    expect(result).toContain("品牌:星巴克 - 岗位:咖啡师");
   });
 });
