@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter } from "events";
-import { experimental_createMCPClient as createMCPClient } from "@ai-sdk/mcp";
+import { createMCPClient } from "@ai-sdk/mcp";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import {
   MCPClientConfig,
@@ -152,13 +152,7 @@ class MCPClientManager {
     if (chromePort) {
       const cdpEndpoint = `http://${chromeHost}:${chromePort}`;
       return {
-        args: [
-          "-y",
-          "@playwright/mcp@latest",
-          "--cdp-endpoint",
-          cdpEndpoint,
-          "--image-responses=allow",
-        ],
+        args: ["-y", "@playwright/mcp@latest", "--cdp-endpoint", cdpEndpoint, "--image-responses=allow"],
         mode: `CDP (${cdpEndpoint})`,
       };
     }
@@ -329,10 +323,7 @@ class MCPClientManager {
         }
 
         const config = this.clientConfigs.get(clientName);
-        console.error(
-          `❌ 获取 ${config?.description} 工具失败 (尝试 ${attempts + 1} 次后):`,
-          error
-        );
+        console.error(`❌ 获取 ${config?.description} 工具失败 (尝试 ${attempts + 1} 次后):`, error);
         return {};
       }
     }
