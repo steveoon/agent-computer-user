@@ -7,7 +7,7 @@
 
 import { z } from "zod/v3";
 import type { ProviderConfig, ModelConfig } from "@/lib/config/models";
-import type { FunnelStage } from "@/types/reply-policy";
+import type { FunnelStage, StageGoals } from "@/types/reply-policy";
 import type { ReplyContext } from "@/types/zhipin";
 
 // ========== 基础 Schema 定义 ==========
@@ -61,6 +61,11 @@ export const ClassificationOptionsSchema = z.object({
   conversationHistory: z.array(z.string()).default([]),
   // 品牌数据
   brandData: BrandDataSchema.optional(),
+  // 场景级过滤：从 prompt 枚举 + 规则检测 + 最终输出中移除指定 stage/need
+  suppressedStages: z.array(z.string()).optional(),
+  suppressedNeeds: z.array(z.string()).optional(),
+  // 阶段目标定义：传入后 LLM 规划 prompt 会附带各阶段 description
+  stageGoals: z.custom<StageGoals>().optional(),
 });
 
 // ========== 共享工具函数 ==========

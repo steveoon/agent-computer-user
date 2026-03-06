@@ -68,6 +68,8 @@ export const TurnPlanSchema = z.object({
 });
 
 export const StageGoalPolicySchema = z.object({
+  /** 阶段简述 — 供 LLM 规划时理解每个阶段的含义 */
+  description: z.string().optional(),
   primaryGoal: z.string(),
   successCriteria: z.array(z.string()),
   ctaStrategy: z.preprocess(

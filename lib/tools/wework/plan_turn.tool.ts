@@ -3,16 +3,15 @@ import type { UIMessage } from "ai";
 import { z } from "zod/v3";
 import { planTurn } from "@/lib/agents/classification-agent";
 import { ErrorCode, createConfigError } from "@/lib/errors";
-import type { FunnelStage, StageGoals } from "@/types/reply-policy";
+import type { StageGoals } from "@/types/reply-policy";
 import type { WeworkPlanTurnOutput } from "./types";
 
 /**
- * private_channel 阶段在企微场景中无实际运营目标配置，
- * 自动流转到 job_consultation 阶段处理。
+ * 企微场景已是私域通道，private_channel 阶段和 wechat need 无意义。
+ * 通过 suppressedStages / suppressedNeeds 从分类代理的 prompt、规则、输出三层过滤。
  */
-const STAGE_FALLBACK: Partial<Record<FunnelStage, FunnelStage>> = {
-  private_channel: "job_consultation",
-};
+const WEWORK_SUPPRESSED_STAGES: string[] = ["private_channel"];
+const WEWORK_SUPPRESSED_NEEDS: string[] = ["wechat"];
 
 /**
  * 企微智能化：对话阶段规划工具
@@ -50,21 +49,23 @@ export function createWeworkPlanTurnTool(
         modelConfig: {
           ...(classifyModel && { classifyModel }),
         },
+        suppressedStages: WEWORK_SUPPRESSED_STAGES,
+        suppressedNeeds: WEWORK_SUPPRESSED_NEEDS,
+        stageGoals: stageGoal,
       });
 
-      const effectiveStage = STAGE_FALLBACK[fullPlan.stage] ?? fullPlan.stage;
-      const currentStageGoal = stageGoal[effectiveStage];
+      const currentStageGoal = stageGoal[fullPlan.stage];
 
       if (!currentStageGoal) {
         throw createConfigError(
           ErrorCode.CONFIG_MISSING_FIELD,
-          `[wework_plan_turn] Stage goal not found for stage: ${effectiveStage}`,
-          { configKey: `stageGoals.${effectiveStage}` }
+          `[wework_plan_turn] Stage goal not found for stage: ${fullPlan.stage}`,
+          { configKey: `stageGoals.${fullPlan.stage}` }
         );
       }
 
       return {
-        stage: effectiveStage,
+        stage: fullPlan.stage,
         needs: fullPlan.needs,
         riskFlags: fullPlan.riskFlags,
         confidence: fullPlan.confidence,
