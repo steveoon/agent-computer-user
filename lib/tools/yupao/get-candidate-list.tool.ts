@@ -1,8 +1,7 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
-import { getPuppeteerMCPClient, getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
+import { getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
 import { YUPAO_SAY_HELLO_SELECTORS } from "./constants";
-import { wrapAntiDetectionScript, randomDelay } from "../zhipin/anti-detection-utils";
 import { createDynamicClassSelector } from "./dynamic-selector-utils";
 import type { YupaoCandidateCard } from "./types";
 import {
@@ -11,32 +10,6 @@ import {
   wrapPlaywrightScript,
   type TabSelectionResult,
 } from "@/lib/tools/shared/playwright-utils";
-
-// Feature flag: 使用 Playwright MCP 而非 Puppeteer MCP
-const USE_PLAYWRIGHT_MCP = process.env.USE_PLAYWRIGHT_MCP === "true";
-
-/**
- * 解析 puppeteer_evaluate 的结果
- */
-function parseEvaluateResult(result: unknown): unknown {
-  try {
-    const mcpResult = result as { content?: Array<{ text?: string }> };
-    if (mcpResult?.content?.[0]?.text) {
-      const resultText = mcpResult.content[0].text;
-      const executionMatch = resultText.match(
-        /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
-      );
-
-      if (executionMatch && executionMatch[1].trim() !== "undefined") {
-        const jsonResult = executionMatch[1].trim();
-        return JSON.parse(jsonResult);
-      }
-    }
-  } catch (e) {
-    console.error("Failed to parse evaluate result:", e);
-  }
-  return null;
-}
 
 /**
  * Yupao获取候选人列表工具
@@ -55,7 +28,7 @@ export const yupaoGetCandidateListTool = () =>
     - 提取姓名、性别、年龄、介绍、期望薪资等信息
     - 标记在线状态和是否已联系
     - 支持过滤已联系的候选人
-    ${USE_PLAYWRIGHT_MCP ? "- [Playwright] 支持自动切换到鱼泡标签页" : ""}
+    - [Playwright] 支持自动切换到鱼泡标签页
 
     注意：
     - 需要先打开Yupao的"牛人打招呼"页面
@@ -73,10 +46,10 @@ export const yupaoGetCandidateListTool = () =>
 
     execute: async ({ skipContacted = false, maxResults, autoSwitchTab = true }) => {
       try {
-        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
+        const mcpBackend = "playwright" as const;
 
-        // Playwright 模式: 自动切换到鱼泡标签页
-        if (USE_PLAYWRIGHT_MCP && autoSwitchTab) {
+        // 自动切换到鱼泡标签页
+        if (autoSwitchTab) {
           console.log("[Playwright] 正在切换到鱼泡标签页...");
           const tabResult: TabSelectionResult = await selectYupaoTab();
 
@@ -92,32 +65,21 @@ export const yupaoGetCandidateListTool = () =>
           console.log(`[Playwright] 已切换到: ${tabResult.tab?.title} (${tabResult.tab?.url})`);
         }
 
-        // 获取适当的 MCP 客户端
-        const client = USE_PLAYWRIGHT_MCP
-          ? await getPlaywrightMCPClient()
-          : await getPuppeteerMCPClient();
+        // 获取 Playwright MCP 客户端
+        const client = await getPlaywrightMCPClient();
 
         const tools = await client.tools();
 
-        // 根据 MCP 类型选择工具名称
-        const toolName = USE_PLAYWRIGHT_MCP ? "browser_evaluate" : "puppeteer_evaluate";
+        // Playwright 工具名称
+        const toolName = "browser_evaluate";
 
         if (!tools[toolName]) {
           throw new Error(
-            `MCP tool ${toolName} not available. ${
-              USE_PLAYWRIGHT_MCP
-                ? "请确保 Playwright MCP 正在运行且已连接浏览器。"
-                : "请确保 Puppeteer MCP 正在运行。"
-            }`
+            `MCP tool ${toolName} not available. 请确保 Playwright MCP 正在运行且已连接浏览器。`
           );
         }
 
         const mcpTool = tools[toolName];
-
-        // 初始延迟 (仅 Puppeteer 模式)
-        if (!USE_PLAYWRIGHT_MCP) {
-          await randomDelay(300, 500);
-        }
 
         // 脚本内容（两个后端共用）
         const scriptContent = `
@@ -372,26 +334,19 @@ export const yupaoGetCandidateListTool = () =>
           return candidates;
         `;
 
-        // 根据 MCP 类型生成不同的脚本包装
-        const getCandidatesScript = USE_PLAYWRIGHT_MCP
-          ? wrapPlaywrightScript(scriptContent)
-          : wrapAntiDetectionScript(scriptContent);
+        // 使用 Playwright 脚本包装
+        const getCandidatesScript = wrapPlaywrightScript(scriptContent);
 
         // 执行脚本
-        console.log(`[${USE_PLAYWRIGHT_MCP ? "Playwright" : "Puppeteer"}] 正在执行脚本...`);
-        const executeParams = USE_PLAYWRIGHT_MCP ? { function: getCandidatesScript } : { script: getCandidatesScript };
-        const candidatesResult = await mcpTool.execute(executeParams);
+        console.log("[Playwright] 正在执行脚本...");
+        const candidatesResult = await mcpTool.execute({ function: getCandidatesScript });
 
-        // 根据 MCP 类型解析结果
+        // 解析 Playwright 结果
         let candidates: YupaoCandidateCard[] | null = null;
 
-        if (USE_PLAYWRIGHT_MCP) {
-          const parsedResult = parsePlaywrightResult(candidatesResult);
-          if (Array.isArray(parsedResult)) {
-            candidates = parsedResult as YupaoCandidateCard[];
-          }
-        } else {
-          candidates = parseEvaluateResult(candidatesResult) as YupaoCandidateCard[] | null;
+        const parsedResult = parsePlaywrightResult(candidatesResult);
+        if (Array.isArray(parsedResult)) {
+          candidates = parsedResult as YupaoCandidateCard[];
         }
 
         if (!candidates || candidates.length === 0) {
@@ -427,12 +382,11 @@ export const yupaoGetCandidateListTool = () =>
           mcpBackend,
         };
       } catch (error) {
-        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
         return {
           success: false,
           error: error instanceof Error ? error.message : "Unknown error occurred",
           message: "获取候选人列表时发生错误",
-          mcpBackend,
+          mcpBackend: "playwright" as const,
         };
       }
     },

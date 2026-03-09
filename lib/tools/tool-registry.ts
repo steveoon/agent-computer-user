@@ -5,7 +5,6 @@
 
 import { bashTool, computerTool } from "@/lib/e2b/tool";
 import { feishuBotTool } from "./feishu-bot-tool";
-import { puppeteerTool } from "./puppeteer-tool";
 import { analyzeScreenshotTool } from "./analyze-screenshot.tool";
 import { screenshotTool } from "./screenshot.tool";
 import { weChatBotTool } from "./wechat-bot-tool";
@@ -125,14 +124,6 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
   }),
 
   // ===== 自动化工具 =====
-  puppeteer: createToolDefinition({
-    name: "puppeteer",
-    description: "Puppeteer浏览器自动化工具",
-    category: "automation",
-    requiresSandbox: false,
-    create: () => puppeteerTool(),
-  }),
-
   analyze_screenshot: createToolDefinition({
     name: "analyze_screenshot",
     description: "截图分析工具，使用AI分析截图内容",
@@ -143,7 +134,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
 
   screenshot: createToolDefinition({
     name: "screenshot",
-    description: "统一截图工具，支持Puppeteer和Playwright双后端",
+    description: "Playwright浏览器截图工具",
     category: "automation",
     requiresSandbox: false,
     create: () => screenshotTool(),
@@ -434,14 +425,13 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "reply_policy_save",
   ],
 
-  // Boss直聘本地版 - 使用Puppeteer自动化
+  // Boss直聘本地版 - 使用Playwright自动化
   bossZhipinLocalSystemPrompt: [
     // 通用工具
     "bash",
     "feishu",
     "wechat",
     // 自动化工具
-    "puppeteer",
     "screenshot",
     "analyze_screenshot",
     // 业务工具
@@ -485,7 +475,7 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "duliday_job_list_for_llm",
   ],
 
-  // 通用计算机使用 - 包含E2B和Puppeteer，但不包含Boss直聘业务工具
+  // 通用计算机使用 - 包含E2B和Playwright，但不包含Boss直聘业务工具
   generalComputerSystemPrompt: [
     // 通用工具
     "bash",
@@ -494,7 +484,6 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     // 沙盒工具
     "computer",
     // 自动化工具
-    "puppeteer",
     "screenshot",
     "analyze_screenshot",
     // 策略配置

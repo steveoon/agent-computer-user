@@ -9,7 +9,6 @@ import {
   MCPManagerStatus,
   MCPClientStatus,
   MCPTools,
-  MCPClient,
   validateMCPClientConfig,
 } from "@/types/mcp";
 
@@ -101,8 +100,6 @@ class MCPClientManager {
     //    - 适用: 本地开发，手动选择要控制的 Tab
     //    - 限制: 同一浏览器只能有一个 MCP 连接，需要安装 Playwright MCP Bridge 插件
     //
-    // 如需使用 Puppeteer MCP，设置 USE_PUPPETEER_MCP=true
-    //
     // Playwright MCP 配置使用动态参数生成器：
     // - 使用本地固定版本 CLI（node node_modules/@playwright/mcp/cli.js）
     // - 实际命令参数在 getMCPClient 时根据运行时环境决定
@@ -118,22 +115,6 @@ class MCPClientManager {
       enabled: true,
     });
     this.clientConfigs.set("playwright", playwrightConfig);
-
-    // 保留原有的 Puppeteer MCP 配置（用于兼容性）
-    const puppeteerConfig = validateMCPClientConfig({
-      name: "puppeteer",
-      command: "npx",
-      args: ["-y", "puppeteer-mcp-server"],
-      env: {
-        NODE_ENV: process.env.NODE_ENV || "production",
-        LOG_LEVEL: "error",
-        // 尝试禁用文件日志记录
-        NO_FILE_LOGGING: "true",
-      },
-      description: "Puppeteer浏览器自动化服务",
-      enabled: true,
-    });
-    this.clientConfigs.set("puppeteer", puppeteerConfig);
 
     // 高德地图 MCP 配置 - 用于地理编码和距离计算
     const amapConfig = validateMCPClientConfig({
@@ -385,20 +366,6 @@ class MCPClientManager {
   }
 
   /**
-   * Puppeteer MCP 客户端
-   */
-  public async getPuppeteerMCPClient(): Promise<MCPClient> {
-    return this.getMCPClient("puppeteer") as Promise<MCPClient>;
-  }
-
-  /**
-   * Puppeteer MCP 工具
-   */
-  public async getPuppeteerMCPTools(): Promise<MCPTools> {
-    return this.getMCPTools("puppeteer");
-  }
-
-  /**
    * Playwright MCP 客户端
    */
   public async getPlaywrightMCPClient(): Promise<any> {
@@ -415,8 +382,8 @@ class MCPClientManager {
   /**
    * 高德地图 MCP 客户端
    */
-  public async getAmapMCPClient(): Promise<MCPClient> {
-    return this.getMCPClient("amap") as Promise<MCPClient>;
+  public async getAmapMCPClient(): Promise<any> {
+    return this.getMCPClient("amap");
   }
 
   /**
@@ -570,9 +537,6 @@ const mcpClientManager = MCPClientManager.getInstance();
 export default mcpClientManager;
 
 // 快捷访问函数
-export const getPuppeteerMCPClient = () => mcpClientManager.getPuppeteerMCPClient();
-export const getPuppeteerMCPTools = () => mcpClientManager.getPuppeteerMCPTools();
-
 export const getPlaywrightMCPClient = () => mcpClientManager.getPlaywrightMCPClient();
 export const getPlaywrightMCPTools = () => mcpClientManager.getPlaywrightMCPTools();
 

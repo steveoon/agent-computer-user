@@ -63,7 +63,7 @@ export interface ToolCreationContext {
 export type ToolCategory =
   | "universal" // 通用工具
   | "sandbox" // 沙盒工具（需要 E2B）
-  | "automation" // 自动化工具（Puppeteer等）
+  | "automation" // 自动化工具（Playwright等）
   | "business" // 业务工具（招聘相关）
   | "communication"; // 通信工具（飞书、微信等）
 

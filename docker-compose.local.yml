@@ -49,10 +49,7 @@ services:
       # Duliday Integration
       - DULIDAY_TOKEN=${DULIDAY_TOKEN}
 
-      # Puppeteer Configuration
-      # Puppeteer MCP Server 会通过 npx 自动管理 Chromium
-      # 如果需要连接到主机的 Chrome，设置此变量
-      - PUPPETEER_REMOTE_DEBUGGING_ADDRESS=host.docker.internal:9222
+      # Playwright MCP Configuration
 
       # Node Environment
       - NODE_ENV=development

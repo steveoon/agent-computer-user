@@ -1,9 +1,8 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
-import { getPuppeteerMCPClient, getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
+import { getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
 import { CHAT_SELECTORS } from "./constants";
-import { randomDelay, wrapAntiDetectionScript } from "./anti-detection-utils";
-import { parseEvaluateResult } from "../shared/puppeteer-utils";
+import { randomDelay } from "./anti-detection-utils";
 import { SourcePlatform } from "@/db/types";
 import { recordMessageSentEvent } from "@/lib/services/recruitment-event";
 import {
@@ -14,14 +13,11 @@ import {
   type TabSelectionResult,
 } from "@/lib/tools/shared/playwright-utils";
 
-// Feature flag: 使用 Playwright MCP 而非 Puppeteer MCP
-const USE_PLAYWRIGHT_MCP = process.env.USE_PLAYWRIGHT_MCP === "true";
-
 /**
  * 发送消息工具
  *
  * 功能：
- * - 使用 Puppeteer MCP 的 click 和 fill 方法
+ * - 使用 Playwright MCP 在浏览器中执行操作
  * - 在输入框中输入消息
  * - 点击发送按钮发送消息
  * - 支持多种发送按钮选择器
@@ -35,7 +31,7 @@ export const zhipinSendMessageTool = () =>
     - 在聊天输入框中输入消息
     - 自动查找并点击发送按钮
     - 验证消息是否成功发送
-    ${USE_PLAYWRIGHT_MCP ? "- [Playwright] 支持自动切换到BOSS直聘标签页" : ""}
+    - [Playwright] 支持自动切换到BOSS直聘标签页
 
     注意：
     - 需要先打开候选人聊天窗口
@@ -96,10 +92,10 @@ export const zhipinSendMessageTool = () =>
       unreadCountBeforeReply,
     }) => {
       try {
-        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
+        const mcpBackend = "playwright" as const;
 
-        // Playwright 模式: 自动切换到 BOSS 直聘标签页
-        if (USE_PLAYWRIGHT_MCP && autoSwitchTab) {
+        // 自动切换到 BOSS 直聘标签页
+        if (autoSwitchTab) {
           console.log("[Playwright] 正在切换到 BOSS 直聘标签页...");
           const tabResult: TabSelectionResult = await selectZhipinTab();
 
@@ -115,141 +111,113 @@ export const zhipinSendMessageTool = () =>
           console.log(`[Playwright] 已切换到: ${tabResult.tab?.title} (${tabResult.tab?.url})`);
         }
 
-        // 获取适当的 MCP 客户端
-        const client = USE_PLAYWRIGHT_MCP
-          ? await getPlaywrightMCPClient()
-          : await getPuppeteerMCPClient();
+        // 获取 Playwright MCP 客户端
+        const client = await getPlaywrightMCPClient();
         const tools = await client.tools();
 
-        // 根据 MCP 类型选择工具名称
-        const evaluateToolName = USE_PLAYWRIGHT_MCP ? "browser_evaluate" : "puppeteer_evaluate";
-        const clickToolName = USE_PLAYWRIGHT_MCP ? "browser_click" : "puppeteer_click";
-        const fillToolName = USE_PLAYWRIGHT_MCP ? "browser_fill" : "puppeteer_fill";
+        const evaluateToolName = "browser_evaluate";
 
         if (!tools[evaluateToolName]) {
           throw new Error(
-            `MCP tool ${evaluateToolName} not available. ${
-              USE_PLAYWRIGHT_MCP
-                ? "请确保 Playwright MCP 正在运行且已连接浏览器。"
-                : "请确保 Puppeteer MCP 正在运行。"
-            }`
+            `MCP tool ${evaluateToolName} not available. 请确保 Playwright MCP 正在运行且已连接浏览器。`
           );
         }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const evaluateTool = tools[evaluateToolName] as any;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const clickTool = tools[clickToolName] as any;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const fillTool = tools[fillToolName] as any;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const keyTool = tools[USE_PLAYWRIGHT_MCP ? "browser_press_key" : "puppeteer_key"] as any;
+        const keyTool = tools["browser_press_key"] as any;
 
         // 辅助函数：执行脚本
         const executeScript = async (scriptContent: string) => {
-          const script = USE_PLAYWRIGHT_MCP
-            ? wrapPlaywrightScript(scriptContent)
-            : wrapAntiDetectionScript(scriptContent);
-          const params = USE_PLAYWRIGHT_MCP ? { function: script } : { script };
-          const result = await evaluateTool.execute(params);
-          return USE_PLAYWRIGHT_MCP ? parsePlaywrightResult(result) : parseEvaluateResult(result);
+          const script = wrapPlaywrightScript(scriptContent);
+          const result = await evaluateTool.execute({ function: script });
+          return parsePlaywrightResult(result);
         };
 
         // 辅助函数：执行点击
         const executeClick = async (selector: string) => {
-          if (USE_PLAYWRIGHT_MCP) {
-            // Playwright MCP 的 browser_click 需要 accessibility ref，不支持 CSS 选择器
-            // 使用 evaluate 方式模拟完整的鼠标点击事件序列
-            await executeScript(`
-              const el = document.querySelector('${selector}');
-              if (el) {
-                // 确保元素可见
-                el.scrollIntoView({ behavior: 'instant', block: 'center' });
+          // Playwright MCP 的 browser_click 需要 accessibility ref，不支持 CSS 选择器
+          // 使用 evaluate 方式模拟完整的鼠标点击事件序列
+          await executeScript(`
+            const el = document.querySelector('${selector}');
+            if (el) {
+              // 确保元素可见
+              el.scrollIntoView({ behavior: 'instant', block: 'center' });
 
-                // 获取元素中心坐标
-                const rect = el.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
+              // 获取元素中心坐标
+              const rect = el.getBoundingClientRect();
+              const centerX = rect.left + rect.width / 2;
+              const centerY = rect.top + rect.height / 2;
 
-                // 创建鼠标事件的通用选项
-                const eventOptions = {
-                  bubbles: true,
-                  cancelable: true,
-                  view: window,
-                  clientX: centerX,
-                  clientY: centerY,
-                  button: 0,
-                  buttons: 1
-                };
+              // 创建鼠标事件的通用选项
+              const eventOptions = {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                clientX: centerX,
+                clientY: centerY,
+                button: 0,
+                buttons: 1
+              };
 
-                // 模拟完整的鼠标事件序列：mousedown -> mouseup -> click
-                el.dispatchEvent(new MouseEvent('mousedown', eventOptions));
-                el.dispatchEvent(new MouseEvent('mouseup', eventOptions));
-                el.dispatchEvent(new MouseEvent('click', eventOptions));
+              // 模拟完整的鼠标事件序列：mousedown -> mouseup -> click
+              el.dispatchEvent(new MouseEvent('mousedown', eventOptions));
+              el.dispatchEvent(new MouseEvent('mouseup', eventOptions));
+              el.dispatchEvent(new MouseEvent('click', eventOptions));
 
-                // 如果是按钮，也尝试直接调用 click()
-                if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button') {
-                  el.click();
-                }
-
-                return { success: true, tagName: el.tagName };
+              // 如果是按钮，也尝试直接调用 click()
+              if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button') {
+                el.click();
               }
-              return { success: false };
-            `);
-          } else {
-            await clickTool.execute({ selector });
-          }
+
+              return { success: true, tagName: el.tagName };
+            }
+            return { success: false };
+          `);
         };
 
         // 辅助函数：执行填充
         const executeFill = async (selector: string, value: string) => {
-          if (USE_PLAYWRIGHT_MCP) {
-            // Playwright MCP 需要使用 evaluate 方式填充
-            // 需要处理多种输入元素类型：input/textarea 和 contenteditable
-            await executeScript(`
-              const el = document.querySelector('${selector}');
-              if (el) {
-                el.focus();
+          // Playwright MCP 需要使用 evaluate 方式填充
+          // 需要处理多种输入元素类型：input/textarea 和 contenteditable
+          await executeScript(`
+            const el = document.querySelector('${selector}');
+            if (el) {
+              el.focus();
 
-                // 检查是否是 contenteditable 元素
-                const isContentEditable = el.isContentEditable ||
-                  el.contentEditable === 'true' ||
-                  el.getAttribute('contenteditable') === 'true';
+              // 检查是否是 contenteditable 元素
+              const isContentEditable = el.isContentEditable ||
+                el.contentEditable === 'true' ||
+                el.getAttribute('contenteditable') === 'true';
 
-                if (isContentEditable) {
-                  // contenteditable 元素：使用 innerHTML 或 textContent
-                  // 将换行符转换为 HTML 段落
-                  const lines = ${JSON.stringify(value)}.split('\\n');
-                  const htmlContent = lines.map(line => '<p>' + (line || '<br>') + '</p>').join('');
-                  el.innerHTML = htmlContent;
-                } else if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-                  // 标准 input/textarea：使用 value
-                  el.value = ${JSON.stringify(value)};
-                } else {
-                  // 其他元素：尝试使用 textContent
-                  el.textContent = ${JSON.stringify(value)};
-                }
-
-                // 触发事件通知 React/Vue 等框架
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-                return { success: true, isContentEditable: isContentEditable };
+              if (isContentEditable) {
+                // contenteditable 元素：使用 innerHTML 或 textContent
+                // 将换行符转换为 HTML 段落
+                const lines = ${JSON.stringify(value)}.split('\\n');
+                const htmlContent = lines.map(line => '<p>' + (line || '<br>') + '</p>').join('');
+                el.innerHTML = htmlContent;
+              } else if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                // 标准 input/textarea：使用 value
+                el.value = ${JSON.stringify(value)};
+              } else {
+                // 其他元素：尝试使用 textContent
+                el.textContent = ${JSON.stringify(value)};
               }
-              return { success: false };
-            `);
-          } else {
-            await fillTool.execute({ selector, value });
-          }
+
+              // 触发事件通知 React/Vue 等框架
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+              return { success: true, isContentEditable: isContentEditable };
+            }
+            return { success: false };
+          `);
         };
 
         // 辅助函数：执行按键
         const executeKey = async (key: string) => {
           if (keyTool) {
-            if (USE_PLAYWRIGHT_MCP) {
-              await keyTool.execute({ key });
-            } else {
-              await keyTool.execute({ key });
-            }
+            await keyTool.execute({ key });
           }
         };
 
@@ -298,10 +266,7 @@ export const zhipinSendMessageTool = () =>
 
         const usedInputSelector = inputData.selector as string;
 
-        // 步骤2: 点击输入框获取焦点（添加随机延迟）
-        if (!USE_PLAYWRIGHT_MCP) {
-          await randomDelay(100, 300);
-        }
+        // 步骤2: 点击输入框获取焦点
         try {
           await executeClick(usedInputSelector);
         } catch {
@@ -313,16 +278,10 @@ export const zhipinSendMessageTool = () =>
           try {
             // 先聚焦
             await executeClick(usedInputSelector);
-            if (!USE_PLAYWRIGHT_MCP) {
-              await randomDelay(50, 150);
-            }
 
             // Ctrl+A 全选
             if (keyTool) {
               await executeKey("Control+a");
-              if (!USE_PLAYWRIGHT_MCP) {
-                await randomDelay(50, 100);
-              }
 
               // Backspace 删除
               await executeKey("Backspace");
@@ -335,10 +294,7 @@ export const zhipinSendMessageTool = () =>
           }
         }
 
-        // 步骤4: 填充消息（添加随机延迟）
-        if (!USE_PLAYWRIGHT_MCP) {
-          await randomDelay(100, 200);
-        }
+        // 步骤4: 填充消息
         try {
           await executeFill(usedInputSelector, message);
         } catch (error) {
@@ -348,11 +304,6 @@ export const zhipinSendMessageTool = () =>
             message: "填充消息失败",
             mcpBackend,
           };
-        }
-
-        // 随机等待300-800ms确保文本已填充
-        if (!USE_PLAYWRIGHT_MCP) {
-          await randomDelay(300, 800);
         }
 
         // 步骤5: 查找发送按钮
@@ -386,23 +337,13 @@ export const zhipinSendMessageTool = () =>
           };
         }
 
-        // 点击发送按钮前添加随机延迟 (仅 Puppeteer)
-        if (!USE_PLAYWRIGHT_MCP) {
-          await randomDelay(200, 400);
-        }
-
         const sendSelector = sendButtonData.selector as string;
 
         try {
-          if (USE_PLAYWRIGHT_MCP) {
-            // Playwright 模式：使用文本定位点击
-            const clickResult = await playwrightClickByText("发送");
-            if (!clickResult.success) {
-              throw new Error(clickResult.error || "Click failed");
-            }
-          } else {
-            // Puppeteer 模式：使用 CSS 选择器点击
-            await executeClick(sendSelector);
+          // 使用文本定位点击发送按钮
+          const clickResult = await playwrightClickByText("发送");
+          if (!clickResult.success) {
+            throw new Error(clickResult.error || "Click failed");
           }
 
           // 等待消息发送完成
@@ -450,13 +391,11 @@ export const zhipinSendMessageTool = () =>
         }
       } catch (error) {
         // 静默处理错误，避免暴露
-        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
-
         return {
           success: false,
           error: error instanceof Error ? error.message : "Unknown error occurred",
           message: "发送消息时发生错误",
-          mcpBackend,
+          mcpBackend: "playwright" as const,
         };
       }
     },

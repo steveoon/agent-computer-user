@@ -102,7 +102,7 @@ export const zhipinReplyTool = (
       - 自然语言生成，符合人工回复风格
       
       适用场景：
-      - 本地浏览器自动化（puppeteer等）需要生成回复内容时
+      - 本地浏览器自动化（Playwright等）需要生成回复内容时
       - 批量处理候选人咨询
       - 招聘聊天机器人
     `,

@@ -1,21 +1,13 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
-import { getPuppeteerMCPClient, getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
+import { getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
 import { getAdaptiveSelectors, generateFindElementScript } from "./dynamic-selector-utils";
-import {
-  wrapAntiDetectionScript,
-  clickWithMouseTrajectory,
-  performRandomScroll,
-} from "../zhipin/anti-detection-utils";
 import {
   selectYupaoTab,
   parsePlaywrightResult,
   wrapPlaywrightScript,
   type TabSelectionResult,
 } from "@/lib/tools/shared/playwright-utils";
-
-// Feature flag: 使用 Playwright MCP 而非 Puppeteer MCP
-const USE_PLAYWRIGHT_MCP = process.env.USE_PLAYWRIGHT_MCP === "true";
 
 export const openCandidateChatTool = tool({
   description: `打开指定候选人的聊天窗口
@@ -25,8 +17,7 @@ export const openCandidateChatTool = tool({
   - 支持按索引点击（第N个候选人）
   - 自动检测未读状态
   - 返回详细的候选人信息
-  - 使用防检测机制和鼠标轨迹模拟
-  ${USE_PLAYWRIGHT_MCP ? "- [Playwright] 支持自动切换到鱼泡标签页" : ""}
+  - [Playwright] 支持自动切换到鱼泡标签页
   `,
 
   inputSchema: z.object({
@@ -47,10 +38,10 @@ export const openCandidateChatTool = tool({
 
   execute: async ({ candidateName, index, preferUnread = true, listOnly = false, autoSwitchTab = true }) => {
     try {
-      const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
+      const mcpBackend = "playwright" as const;
 
-      // Playwright 模式: 自动切换到鱼泡标签页
-      if (USE_PLAYWRIGHT_MCP && autoSwitchTab) {
+      // 自动切换到鱼泡标签页
+      if (autoSwitchTab) {
         console.log("[Playwright] 正在切换到鱼泡标签页...");
         const tabResult: TabSelectionResult = await selectYupaoTab();
 
@@ -66,10 +57,8 @@ export const openCandidateChatTool = tool({
         console.log(`[Playwright] 已切换到: ${tabResult.tab?.title} (${tabResult.tab?.url})`);
       }
 
-      // 获取适当的 MCP 客户端
-      const client = USE_PLAYWRIGHT_MCP
-        ? await getPlaywrightMCPClient()
-        : await getPuppeteerMCPClient();
+      // 获取 Playwright MCP 客户端
+      const client = await getPlaywrightMCPClient();
 
       // 创建脚本
       const script = `
@@ -309,62 +298,25 @@ export const openCandidateChatTool = tool({
           }
       `;
 
-      // 根据 MCP 类型生成不同的脚本包装
-      const wrappedScript = USE_PLAYWRIGHT_MCP
-        ? wrapPlaywrightScript(script)
-        : wrapAntiDetectionScript(script);
+      // 使用 Playwright 脚本包装
+      const wrappedScript = wrapPlaywrightScript(script);
 
       // 执行脚本
       const tools = await client.tools();
-      const toolName = USE_PLAYWRIGHT_MCP ? "browser_evaluate" : "puppeteer_evaluate";
+      const toolName = "browser_evaluate";
 
       if (!tools[toolName]) {
         throw new Error(
-          `MCP tool ${toolName} not available. ${
-            USE_PLAYWRIGHT_MCP
-              ? "请确保 Playwright MCP 正在运行且已连接浏览器。"
-              : "请确保 Puppeteer MCP 正在运行。"
-          }`
+          `MCP tool ${toolName} not available. 请确保 Playwright MCP 正在运行且已连接浏览器。`
         );
       }
 
       const mcpTool = tools[toolName];
-      const executeParams = USE_PLAYWRIGHT_MCP ? { function: wrappedScript } : { script: wrappedScript };
-      const result = await mcpTool.execute(executeParams);
+      const result = await mcpTool.execute({ function: wrappedScript });
 
-      // 根据 MCP 类型解析结果
+      // 解析 Playwright 结果
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let parsedResult: any = null;
-
-      if (USE_PLAYWRIGHT_MCP) {
-        // Playwright MCP 结果解析
-        parsedResult = parsePlaywrightResult(result);
-      } else {
-        // Puppeteer MCP 结果解析
-        const mcpResult = result as { content?: Array<{ text?: string }> };
-        if (mcpResult?.content?.[0]?.text) {
-          const resultText = mcpResult.content[0].text;
-
-          try {
-            const executionMatch = resultText.match(
-              /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
-            );
-
-            if (executionMatch && executionMatch[1].trim() !== "undefined") {
-              const jsonResult = executionMatch[1].trim();
-              parsedResult = JSON.parse(jsonResult);
-            }
-          } catch (e) {
-            console.error("Failed to parse result:", e);
-            return {
-              success: false,
-              error: "Failed to parse script result",
-              rawResult: resultText,
-              mcpBackend,
-            };
-          }
-        }
-      }
+      const parsedResult: any = parsePlaywrightResult(result);
 
       if (!parsedResult) {
         return {
@@ -386,16 +338,6 @@ export const openCandidateChatTool = tool({
           // 添加随机延迟模拟人类行为
           const delay = 50 + Math.random() * 100;
           await new Promise(resolve => setTimeout(resolve, delay));
-
-          // 在点击前执行随机滚动 (仅 Puppeteer 模式)
-          if (!USE_PLAYWRIGHT_MCP) {
-            await performRandomScroll(client, {
-              minDistance: 20,
-              maxDistance: 80,
-              probability: 0.3,
-              direction: "both",
-            });
-          }
 
           // 标记和点击脚本
           const markScriptContent = `
@@ -428,18 +370,11 @@ export const openCandidateChatTool = tool({
             return { success: false, error: '无法找到目标元素' };
           `;
 
-          const markScript = USE_PLAYWRIGHT_MCP
-            ? wrapPlaywrightScript(markScriptContent)
-            : wrapAntiDetectionScript(markScriptContent);
+          const markScript = wrapPlaywrightScript(markScriptContent);
 
-          const markExecuteParams = USE_PLAYWRIGHT_MCP
-            ? { function: markScript }
-            : { script: markScript };
-          const markResult = await mcpTool.execute(markExecuteParams);
+          const markResult = await mcpTool.execute({ function: markScript });
 
-          const markData = USE_PLAYWRIGHT_MCP
-            ? parsePlaywrightResult(markResult)
-            : parseEvaluateResult(markResult);
+          const markData = parsePlaywrightResult(markResult);
 
           if (
             markData &&
@@ -450,39 +385,31 @@ export const openCandidateChatTool = tool({
             // 使用临时属性选择器点击
             const tempSelector = `${selector}[data-temp-click-target="true"]`;
 
-            if (USE_PLAYWRIGHT_MCP) {
-              // Playwright: 使用 browser_evaluate 执行点击
-              // 注意: browser_click 需要 accessibility ref，不支持 CSS 选择器
-              const clickScript = wrapPlaywrightScript(`
-                const el = document.querySelector('${tempSelector}');
-                if (el) {
-                  el.click();
-                  return { success: true, clicked: true, selector: '${tempSelector}' };
-                }
-                return { success: false, error: '元素未找到', selector: '${tempSelector}' };
-              `);
-              const clickResult = await mcpTool.execute({ function: clickScript });
-              const parsedClickResult = parsePlaywrightResult(clickResult);
-
-              // 检查点击是否成功
-              if (parsedClickResult && typeof parsedClickResult === 'object' && 'success' in parsedClickResult) {
-                if (!parsedClickResult.success) {
-                  console.error(`[${mcpBackend}] 点击失败:`, parsedClickResult);
-                  return {
-                    success: false,
-                    error: "点击元素失败",
-                    details: parsedClickResult,
-                    candidateInfo: parsedResult.candidateInfo,
-                    mcpBackend,
-                  };
-                }
+            // Playwright: 使用 browser_evaluate 执行点击
+            // 注意: browser_click 需要 accessibility ref，不支持 CSS 选择器
+            const clickScript = wrapPlaywrightScript(`
+              const el = document.querySelector('${tempSelector}');
+              if (el) {
+                el.click();
+                return { success: true, clicked: true, selector: '${tempSelector}' };
               }
-            } else {
-              // Puppeteer: 使用带鼠标轨迹的点击
-              await clickWithMouseTrajectory(client, tempSelector, {
-                preClickDelay: 200,
-                moveSteps: 18,
-              });
+              return { success: false, error: '元素未找到', selector: '${tempSelector}' };
+            `);
+            const clickResult = await mcpTool.execute({ function: clickScript });
+            const parsedClickResult = parsePlaywrightResult(clickResult);
+
+            // 检查点击是否成功
+            if (parsedClickResult && typeof parsedClickResult === 'object' && 'success' in parsedClickResult) {
+              if (!parsedClickResult.success) {
+                console.error(`[${mcpBackend}] 点击失败:`, parsedClickResult);
+                return {
+                  success: false,
+                  error: "点击元素失败",
+                  details: parsedClickResult,
+                  candidateInfo: parsedResult.candidateInfo,
+                  mcpBackend,
+                };
+              }
             }
 
             // 清理临时属性
@@ -491,13 +418,8 @@ export const openCandidateChatTool = tool({
               if (el) el.removeAttribute('data-temp-click-target');
               return { cleaned: true };
             `;
-            const cleanupScript = USE_PLAYWRIGHT_MCP
-              ? wrapPlaywrightScript(cleanupScriptContent)
-              : wrapAntiDetectionScript(cleanupScriptContent);
-            const cleanupParams = USE_PLAYWRIGHT_MCP
-              ? { function: cleanupScript }
-              : { script: cleanupScript };
-            await mcpTool.execute(cleanupParams);
+            const cleanupScript = wrapPlaywrightScript(cleanupScriptContent);
+            await mcpTool.execute({ function: cleanupScript });
 
             return {
               success: true,
@@ -535,39 +457,15 @@ export const openCandidateChatTool = tool({
       return { ...parsedResult, mcpBackend };
     } catch (error) {
       console.error("Failed to open candidate chat:", error);
-      const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
         message: "打开候选人聊天失败",
-        mcpBackend,
+        mcpBackend: "playwright" as const,
       };
     }
   },
 });
-
-/**
- * 解析 puppeteer_evaluate 的结果
- */
-function parseEvaluateResult(result: unknown): Record<string, unknown> | null {
-  try {
-    const mcpResult = result as { content?: Array<{ text?: string }> };
-    if (mcpResult?.content?.[0]?.text) {
-      const resultText = mcpResult.content[0].text;
-      const executionMatch = resultText.match(
-        /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
-      );
-
-      if (executionMatch && executionMatch[1].trim() !== "undefined") {
-        const jsonResult = executionMatch[1].trim();
-        return JSON.parse(jsonResult) as Record<string, unknown>;
-      }
-    }
-  } catch (e) {
-    console.error("Failed to parse evaluate result:", e);
-  }
-  return null;
-}
 
 // 导出工具
 export const OPEN_CANDIDATE_CHAT_ACTION = "open_candidate_chat";

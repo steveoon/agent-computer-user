@@ -1,7 +1,6 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
-import { getPuppeteerMCPClient, getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
-import { wrapAntiDetectionScript } from "../zhipin/anti-detection-utils";
+import { getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
 import { createDynamicClassSelector, generateFindElementScript } from "./dynamic-selector-utils";
 import {
   selectYupaoTab,
@@ -9,9 +8,6 @@ import {
   wrapPlaywrightScript,
   type TabSelectionResult,
 } from "@/lib/tools/shared/playwright-utils";
-
-// Feature flag: 使用 Playwright MCP 而非 Puppeteer MCP
-const USE_PLAYWRIGHT_MCP = process.env.USE_PLAYWRIGHT_MCP === "true";
 
 /**
  * 获取聊天详情工具
@@ -31,7 +27,7 @@ export const yupaoChatDetailsTool = () =>
     - 获取完整的聊天历史记录
     - 自动识别消息发送者
     - 包含消息时间戳
-    ${USE_PLAYWRIGHT_MCP ? "- [Playwright] 支持自动切换到鱼泡标签页" : ""}
+    - [Playwright] 支持自动切换到鱼泡标签页
 
     注意：
     - 需要先打开候选人聊天窗口
@@ -52,12 +48,12 @@ export const yupaoChatDetailsTool = () =>
         .describe("是否自动切换到鱼泡标签页（仅 Playwright 模式有效）"),
     }),
 
-    execute: async ({ includeHtml = false, maxMessages = 100, maxDataSizeKB = 300, autoSwitchTab = true }) => {
+    execute: async ({ includeHtml: _includeHtml = false, maxMessages = 100, maxDataSizeKB = 300, autoSwitchTab = true }) => {
       try {
-        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
+        const mcpBackend = "playwright" as const;
 
-        // Playwright 模式: 自动切换到鱼泡标签页
-        if (USE_PLAYWRIGHT_MCP && autoSwitchTab) {
+        // 自动切换到鱼泡标签页
+        if (autoSwitchTab) {
           console.log("[Playwright] 正在切换到鱼泡标签页...");
           const tabResult: TabSelectionResult = await selectYupaoTab();
 
@@ -73,45 +69,21 @@ export const yupaoChatDetailsTool = () =>
           console.log(`[Playwright] 已切换到: ${tabResult.tab?.title} (${tabResult.tab?.url})`);
         }
 
-        // 获取适当的 MCP 客户端
-        const client = USE_PLAYWRIGHT_MCP
-          ? await getPlaywrightMCPClient()
-          : await getPuppeteerMCPClient();
+        // 获取 Playwright MCP 客户端
+        const client = await getPlaywrightMCPClient();
 
         const tools = await client.tools();
 
-        // 根据 MCP 类型选择工具名称
-        const toolName = USE_PLAYWRIGHT_MCP ? "browser_evaluate" : "puppeteer_evaluate";
+        // Playwright 工具名称
+        const toolName = "browser_evaluate";
 
         if (!tools[toolName]) {
           throw new Error(
-            `MCP tool ${toolName} not available. ${
-              USE_PLAYWRIGHT_MCP
-                ? "请确保 Playwright MCP 正在运行且已连接浏览器。"
-                : "请确保 Puppeteer MCP 正在运行。"
-            }`
+            `MCP tool ${toolName} not available. 请确保 Playwright MCP 正在运行且已连接浏览器。`
           );
         }
 
         const mcpTool = tools[toolName];
-
-        // 添加滚轮事件以模拟用户行为 (仅 Puppeteer 模式)
-        const addScrollBehavior = async () => {
-          if (!USE_PLAYWRIGHT_MCP && tools.puppeteer_evaluate) {
-            const scrollScript = wrapAntiDetectionScript(`
-              // 模拟轻微的滚动
-              const scrollY = window.scrollY;
-              const delta = 50 + Math.random() * 100;
-              window.scrollTo({
-                top: scrollY + delta,
-                behavior: 'smooth'
-              });
-              return { scrolled: true, from: scrollY, to: scrollY + delta };
-            `);
-            await tools.puppeteer_evaluate.execute({ script: scrollScript });
-            await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
-          }
-        };
 
         // 脚本内容（两个后端共用）
         const scriptContent = `
@@ -719,51 +691,15 @@ export const yupaoChatDetailsTool = () =>
           return resultData;
         `;
 
-        // 根据 MCP 类型生成不同的脚本包装
-        const script = USE_PLAYWRIGHT_MCP
-          ? wrapPlaywrightScript(scriptContent)
-          : wrapAntiDetectionScript(scriptContent);
-
-        // 在执行前添加初始滚动行为
-        await addScrollBehavior();
+        // 使用 Playwright 脚本包装
+        const script = wrapPlaywrightScript(scriptContent);
 
         // 执行脚本
-        const executeParams = USE_PLAYWRIGHT_MCP ? { function: script } : { script };
-        const result = await mcpTool.execute(executeParams);
+        const result = await mcpTool.execute({ function: script });
 
-        // 根据 MCP 类型解析结果
+        // 解析 Playwright 结果
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let parsedResult: any = null;
-
-        if (USE_PLAYWRIGHT_MCP) {
-          // Playwright MCP 结果解析
-          parsedResult = parsePlaywrightResult(result);
-        } else {
-          // Puppeteer MCP 结果解析
-          const mcpResult = result as { content?: Array<{ text?: string }> };
-          if (mcpResult?.content?.[0]?.text) {
-            const resultText = mcpResult.content[0].text;
-
-            try {
-              const executionMatch = resultText.match(
-                /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
-              );
-
-              if (executionMatch && executionMatch[1].trim() !== "undefined") {
-                const jsonResult = executionMatch[1].trim();
-                parsedResult = JSON.parse(jsonResult);
-              }
-            } catch {
-              // 静默处理解析错误
-              return {
-                success: false,
-                error: "Failed to parse chat details",
-                rawResult: includeHtml ? resultText : undefined,
-                mcpBackend,
-              };
-            }
-          }
-        }
+        const parsedResult: any = parsePlaywrightResult(result);
 
         if (parsedResult && (parsedResult.candidateInfoFound || parsedResult.chatContainerFound)) {
           return {
@@ -806,13 +742,11 @@ export const yupaoChatDetailsTool = () =>
         }
       } catch (error) {
         // 静默处理错误
-        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
-
         return {
           success: false,
           error: error instanceof Error ? error.message : "Unknown error occurred",
           message: "获取聊天详情时发生错误",
-          mcpBackend,
+          mcpBackend: "playwright" as const,
         };
       }
     },

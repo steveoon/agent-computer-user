@@ -105,8 +105,6 @@ const DEFAULT_CONFIG: MonitorConfig = {
 
 const LOGIN_WAIT_DURATION_MS = 60000; // 间隔60秒后开始监听
 const AGENT_PROCESS_WAIT_MS = 60000; // 等待1分钟让Agent处理完成
-const INITIAL_CONNECT_WAIT_MS = 30000; // 等待30秒让Agent完成初始化连接
-
 const WAIT_UNTIL_OPTIONS = { waitUntil: "networkidle2" as const };
 
 // ==================== 工具函数 ====================
@@ -859,45 +857,8 @@ class UnreadMonitor {
       logger.success("所有页面已复用，跳过登录等待");
     }
 
-    // 初始化提示词逻辑
-    // 默认使用 Playwright MCP (CDP 模式): 不需要显式连接，工具会自动连接到浏览器
-    // 可选 Puppeteer MCP (设置 USE_PUPPETEER_MCP=true): 需要先连接到浏览器端口
-    const usePuppeteerMCP = process.env.USE_PUPPETEER_MCP === "true";
-
-    if (this.chatPage && usePuppeteerMCP) {
-      // Puppeteer MCP 模式（备选）：需要先发送连接指令
-      try {
-        const port = new URL(this.config.browserURL).port || "9222";
-
-        // 确定目标 URL 关键词
-        let targetUrlKeyword = "";
-        if (this.config.enabledBrands.includes("yupao")) {
-          targetUrlKeyword = "yupao.com";
-        } else if (this.config.enabledBrands.includes("boss-zhipin")) {
-          targetUrlKeyword = "zhipin.com";
-        }
-
-        // 构建连接提示词（仅 Puppeteer MCP 需要）
-        const connectPrompt = targetUrlKeyword
-          ? `连接到浏览器端口 ${port}，并切换到包含 "${targetUrlKeyword}" 的标签页`
-          : `连接到浏览器,端口 ${port}`;
-
-        logger.info(`[Puppeteer MCP] 正在填入初始化指令: "${connectPrompt}"`);
-
-        await this.chatPage.bringToFront();
-        await fillChatInput(this.chatPage, null, this.config.autoSubmit, connectPrompt);
-
-        if (this.config.autoSubmit) {
-          logger.info(`等待 ${INITIAL_CONNECT_WAIT_MS / 1000} 秒，让 Agent 完成初始化连接...`);
-          await new Promise(resolve => setTimeout(resolve, INITIAL_CONNECT_WAIT_MS));
-        }
-      } catch (error) {
-        logger.warn(`填入初始化指令失败: ${error}`);
-      }
-    } else {
-      // Playwright MCP 模式（默认）：无需连接指令，工具会自动通过 CDP 连接
-      logger.info("🎭 [Playwright MCP] 工具会自动连接到浏览器，跳过初始化连接指令");
-    }
+    // Playwright MCP (CDP 模式)：无需连接指令，工具会自动通过 CDP 连接
+    logger.info("🎭 [Playwright MCP] 工具会自动连接到浏览器，跳过初始化连接指令");
 
     // 设置键盘快捷键
     this.setupKeyboardControls();
@@ -1066,12 +1027,11 @@ async function main() {
       browserWSEndpoint: process.env.BROWSER_WS_ENDPOINT,
     };
 
-    const mcpMode = process.env.USE_PUPPETEER_MCP === "true" ? "Puppeteer MCP" : "Playwright MCP (CDP)";
     logger.info(`📍 监听配置:`);
     logger.info(`  - 浏览器端口: ${agentConfig.chromePort}`);
     logger.info(`  - Agent 端口: ${agentConfig.appPort}`);
     logger.info(`  - 监听品牌: ${config.enabledBrands.join(", ")}`);
-    logger.info(`  - MCP 模式: ${mcpMode}`);
+    logger.info(`  - MCP 模式: Playwright MCP (CDP)`);
 
   } else {
     logger.info("🔧 使用环境变量配置");

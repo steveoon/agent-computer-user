@@ -1,6 +1,6 @@
 # Zhipin Automation Tools
 
-基于 AI SDK + Puppeteer MCP 的 BOSS直聘自动化工具集，包含反检测机制。
+基于 AI SDK + Playwright MCP 的 BOSS直聘自动化工具集，包含反检测机制。
 
 ## 📁 文件结构
 
@@ -261,7 +261,7 @@ export const DELAYS = {
 ```typescript
 import { tool } from "ai";
 import { z } from "zod";
-import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
+import mcpClientManager from "@/lib/mcp/client-manager";
 import { humanDelay, wrapAntiDetectionScript } from "./anti-detection-utils";
 
 export const newZhipinTool = tool({
@@ -270,7 +270,7 @@ export const newZhipinTool = tool({
     // 参数定义
   }),
   execute: async params => {
-    const client = await getPuppeteerMCPClient();
+    const client = await mcpClientManager.getPlaywrightMCPClient();
 
     // 添加人性化延迟
     await humanDelay();

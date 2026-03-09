@@ -4,7 +4,6 @@ import {
   MessageCircle,
   MessageSquare,
   Briefcase,
-  Globe,
   Bot,
   Users,
   Smartphone,
@@ -25,7 +24,6 @@ import { BashToolMessage } from "./bash-tool";
 import { FeishuToolMessage } from "./feishu-tool";
 import { WechatToolMessage } from "./wechat-tool";
 import { JobPostingToolMessage } from "./job-posting-tool";
-import { PuppeteerToolMessage } from "./puppeteer-tool";
 import { ZhipinReplyToolMessage } from "./zhipin-reply-tool";
 import { ZhipinToolMessage } from "./zhipin-tool";
 import { ZhipinSendMessageTool } from "./zhipin-send-message-tool";
@@ -70,11 +68,6 @@ export const toolRegistry: Record<string, ToolConfig> = {
     icon: Briefcase,
     defaultTheme: themes.indigo,
     render: JobPostingToolMessage,
-  },
-  puppeteer: {
-    icon: Globe,
-    defaultTheme: themes.purple,
-    render: PuppeteerToolMessage,
   },
   zhipin_reply_generator: {
     icon: Bot,

@@ -10,7 +10,6 @@ import {
   MessageCircle,
   MessageSquare,
   Briefcase,
-  Globe,
   Bot,
   Users,
   Smartphone,
@@ -58,11 +57,6 @@ export const lazyToolRegistry: Record<string, LazyToolConfig> = {
     icon: Briefcase,
     defaultTheme: themes.indigo,
     loader: () => import("./job-posting-tool").then(m => ({ default: m.JobPostingToolMessage })),
-  },
-  puppeteer: {
-    icon: Globe,
-    defaultTheme: themes.purple,
-    loader: () => import("./puppeteer-tool").then(m => ({ default: m.PuppeteerToolMessage })),
   },
   zhipin_reply_generator: {
     icon: Bot,

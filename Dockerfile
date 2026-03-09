@@ -62,7 +62,7 @@ COPY --from=builder /app/public ./public
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
-# Create logs directory for puppeteer-mcp-server
+# Create logs directory for MCP services
 RUN mkdir logs
 RUN chown nextjs:nodejs logs
 

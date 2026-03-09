@@ -1,6 +1,6 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
-import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
+import { playwrightEvaluate, selectZhipinTab } from "@/lib/tools/shared/playwright-utils";
 import { wrapAntiDetectionScript, randomDelay } from "./anti-detection-utils";
 import type { AutomationResult } from "./types";
 
@@ -48,15 +48,8 @@ export const zhipinCloseResumeDetailTool = () =>
 
     execute: async (): Promise<AutomationResult<{ closed: boolean; message: string }>> => {
       try {
-        const client = await getPuppeteerMCPClient();
-        const tools = await client.tools();
-
-        // 检查必需的工具
-        if (!tools.puppeteer_evaluate) {
-          throw new Error("MCP tool puppeteer_evaluate not available");
-        }
-
-        const puppeteerEvaluate = tools.puppeteer_evaluate;
+        // 确保在正确的标签页
+        await selectZhipinTab();
 
         // 初始延迟
         await randomDelay(200, 400);
@@ -164,26 +157,10 @@ export const zhipinCloseResumeDetailTool = () =>
         `);
 
         // 执行检测脚本
-        const detectResult = await puppeteerEvaluate.execute({ script: closeScript });
+        const detectResult = await playwrightEvaluate(closeScript);
 
         // 解析结果
-        const result = (() => {
-          try {
-            const mcpResult = detectResult as { content?: Array<{ text?: string }> };
-            if (mcpResult?.content?.[0]?.text) {
-              const resultText = mcpResult.content[0].text;
-              const executionMatch = resultText.match(
-                /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
-              );
-              if (executionMatch && executionMatch[1].trim() !== "undefined") {
-                return JSON.parse(executionMatch[1].trim());
-              }
-            }
-          } catch (e) {
-            console.error("Failed to parse detect result:", e);
-          }
-          return { found: false };
-        })() as {
+        const result = (detectResult || { found: false }) as {
           found: boolean;
           inIframe: boolean;
           selector: string;
@@ -243,11 +220,10 @@ export const zhipinCloseResumeDetailTool = () =>
               return false;
             `);
 
-            await puppeteerEvaluate.execute({ script: clickScript });
+            await playwrightEvaluate(clickScript);
           } else {
             // 主文档中的点击（很少见，但保留作为备用）
-            await puppeteerEvaluate.execute({
-              script: wrapAntiDetectionScript(`
+            await playwrightEvaluate(wrapAntiDetectionScript(`
                 const closeBtn = document.querySelector('${result.selector}');
                 if (closeBtn) {
                   closeBtn.scrollIntoView({ behavior: 'auto', block: 'center' });
@@ -256,8 +232,7 @@ export const zhipinCloseResumeDetailTool = () =>
                   return true;
                 }
                 return false;
-              `),
-            });
+              `));
           }
 
           // 等待初始动画
@@ -318,24 +293,8 @@ export const zhipinCloseResumeDetailTool = () =>
               return isDialogClosed();
             `);
 
-            const verifyResult = await puppeteerEvaluate.execute({ script: verifyScript });
-            const closed = (() => {
-              try {
-                const mcpResult = verifyResult as { content?: Array<{ text?: string }> };
-                if (mcpResult?.content?.[0]?.text) {
-                  const resultText = mcpResult.content[0].text;
-                  const executionMatch = resultText.match(
-                    /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
-                  );
-                  if (executionMatch) {
-                    return executionMatch[1].trim() === "true";
-                  }
-                }
-              } catch (e) {
-                console.error("Failed to parse verify result:", e);
-              }
-              return false;
-            })();
+            const verifyResult = await playwrightEvaluate(verifyScript);
+            const closed = verifyResult === true;
 
             if (closed) {
               isClosed = true;

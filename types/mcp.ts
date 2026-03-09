@@ -1,114 +1,5 @@
 import { z } from 'zod/v3';
 
-// ========== Puppeteer MCP 操作类型定义 ==========
-
-/**
- * Puppeteer支持的操作类型
- */
-export const PuppeteerActionSchema = z.enum([
-  "connect_active_tab",
-  "navigate",
-  "screenshot",
-  "click",
-  "fill",
-  "select",
-  "hover",
-  "evaluate",
-]);
-
-export type PuppeteerAction = z.infer<typeof PuppeteerActionSchema>;
-
-/**
- * Puppeteer连接参数
- */
-export const PuppeteerConnectParamsSchema = z.object({
-  targetUrl: z.string().optional().describe("目标标签页URL"),
-  debugPort: z.number().optional().default(9222).describe("Chrome远程调试端口"),
-});
-
-export type PuppeteerConnectParams = z.infer<typeof PuppeteerConnectParamsSchema>;
-
-/**
- * Puppeteer导航参数
- */
-export const PuppeteerNavigateParamsSchema = z.object({
-  url: z.string().describe("要导航到的URL"),
-});
-
-export type PuppeteerNavigateParams = z.infer<typeof PuppeteerNavigateParamsSchema>;
-
-/**
- * Puppeteer截图参数
- */
-export const PuppeteerScreenshotParamsSchema = z.object({
-  name: z.string().describe("截图名称"),
-  selector: z.string().optional().describe("CSS选择器"),
-  width: z.number().optional().default(800).describe("视口宽度"),
-  height: z.number().optional().default(600).describe("视口高度"),
-});
-
-export type PuppeteerScreenshotParams = z.infer<typeof PuppeteerScreenshotParamsSchema>;
-
-/**
- * Puppeteer交互参数
- */
-export const PuppeteerInteractionParamsSchema = z.object({
-  selector: z.string().describe("CSS选择器"),
-  value: z.string().optional().describe("输入值或选择值"),
-});
-
-export type PuppeteerInteractionParams = z.infer<typeof PuppeteerInteractionParamsSchema>;
-
-/**
- * Puppeteer脚本执行参数
- */
-export const PuppeteerEvaluateParamsSchema = z.object({
-  script: z.string().describe("要执行的JavaScript代码"),
-});
-
-export type PuppeteerEvaluateParams = z.infer<typeof PuppeteerEvaluateParamsSchema>;
-
-/**
- * Puppeteer统一参数（用于AI SDK工具）
- */
-export const PuppeteerParamsSchema = z.object({
-  action: PuppeteerActionSchema,
-  targetUrl: z.string().optional().describe("目标标签页URL"),
-  debugPort: z.number().optional().describe("Chrome远程调试端口"),
-  url: z.string().optional().describe("要导航到的URL"),
-  name: z.string().optional().describe("截图名称"),
-  selector: z.string().optional().describe("CSS选择器"),
-  width: z.number().optional().describe("视口宽度"),
-  height: z.number().optional().describe("视口高度"),
-  value: z.string().optional().describe("输入值"),
-  script: z.string().optional().describe("JavaScript代码"),
-});
-
-export type PuppeteerParams = z.infer<typeof PuppeteerParamsSchema>;
-
-/**
- * Puppeteer结果类型
- * Note: Using z.union instead of z.discriminatedUnion because ZodEffects (from .refine())
- * is not compatible with discriminatedUnion in Zod v4
- */
-const PuppeteerTextResultSchema = z.object({
-  type: z.literal("text"),
-  text: z.string(),
-});
-
-const PuppeteerImageResultSchema = z
-  .object({
-    type: z.literal("image"),
-    data: z.string().optional().describe("Base64编码的图片数据（可选）"),
-    url: z.string().optional().describe("图片的公网URL（可选）"),
-    displayData: z.string().optional().describe("用于UI显示的压缩后Base64数据（不发送给LLM）"),
-  })
-  .refine(data => data.data || data.url || data.displayData, { message: "图片结果必须包含 data、url 或 displayData 其中之一" });
-
-export const PuppeteerResultSchema = z.union([PuppeteerTextResultSchema, PuppeteerImageResultSchema]);
-
-export type PuppeteerResult = z.infer<typeof PuppeteerResultSchema>;
-
 // ========== MCP 客户端管理器类型定义 ==========
 
 /**
@@ -247,71 +138,6 @@ export function isMCPTool(value: unknown): value is GenericMCPTool {
   return MCPToolSchema.safeParse(value).success;
 }
 
-/**
- * MCP客户端接口定义
- * 用于与MCP服务交互的客户端类型
- */
-export interface MCPClient {
-  /**
-   * 获取客户端可用的工具集合
-   * @returns 包含工具名称和执行方法的对象
-   */
-  tools(): Promise<{
-    puppeteer_evaluate?: {
-      execute(params: { script: string }): Promise<unknown>;
-    };
-    puppeteer_click?: {
-      execute(params: { selector: string }): Promise<unknown>;
-    };
-    puppeteer_fill?: {
-      execute(params: { selector: string; value: string }): Promise<unknown>;
-    };
-    puppeteer_key?: {
-      execute(params: { key: string }): Promise<unknown>;
-    };
-    [key: string]: unknown;
-  }>;
-}
-
-// ========== Puppeteer MCP 服务接口类型 ==========
-
-/**
- * Puppeteer MCP服务提供的工具名称
- */
-export const PuppeteerMCPToolNamesSchema = z.enum([
-  "puppeteer_connect_active_tab",
-  "puppeteer_navigate",
-  "puppeteer_screenshot",
-  "puppeteer_click",
-  "puppeteer_fill",
-  "puppeteer_select",
-  "puppeteer_hover",
-  "puppeteer_evaluate",
-]);
-
-export type PuppeteerMCPToolNames = z.infer<typeof PuppeteerMCPToolNamesSchema>;
-
-/**
- * Puppeteer MCP工具执行结果
- */
-export const PuppeteerMCPResultSchema = z.object({
-  content: z.array(
-    z.discriminatedUnion("type", [
-      z.object({
-        type: z.literal("text"),
-        text: z.string(),
-      }),
-      z.object({
-        type: z.literal("image"),
-        data: z.string(),
-        mimeType: z.string().optional(),
-      }),
-    ])
-  ),
-});
-
-export type PuppeteerMCPResult = z.infer<typeof PuppeteerMCPResultSchema>;
-
 // ========== MCPClientManager 方法参数类型 ==========
 
 /**
@@ -380,40 +206,6 @@ export const ToolResultContentSchema = z.array(
 );
 
 export type ToolResultContent = z.infer<typeof ToolResultContentSchema>;
-
-/**
- * Puppeteer工具完整参数（用于AI SDK tool） - 与PuppeteerParamsSchema相同
- */
-export const PuppeteerToolParamsSchema = PuppeteerParamsSchema;
-
-export type PuppeteerToolParams = PuppeteerParams;
-
-// ========== 类型守卫 ==========
-
-/**
- * 检查是否为Puppeteer文本结果
- */
-export function isPuppeteerTextResult(result: unknown): result is { type: "text"; text: string } {
-  const parsed = PuppeteerResultSchema.safeParse(result);
-  return parsed.success && parsed.data.type === "text";
-}
-
-/**
- * 检查是否为Puppeteer图片结果
- */
-export function isPuppeteerImageResult(
-  result: unknown
-): result is { type: "image"; data?: string; url?: string; displayData?: string } {
-  const parsed = PuppeteerResultSchema.safeParse(result);
-  return parsed.success && parsed.data.type === "image";
-}
-
-/**
- * 验证Puppeteer参数
- */
-export function validatePuppeteerParams(params: unknown): PuppeteerParams {
-  return PuppeteerParamsSchema.parse(params);
-}
 
 /**
  * 验证MCP客户端配置
@@ -553,8 +345,3 @@ export interface PlaywrightMCPClient {
     [key: string]: unknown;
   }>;
 }
-
-/**
- * 任意 MCP 客户端类型（Puppeteer 或 Playwright）
- */
-export type AnyMCPClient = MCPClient | PlaywrightMCPClient;

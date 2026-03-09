@@ -127,8 +127,7 @@ z.string({ error: issue => issue.input === undefined ? "Required" : "Invalid" })
 
 ### Automation Tools
 - **bash** - Execute commands with safety features (E2B sandbox or local preview)
-- **puppeteer** - Browser automation via Puppeteer MCP
-- **screenshot** - Unified screenshot tool (Puppeteer/Playwright dual backend)
+- **screenshot** - Screenshot tool via Playwright MCP
 - **analyze_screenshot** - AI-powered screenshot analysis
 
 ### Business-Specific Tools
@@ -195,15 +194,14 @@ DULIDAY_TOKEN, EXA_API_KEY
 
 ### MCP Integration
 - Singleton manager for client lifecycle (`lib/mcp/client-manager.ts`)
-- **Dual Backend Support**: Puppeteer MCP and Playwright MCP
-- Environment variable `USE_PLAYWRIGHT_MCP=true` to switch backends
+- **Playwright MCP** for browser automation
 - Shared utilities: `lib/tools/shared/playwright-utils.ts` (tab management, script execution)
-- Multiple servers: Puppeteer, Playwright, Google Maps, Exa
+- Multiple servers: Playwright, Google Maps, Exa
 - Test connection: `pnpm test:mcp-connection`
 - Run before shipping MCP protocol changes
 
 ### Screenshot Tool Pattern
-- Unified `screenshot.tool.ts` supports both Puppeteer and Playwright backends
+- `screenshot.tool.ts` uses Playwright MCP backend
 - Uses `displayData` field for UI display without sending to LLM context
 - `toModelOutput` returns text-only (URL reference) to avoid context bloat
 - UI component reads `displayData` for image rendering

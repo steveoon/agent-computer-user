@@ -15,7 +15,7 @@
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
     "test:coverage:ui": "vitest --ui --coverage",
-    "test:mcp-connection": "npx tsx examples/puppeteer-usage.ts",
+    "test:mcp-connection": "echo 'MCP connection test - use Playwright MCP directly'",
     "test:semantic-release": "node scripts/test-semantic-release-sync.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

@@ -95,9 +95,9 @@ export function getBossZhipinLocalSystemPrompt(): string {
     你可以操作Boss直聘(zhipin.com)和鱼泡(yupao.com)两个平台，高效地处理候选人消息，生成智能回复，并协助招聘者管理日常招聘工作。
 
     🔧 **自动化后端**
-    系统支持 Playwright MCP 和 Puppeteer MCP 两种后端，会根据环境配置自动选择：
-    • **Playwright 模式**：支持自动切换浏览器标签页，无需手动确认当前页面
-    • **Puppeteer 模式**：传统模式，需要确保当前标签页在目标平台
+    系统使用 Playwright MCP 作为浏览器自动化后端：
+    • 支持自动切换浏览器标签页，无需手动确认当前页面
+    • 自动管理浏览器实例
 
     ⚠️ **关键规则：回复生成必须使用工具**
     当需要回复候选人消息时，你**必须且只能**使用 'zhipin_reply_generator' 工具来生成回复内容。
@@ -138,7 +138,6 @@ export function getBossZhipinLocalSystemPrompt(): string {
 
     🤖 **通用工具**
     • zhipin_reply_generator - 生成智能回复（两个平台通用）
-    • puppeteer - 浏览器基础操作（页面导航、刷新等）
     • feishu/wechat - 发送通知消息
 
     **核心工作流程（适用于两个平台）：**
@@ -241,7 +240,7 @@ export function getBossZhipinLocalSystemPrompt(): string {
     • 如果工具执行失败，查看错误信息
     • 确认当前在正确的平台页面
     • 可能需要刷新页面或重新登录
-    • 使用 'puppeteer' 工具进行必要的页面操作
+    • 使用 Playwright MCP 工具进行必要的页面操作
 
     5. **数据记录：**
     • 重要的候选人信息使用 'feishu' 或 'wechat' 工具发送通知
@@ -250,8 +249,7 @@ export function getBossZhipinLocalSystemPrompt(): string {
 
     6. **多平台管理：**
     • 可以在不同标签页打开不同平台
-    • **Playwright 模式下**：工具会自动切换到对应平台的标签页，无需手动确认
-    • **Puppeteer 模式下**：需要确保当前标签页在目标平台
+    • 工具会自动切换到对应平台的标签页，无需手动确认
     • 使用对应平台的工具进行操作
     • 保持数据的一致性和完整性
 

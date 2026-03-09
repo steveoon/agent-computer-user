@@ -11,20 +11,13 @@ import {
 import { BaseToolMessage } from "./base-tool-message";
 import { themes, type ToolMessageProps } from "./types";
 
-// MCP 后端类型
-type MCPBackend = "puppeteer" | "playwright";
-
 // MCP 后端标签配置
-const MCP_BACKEND_STYLES: Record<MCPBackend, { label: string; className: string }> = {
-  puppeteer: {
-    label: "Puppeteer",
-    className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  },
+const MCP_BACKEND_STYLES = {
   playwright: {
     label: "Playwright",
     className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   },
-};
+} as const;
 
 // 定义各个工具的图标映射
 const toolIcons: Record<string, LucideIcon> = {
@@ -95,7 +88,7 @@ export function ZhipinToolMessage(props: ToolMessageProps) {
   }
 
   // 提取 MCP 后端信息
-  let mcpBackend: MCPBackend | undefined;
+  let mcpBackend: "playwright" | undefined;
 
   // 对于输出，更新detail以包含结果信息
   if (state === "output-available" && output) {
@@ -110,7 +103,7 @@ export function ZhipinToolMessage(props: ToolMessageProps) {
         };
       };
       // MCP 后端标识
-      mcpBackend?: MCPBackend;
+      mcpBackend?: "playwright";
       // 直接在顶层的字段（get_unread_candidates_improved 的返回格式）
       candidates?: unknown[];
       count?: number;
