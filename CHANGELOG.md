@@ -2,6 +2,20 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.2...v1.29.0-develop.3) (2026-03-09)
+
+
+### Bug Fixes
+
+* multi-agent.sh update_config_atomic 参数顺序修正 ([ebff49b](https://github.com/steveoon/agent-computer-user/commit/ebff49bf0bbe72097463d1f3be47ef4a19acfc73))
+* tsconfig-electron 添加 Electron 类型定义，修复 process.resourcesPath 类型错误 ([314094f](https://github.com/steveoon/agent-computer-user/commit/314094f805f7d7038a2dee273d5ff9a74325716c))
+* 全量同步允许部分品牌失败，不再阻断应用使用 ([af86bf0](https://github.com/steveoon/agent-computer-user/commit/af86bf0e1a7e09ae444685c2ff4f83aa23af9c95))
+
+
+### Features
+
+* 区域品牌通过 projectIdList 自动继承父品牌别名 ([a9a3411](https://github.com/steveoon/agent-computer-user/commit/a9a34111d1b3f343728febc9ab7f535ef794f681))
+
 # [1.29.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.1...v1.29.0-develop.2) (2026-03-09)
 
 
