@@ -359,7 +359,7 @@ EOF
 )
 
         # 添加到配置文件
-        if ! update_config_atomic --argjson new_agent "$new_agent" '.agents += [$new_agent]'; then
+        if ! update_config_atomic '.agents += [$new_agent]' --argjson new_agent "$new_agent"; then
             log_error "更新配置文件失败"
             exit 1
         fi
@@ -928,7 +928,7 @@ cmd_remove() {
     cmd_stop "$target_id"
 
     # 从配置文件删除
-    if ! update_config_atomic --arg id "$target_id" 'del(.agents[] | select(.id == $id))'; then
+    if ! update_config_atomic 'del(.agents[] | select(.id == $id))' --arg id "$target_id"; then
         log_error "更新配置文件失败"
         exit 1
     fi
