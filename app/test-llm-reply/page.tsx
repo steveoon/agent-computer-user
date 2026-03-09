@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Settings } from "lucide-react";
 import { BrandSelector } from "@/components/brand-selector";
+import { BackButton } from "@/components/ui/back-button";
 import { useBrand } from "@/lib/contexts/brand-context";
 import { clearBrandStorage, getBrandStorageStatus } from "@/lib/utils/brand-storage";
 import { useModelConfig } from "@/lib/stores/model-config-store";
@@ -228,9 +229,12 @@ export default function TestLLMReplyPage() {
       <div className="relative z-10 container mx-auto p-6 max-w-5xl space-y-6">
         {/* 头部标题区 */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">智能回复测试</h1>
-            <p className="text-muted-foreground">测试AI对求职者消息的理解与自动回复生成</p>
+          <div className="flex items-center gap-3">
+            <BackButton href="/" />
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">智能回复测试</h1>
+              <p className="text-muted-foreground">测试AI对求职者消息的理解与自动回复生成</p>
+            </div>
           </div>
           <div className="flex items-center bg-white/60 backdrop-blur-md rounded-xl border border-white/40 shadow-sm p-1 gap-1">
             <div className="flex items-center px-3 py-1.5 gap-2 border-r border-black/5">

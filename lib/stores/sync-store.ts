@@ -286,15 +286,15 @@ export const useSyncStore = create<SyncState>()(
             });
           }
 
-          if (needsFullResync && !result.overallSuccess) {
-            const failedBrands = result.results
-              .filter(r => !r.success)
-              .map(r => r.brandName || "未知品牌");
-            const message =
-              failedBrands.length > 0
-                ? `全量重同步要求所有品牌成功，本次失败 ${failedBrands.length} 个品牌：${failedBrands.slice(0, 3).join("、")}${failedBrands.length > 3 ? "..." : ""}`
-                : "全量重同步要求所有品牌成功，但本次同步未全部完成";
-            throw new Error(message);
+          // 全量重同步：允许部分成功，失败品牌可后续单独重试
+          const successfulResults = result.results.filter(r => r.success);
+          const failedResults = result.results.filter(r => !r.success);
+
+          if (needsFullResync && successfulResults.length === 0) {
+            const failedBrands = failedResults.map(r => r.brandName || "未知品牌");
+            throw new Error(
+              `全量重同步失败，所有 ${failedBrands.length} 个品牌均未成功：${failedBrands.slice(0, 3).join("、")}${failedBrands.length > 3 ? "..." : ""}`
+            );
           }
 
           // 处理转换后的数据并保存到本地配置
@@ -339,8 +339,16 @@ export const useSyncStore = create<SyncState>()(
             overallProgress: 100,
           });
 
-          if (needsFullResync && result.overallSuccess) {
+          if (needsFullResync && successfulResults.length > 0) {
             get().clearMigrationBlocked();
+
+            if (failedResults.length > 0) {
+              const failedBrands = failedResults.map(r => r.brandName || "未知品牌");
+              toast.warning("全量同步部分完成", {
+                description: `${successfulResults.length} 个品牌已同步，${failedBrands.length} 个失败：${failedBrands.slice(0, 3).join("、")}${failedBrands.length > 3 ? "..." : ""}。失败品牌可在同步管理页面单独重试。`,
+                duration: 10000,
+              });
+            }
           }
 
           // 刷新历史记录

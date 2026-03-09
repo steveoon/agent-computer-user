@@ -58,7 +58,7 @@ export function ConfigInitializer() {
           </div>
           <p className="mt-3 text-sm text-muted-foreground">
             {migrationBlockReason ||
-              "检测到旧版本配置，需要完成全量同步后才能继续使用。"}
+              "检测到旧版本配置，需要完成全量同步后才能继续使用。部分品牌失败不会阻断使用，可后续单独重试。"}
           </p>
           <div className="mt-5 flex flex-col gap-2">
             <Button onClick={handleResetAndSync} disabled={isSyncing}>
