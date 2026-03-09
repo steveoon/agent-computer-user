@@ -1,6 +1,7 @@
 import { spawn, ChildProcess, execSync } from "child_process";
 import fs from "fs";
 import path from "path";
+import { app } from "electron";
 import type { AgentConfig, AppLaunchResult } from "./types";
 import { TIMEOUTS } from "./types";
 
@@ -299,14 +300,14 @@ export class AppLauncher {
    * 1. Explicit env override
    * 2. Agent runtime node_modules
    * 3. Project root node_modules (development)
-   * 4. Packaged app Resources/app/node_modules
+   * 4. Packaged app appPath/node_modules
    */
   private resolvePlaywrightMcpCliPath(runtimeDir: string): string | null {
     const candidates = [
       process.env.PLAYWRIGHT_MCP_CLI_PATH,
       path.join(runtimeDir, "node_modules", "@playwright", "mcp", "cli.js"),
       path.join(process.cwd(), "node_modules", "@playwright", "mcp", "cli.js"),
-      path.join(process.resourcesPath, "app", "node_modules", "@playwright", "mcp", "cli.js"),
+      path.join(app.getAppPath(), "node_modules", "@playwright", "mcp", "cli.js"),
     ];
 
     for (const candidate of candidates) {
