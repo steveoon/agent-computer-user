@@ -262,6 +262,9 @@ importers:
       electron-builder:
         specifier: ^26.4.0
         version: 26.4.0(electron-builder-squirrel-windows@26.4.0)
+      esbuild:
+        specifier: ^0.25.6
+        version: 0.25.6
       eslint:
         specifier: ^9
         version: 9.22.0(jiti@2.4.2)
