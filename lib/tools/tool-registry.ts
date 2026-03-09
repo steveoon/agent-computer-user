@@ -5,7 +5,6 @@
 
 import { bashTool, computerTool } from "@/lib/e2b/tool";
 import { feishuBotTool } from "./feishu-bot-tool";
-import { puppeteerTool } from "./puppeteer-tool";
 import { analyzeScreenshotTool } from "./analyze-screenshot.tool";
 import { screenshotTool } from "./screenshot.tool";
 import { weChatBotTool } from "./wechat-bot-tool";
@@ -18,8 +17,14 @@ import { dulidayJobDetailsTool } from "./duliday/duliday-job-details-tool";
 import { dulidayInterviewBookingTool } from "./duliday/duliday-interview-booking-tool";
 import { dulidayBiReportTool } from "./duliday/bi-report-tool";
 import { dulidayBiRefreshTool } from "./duliday/bi-refresh-tool";
+import { dulidayJobListForLlmTool } from "./duliday-job-list-for-llm.tool";
+import { createWeworkPlanTurnTool } from "./wework/plan_turn.tool";
+import { replyPolicyReadTool } from "./reply-policy/reply-policy-read-tool";
+import { replyPolicyAskTool } from "./reply-policy/reply-policy-ask-tool";
+import { replyPolicySaveTool } from "./reply-policy/reply-policy-save-tool";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import { ZhipinDataSchema } from "@/types/zhipin";
+import { ReplyPolicyConfigSchema, StageGoalsSchema } from "@/types/reply-policy";
 
 // Import types from centralized location
 import type {
@@ -54,7 +59,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
         ctx.preferredBrand || "",
         ctx.modelConfig || DEFAULT_MODEL_CONFIG,
         ctx.configData,
-        ctx.replyPrompts,
+        ctx.replyPolicy,
         ctx.defaultWechatId
       );
     },
@@ -100,30 +105,25 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     description: "智聘智能回复生成器",
     category: "business",
     requiresSandbox: false,
-    requiredContext: ["configData", "replyPrompts"],
+    requiredContext: ["configData", "replyPolicy"],
     contextSchemas: {
       configData: ZhipinDataSchema,
+      replyPolicy: ReplyPolicyConfigSchema,
     },
     create: ctx =>
       zhipinReplyTool(
         ctx.preferredBrand,
         ctx.modelConfig || DEFAULT_MODEL_CONFIG,
         ctx.configData,
-        ctx.replyPrompts,
+        ctx.replyPolicy,
         ctx.defaultWechatId,
-        ctx.brandPriorityStrategy
+        ctx.brandPriorityStrategy,
+        ctx.industryVoiceId,
+        ctx.channelType
       ),
   }),
 
   // ===== 自动化工具 =====
-  puppeteer: createToolDefinition({
-    name: "puppeteer",
-    description: "Puppeteer浏览器自动化工具",
-    category: "automation",
-    requiresSandbox: false,
-    create: () => puppeteerTool(),
-  }),
-
   analyze_screenshot: createToolDefinition({
     name: "analyze_screenshot",
     description: "截图分析工具，使用AI分析截图内容",
@@ -134,7 +134,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
 
   screenshot: createToolDefinition({
     name: "screenshot",
-    description: "统一截图工具，支持Puppeteer和Playwright双后端",
+    description: "Playwright浏览器截图工具",
     category: "automation",
     requiresSandbox: false,
     create: () => screenshotTool(),
@@ -337,6 +337,52 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     requiresSandbox: false,
     create: () => dulidayBiRefreshTool(),
   }),
+
+  duliday_job_list_for_llm: createToolDefinition({
+    name: "duliday_job_list_for_llm",
+    description: "查询在招岗位列表（LLM优化格式），返回 Markdown 格式化的岗位信息，包含薪资、招聘要求、工作时间、面试安排等完整信息，适用于自动回复求职者场景",
+    category: "business",
+    requiresSandbox: false,
+    requiredContext: ["dulidayToken"],
+    create: ctx => dulidayJobListForLlmTool(ctx.dulidayToken, ctx.onJobsFetched),
+  }),
+
+  wework_plan_turn: createToolDefinition({
+    name: "wework_plan_turn",
+    description: "企微智能化：识别当前对话阶段、检测回复需求、标记风险因子，并返回当前阶段的运营目标配置",
+    category: "business",
+    requiresSandbox: false,
+    requiredContext: ["stageGoals"],
+    contextSchemas: {
+      stageGoals: StageGoalsSchema,
+    },
+    create: ctx => ctx.stageGoals ? createWeworkPlanTurnTool(ctx.stageGoals, ctx.modelConfig?.classifyModel, ctx.processedMessages, ctx.channelType) : null,
+  }),
+
+  // ===== 策略配置工具 =====
+  reply_policy_read: createToolDefinition({
+    name: "reply_policy_read",
+    description: "读取当前回复策略配置",
+    category: "business",
+    requiresSandbox: false,
+    create: ctx => replyPolicyReadTool(ctx.replyPolicyDraftContext, ctx.replyPolicy),
+  }),
+
+  reply_policy_ask: createToolDefinition({
+    name: "reply_policy_ask",
+    description: "策略配置引导提问（HITL）",
+    category: "business",
+    requiresSandbox: false,
+    create: () => replyPolicyAskTool(),
+  }),
+
+  reply_policy_save: createToolDefinition({
+    name: "reply_policy_save",
+    description: "保存回复策略配置",
+    category: "business",
+    requiresSandbox: false,
+    create: ctx => replyPolicySaveTool(ctx.replyPolicyDraftContext),
+  }),
 };
 
 // ========== 工具分组配置 ==========
@@ -348,6 +394,7 @@ export const OPEN_API_PROMPT_TYPES = [
   "bossZhipinSystemPrompt",
   "bossZhipinLocalSystemPrompt",
   "generalComputerSystemPrompt",
+  "weworkSystemPrompt",
 ] as const;
 
 export type OpenApiPromptType = typeof OPEN_API_PROMPT_TYPES[number];
@@ -372,16 +419,19 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "duliday_interview_booking",
     "duliday_bi_report",
     "duliday_bi_refresh",
+    // 策略配置
+    "reply_policy_read",
+    "reply_policy_ask",
+    "reply_policy_save",
   ],
 
-  // Boss直聘本地版 - 使用Puppeteer自动化
+  // Boss直聘本地版 - 使用Playwright自动化
   bossZhipinLocalSystemPrompt: [
     // 通用工具
     "bash",
     "feishu",
     "wechat",
     // 自动化工具
-    "puppeteer",
     "screenshot",
     "analyze_screenshot",
     // 业务工具
@@ -413,9 +463,19 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "yupao_get_username",
     "yupao_get_candidate_list",
     "yupao_say_hello",
+    // 策略配置
+    "reply_policy_read",
+    "reply_policy_ask",
+    "reply_policy_save",
   ],
 
-  // 通用计算机使用 - 包含E2B和Puppeteer，但不包含Boss直聘业务工具
+  // 企微智能化 - 对话阶段规划 + 岗位信息（事实提取已移至预处理器）
+  weworkSystemPrompt: [
+    "wework_plan_turn",
+    "duliday_job_list_for_llm",
+  ],
+
+  // 通用计算机使用 - 包含E2B和Playwright，但不包含Boss直聘业务工具
   generalComputerSystemPrompt: [
     // 通用工具
     "bash",
@@ -424,9 +484,12 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     // 沙盒工具
     "computer",
     // 自动化工具
-    "puppeteer",
     "screenshot",
     "analyze_screenshot",
+    // 策略配置
+    "reply_policy_read",
+    "reply_policy_ask",
+    "reply_policy_save",
   ],
 };
 

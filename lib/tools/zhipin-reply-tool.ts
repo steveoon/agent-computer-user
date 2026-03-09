@@ -1,14 +1,20 @@
 import { tool } from "ai";
-import { z } from 'zod/v3';
+import { z } from "zod/v3";
 import { loadZhipinData } from "@/lib/loaders/zhipin-data.loader";
 import { generateSmartReply } from "@/lib/agents";
 import type { StoreWithDistance } from "@/types/geocoding";
 import type { ZhipinData, MessageClassification } from "@/types/zhipin";
-import type { ReplyPromptsConfig, BrandPriorityStrategy } from "@/types/config";
+import type { ReplyPolicyConfig, BrandPriorityStrategy } from "@/types/config";
 import type { ModelConfig } from "@/lib/config/models";
 import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
 import { CandidateInfoSchema } from "@/lib/tools/zhipin/types";
 import type { SafeGenerateTextUsage } from "@/lib/ai";
+import type { TurnPlan } from "@/types/reply-policy";
+import type {
+  AgeEligibilityAppliedStrategy,
+  AgeEligibilityStatus,
+  AgeEligibilitySummary,
+} from "@/lib/services/eligibility/age-eligibility";
 
 /**
  * 调试信息类型
@@ -17,7 +23,12 @@ type ReplyDebugInfo = {
   relevantStores: StoreWithDistance[];
   storeCount: number;
   detailLevel: string;
+  turnPlan: TurnPlan;
+  aliasLookupError?: string;
   classification: MessageClassification;
+  gateStatus: AgeEligibilityStatus;
+  appliedStrategy: AgeEligibilityAppliedStrategy;
+  ageRangeSummary: AgeEligibilitySummary;
 };
 
 /**
@@ -25,7 +36,10 @@ type ReplyDebugInfo = {
  */
 type ZhipinReplyToolResult = {
   reply: string;
-  replyType: string;
+  stage: TurnPlan["stage"];
+  subGoals: string[];
+  needs: TurnPlan["needs"];
+  riskFlags: TurnPlan["riskFlags"];
   reasoningText: string;
   candidateMessage: string;
   historyCount: number;
@@ -55,7 +69,7 @@ type ZhipinReplyToolResult = {
  * - 🤖 根据候选人消息生成智能回复
  * - 📝 支持对话历史上下文
  * - 🏢 多品牌支持
- * - 🎯 16种回复场景分类
+ * - 🎯 FunnelStage 阶段规划 + Needs 按需取事实
  * - 💬 自然语言生成
  *
  * 使用场景：
@@ -68,9 +82,11 @@ export const zhipinReplyTool = (
   preferredBrand?: string,
   modelConfig?: ModelConfig,
   configData?: ZhipinData,
-  replyPrompts?: ReplyPromptsConfig,
+  replyPolicy?: ReplyPolicyConfig,
   defaultWechatId?: string,
-  brandPriorityStrategy?: BrandPriorityStrategy
+  brandPriorityStrategy?: BrandPriorityStrategy,
+  industryVoiceId?: string,
+  channelType?: "public" | "private"
 ) => {
   // 注意：configData 的验证在工具创建时完成（通过 contextSchemas）
   // 执行时只关注业务逻辑验证
@@ -82,12 +98,12 @@ export const zhipinReplyTool = (
       主要功能：
       - 根据候选人消息内容智能生成回复
       - 支持多轮对话历史上下文
-      - 自动识别16种回复场景（招聘类10种+考勤类6种）
+      - 自动输出回合规划（stage/subGoals/needs/riskFlags）
       - 支持多品牌门店数据
       - 自然语言生成，符合人工回复风格
       
       适用场景：
-      - 本地浏览器自动化（puppeteer等）需要生成回复内容时
+      - 本地浏览器自动化（Playwright等）需要生成回复内容时
       - 批量处理候选人咨询
       - 招聘聊天机器人
     `,
@@ -107,7 +123,7 @@ export const zhipinReplyTool = (
         .string()
         .optional()
         .describe(
-          "从聊天详情中获取品牌名称，Boss直聘和鱼泡直聘可以根据招聘或应聘的岗位内容来获取，如果不指定则使用默认品牌"
+          "从沟通职位中提取品牌名称（如'深圳kfc-周结兼职'→'深圳kfc'，'肯德基-全职服务员'→'肯德基'）。必须保留城市前缀，因为'深圳肯德基'和'肯德基'是不同品牌、不同门店数据。如果不指定则使用默认品牌"
         ),
 
       include_stats: z
@@ -169,9 +185,11 @@ export const zhipinReplyTool = (
             providerConfigs: effectiveProviderConfigs,
           },
           configData: effectiveConfigData,
-          replyPrompts,
+          replyPolicy,
           candidateInfo: candidate_info,
           defaultWechatId,
+          industryVoiceId,
+          channelType,
         });
 
         // 检查是否有错误
@@ -179,8 +197,11 @@ export const zhipinReplyTool = (
           console.error(`❌ 回复生成失败: ${replyResult.error.userMessage}`);
           return {
             reply: "",
-            replyType: replyResult.classification.replyType,
-            reasoningText: replyResult.classification.reasoningText || "生成失败",
+            stage: replyResult.turnPlan.stage,
+            subGoals: replyResult.turnPlan.subGoals,
+            needs: replyResult.turnPlan.needs,
+            riskFlags: replyResult.turnPlan.riskFlags,
+            reasoningText: replyResult.turnPlan.reasoningText || "生成失败",
             candidateMessage: candidate_message,
             historyCount: processedHistory.length,
             debugInfo: replyResult.debugInfo,
@@ -195,14 +216,17 @@ export const zhipinReplyTool = (
 
         console.log(`✅ 回复生成成功`);
         console.log(`📝 回复内容: ${replyResult.suggestedReply}`);
-        console.log(`🎯 回复类型: ${replyResult.classification.replyType}`);
-        console.log(`📊 分类依据: ${replyResult.classification.reasoningText}`);
+        console.log(`🎯 阶段: ${replyResult.turnPlan.stage}`);
+        console.log(`📊 规划依据: ${replyResult.turnPlan.reasoningText}`);
 
         // 构建响应
         const response: ZhipinReplyToolResult = {
           reply: replyResult.suggestedReply,
-          replyType: replyResult.classification.replyType,
-          reasoningText: replyResult.classification.reasoningText || "未提供分类依据",
+          stage: replyResult.turnPlan.stage,
+          subGoals: replyResult.turnPlan.subGoals,
+          needs: replyResult.turnPlan.needs,
+          riskFlags: replyResult.turnPlan.riskFlags,
+          reasoningText: replyResult.turnPlan.reasoningText || "未提供规划依据",
           candidateMessage: candidate_message,
           historyCount: processedHistory.length,
           debugInfo: replyResult.debugInfo,
@@ -233,16 +257,13 @@ export const zhipinReplyTool = (
       }
     },
 
-    toModelOutput(
-      {
-        output
-      }
-    ) {
+    toModelOutput({ output }) {
       // 检查是否有错误
       if (output.error) {
-        const content = `❌ 智能回复生成失败\n\n` +
+        const content =
+          `❌ 智能回复生成失败\n\n` +
           `🔴 错误: ${output.error.userMessage}\n` +
-          `🎯 回复类型: ${output.replyType}\n` +
+          `🎯 阶段: ${output.stage}\n` +
           `💬 候选人消息: "${output.candidateMessage}"`;
         return {
           type: "content" as const,
@@ -253,7 +274,10 @@ export const zhipinReplyTool = (
       // 格式化成功输出结果
       let content = `✅ 智能回复已生成\n\n`;
       content += `📝 回复内容:\n"${output.reply}"\n\n`;
-      content += `🎯 回复类型: ${output.replyType}\n`;
+      content += `🎯 阶段: ${output.stage}\n`;
+      content += `🧭 子目标: ${output.subGoals?.join("、") || "无"}\n`;
+      content += `📌 Needs: ${output.needs?.join("、") || "none"}\n`;
+      content += `⚠️ 风险标记: ${output.riskFlags?.join("、") || "无"}\n`;
       content += `💬 候选人消息: "${output.candidateMessage}"\n`;
       content += `📋 历史记录: ${output.historyCount}条\n`;
 
@@ -289,7 +313,7 @@ export const zhipinReplyTool = (
  * @param preferredBrand 优先使用的品牌
  * @param modelConfig 模型配置
  * @param configData 配置数据
- * @param replyPrompts 回复提示词
+ * @param replyPolicy 回复策略
  * @returns 智能回复工具实例
  */
 export const createZhipinReplyTool = zhipinReplyTool;

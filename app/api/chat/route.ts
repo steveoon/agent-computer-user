@@ -18,6 +18,7 @@ import { APPROVAL, executeBashCommandLocally } from "@/lib/utils/hitl-utils";
 import type { ChatRequestBody } from "@/types";
 import { SourcePlatform, ApiSource } from "@/db/types";
 import { parseAISDKError, toError } from "@/lib/errors/error-utils";
+import { createReplyPolicyDraftContext } from "@/lib/tools/reply-policy/reply-policy-draft-context";
 import {
   recruitmentContext,
   processStepToolResults,
@@ -154,7 +155,8 @@ export async function POST(req: Request) {
     modelConfig,
     configData,
     systemPrompts,
-    replyPrompts,
+    replyPolicy,
+    industryVoiceId,
     activeSystemPrompt,
     dulidayToken,
     defaultWechatId,
@@ -219,6 +221,12 @@ export async function POST(req: Request) {
         }),
       ]);
 
+      const replyPolicyDraftContext = createReplyPolicyDraftContext({
+        initialPolicy: replyPolicy,
+        historyMessages: messages,
+        modelVisibleMessages: processedMessages,
+      });
+
       // 估算消息大小并记录优化效果
       const originalSize = JSON.stringify(messages).length;
       const processedSize = JSON.stringify(processedMessages).length;
@@ -240,7 +248,9 @@ export async function POST(req: Request) {
           brandPriorityStrategy,
           modelConfig,
           configData,
-          replyPrompts,
+          replyPolicy,
+          replyPolicyDraftContext,
+          industryVoiceId,
           dulidayToken,
           defaultWechatId,
         },

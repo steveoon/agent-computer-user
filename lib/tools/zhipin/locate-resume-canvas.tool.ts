@@ -1,6 +1,6 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
-import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
+import { playwrightEvaluate, selectZhipinTab } from "@/lib/tools/shared/playwright-utils";
 import { wrapAntiDetectionScript, randomDelay } from "./anti-detection-utils";
 import type { AutomationResult } from "./types";
 
@@ -45,29 +45,6 @@ export interface CanvasPositionInfo {
   debugInfo?: CanvasDebugInfo;
   markerAdded: boolean;
   note: string;
-}
-
-/**
- * 解析 puppeteer_evaluate 的结果
- */
-function parseEvaluateResult(result: unknown): unknown {
-  try {
-    const mcpResult = result as { content?: Array<{ text?: string }> };
-    if (mcpResult?.content?.[0]?.text) {
-      const resultText = mcpResult.content[0].text;
-      const executionMatch = resultText.match(
-        /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
-      );
-
-      if (executionMatch && executionMatch[1].trim() !== "undefined") {
-        const jsonResult = executionMatch[1].trim();
-        return JSON.parse(jsonResult);
-      }
-    }
-  } catch (e) {
-    console.error("Failed to parse evaluate result:", e);
-  }
-  return null;
 }
 
 /**
@@ -129,15 +106,8 @@ export const zhipinLocateResumeCanvasTool = () =>
       clearExistingMarkers = true,
     }): Promise<AutomationResult<CanvasPositionInfo>> => {
       try {
-        const client = await getPuppeteerMCPClient();
-        const tools = await client.tools();
-
-        // 检查必需的工具
-        if (!tools.puppeteer_evaluate) {
-          throw new Error("Required MCP tool puppeteer_evaluate not available");
-        }
-
-        const puppeteerEvaluate = tools.puppeteer_evaluate;
+        // 确保在正确的标签页
+        await selectZhipinTab();
 
         // 初始延迟
         await randomDelay(300, 500);
@@ -151,7 +121,7 @@ export const zhipinLocateResumeCanvasTool = () =>
             return { cleared: existingMarkers.length };
           `);
 
-          await puppeteerEvaluate.execute({ script: clearScript });
+          await playwrightEvaluate(clearScript);
         }
 
         // 主要的Canvas定位脚本（包含轮询等待）
@@ -382,8 +352,7 @@ export const zhipinLocateResumeCanvasTool = () =>
           })();
         `);
 
-        const result = await puppeteerEvaluate.execute({ script: locateCanvasScript });
-        const positionData = parseEvaluateResult(result) as
+        const positionData = await playwrightEvaluate(locateCanvasScript) as
           | (CanvasPositionInfo & { success: boolean })
           | { error: string }
           | null;

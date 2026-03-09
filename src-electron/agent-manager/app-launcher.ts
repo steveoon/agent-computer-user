@@ -1,6 +1,7 @@
 import { spawn, ChildProcess, execSync } from "child_process";
 import fs from "fs";
 import path from "path";
+import { app } from "electron";
 import type { AgentConfig, AppLaunchResult } from "./types";
 import { TIMEOUTS } from "./types";
 
@@ -53,6 +54,7 @@ export class AppLauncher {
 
     // Step 3: Load environment variables from .env files
     const envVars = this.loadEnvFiles(runtimeDir);
+    const playwrightMcpCliPath = this.resolvePlaywrightMcpCliPath(runtimeDir);
 
     // Step 4: Build process environment
     const processEnv: NodeJS.ProcessEnv = {
@@ -63,6 +65,7 @@ export class AppLauncher {
       HOSTNAME: "0.0.0.0",
       CHROME_REMOTE_DEBUGGING_PORT: String(chromePort),
       AGENT_ID: id,
+      PLAYWRIGHT_MCP_CLI_PATH: playwrightMcpCliPath || process.env.PLAYWRIGHT_MCP_CLI_PATH,
       // Add any custom env from agent config
       ...agent.env,
     };
@@ -289,6 +292,31 @@ export class AppLauncher {
       // Fall back to assuming node is in PATH
       return "node";
     }
+  }
+
+  /**
+   * Resolve local Playwright MCP CLI path for agent runtime.
+   * Priority:
+   * 1. Explicit env override
+   * 2. Agent runtime node_modules
+   * 3. Project root node_modules (development)
+   * 4. Packaged app appPath/node_modules
+   */
+  private resolvePlaywrightMcpCliPath(runtimeDir: string): string | null {
+    const candidates = [
+      process.env.PLAYWRIGHT_MCP_CLI_PATH,
+      path.join(runtimeDir, "node_modules", "@playwright", "mcp", "cli.js"),
+      path.join(process.cwd(), "node_modules", "@playwright", "mcp", "cli.js"),
+      path.join(app.getAppPath(), "node_modules", "@playwright", "mcp", "cli.js"),
+    ];
+
+    for (const candidate of candidates) {
+      if (candidate && fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    return null;
   }
 
   /**

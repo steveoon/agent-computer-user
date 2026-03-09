@@ -1,11 +1,9 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
-import { getPuppeteerMCPClient, getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
+import { getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
 import {
-  wrapAntiDetectionScript,
   randomDelay,
   humanDelay,
-  performRandomScroll,
   shouldAddRandomBehavior,
 } from "./anti-detection-utils";
 import { SourcePlatform } from "@/db/types";
@@ -17,9 +15,6 @@ import {
   type TabSelectionResult,
 } from "@/lib/tools/shared/playwright-utils";
 
-// Feature flag: 使用 Playwright MCP 而非 Puppeteer MCP
-const USE_PLAYWRIGHT_MCP = process.env.USE_PLAYWRIGHT_MCP === "true";
-
 /**
  * Zhipin打招呼结果类型
  */
@@ -30,29 +25,6 @@ export interface ZhipinSayHelloResult {
   message?: string;
   error?: string;
   timestamp: string;
-}
-
-/**
- * 解析 puppeteer_evaluate 的结果
- */
-function parseEvaluateResult(result: unknown): unknown {
-  try {
-    const mcpResult = result as { content?: Array<{ text?: string }> };
-    if (mcpResult?.content?.[0]?.text) {
-      const resultText = mcpResult.content[0].text;
-      const executionMatch = resultText.match(
-        /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
-      );
-
-      if (executionMatch && executionMatch[1].trim() !== "undefined") {
-        const jsonResult = executionMatch[1].trim();
-        return JSON.parse(jsonResult);
-      }
-    }
-  } catch (e) {
-    console.error("Failed to parse evaluate result:", e);
-  }
-  return null;
 }
 
 /**
@@ -76,7 +48,7 @@ export const zhipinSayHelloSimpleTool = () =>
     - 系统会自动发送默认的招呼语
     - 支持批量打招呼（依次点击多个候选人）
     - 包含反爬虫策略和人性化操作
-    ${USE_PLAYWRIGHT_MCP ? "- [Playwright] 支持自动切换到Boss直聘标签页" : ""}
+    - [Playwright] 支持自动切换到Boss直聘标签页
 
     注意：
     - 需要在候选人列表页面使用
@@ -110,14 +82,14 @@ export const zhipinSayHelloSimpleTool = () =>
       candidateIndices,
       delayBetweenClicksMin = 2000,
       delayBetweenClicksMax = 4000,
-      scrollBehavior = true,
+      scrollBehavior: _scrollBehavior = true,
       autoSwitchTab = true,
     }) => {
       try {
-        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
+        const mcpBackend = "playwright" as const;
 
-        // Playwright 模式: 自动切换到Boss直聘标签页
-        if (USE_PLAYWRIGHT_MCP && autoSwitchTab) {
+        // 自动切换到Boss直聘标签页
+        if (autoSwitchTab) {
           console.log("[Playwright] 正在切换到Boss直聘标签页...");
           const tabResult: TabSelectionResult = await selectZhipinTab();
 
@@ -133,24 +105,17 @@ export const zhipinSayHelloSimpleTool = () =>
           console.log(`[Playwright] 已切换到: ${tabResult.tab?.title} (${tabResult.tab?.url})`);
         }
 
-        // 获取适当的 MCP 客户端
-        const client = USE_PLAYWRIGHT_MCP
-          ? await getPlaywrightMCPClient()
-          : await getPuppeteerMCPClient();
+        // 获取 Playwright MCP 客户端
+        const client = await getPlaywrightMCPClient();
 
         const tools = await client.tools();
 
-        // 根据 MCP 类型选择工具名称
-        const evaluateToolName = USE_PLAYWRIGHT_MCP ? "browser_evaluate" : "puppeteer_evaluate";
+        const evaluateToolName = "browser_evaluate";
 
         // 检查必需的工具
         if (!tools[evaluateToolName]) {
           throw new Error(
-            `MCP tool ${evaluateToolName} not available. ${
-              USE_PLAYWRIGHT_MCP
-                ? "请确保 Playwright MCP 正在运行且已连接浏览器。"
-                : "请确保 Puppeteer MCP 正在运行。"
-            }`
+            `MCP tool ${evaluateToolName} not available. 请确保 Playwright MCP 正在运行且已连接浏览器。`
           );
         }
 
@@ -159,18 +124,10 @@ export const zhipinSayHelloSimpleTool = () =>
 
         // 辅助函数：执行脚本
         const executeScript = async (scriptContent: string) => {
-          const script = USE_PLAYWRIGHT_MCP
-            ? wrapPlaywrightScript(scriptContent)
-            : wrapAntiDetectionScript(scriptContent);
-          const params = USE_PLAYWRIGHT_MCP ? { function: script } : { script };
-          const result = await evaluateTool.execute(params);
-          return USE_PLAYWRIGHT_MCP ? parsePlaywrightResult(result) : parseEvaluateResult(result);
+          const script = wrapPlaywrightScript(scriptContent);
+          const result = await evaluateTool.execute({ function: script });
+          return parsePlaywrightResult(result);
         };
-
-        // 初始延迟 (仅 Puppeteer 模式)
-        if (!USE_PLAYWRIGHT_MCP) {
-          await randomDelay(500, 1000);
-        }
 
         const results: ZhipinSayHelloResult[] = [];
 
@@ -179,16 +136,6 @@ export const zhipinSayHelloSimpleTool = () =>
           const candidateIndex = candidateIndices[i];
 
           try {
-            // 滚动行为 (仅 Puppeteer 模式)
-            if (!USE_PLAYWRIGHT_MCP && scrollBehavior && shouldAddRandomBehavior(0.3)) {
-              await performRandomScroll(client, {
-                minDistance: 100,
-                maxDistance: 300,
-                direction: "down",
-                probability: 0.5,
-              });
-            }
-
             // 查找并点击目标按钮的脚本内容
             const clickScriptContent = `
               // 首先尝试获取iframe
@@ -531,12 +478,11 @@ export const zhipinSayHelloSimpleTool = () =>
           mcpBackend,
         };
       } catch (error) {
-        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
         return {
           success: false,
           error: error instanceof Error ? error.message : "Unknown error occurred",
           message: "点击打招呼按钮时发生错误",
-          mcpBackend,
+          mcpBackend: "playwright" as const,
         };
       }
     },

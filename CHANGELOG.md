@@ -2,6 +2,128 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.4](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.3...v1.29.0-develop.4) (2026-03-09)
+
+
+### Bug Fixes
+
+* 显式添加 esbuild devDependency，修复 Windows CI 打包失败 ([e814243](https://github.com/steveoon/agent-computer-user/commit/e814243876a642a9072403641dfdfc7485d76080))
+
+# [1.29.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.2...v1.29.0-develop.3) (2026-03-09)
+
+
+### Bug Fixes
+
+* multi-agent.sh update_config_atomic 参数顺序修正 ([ebff49b](https://github.com/steveoon/agent-computer-user/commit/ebff49bf0bbe72097463d1f3be47ef4a19acfc73))
+* tsconfig-electron 添加 Electron 类型定义，修复 process.resourcesPath 类型错误 ([314094f](https://github.com/steveoon/agent-computer-user/commit/314094f805f7d7038a2dee273d5ff9a74325716c))
+* 全量同步允许部分品牌失败，不再阻断应用使用 ([af86bf0](https://github.com/steveoon/agent-computer-user/commit/af86bf0e1a7e09ae444685c2ff4f83aa23af9c95))
+
+
+### Features
+
+* 区域品牌通过 projectIdList 自动继承父品牌别名 ([a9a3411](https://github.com/steveoon/agent-computer-user/commit/a9a34111d1b3f343728febc9ab7f535ef794f681))
+
+# [1.29.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.1...v1.29.0-develop.2) (2026-03-09)
+
+
+### Bug Fixes
+
+* **duliday:** 门店名模糊匹配回退 & 会话记忆字段标签 ([8b7d43d](https://github.com/steveoon/agent-computer-user/commit/8b7d43d9a6c58683bf15f8a8f3691555b787b180))
+* **lint:** suppress no-explicit-any errors and remove unused schema const ([ebab188](https://github.com/steveoon/agent-computer-user/commit/ebab1889b96a85425777ce1e88aa6e4747760175))
+* **test:** align session-memory test assertions with actual output format ([ccccc1c](https://github.com/steveoon/agent-computer-user/commit/ccccc1c18ad725473b8e67e0435c59638ea93998))
+* **types:** add MCP SDK subpath type declaration for CI tsc ([51241d4](https://github.com/steveoon/agent-computer-user/commit/51241d4945046d57527e87e914311436923cd150))
+* **wecom:** 冷启动场景同步提取事实，保证首轮即有结构化记忆 ([2566d31](https://github.com/steveoon/agent-computer-user/commit/2566d315cfa45c1b8ca4fb105ec39a54d226723e))
+* 使用 origin/develop 版本恢复 model-registry 文件 ([09a2c76](https://github.com/steveoon/agent-computer-user/commit/09a2c762b8d26fd2762f4c41dc24519504e48db3))
+
+
+### Features
+
+* **duliday:** add duliday_job_list_for_llm tool for WeCom intelligent reply ([a09dcce](https://github.com/steveoon/agent-computer-user/commit/a09dcceb992aeec9e3fd04a3048391319d3391be))
+* **duliday:** implement progressive disclosure for job list tool ([9a0c6cd](https://github.com/steveoon/agent-computer-user/commit/9a0c6cd2d4f9f131692df577fe8307f9d6da2b80))
+* **duliday:** 岗位列表工具支持 responseFormat 按需返回格式 ([1f1d2b4](https://github.com/steveoon/agent-computer-user/commit/1f1d2b4a51ddbe49fc256a74fc9a814c0fe8dd8a))
+* **wecom:** add entity extraction agent with three-tier cache ([13390aa](https://github.com/steveoon/agent-computer-user/commit/13390aaee4744257a197015af8cab8e6e0827616))
+* **wecom:** planTurn 支持 stageGoals 注入，阶段枚举附带 description ([d1e738d](https://github.com/steveoon/agent-computer-user/commit/d1e738dc806adb053ea8176e1085ea2fcbc62abb))
+
+
+### Reverts
+
+* 回滚 PR[#57](https://github.com/steveoon/agent-computer-user/issues/57) 中 MCP SDK .js 后缀移除和 as any 类型绕过 ([7e061e6](https://github.com/steveoon/agent-computer-user/commit/7e061e66044bd6c3c61e901fe84a09744f5b7569))
+* 完全回滚 client-manager.ts 到 develop 状态 ([4e722e8](https://github.com/steveoon/agent-computer-user/commit/4e722e8336df74e74fa66f9aa0f9962176e69558))
+* 完全回滚 model-registry 下两个文件到 develop 状态 ([b9f6229](https://github.com/steveoon/agent-computer-user/commit/b9f62292e5fc2209784dfde1e5bae00a2daeb96e))
+
+# [1.29.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.28.1...v1.29.0-develop.1) (2026-03-06)
+
+
+### Bug Fixes
+
+* **eligibility:** filter duliday job list by brand/city candidates ([e71eb88](https://github.com/steveoon/agent-computer-user/commit/e71eb880455f10c585cadad2b0364deae854d05d))
+* **sync:** support Duliday segmented job list response ([3ca75b5](https://github.com/steveoon/agent-computer-user/commit/3ca75b5001d8871abf948bea198b2aafe684adde))
+* **test-reply:** expose age policy editor and pass brand strategy ([de02776](https://github.com/steveoon/agent-computer-user/commit/de027765effe1d119acd21203f80ec4238372ea3))
+
+
+### Features
+
+* **planning:** channel-aware turn planning with STAGE_DEFINITIONS ([b895fdb](https://github.com/steveoon/agent-computer-user/commit/b895fdbac6d028bfde8ac91dfa3817acb5f1ef02))
+* refactor zhipin reply system with replyPolicy and planning builder ([77298a8](https://github.com/steveoon/agent-computer-user/commit/77298a834343592508db11ebaab17faeac45183e))
+* **reply-policy:** add LLM-guided strategy configuration with HITL tools ([dbe9a5e](https://github.com/steveoon/agent-computer-user/commit/dbe9a5e3f59f824aad2aad7af40d8c5f40aceb93))
+* **replyPolicy:** deterministic age eligibility gate ([1097964](https://github.com/steveoon/agent-computer-user/commit/109796421dd8f5861fa44e7155f95b603577cc1a))
+* **sync:** enforce full-resync gating and migration blocking flow ([193c337](https://github.com/steveoon/agent-computer-user/commit/193c337990db1f1a037f556f7ab7852fa9551e49))
+* **sync:** harden sync pipeline and migrate age-eligibility to new Duliday API ([63c559d](https://github.com/steveoon/agent-computer-user/commit/63c559d7ad31316833c69bf4f602a9203fdafff8))
+* **sync:** migrate job/list payload and enforce cityNameList ([42a465d](https://github.com/steveoon/agent-computer-user/commit/42a465dcf9585d3606629cae2f15b1ec27dc912d))
+
+# [1.29.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.28.1...v1.29.0-develop.1) (2026-03-06)
+
+
+### Bug Fixes
+
+* **eligibility:** filter duliday job list by brand/city candidates ([e71eb88](https://github.com/steveoon/agent-computer-user/commit/e71eb880455f10c585cadad2b0364deae854d05d))
+* **sync:** support Duliday segmented job list response ([3ca75b5](https://github.com/steveoon/agent-computer-user/commit/3ca75b5001d8871abf948bea198b2aafe684adde))
+* **test-reply:** expose age policy editor and pass brand strategy ([de02776](https://github.com/steveoon/agent-computer-user/commit/de027765effe1d119acd21203f80ec4238372ea3))
+
+
+### Features
+
+* **planning:** channel-aware turn planning with STAGE_DEFINITIONS ([b895fdb](https://github.com/steveoon/agent-computer-user/commit/b895fdbac6d028bfde8ac91dfa3817acb5f1ef02))
+* refactor zhipin reply system with replyPolicy and planning builder ([77298a8](https://github.com/steveoon/agent-computer-user/commit/77298a834343592508db11ebaab17faeac45183e))
+* **reply-policy:** add LLM-guided strategy configuration with HITL tools ([dbe9a5e](https://github.com/steveoon/agent-computer-user/commit/dbe9a5e3f59f824aad2aad7af40d8c5f40aceb93))
+* **replyPolicy:** deterministic age eligibility gate ([1097964](https://github.com/steveoon/agent-computer-user/commit/109796421dd8f5861fa44e7155f95b603577cc1a))
+* **sync:** enforce full-resync gating and migration blocking flow ([193c337](https://github.com/steveoon/agent-computer-user/commit/193c337990db1f1a037f556f7ab7852fa9551e49))
+* **sync:** harden sync pipeline and migrate age-eligibility to new Duliday API ([63c559d](https://github.com/steveoon/agent-computer-user/commit/63c559d7ad31316833c69bf4f602a9203fdafff8))
+* **sync:** migrate job/list payload and enforce cityNameList ([42a465d](https://github.com/steveoon/agent-computer-user/commit/42a465dcf9585d3606629cae2f15b1ec27dc912d))
+
+# [1.29.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.28.1...v1.29.0-develop.1) (2026-03-05)
+
+
+### Bug Fixes
+
+* **eligibility:** filter duliday job list by brand/city candidates ([e71eb88](https://github.com/steveoon/agent-computer-user/commit/e71eb880455f10c585cadad2b0364deae854d05d))
+* **sync:** support Duliday segmented job list response ([3ca75b5](https://github.com/steveoon/agent-computer-user/commit/3ca75b5001d8871abf948bea198b2aafe684adde))
+* **test-reply:** expose age policy editor and pass brand strategy ([de02776](https://github.com/steveoon/agent-computer-user/commit/de027765effe1d119acd21203f80ec4238372ea3))
+
+
+### Features
+
+* refactor zhipin reply system with replyPolicy and planning builder ([77298a8](https://github.com/steveoon/agent-computer-user/commit/77298a834343592508db11ebaab17faeac45183e))
+* **reply-policy:** add LLM-guided strategy configuration with HITL tools ([dbe9a5e](https://github.com/steveoon/agent-computer-user/commit/dbe9a5e3f59f824aad2aad7af40d8c5f40aceb93))
+* **replyPolicy:** deterministic age eligibility gate ([1097964](https://github.com/steveoon/agent-computer-user/commit/109796421dd8f5861fa44e7155f95b603577cc1a))
+* **sync:** enforce full-resync gating and migration blocking flow ([193c337](https://github.com/steveoon/agent-computer-user/commit/193c337990db1f1a037f556f7ab7852fa9551e49))
+* **sync:** harden sync pipeline and migrate age-eligibility to new Duliday API ([63c559d](https://github.com/steveoon/agent-computer-user/commit/63c559d7ad31316833c69bf4f602a9203fdafff8))
+* **sync:** migrate job/list payload and enforce cityNameList ([42a465d](https://github.com/steveoon/agent-computer-user/commit/42a465dcf9585d3606629cae2f15b1ec27dc912d))
+
+# [1.29.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.28.1...v1.29.0-develop.1) (2026-02-25)
+
+
+### Bug Fixes
+
+* **eligibility:** filter duliday job list by brand/city candidates ([e71eb88](https://github.com/steveoon/agent-computer-user/commit/e71eb880455f10c585cadad2b0364deae854d05d))
+* **test-reply:** expose age policy editor and pass brand strategy ([de02776](https://github.com/steveoon/agent-computer-user/commit/de027765effe1d119acd21203f80ec4238372ea3))
+
+
+### Features
+
+* refactor zhipin reply system with replyPolicy and planning builder ([77298a8](https://github.com/steveoon/agent-computer-user/commit/77298a834343592508db11ebaab17faeac45183e))
+* **replyPolicy:** deterministic age eligibility gate ([1097964](https://github.com/steveoon/agent-computer-user/commit/109796421dd8f5861fa44e7155f95b603577cc1a))
+
 ## [1.28.1](https://github.com/steveoon/agent-computer-user/compare/v1.28.0...v1.28.1) (2026-02-02)
 
 

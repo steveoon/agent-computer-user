@@ -6,7 +6,12 @@
 import { z } from 'zod/v3';
 import type { UIMessage } from "ai";
 import type { ModelConfig } from "@/lib/config/models";
-import type { ZhipinData, SystemPromptsConfig, ReplyPromptsConfig, BrandPriorityStrategy } from "./index";
+import type {
+  ZhipinData,
+  SystemPromptsConfig,
+  ReplyPolicyConfig,
+  BrandPriorityStrategy,
+} from "./index";
 import type { OpenApiPromptType } from "@/lib/tools/tool-registry";
 import { BrandPriorityStrategySchema } from "./config";
 
@@ -31,7 +36,8 @@ export const ChatRequestBodySchema = z.object({
   modelConfig: z.unknown().optional(), // ModelConfig - 来自 lib/config/models
   configData: z.unknown().optional(), // ZhipinData
   systemPrompts: z.unknown().optional(), // SystemPromptsConfig
-  replyPrompts: z.unknown().optional(), // ReplyPromptsConfig
+  replyPolicy: z.unknown().optional(), // ReplyPolicyConfig
+  industryVoiceId: z.string().optional(),
   activeSystemPrompt: z.string().optional(), // keyof SystemPromptsConfig
   dulidayToken: z.string().optional(),
   defaultWechatId: z.string().optional(), // 默认微信号
@@ -54,7 +60,8 @@ export interface ChatRequestBody {
   modelConfig?: ModelConfig;
   configData?: ZhipinData;
   systemPrompts?: SystemPromptsConfig;
-  replyPrompts?: ReplyPromptsConfig;
+  replyPolicy?: ReplyPolicyConfig;
+  industryVoiceId?: string;
   activeSystemPrompt?: keyof SystemPromptsConfig;
   dulidayToken?: string;
   defaultWechatId?: string; // 默认微信号
@@ -110,7 +117,8 @@ export interface TestLLMReplyRequestBody {
   }>;
   modelConfig?: ModelConfig;
   configData?: ZhipinData;
-  replyPrompts?: ReplyPromptsConfig;
+  replyPolicy?: ReplyPolicyConfig;
+  industryVoiceId?: string;
 }
 
 /**
@@ -287,15 +295,15 @@ export const OpenChatRequestSchema = z.object({
   // 系统提示词
   systemPrompt: z.string().optional().describe("直接指定系统提示词，优先级高于 promptType"),
   promptType: z
-    .enum(["bossZhipinSystemPrompt", "bossZhipinLocalSystemPrompt", "generalComputerSystemPrompt"])
+    .enum(["bossZhipinSystemPrompt", "bossZhipinLocalSystemPrompt", "generalComputerSystemPrompt", "weworkSystemPrompt"])
     .optional()
     .describe(
-      `系统提示词类型，从 context.systemPrompts 中查找。可选值: bossZhipinSystemPrompt, bossZhipinLocalSystemPrompt, generalComputerSystemPrompt`
+      `系统提示词类型，从 context.systemPrompts 中查找。可选值: bossZhipinSystemPrompt, bossZhipinLocalSystemPrompt, generalComputerSystemPrompt, weworkSystemPrompt`
     ),
 
   // 工具控制
   allowedTools: z.array(z.string()).optional().describe("允许使用的工具名称列表"),
-  toolContext: z.record(z.string(), z.unknown()).optional().describe("工具特定上下文"),
+  toolContext: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe("工具特定上下文，键为工具名，值为该工具的上下文覆盖"),
   contextStrategy: z
     .enum(["error", "skip", "report"])
     .optional()
@@ -313,12 +321,25 @@ export const OpenChatRequestSchema = z.object({
       modelConfig: z.unknown().optional(),
       configData: z.unknown().optional(),
       systemPrompts: z.record(z.string(), z.string()).optional().describe("系统提示词映射"),
-      replyPrompts: z.unknown().optional(),
+      replyPolicy: z.unknown().optional(),
+      industryVoiceId: z.string().optional(),
       dulidayToken: z.string().optional(),
       defaultWechatId: z.string().optional(),
+      userId: z.string().optional(),
+      sessionId: z.string().optional(),
+      channelType: z.enum(["public", "private"]).optional(),
     })
     .optional()
     .describe("全局上下文"),
+
+  // 推理思考（仅 Anthropic Claude 3.7+ 模型）
+  thinking: z
+    .object({
+      type: z.enum(["enabled", "disabled"]).default("enabled"),
+      budgetTokens: z.number().min(1024).max(128000).default(8192),
+    })
+    .optional()
+    .describe("启用模型推理思考过程（仅 Anthropic Claude 3.7+ 支持）"),
 
   // 验证模式
   validateOnly: z.boolean().optional().default(false).describe("仅验证，不执行"),
@@ -366,9 +387,19 @@ export interface OpenChatRequest {
     modelConfig?: ModelConfig;
     configData?: ZhipinData;
     systemPrompts?: Record<string, string>;
-    replyPrompts?: ReplyPromptsConfig;
+    replyPolicy?: ReplyPolicyConfig;
+    industryVoiceId?: string;
     dulidayToken?: string;
     defaultWechatId?: string;
+    userId?: string;
+    sessionId?: string;
+    channelType?: "public" | "private";
+  };
+
+  // 推理思考
+  thinking?: {
+    type: "enabled" | "disabled";
+    budgetTokens: number;
   };
 
   // 验证模式

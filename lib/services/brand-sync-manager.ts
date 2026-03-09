@@ -1,15 +1,21 @@
 import { getAvailableBrands } from "@/actions/brand-mapping";
 import { configService } from "@/lib/services/config.service";
+import { consumeNdjsonStream } from "@/lib/utils/ndjson-stream";
+import { createSyncStreamHandler } from "@/lib/utils/sync-stream";
 
 // 从统一类型文件导入（Schema-First 原则）
 import type { SyncRecord } from "@/types/duliday-sync";
-import { SyncResponseSchema, SyncStreamMessageSchema } from "@/types/duliday-sync";
+import { SyncResponseSchema } from "@/types/duliday-sync";
 
 /**
  * 品牌同步管理器
  * 确保数据库中的所有品牌都被同步到本地 IndexedDB
  */
 export class BrandSyncManager {
+  private static isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+  }
+
   private static async parseSyncResponse(response: Response): Promise<SyncRecord> {
     const contentType = response.headers.get("content-type") || "";
 
@@ -19,57 +25,13 @@ export class BrandSyncManager {
       }
 
       const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let result: SyncRecord | null = null;
+      const { result, error } = await consumeNdjsonStream<SyncRecord>(
+        reader,
+        createSyncStreamHandler()
+      );
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-
-          try {
-            const data = JSON.parse(line);
-            const parsed = SyncStreamMessageSchema.safeParse(data);
-            if (!parsed.success) {
-              continue;
-            }
-
-            if (parsed.data.type === "result") {
-              result = parsed.data.data;
-            } else if (parsed.data.type === "error") {
-              throw new Error(parsed.data.error || "同步请求失败");
-            }
-          } catch (error) {
-            console.warn("解析同步流数据失败:", error);
-          }
-        }
-      }
-
-      if (buffer.trim()) {
-        try {
-          const data = JSON.parse(buffer);
-          const parsed = SyncStreamMessageSchema.safeParse(data);
-          if (parsed.success) {
-            if (parsed.data.type === "result") {
-              result = parsed.data.data;
-            } else if (parsed.data.type === "error") {
-              throw new Error(parsed.data.error || "同步请求失败");
-            }
-          }
-        } catch (error) {
-          console.warn("解析同步流剩余数据失败:", error);
-        }
-      }
-
-      if (!result) {
-        throw new Error("未收到同步结果数据");
+      if (error) {
+        console.warn("[BrandSyncManager] 同步流返回错误，但已收到结果:", error.message);
       }
 
       return result;
@@ -102,6 +64,12 @@ export class BrandSyncManager {
     errors: Record<string, string>;
     /** Token 缺失标志，调用方可据此显示提示 */
     tokenMissing?: boolean;
+    /** 未登录/无权限（避免在未登录场景下自动同步导致控制台报错） */
+    unauthorized?: boolean;
+    /** 全量同步要求未满足 */
+    requiresFullResync?: boolean;
+    /** 阻断原因 */
+    blockedReason?: string;
   }> {
     const syncedBrands: string[] = [];
     const failedBrands: string[] = [];
@@ -115,6 +83,18 @@ export class BrandSyncManager {
       // 获取所有映射的品牌（从数据库）
       const mappedBrands = await getAvailableBrands();
       const mappedBrandNames = mappedBrands.map(b => b.name);
+
+      const needsFullResync = config?.metadata?.needsFullResync === true;
+      if (needsFullResync && !forceSync) {
+        return {
+          syncedBrands,
+          failedBrands,
+          errors,
+          requiresFullResync: true,
+          blockedReason:
+            "检测到旧版本配置，需要全量同步所有品牌。请前往同步管理选择全部品牌后再同步。",
+        };
+      }
 
       // 找出缺失的映射品牌（只同步数据库中定义的品牌）
       const missingBrands = forceSync
@@ -160,8 +140,38 @@ export class BrandSyncManager {
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "同步请求失败");
+          // ✅ 产品化处理：未登录时跳过（/api/sync 在 middleware 中属于受保护 API）
+          if (response.status === 401) {
+            let errorMessage: string | undefined;
+            try {
+              const data: unknown = await response.json();
+              if (BrandSyncManager.isRecord(data)) {
+                const message = data.message;
+                if (typeof message === "string") errorMessage = message;
+              }
+            } catch {
+              // ignore
+            }
+
+            console.info(
+              `[BrandSyncManager] 未登录或无权限，跳过自动同步品牌` +
+                (errorMessage ? `（${errorMessage}）` : "")
+            );
+            return { syncedBrands, failedBrands, errors, unauthorized: true };
+          }
+
+          let serverError: string | undefined;
+          try {
+            const data: unknown = await response.json();
+            if (BrandSyncManager.isRecord(data)) {
+              const error = data.error;
+              if (typeof error === "string") serverError = error;
+            }
+          } catch {
+            // ignore
+          }
+
+          throw new Error(serverError || "同步请求失败");
         }
 
         const syncRecord = await BrandSyncManager.parseSyncResponse(response);
@@ -188,7 +198,8 @@ export class BrandSyncManager {
             } else {
               failedBrands.push(brand.name);
               errors[brand.name] = result.errors.join(", ") || "同步失败";
-              console.error(`❌ 同步品牌失败: ${brand.name}`, result.errors);
+              // 用 warn 避免在 Next.js dev 中触发 error overlay
+              console.warn(`⚠️ 同步品牌失败: ${brand.name}`, result.errors);
             }
           }
         }

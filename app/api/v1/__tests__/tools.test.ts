@@ -31,7 +31,7 @@ vi.mock("@/lib/tools/tool-registry", () => ({
     {
       name: "zhipin_reply_generator",
       requiresSandbox: false,
-      requiredContext: ["configData", "replyPrompts"],
+      requiredContext: ["configData", "replyPolicy"],
     },
     {
       name: "duliday_job_list",
@@ -118,7 +118,7 @@ describe("GET /api/v1/tools", () => {
         { name: "bash", description: "Execute bash commands", category: "automation", requiresSandbox: false, requiredContext: [] },
         { name: "computer", description: "Computer use tool", category: "automation", requiresSandbox: true, requiredContext: ["sandboxId"] },
         { name: "internal_debug_tool", description: "Internal debug tool", category: "debug", requiresSandbox: false, requiredContext: [] },
-        { name: "zhipin_reply_generator", description: "Generate Zhipin reply", category: "business", requiresSandbox: false, requiredContext: ["configData", "replyPrompts"] },
+        { name: "zhipin_reply_generator", description: "Generate Zhipin reply", category: "business", requiresSandbox: false, requiredContext: ["configData", "replyPolicy"] },
       ]);
 
       const response = await callGET();

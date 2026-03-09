@@ -4,10 +4,32 @@
  */
 
 import { z } from 'zod/v3';
-import type { UIMessagePart, UIDataTypes, UITools, Tool } from "ai";
+import type { UIMessage, UIMessagePart, UIDataTypes, UITools, Tool } from "ai";
 import type { ModelConfig } from "@/lib/config/models";
 import type { ZhipinData } from "./zhipin";
-import type { SystemPromptsConfig, ReplyPromptsConfig, BrandPriorityStrategy } from "./config";
+import type { SystemPromptsConfig, ReplyPolicyConfig, BrandPriorityStrategy } from "./config";
+import type { StageGoals } from "./reply-policy";
+
+export interface ReplyPolicyPatchChange {
+  module: string;
+  value?: unknown;
+  keepCurrent?: boolean;
+  displayValue?: string;
+}
+
+export interface ReplyPolicyDraftRuntimeContext {
+  hasServedFullPolicy: () => boolean;
+  markFullPolicyServed: () => void;
+  getCurrentPolicy: () => ReplyPolicyConfig | null;
+  getDraftPolicy: () => ReplyPolicyConfig | null;
+  getRevision: () => number;
+  applyPatch: (patch: ReplyPolicyPatchChange) => {
+    applied: boolean;
+    reason?: string;
+    revision: number;
+  };
+  commitPolicy: (policy: ReplyPolicyConfig) => void;
+}
 
 // ========== 工具注册表类型定义 ==========
 
@@ -21,9 +43,17 @@ export interface ToolCreationContext {
   brandPriorityStrategy?: BrandPriorityStrategy; // 品牌冲突处理策略
   modelConfig?: ModelConfig;
   configData?: ZhipinData;
-  replyPrompts?: ReplyPromptsConfig;
+  replyPolicy?: ReplyPolicyConfig;
+  industryVoiceId?: string;
   dulidayToken?: string;
   defaultWechatId?: string; // 默认微信号
+  processedMessages?: UIMessage[]; // 完整对话消息，由工具内部转换为所需格式
+  userId?: string; // 用户 ID，通过 context.userId 注入
+  sessionId?: string; // 会话 ID，通过 context.sessionId 注入
+  stageGoals?: StageGoals; // 企微对话阶段目标，通过 toolContext.wework_plan_turn.stageGoals 注入
+  onJobsFetched?: (jobs: unknown[]) => void; // 工具获取到岗位数据后的回调，由预处理器注入
+  channelType?: "public" | "private";
+  replyPolicyDraftContext?: ReplyPolicyDraftRuntimeContext;
 }
 
 /**
@@ -33,7 +63,7 @@ export interface ToolCreationContext {
 export type ToolCategory =
   | "universal" // 通用工具
   | "sandbox" // 沙盒工具（需要 E2B）
-  | "automation" // 自动化工具（Puppeteer等）
+  | "automation" // 自动化工具（Playwright等）
   | "business" // 业务工具（招聘相关）
   | "communication"; // 通信工具（飞书、微信等）
 
@@ -63,14 +93,14 @@ export interface ToolDefinition {
    * 键为 requiredContext 中的字段名，值为对应的 Zod Schema
    * 在 contextStrategy === "error" 时会进行结构验证
    *
-   * @example
-   * ```typescript
-   * contextSchemas: {
-   *   configData: ZhipinDataSchema,
-   *   replyPrompts: ReplyPromptsSchema,
-   * }
-   * ```
-   */
+ * @example
+ * ```typescript
+ * contextSchemas: {
+ *   configData: ZhipinDataSchema,
+ *   replyPolicy: ReplyPolicyConfigSchema,
+ * }
+ * ```
+ */
   contextSchemas?: Record<string, z.ZodSchema>;
 }
 

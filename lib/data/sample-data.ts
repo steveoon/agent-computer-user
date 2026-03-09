@@ -18,7 +18,6 @@ export const sampleData: SampleData = {
         district: "杨浦区",
         subarea: "五角场",
         coordinates: { lat: 31.1956, lng: 121.4349 },
-        transportation: "地铁站4号口出",
         brand: "成都你六姐",
         positions: [
           {
@@ -63,7 +62,6 @@ export const sampleData: SampleData = {
             },
             minHoursPerWeek: 10,
             maxHoursPerWeek: 20,
-            preferredDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
             // 新增：出勤要求
             attendanceRequirement: {
               requiredDays: [1, 2, 3, 4, 5], // 周一到周五
@@ -113,15 +111,6 @@ export const sampleData: SampleData = {
             },
             minHoursPerWeek: 15,
             maxHoursPerWeek: 25,
-            preferredDays: [
-              "Monday",
-              "Tuesday",
-              "Wednesday",
-              "Thursday",
-              "Friday",
-              "Saturday",
-              "Sunday",
-            ],
             // 新增：出勤要求
             attendanceRequirement: {
               requiredDays: [6, 7], // 周六、周日
@@ -138,7 +127,6 @@ export const sampleData: SampleData = {
         district: "杨浦区",
         subarea: "五角场",
         coordinates: { lat: 31.242, lng: 121.4467 },
-        transportation: "地铁站10号口出",
         brand: "成都你六姐",
         positions: [
           {
@@ -190,7 +178,6 @@ export const sampleData: SampleData = {
             },
             minHoursPerWeek: 12,
             maxHoursPerWeek: 30,
-            preferredDays: ["Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
             // 新增：出勤要求
             attendanceRequirement: {
               requiredDays: [5, 6, 7], // 周五-周日
@@ -207,7 +194,6 @@ export const sampleData: SampleData = {
         district: "杨浦区",
         subarea: "大桥街道",
         coordinates: { lat: 31.2354, lng: 121.5055 },
-        transportation: "地铁站12号口出",
         brand: "成都你六姐",
         positions: [
           {
@@ -252,8 +238,6 @@ export const sampleData: SampleData = {
             },
             minHoursPerWeek: 6,
             maxHoursPerWeek: 15,
-            preferredDays: ["Monday", "Wednesday", "Friday"],
-            blackoutDates: ["2024-12-25", "2024-01-01"],
             // 新增：出勤要求
             attendanceRequirement: {
               minimumDays: 2,
@@ -269,7 +253,6 @@ export const sampleData: SampleData = {
         district: "杨浦区",
         subarea: "天盛广场",
         coordinates: { lat: 31.2965, lng: 121.5089 },
-        transportation: "地铁站附近",
         brand: "大米先生",
         positions: [
           {
@@ -313,15 +296,6 @@ export const sampleData: SampleData = {
             },
             minHoursPerWeek: 20,
             maxHoursPerWeek: 40,
-            preferredDays: [
-              "Monday",
-              "Tuesday",
-              "Wednesday",
-              "Thursday",
-              "Friday",
-              "Saturday",
-              "Sunday",
-            ],
             // 新增：出勤要求
             attendanceRequirement: {
               requiredDays: [1, 2, 3, 4, 5, 6, 7], // 每天都来
@@ -338,7 +312,6 @@ export const sampleData: SampleData = {
         district: "虹口区",
         subarea: "彩虹湾",
         coordinates: { lat: 31.2384, lng: 121.4759 },
-        transportation: "地铁站附近",
         brand: "大米先生",
         positions: [
           {
@@ -382,7 +355,6 @@ export const sampleData: SampleData = {
             },
             minHoursPerWeek: 15,
             maxHoursPerWeek: 25,
-            preferredDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
             // 新增：出勤要求
             attendanceRequirement: {
               requiredDays: [1, 2, 3, 4, 5], // 周一-周五
@@ -467,11 +439,6 @@ export const sampleData: SampleData = {
           age_concern: ["你的年龄没问题的，听店长安排。", "年龄要求比较灵活，你的情况可以考虑。"],
           insurance_inquiry: ["有商业保险的。", "六姐门店有商业保险保障。"],
         },
-        screening: {
-          age: { min: 18, max: 50, preferred: [20, 30, 40] },
-          blacklistKeywords: ["骗子", "不靠谱", "假的"],
-          preferredKeywords: ["经验", "稳定", "长期"],
-        },
       },
       大米先生: {
         templates: {
@@ -546,11 +513,6 @@ export const sampleData: SampleData = {
             "年龄要求大米先生比较严格，但你的情况可以考虑。",
           ],
           insurance_inquiry: ["有商业保险的。", "大米先生有商业保险保障。"],
-        },
-        screening: {
-          age: { min: 18, max: 45, preferred: [20, 25, 30, 35] },
-          blacklistKeywords: ["骗子", "不靠谱", "假的"],
-          preferredKeywords: ["经验", "稳定", "长期", "听话"],
         },
       },
     },

@@ -1,8 +1,8 @@
 /**
- * Classification Prompt Builder - 分类提示构建器
+ * Classification Prompt Builder - 分类提示构建器（Legacy）
  *
- * 基于Context Engineering原则优化消息分类提示构建
- * 实现16种招聘场景的精准意图识别
+ * 基于Context Engineering原则优化消息分类提示构建。
+ * 兼容16种招聘场景意图识别，Policy-first 主路径请使用 TurnPlanningPromptBuilder 或 planTurn。
  */
 
 import { BasePromptBuilder } from "./base-prompt-builder";

@@ -1,11 +1,10 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
-import { getPuppeteerMCPClient } from "@/lib/mcp/client-manager";
+import { playwrightEvaluate, selectZhipinTab } from "@/lib/tools/shared/playwright-utils";
 import {
   wrapAntiDetectionScript,
   randomDelay,
   humanDelay,
-  performRandomScroll,
   shouldAddRandomBehavior,
 } from "./anti-detection-utils";
 import type { AutomationResult } from "./types";
@@ -20,29 +19,6 @@ export interface ZhipinOpenResumeResult {
   message?: string;
   error?: string;
   timestamp: string;
-}
-
-/**
- * 解析 puppeteer_evaluate 的结果
- */
-function parseEvaluateResult(result: unknown): unknown {
-  try {
-    const mcpResult = result as { content?: Array<{ text?: string }> };
-    if (mcpResult?.content?.[0]?.text) {
-      const resultText = mcpResult.content[0].text;
-      const executionMatch = resultText.match(
-        /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
-      );
-
-      if (executionMatch && executionMatch[1].trim() !== "undefined") {
-        const jsonResult = executionMatch[1].trim();
-        return JSON.parse(jsonResult);
-      }
-    }
-  } catch (e) {
-    console.error("Failed to parse evaluate result:", e);
-  }
-  return null;
 }
 
 /**
@@ -111,15 +87,8 @@ export const zhipinOpenResumeTool = () =>
       }>
     > => {
       try {
-        const client = await getPuppeteerMCPClient();
-        const tools = await client.tools();
-
-        // 检查必需的工具
-        if (!tools.puppeteer_evaluate) {
-          throw new Error("Required MCP tool puppeteer_evaluate not available");
-        }
-
-        const puppeteerEvaluate = tools.puppeteer_evaluate;
+        // 确保在正确的标签页
+        await selectZhipinTab();
 
         // 初始延迟
         await randomDelay(500, 1000);
@@ -151,8 +120,7 @@ export const zhipinOpenResumeTool = () =>
         // 等待列表加载（最多重试10次，每次500ms）
         let listLoaded = false;
         for (let retry = 0; retry < 10; retry++) {
-          const checkResult = await puppeteerEvaluate.execute({ script: checkListScript });
-          const listStatus = parseEvaluateResult(checkResult) as {
+          const listStatus = await playwrightEvaluate(checkListScript) as {
             loaded: boolean;
             count: number;
           } | null;
@@ -180,14 +148,9 @@ export const zhipinOpenResumeTool = () =>
           const candidateIndex = candidateIndices[i];
 
           try {
-            // 滚动行为
+            // 随机延迟模拟滚动行为
             if (scrollBehavior && shouldAddRandomBehavior(0.3)) {
-              await performRandomScroll(client, {
-                minDistance: 100,
-                maxDistance: 300,
-                direction: "down",
-                probability: 0.5,
-              });
+              await randomDelay(200, 500);
             }
 
             // 查找并点击目标卡片
@@ -309,8 +272,7 @@ export const zhipinOpenResumeTool = () =>
               }
             `);
 
-            const clickResult = await puppeteerEvaluate.execute({ script: clickScript });
-            const result = parseEvaluateResult(clickResult) as {
+            const result = await playwrightEvaluate(clickScript) as {
               success: boolean;
               candidateName?: string;
               candidateId?: string;
@@ -390,8 +352,7 @@ export const zhipinOpenResumeTool = () =>
                 return { modalOpened: false };
               `);
 
-              const modalResult = await puppeteerEvaluate.execute({ script: checkModalScript });
-              const modalCheck = parseEvaluateResult(modalResult) as {
+              const modalCheck = await playwrightEvaluate(checkModalScript) as {
                 modalOpened: boolean;
               } | null;
 

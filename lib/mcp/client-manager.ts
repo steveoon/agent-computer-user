@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter } from "events";
+import fs from "fs";
+import path from "path";
 import { createMCPClient } from "@ai-sdk/mcp";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import {
@@ -7,7 +9,6 @@ import {
   MCPManagerStatus,
   MCPClientStatus,
   MCPTools,
-  MCPClient,
   validateMCPClientConfig,
 } from "@/types/mcp";
 
@@ -42,6 +43,15 @@ class MCPClientManager {
   private static readonly TOOLS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 分钟
   private static readonly MAX_RECONNECT_ATTEMPTS = 2;
   private static readonly RECONNECT_DELAY_MS = 1000;
+
+  private static readonly PLAYWRIGHT_MCP_VERSION = "0.0.68";
+  private static readonly PLAYWRIGHT_MCP_PACKAGE = "@playwright/mcp";
+  private static readonly PLAYWRIGHT_MCP_CLI_RELATIVE = path.join(
+    "node_modules",
+    "@playwright",
+    "mcp",
+    "cli.js"
+  );
 
   private constructor() {
     // 私有构造函数，防止外部直接实例化
@@ -90,14 +100,13 @@ class MCPClientManager {
     //    - 适用: 本地开发，手动选择要控制的 Tab
     //    - 限制: 同一浏览器只能有一个 MCP 连接，需要安装 Playwright MCP Bridge 插件
     //
-    // 如需使用 Puppeteer MCP，设置 USE_PUPPETEER_MCP=true
-    //
-    // Playwright MCP 配置使用动态参数生成器
-    // 实际参数在 getMCPClient 时根据当时的环境变量决定
-    // 这样支持运行时动态切换 CDP/Extension 模式
+    // Playwright MCP 配置使用动态参数生成器：
+    // - 使用本地固定版本 CLI（node node_modules/@playwright/mcp/cli.js）
+    // - 实际命令参数在 getMCPClient 时根据运行时环境决定
+    // - 支持动态切换 CDP/Extension 模式
     const playwrightConfig = validateMCPClientConfig({
       name: "playwright",
-      command: "npx",
+      command: "node",
       args: [], // 占位，实际参数在 getMCPClient 中动态生成
       env: {
         NODE_ENV: process.env.NODE_ENV || "production",
@@ -106,22 +115,6 @@ class MCPClientManager {
       enabled: true,
     });
     this.clientConfigs.set("playwright", playwrightConfig);
-
-    // 保留原有的 Puppeteer MCP 配置（用于兼容性）
-    const puppeteerConfig = validateMCPClientConfig({
-      name: "puppeteer",
-      command: "npx",
-      args: ["-y", "puppeteer-mcp-server"],
-      env: {
-        NODE_ENV: process.env.NODE_ENV || "production",
-        LOG_LEVEL: "error",
-        // 尝试禁用文件日志记录
-        NO_FILE_LOGGING: "true",
-      },
-      description: "Puppeteer浏览器自动化服务",
-      enabled: true,
-    });
-    this.clientConfigs.set("puppeteer", puppeteerConfig);
 
     // 高德地图 MCP 配置 - 用于地理编码和距离计算
     const amapConfig = validateMCPClientConfig({
@@ -145,20 +138,59 @@ class MCPClientManager {
    * - CHROME_REMOTE_DEBUGGING_PORT: Chrome 远程调试端口（设置后启用 CDP 模式）
    * - CHROME_HOST: Chrome 所在主机（默认 localhost，Docker 部署时设为 host.docker.internal）
    */
-  private getPlaywrightArgs(): { args: string[]; mode: string } {
+  private resolvePlaywrightCliPath(): string | null {
+    const envCliPath = process.env.PLAYWRIGHT_MCP_CLI_PATH;
+    if (envCliPath && fs.existsSync(envCliPath)) {
+      return envCliPath;
+    }
+
+    const localCliPath = path.join(process.cwd(), MCPClientManager.PLAYWRIGHT_MCP_CLI_RELATIVE);
+    if (fs.existsSync(localCliPath)) {
+      return localCliPath;
+    }
+
+    return null;
+  }
+
+  private getPlaywrightLaunchConfig(): { command: string; args: string[]; mode: string } {
     const chromePort = process.env.CHROME_REMOTE_DEBUGGING_PORT;
     const chromeHost = process.env.CHROME_HOST || "localhost";
+    const cliPath = this.resolvePlaywrightCliPath();
+
+    if (!cliPath) {
+      const packageWithVersion = `${MCPClientManager.PLAYWRIGHT_MCP_PACKAGE}@${MCPClientManager.PLAYWRIGHT_MCP_VERSION}`;
+      const npxBaseArgs = ["-y", packageWithVersion];
+
+      if (chromePort) {
+        const cdpEndpoint = `http://${chromeHost}:${chromePort}`;
+        return {
+          command: "npx",
+          args: [...npxBaseArgs, "--cdp-endpoint", cdpEndpoint, "--image-responses=allow"],
+          mode: `CDP (${cdpEndpoint}, npx fallback)`,
+        };
+      }
+
+      return {
+        command: "npx",
+        args: [...npxBaseArgs, "--extension", "--image-responses=allow"],
+        mode: "Extension (npx fallback)",
+      };
+    }
+
+    const command = process.execPath;
 
     if (chromePort) {
       const cdpEndpoint = `http://${chromeHost}:${chromePort}`;
       return {
-        args: ["-y", "@playwright/mcp@latest", "--cdp-endpoint", cdpEndpoint, "--image-responses=allow"],
+        command,
+        args: [cliPath, "--cdp-endpoint", cdpEndpoint, "--image-responses=allow"],
         mode: `CDP (${cdpEndpoint})`,
       };
     }
 
     return {
-      args: ["-y", "@playwright/mcp@latest", "--extension", "--image-responses=allow"],
+      command,
+      args: [cliPath, "--extension", "--image-responses=allow"],
       mode: "Extension",
     };
   }
@@ -210,11 +242,13 @@ class MCPClientManager {
     }
 
     // Playwright 使用动态参数
+    let command = config.command;
     let args = config.args;
     let description = config.description;
 
     if (clientName === "playwright") {
-      const playwrightConfig = this.getPlaywrightArgs();
+      const playwrightConfig = this.getPlaywrightLaunchConfig();
+      command = playwrightConfig.command;
       args = playwrightConfig.args;
       description = `Playwright 浏览器自动化服务（${playwrightConfig.mode} 模式）`;
       console.log(`🎭 Playwright MCP 模式: ${playwrightConfig.mode}`);
@@ -238,7 +272,7 @@ class MCPClientManager {
 
       // 创建传输层
       const transport = new StdioClientTransport({
-        command: config.command,
+        command,
         args: args,
         env: filteredEnv,
       });
@@ -332,20 +366,6 @@ class MCPClientManager {
   }
 
   /**
-   * Puppeteer MCP 客户端
-   */
-  public async getPuppeteerMCPClient(): Promise<MCPClient> {
-    return this.getMCPClient("puppeteer") as Promise<MCPClient>;
-  }
-
-  /**
-   * Puppeteer MCP 工具
-   */
-  public async getPuppeteerMCPTools(): Promise<MCPTools> {
-    return this.getMCPTools("puppeteer");
-  }
-
-  /**
    * Playwright MCP 客户端
    */
   public async getPlaywrightMCPClient(): Promise<any> {
@@ -362,8 +382,8 @@ class MCPClientManager {
   /**
    * 高德地图 MCP 客户端
    */
-  public async getAmapMCPClient(): Promise<MCPClient> {
-    return this.getMCPClient("amap") as Promise<MCPClient>;
+  public async getAmapMCPClient(): Promise<any> {
+    return this.getMCPClient("amap");
   }
 
   /**
@@ -517,9 +537,6 @@ const mcpClientManager = MCPClientManager.getInstance();
 export default mcpClientManager;
 
 // 快捷访问函数
-export const getPuppeteerMCPClient = () => mcpClientManager.getPuppeteerMCPClient();
-export const getPuppeteerMCPTools = () => mcpClientManager.getPuppeteerMCPTools();
-
 export const getPlaywrightMCPClient = () => mcpClientManager.getPlaywrightMCPClient();
 export const getPlaywrightMCPTools = () => mcpClientManager.getPlaywrightMCPTools();
 

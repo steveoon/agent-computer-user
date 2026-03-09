@@ -1,14 +1,8 @@
 import { tool } from "ai";
 import { z } from "zod/v3";
-import { getPuppeteerMCPClient, getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
-import { PuppeteerMCPResult } from "@/types/mcp";
+import { getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
 import { compressImageServerV2 } from "@/lib/image-optimized";
 import { uploadScreenshotToBailian } from "@/lib/bailian-upload";
-
-/**
- * 环境变量控制后端选择
- */
-const USE_PLAYWRIGHT_MCP = process.env.USE_PLAYWRIGHT_MCP === "true";
 
 /**
  * 截图结果类型
@@ -19,14 +13,13 @@ export interface ScreenshotResult {
   data?: string;
   /** 用于 UI 显示的压缩后 base64 数据（不会发送给 LLM） */
   displayData?: string;
-  mcpBackend: "playwright" | "puppeteer";
+  mcpBackend: "playwright";
 }
 
 /**
- * 统一截图工具
+ * Playwright 截图工具
  *
  * 功能特性：
- * - 双后端支持 - Puppeteer MCP 和 Playwright MCP
  * - 智能压缩 - 自动压缩图片以优化 token 消耗
  * - 云端存储 - 自动上传到阿里云百炼获取公网 URL
  * - 格式兼容 - 与 analyze_screenshot 工具无缝集成
@@ -38,89 +31,55 @@ export interface ScreenshotResult {
  */
 export const screenshotTool = () =>
   tool({
-    description: `统一截图工具，支持 Puppeteer 和 Playwright 双后端。
+    description: `Playwright 截图工具。
 
     功能：
-    - 截取当前页面或指定元素
+    - 截取当前页面
     - 支持全页面截图（fullPage）
     - 自动压缩和上传到云端
     - 返回图片 URL 用于后续分析
 
     注意：
-    - 元素截图（selector）仅 Puppeteer 模式支持
-    - fullPage 参数仅 Playwright 模式支持
     - 结果可直接传给 analyze_screenshot 工具进行分析`,
 
     inputSchema: z.object({
-      // 截图类型
       fullPage: z
         .boolean()
         .optional()
         .default(false)
-        .describe("是否截取整个可滚动页面（仅 Playwright 模式支持）"),
+        .describe("是否截取整个可滚动页面"),
 
-      // 元素截图
-      selector: z
-        .string()
-        .optional()
-        .describe("CSS 选择器，指定要截图的元素（仅 Puppeteer 模式支持）"),
+      type: z.enum(["png", "jpeg"]).optional().default("jpeg").describe("图片格式"),
 
-      // 图片格式
-      type: z
-        .enum(["png", "jpeg"])
-        .optional()
-        .default("jpeg")
-        .describe("图片格式"),
-
-      // 视口尺寸（仅 Puppeteer）
-      width: z.number().optional().default(1440).describe("视口宽度（仅 Puppeteer 模式）"),
-      height: z.number().optional().default(1080).describe("视口高度（仅 Puppeteer 模式）"),
-
-      // 截图名称
       name: z.string().optional().describe("截图名称，用于日志追踪"),
     }),
 
-    execute: async (params) => {
-      const { fullPage, selector, type, width, height, name } = params;
-      const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
+    execute: async params => {
+      const { fullPage, type, name } = params;
 
-      console.log(`📸 执行截图操作 [${mcpBackend}]`, {
+      console.log(`📸 执行截图操作 [playwright]`, {
         fullPage,
-        selector,
         type,
         name,
       });
 
       try {
-        let base64Data: string;
-
-        if (USE_PLAYWRIGHT_MCP) {
-          // ========== Playwright MCP 模式 ==========
-          base64Data = await executePlaywrightScreenshot({ fullPage, type });
-        } else {
-          // ========== Puppeteer MCP 模式 ==========
-          base64Data = await executePuppeteerScreenshot({
-            name: name || `screenshot-${Date.now()}`,
-            selector,
-            width,
-            height,
-          });
-        }
+        const base64Data = await executePlaywrightScreenshot({ fullPage, type });
 
         // 处理和上传图片
         const result = await processAndUploadImage(base64Data, name);
 
         return {
           ...result,
-          mcpBackend,
+          mcpBackend: "playwright" as const,
         } as ScreenshotResult;
       } catch (error) {
-        console.error(`❌ 截图失败 [${mcpBackend}]:`, error);
+        console.error(`❌ 截图失败 [playwright]:`, error);
 
         return {
           type: "image" as const,
           error: error instanceof Error ? error.message : String(error),
-          mcpBackend,
+          mcpBackend: "playwright" as const,
         };
       }
     },
@@ -146,7 +105,7 @@ export const screenshotTool = () =>
           value: [
             {
               type: "text" as const,
-              text: `Screenshot captured successfully using ${result.mcpBackend} backend.\n\nImage URL: ${result.url}\n\nNote: This screenshot is available for analysis. Use the analyze_screenshot tool with this URL to get insights.`,
+              text: `Screenshot captured successfully.\n\nImage URL: ${result.url}\n\nNote: This screenshot is available for analysis. Use the analyze_screenshot tool with this URL to get insights.`,
             },
           ],
         };
@@ -159,7 +118,7 @@ export const screenshotTool = () =>
           value: [
             {
               type: "text" as const,
-              text: `Screenshot captured using ${result.mcpBackend} backend but upload failed. Image data available locally.`,
+              text: `Screenshot captured but upload failed. Image data available locally.`,
             },
           ],
         };
@@ -275,54 +234,6 @@ function extractBase64FromPlaywrightScreenshot(result: unknown): string {
   throw new Error("Failed to extract base64 data from Playwright screenshot result");
 }
 
-/**
- * 执行 Puppeteer 截图
- */
-async function executePuppeteerScreenshot(params: {
-  name: string;
-  selector?: string;
-  width?: number;
-  height?: number;
-}): Promise<string> {
-  const client = await getPuppeteerMCPClient();
-  const tools = await client.tools();
-
-  const tool = tools["puppeteer_screenshot"] as
-    | { execute: (params: unknown) => Promise<unknown> }
-    | undefined;
-
-  if (!tool) {
-    throw new Error("puppeteer_screenshot tool not available");
-  }
-
-  const mcpParams: Record<string, unknown> = {
-    name: params.name,
-  };
-
-  if (params.selector) {
-    mcpParams.selector = params.selector;
-  }
-
-  if (params.width) {
-    mcpParams.width = params.width;
-  }
-
-  if (params.height) {
-    mcpParams.height = params.height;
-  }
-
-  const result = await tool.execute(mcpParams);
-  const mcpResult = result as PuppeteerMCPResult;
-
-  // 从 Puppeteer MCP 结果中提取 base64 数据
-  const imageContent = mcpResult?.content?.find((c) => c.type === "image");
-
-  if (imageContent && imageContent.type === "image") {
-    return imageContent.data;
-  }
-
-  throw new Error("No image data in Puppeteer screenshot result");
-}
 /**
  * 处理图片：压缩 + 上传
  *

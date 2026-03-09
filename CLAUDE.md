@@ -57,13 +57,14 @@ Manage multiple Agent instances with isolated browser sessions. See [MULTI_AGENT
 
 ### Core Application Structure
 
-Next.js 15 AI recruitment assistant platform with:
+Next.js 15 AI recruitment assistant platform with AI SDK v6:
 
 **Multi-Provider AI Integration:**
 - Primary: Anthropic Claude Sonnet for computer use
 - Secondary: Qwen models via `qwen-ai-provider` for smart reply
-- Supports OpenAI, Google AI, OpenRouter via AI SDK
+- Supports OpenAI, Google AI, OpenRouter (v2, native AI SDK v6 support) via AI SDK
 - Provider management: `lib/model-registry/`
+- Custom OpenRouter provider: `lib/model-registry/providers/openrouter-custom.ts` (Kimi K2 stream fix only)
 
 **Configuration Management:**
 - Unified Config Service (`lib/services/config.service.ts`) using LocalForage
@@ -126,8 +127,7 @@ z.string({ error: issue => issue.input === undefined ? "Required" : "Invalid" })
 
 ### Automation Tools
 - **bash** - Execute commands with safety features (E2B sandbox or local preview)
-- **puppeteer** - Browser automation via Puppeteer MCP
-- **screenshot** - Unified screenshot tool (Puppeteer/Playwright dual backend)
+- **screenshot** - Screenshot tool via Playwright MCP
 - **analyze_screenshot** - AI-powered screenshot analysis
 
 ### Business-Specific Tools
@@ -135,6 +135,7 @@ z.string({ error: issue => issue.input === undefined ? "Required" : "Invalid" })
 - **duliday** tools - HR system integration (`duliday_job_list`, `duliday_job_details`, `duliday_interview_booking`)
 - **yupao** tools - Yupao recruitment platform (`get_unread_messages`, `exchange_wechat`)
 - **zhipin** tools - BOSS直聘 recruitment automation
+- **reply_policy** tools - LLM-guided strategy configuration (`reply_policy_read`, `reply_policy_ask` HITL, `reply_policy_save`)
 
 ## Testing
 
@@ -193,28 +194,63 @@ DULIDAY_TOKEN, EXA_API_KEY
 
 ### MCP Integration
 - Singleton manager for client lifecycle (`lib/mcp/client-manager.ts`)
-- **Dual Backend Support**: Puppeteer MCP and Playwright MCP
-- Environment variable `USE_PLAYWRIGHT_MCP=true` to switch backends
+- **Playwright MCP** for browser automation
 - Shared utilities: `lib/tools/shared/playwright-utils.ts` (tab management, script execution)
-- Multiple servers: Puppeteer, Playwright, Google Maps, Exa
+- Multiple servers: Playwright, Google Maps, Exa
 - Test connection: `pnpm test:mcp-connection`
 - Run before shipping MCP protocol changes
 
 ### Screenshot Tool Pattern
-- Unified `screenshot.tool.ts` supports both Puppeteer and Playwright backends
+- `screenshot.tool.ts` uses Playwright MCP backend
 - Uses `displayData` field for UI display without sending to LLM context
 - `toModelOutput` returns text-only (URL reference) to avoid context bloat
 - UI component reads `displayData` for image rendering
 
-### AI SDK Message Handling
+### AI SDK v6 Message Handling
 - Uses `message.parts` array (not `message.content` array)
 - Tool invocations in `part.toolInvocation` (not `part.toolCall`)
-- See `docs/AI_SDK_MESSAGE_MIGRATION.md`
+- See `docs/guides/ai-sdk/AI_SDK_MESSAGE_MIGRATION.md`
+- Full v6 migration guide: `docs/guides/ai-sdk/AI_SDK_V6_MIGRATION.md`
+- v6 features reference: `docs/guides/ai-sdk/AI_SDK_V6_FEATURES.md`
 
 ### Tool Component Architecture
 - Registry pattern in `components/tool-messages/`
 - Each tool has component with theme configuration
 - Registry maps tool names to render components
+- Lazy loading via `components/tool-messages/lazy-registry.ts` for code splitting
+
+### HITL (Human-in-the-Loop) Tool Pattern
+Tools without `execute` function automatically pause the AI stream (`state: "input-available"`):
+```typescript
+// Tool definition (no execute = HITL mode)
+export const myHitlTool = () => tool({
+  inputSchema: z.object({ question: z.string() }),
+  outputSchema: z.object({ answer: z.string() }),
+  // no execute → stream pauses, waits for frontend
+});
+
+// Frontend component handles user interaction
+if (state === "input-available") {
+  await addToolOutput({ toolCallId, tool: "my_tool", output: { answer } });
+  sendMessage(); // resumes the stream
+}
+```
+- Reference implementation: `lib/tools/reply-policy/reply-policy-ask-tool.ts` + `components/tool-messages/reply-policy-ask-tool.tsx`
+- `addToolOutput` output type is `unknown` (not just `string`) to support structured patches
+- **HITL body loss pitfall**: `sendMessage()` from HITL flow must carry full request body. Use `useRef` + function body on `DefaultChatTransport`:
+  ```typescript
+  const chatBodyRef = useRef<Record<string, unknown>>({});
+  useEffect(() => { chatBodyRef.current = { ...allFields }; }, [deps]);
+  const [transport] = useState(() => new DefaultChatTransport({
+    body: () => chatBodyRef.current, // function form reads latest ref
+  }));
+  ```
+
+### Reply Policy Draft Context (Server-Side)
+- `lib/tools/reply-policy/reply-policy-draft-context.ts` rebuilds draft state from message history on each request
+- `setValueAtPath()` for safe nested property writes with array index support
+- Revision tracking for optimistic UI updates
+- `toModelOutput` on read tool returns full JSON only on first call, cached summary thereafter
 
 ## Development Guidelines
 
@@ -307,10 +343,11 @@ catch (error) {
 
 ## Key Data Flows
 
-1. **Config**: `ConfigInitializer` → `configService.getConfig()` → Components
+1. **Config**: 企微智能bot平台通过 `/api/v1/chat` context 传入 → Components (本地开发: `ConfigInitializer` → `configService.getConfig()`)
 2. **Smart Reply**: Message → Classification → Reply generation
 3. **Computer Use**: Action → E2B tools → Desktop → Screenshot/result
 4. **Brand Management**: Database → Server Actions → Zustand → Admin UI
+5. **LLM-Guided Config**: User chat → `reply_policy_read` → `reply_policy_ask` (HITL loop) → `reply_policy_save` → client-side IndexedDB write
 
 ## Important Notes
 
@@ -319,6 +356,15 @@ catch (error) {
 - Test Chinese input when modifying desktop automation
 - Run `npx tsc --noEmit` before committing
 - When tests fail, analyze business logic first (don't just modify tests to pass)
+- **`configService` is client-only** (LocalForage/IndexedDB) — never call from server-side tool `execute`. Use tool message components' `useEffect` for client-side persistence
+- **ESLint `no-assign-module-variable`**: Next.js reserves `module` as a variable name. Use alternatives like `configModule`
+- **Cross-page config sync**: After IndexedDB updates (e.g., "一键使用"), other pages (admin/settings) require manual refresh. BroadcastChannel not yet implemented
+
+### Known Peer Dependency Warnings
+
+- `qwen-ai-provider@0.1.0` requires `zod@^3` but project uses zod v4 — awaiting upstream update
+- `@tremor/react@3.x` requires `react@^18` but project uses React 19 — awaiting upstream update
+- These warnings do not affect runtime behavior
 
 ### Commit Convention
 
@@ -331,7 +377,7 @@ Use conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore
 - `generateText` / `streamText` API 使用和配置
 - Tool calling、structured output、streaming endpoints
 - Next.js Route Handlers (App Router) 中的 AI 端点
-- AI SDK 错误处理和类型问题
-- 从 v5 迁移到 v6 的模式
+- AI SDK v6 错误处理和类型问题
+- v6 的 ProviderV3 接口和 provider 集成
 
 **使用方式**: 当遇到上述场景时，使用 Skill tool 调用 `vercel-ai-sdk-v6.skill`

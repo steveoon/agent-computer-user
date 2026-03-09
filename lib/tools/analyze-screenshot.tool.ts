@@ -66,7 +66,7 @@ function extractFromUnstructuredText(content: string): ScreenshotAnalysis {
  * 截图分析工具
  *
  * 功能：
- * - 接收图片URL（通常来自puppeteer截图工具）
+ * - 接收图片URL（通常来自截图工具）
  * - 使用视觉模型分析截图内容
  * - 返回结构化的分析结果
  */

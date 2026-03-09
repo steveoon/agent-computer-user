@@ -1,7 +1,6 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
-import { getPuppeteerMCPClient, getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
-import { wrapAntiDetectionScript, randomDelay } from "./anti-detection-utils";
+import { getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
 import {
   selectZhipinTab,
   parsePlaywrightResult,
@@ -9,67 +8,12 @@ import {
   type TabSelectionResult,
 } from "@/lib/tools/shared/playwright-utils";
 
-// Feature flag: 使用 Playwright MCP 而非 Puppeteer MCP
-const USE_PLAYWRIGHT_MCP = process.env.USE_PLAYWRIGHT_MCP === "true";
-
-/**
- * 解析 puppeteer_evaluate 的结果
- */
-function parseEvaluateResult(result: unknown): Record<string, unknown> | null {
-  try {
-    const mcpResult = result as { content?: Array<{ text?: string }> };
-    if (mcpResult?.content?.[0]?.text) {
-      const resultText = mcpResult.content[0].text;
-
-      // 首先尝试标准格式解析（包含 "Execution result:"）
-      const executionMatch = resultText.match(
-        /Execution result:\s*\n([\s\S]*?)(\n\nConsole output|$)/
-      );
-
-      if (executionMatch) {
-        const executionResult = executionMatch[1].trim();
-        // 跳过 "undefined" 结果
-        if (executionResult !== "undefined" && executionResult !== "") {
-          try {
-            return JSON.parse(executionResult) as Record<string, unknown>;
-          } catch {
-            // 静默处理错误
-          }
-        }
-      }
-
-      // 如果标准格式解析失败，尝试查找 JSON 对象
-      const jsonMatch = resultText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          return JSON.parse(jsonMatch[0]) as Record<string, unknown>;
-        } catch {
-          // 静默处理错误
-        }
-      }
-
-      // 最后尝试直接解析整个文本
-      try {
-        const parsed = JSON.parse(resultText);
-        if (typeof parsed === "object" && parsed !== null) {
-          return parsed as Record<string, unknown>;
-        }
-      } catch {
-        // 忽略错误
-      }
-    }
-  } catch (_e) {
-    // 静默处理错误
-  }
-  return null;
-}
-
 /**
  * 获取BOSS直聘当前登录账号的用户名
  */
 export const zhipinGetUsername = tool({
   description: `获取BOSS直聘当前登录账号的用户名
-  ${USE_PLAYWRIGHT_MCP ? "- [Playwright] 支持自动切换到BOSS直聘标签页" : ""}`,
+  - [Playwright] 支持自动切换到BOSS直聘标签页`,
   inputSchema: z.object({
     autoSwitchTab: z
       .boolean()
@@ -79,8 +23,8 @@ export const zhipinGetUsername = tool({
   }),
   execute: async ({ autoSwitchTab = true }) => {
     try {
-      // Playwright 模式: 自动切换到BOSS直聘标签页
-      if (USE_PLAYWRIGHT_MCP && autoSwitchTab) {
+      // 自动切换到BOSS直聘标签页
+      if (autoSwitchTab) {
         console.log("[Playwright] 正在切换到BOSS直聘标签页...");
         const tabResult: TabSelectionResult = await selectZhipinTab();
 
@@ -95,32 +39,20 @@ export const zhipinGetUsername = tool({
         console.log(`[Playwright] 已切换到: ${tabResult.tab?.title} (${tabResult.tab?.url})`);
       }
 
-      // 获取适当的 MCP 客户端
-      const client = USE_PLAYWRIGHT_MCP
-        ? await getPlaywrightMCPClient()
-        : await getPuppeteerMCPClient();
+      // 获取 Playwright MCP 客户端
+      const client = await getPlaywrightMCPClient();
 
       const tools = await client.tools();
 
-      // 根据 MCP 类型选择工具名称
-      const toolName = USE_PLAYWRIGHT_MCP ? "browser_evaluate" : "puppeteer_evaluate";
+      const toolName = "browser_evaluate";
 
       if (!tools[toolName]) {
         throw new Error(
-          `MCP tool ${toolName} not available. ${
-            USE_PLAYWRIGHT_MCP
-              ? "请确保 Playwright MCP 正在运行且已连接浏览器。"
-              : "请确保 Puppeteer MCP 正在运行。"
-          }`
+          `MCP tool ${toolName} not available. 请确保 Playwright MCP 正在运行且已连接浏览器。`
         );
       }
 
-      // 添加初始延迟 (仅 Puppeteer 模式)
-      if (!USE_PLAYWRIGHT_MCP) {
-        await randomDelay(100, 300);
-      }
-
-      // 脚本内容（两个后端共用）
+      // 脚本内容
       const scriptContent = `
         // 批量定义所有选择器
         const selectors = [
@@ -169,32 +101,21 @@ export const zhipinGetUsername = tool({
         };
       `;
 
-      // 根据 MCP 类型生成不同的脚本包装
-      const script = USE_PLAYWRIGHT_MCP
-        ? wrapPlaywrightScript(scriptContent)
-        : wrapAntiDetectionScript(scriptContent);
+      // 生成脚本包装
+      const script = wrapPlaywrightScript(scriptContent);
 
       // 执行脚本
       const mcpTool = tools[toolName];
-      console.log(`[${USE_PLAYWRIGHT_MCP ? "Playwright" : "Puppeteer"}] 正在执行脚本...`);
+      console.log("[Playwright] 正在执行脚本...");
+      const scriptResult = await mcpTool.execute({ function: script });
 
-      // Playwright MCP 使用 "function" 参数名，Puppeteer MCP 使用 "script" 参数名
-      const executeParams = USE_PLAYWRIGHT_MCP ? { function: script } : { script };
-      const scriptResult = await mcpTool.execute(executeParams);
-
-      // 根据 MCP 类型解析结果
+      // 解析结果
       let result: Record<string, unknown> | null = null;
-      const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
+      const mcpBackend = "playwright" as const;
 
-      if (USE_PLAYWRIGHT_MCP) {
-        // Playwright MCP 结果解析
-        const parsedResult = parsePlaywrightResult(scriptResult);
-        if (parsedResult && typeof parsedResult === "object") {
-          result = parsedResult as Record<string, unknown>;
-        }
-      } else {
-        // Puppeteer MCP 结果解析
-        result = parseEvaluateResult(scriptResult);
+      const parsedResult = parsePlaywrightResult(scriptResult);
+      if (parsedResult && typeof parsedResult === "object") {
+        result = parsedResult as Record<string, unknown>;
       }
 
       if (!result) {
@@ -222,7 +143,7 @@ export const zhipinGetUsername = tool({
       }
     } catch (error) {
       // 静默处理错误
-      const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
+      const mcpBackend = "playwright" as const;
 
       let errorMessage = "❌ 获取用户名时发生错误";
       if (error instanceof Error) {

@@ -88,7 +88,8 @@ enable-pre-post-scripts=true
 
 1. 打包前手动处理 node_modules 结构
 2. 使用 `electron-builder` 的 `npmRebuild` 选项
-3. 参考 [electron-builder pnpm 支持讨论](https://github.com/electron-userland/electron-builder/issues/6289)
+3. 对 Electron 主进程做 bundling（推荐，避免遗漏 transitive deps）
+4. 参考 [electron-builder pnpm 支持讨论](https://github.com/electron-userland/electron-builder/issues/6289)
 
 ---
 
@@ -389,10 +390,12 @@ mac:
 ```json
 {
   "scripts": {
-    "electron:build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public/* .next/standalone/public/ 2>/dev/null || mkdir -p .next/standalone/public && cp -r public/* .next/standalone/public/ && tsc -p tsconfig-electron.json"
+    "electron:build": "rm -rf build && next build && cp -r .next/static .next/standalone/.next/ && cp -r public/* .next/standalone/public/ 2>/dev/null || mkdir -p .next/standalone/public && cp -r public/* .next/standalone/public/ && tsc -p tsconfig-electron.json"
   }
 }
 ```
+
+其中 `rm -rf build` 用于清理旧的 Electron 编译产物，避免历史残留文件（例如已删除源码对应的 `.js`）被误打进安装包。
 
 ### 验证方法
 
@@ -560,7 +563,7 @@ spawn("/opt/homebrew/bin/npx", ["..."]);
 将 MCP 服务器等依赖作为项目依赖安装，而不是运行时通过 npx 下载：
 
 ```bash
-pnpm add @playwright/mcp
+pnpm add @playwright/mcp@0.0.68
 ```
 
 ```typescript

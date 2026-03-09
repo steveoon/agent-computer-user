@@ -48,7 +48,6 @@ jobs:
           DULIDAY_TOKEN="${{ secrets.DULIDAY_TOKEN }}"
           OPEN_API_AUTH_URL="${{ secrets.OPEN_API_AUTH_URL }}"
           ENABLE_SCHEDULER="${{ secrets.ENABLE_SCHEDULER }}"
-          USE_PLAYWRIGHT_MCP="${{ secrets.USE_PLAYWRIGHT_MCP }}"
           ENVEOF
           cp .env .env.production
 

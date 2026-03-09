@@ -11,7 +11,11 @@ import { createMockObjectGeneration } from "@/lib/__tests__/test-utils/ai-mocks"
 vi.mock("@/lib/model-registry/dynamic-registry", () => ({
   getDynamicRegistry: vi.fn(() => ({
     languageModel: vi.fn(() => createMockObjectGeneration({
-      replyType: "salary_inquiry",
+      stage: "job_consultation",
+      subGoals: ["回答岗位问题", "推进下一步沟通"],
+      needs: ["salary", "location"],
+      riskFlags: [],
+      confidence: 0.78,
       extractedInfo: {
         mentionedBrand: null,
         city: "成都",
@@ -23,20 +27,11 @@ vi.mock("@/lib/model-registry/dynamic-registry", () => ({
         hasUrgency: false,
         preferredSchedule: null,
       },
-      reasoningText: "候选人询问薪资待遇，属于 salary_inquiry 类型",
+      reasoningText: "候选人询问薪资待遇并关注门店位置",
     })),
   })),
 }));
 
-// Mock the classification prompt builder
-vi.mock("@/lib/prompt-engineering", () => ({
-  ClassificationPromptBuilder: vi.fn().mockImplementation(() => ({
-    build: vi.fn(() => ({
-      system: "你是一个消息分类助手...",
-      prompt: "请分类以下消息...",
-    })),
-  })),
-}));
 
 describe("classifyMessage", () => {
   beforeEach(() => {
@@ -61,7 +56,7 @@ describe("classifyMessage", () => {
       expect(result).toBeDefined();
       expect(result.replyType).toBe("salary_inquiry");
       expect(result.extractedInfo).toBeDefined();
-      expect(result.reasoningText).toContain("salary_inquiry");
+      expect(result.reasoningText).toContain("stage=job_consultation");
     });
 
     it("should extract location information from message", async () => {

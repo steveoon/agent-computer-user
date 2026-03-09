@@ -14,20 +14,13 @@ import { ABORTED } from "@/lib/utils";
 import Image from "next/image";
 import { themes, type ToolMessageProps, type ToolTheme } from "./types";
 
-// MCP 后端类型
-type MCPBackend = "puppeteer" | "playwright";
-
 // MCP 后端标签配置
-const MCP_BACKEND_STYLES: Record<MCPBackend, { label: string; className: string }> = {
-  puppeteer: {
-    label: "Puppeteer",
-    className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  },
+const MCP_BACKEND_STYLES = {
   playwright: {
     label: "Playwright",
     className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   },
-};
+} as const;
 
 // 扩展 props 以支持来自父组件的自定义参数
 interface ScreenshotToolMessageProps extends ToolMessageProps {
@@ -62,9 +55,9 @@ export function ScreenshotToolMessage(props: ScreenshotToolMessageProps) {
   const maxHeight = customMaxHeight || "500px";
 
   // 提取 MCP 后端信息
-  let mcpBackend: MCPBackend | undefined;
+  let mcpBackend: "playwright" | undefined;
   if (output && typeof output === "object" && "mcpBackend" in output) {
-    mcpBackend = (output as { mcpBackend?: MCPBackend }).mcpBackend;
+    mcpBackend = (output as { mcpBackend?: "playwright" }).mcpBackend;
   }
 
   // 使用自定义标签或默认标签

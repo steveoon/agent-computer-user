@@ -37,8 +37,8 @@ const brandName = getBrandNameByOrgId(organizationId);
 **区域名称解析**:
 
 ```typescript
-// 优先使用 storeRegionId 映射区域，备用方案为解析 storeAddress
-const district = getDistrictByRegionId(storeRegionId) || storeAddress.split("-")[1] || "未知区域";
+// 优先使用 API 提供的 storeRegionName，降级为解析 storeAddress
+const district = storeRegionName || storeAddress.split("-")[1] || "未知区域";
 ```
 
 **子区域解析**:

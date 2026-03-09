@@ -26,6 +26,11 @@ const FIELD_DESCRIPTIONS = {
       required: false,
       description: "首选品牌名称",
     },
+    brandPriorityStrategy: {
+      type: "BrandPriorityStrategy",
+      required: false,
+      description: "品牌冲突处理策略",
+    },
     modelConfig: {
       type: "ModelConfig",
       required: false,
@@ -41,10 +46,15 @@ const FIELD_DESCRIPTIONS = {
       required: false,
       description: "系统提示词映射，键为 promptType，值为对应的系统提示词",
     },
-    replyPrompts: {
-      type: "ReplyPromptsConfig",
+    replyPolicy: {
+      type: "ReplyPolicyConfig",
       required: "按工具需要",
-      description: "回复提示词配置",
+      description: "回复策略配置（阶段目标、人格、行业指纹、红线、事实闸门）",
+    },
+    industryVoiceId: {
+      type: "string",
+      required: false,
+      description: "可选，显式指定当前对话使用的行业指纹 ID",
     },
     dulidayToken: {
       type: "string | null",

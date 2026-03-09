@@ -3,27 +3,61 @@
  * 调试位置提取逻辑
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { SmartExtractor, LOCATION_DICTIONARY } from "../memory/smart-patterns";
-import { SHANGHAI_REGION_MAPPING } from "@/lib/constants/organization-mapping";
 import {
   BrandDictionaryCache,
   clearBrandDictionaryCache,
   isCacheValid,
 } from "../memory/brand-dictionary-cache";
+import type { BrandDictionary } from "../memory/brand-dictionary-cache";
+
+// Mock 共享品牌别名服务（避免调用真实 Duliday API）
+const mockDictionary: BrandDictionary = {
+  肯德基: ["肯德基", "KFC", "kfc"],
+  必胜客: ["必胜客", "Pizza Hut", "PizzaHut"],
+  奥乐齐: ["奥乐齐", "ALDI", "Aldi"],
+  大米先生: ["大米先生"],
+  成都你六姐: ["成都你六姐", "你六姐"],
+  海底捞: ["海底捞", "海捞"],
+  大连肯德基: ["大连肯德基", "大连KFC", "大连kfc"],
+  天津肯德基: ["天津肯德基", "天津KFC", "天津kfc"],
+  北京肯德基: ["北京肯德基", "北京KFC", "北京kfc"],
+  成都肯德基: ["成都肯德基", "成都KFC", "成都kfc"],
+  深圳肯德基: ["深圳肯德基", "深圳KFC", "深圳kfc"],
+  广州肯德基: ["广州肯德基", "广州KFC", "广州kfc"],
+  杭州肯德基: ["杭州肯德基", "杭州KFC", "杭州kfc"],
+  上海必胜客: ["上海必胜客", "上海Pizza Hut", "上海PizzaHut"],
+  北京必胜客: ["北京必胜客", "北京Pizza Hut", "北京PizzaHut"],
+  成都必胜客: ["成都必胜客", "成都Pizza Hut", "成都PizzaHut"],
+  佛山必胜客: ["佛山必胜客", "佛山Pizza Hut", "佛山PizzaHut"],
+  麦当劳: ["麦当劳", "金拱门", "McDonald", "M记"],
+  星巴克: ["星巴克", "Starbucks", "星爸爸"],
+};
+
+const mockAliasMap = new Map<string, string>();
+for (const [brand, aliases] of Object.entries(mockDictionary)) {
+  for (const alias of aliases) {
+    const key = alias.toLowerCase();
+    const existing = mockAliasMap.get(key);
+    if (!existing || brand.length > existing.length) {
+      mockAliasMap.set(key, brand);
+    }
+  }
+}
+
+vi.mock("@/lib/services/brand-alias/brand-alias.service", () => ({
+  getSharedBrandDictionary: vi.fn(async () => mockDictionary),
+  getSharedBrandAliasMap: vi.fn(async () => mockAliasMap),
+}));
 
 describe("SmartExtractor - 调试位置提取", () => {
   describe("LOCATION_DICTIONARY 构建验证", () => {
     it("应该包含浦东新区的完整名称和简称", () => {
-      console.log("=== SHANGHAI_REGION_MAPPING 中的值 ===");
-      const regions = Object.values(SHANGHAI_REGION_MAPPING);
-      console.log(regions);
-
       console.log("\n=== LOCATION_DICTIONARY.districts ===");
       console.log(LOCATION_DICTIONARY.districts);
 
       // 验证浦东新区被正确处理
-      expect(regions).toContain("浦东新区");
       expect(LOCATION_DICTIONARY.districts).toContain("浦东新区");
       expect(LOCATION_DICTIONARY.districts).toContain("浦东");
     });
@@ -36,29 +70,14 @@ describe("SmartExtractor - 调试位置提取", () => {
     });
 
     it("应该正确构建所有区的简称", () => {
-      const regions = Object.values(SHANGHAI_REGION_MAPPING);
-      console.log("\n=== 所有区域及其简称验证 ===");
+      // 验证核心区域都在 districts 中（来自 smart-patterns 内部的 districtAliasMapping）
+      const expectedDistricts = [
+        "黄浦区", "黄浦", "徐汇区", "徐汇", "浦东新区", "浦东",
+        "闵行区", "闵行", "松江区", "松江", "嘉定区", "嘉定",
+      ];
 
-      // 特殊处理的区域简称映射
-      const specialShortNames: Record<string, string> = {
-        浦东新区: "浦东", // 特殊：浦东新区简称为浦东
-      };
-
-      regions.forEach(region => {
-        // 获取实际的简称
-        let shortName: string | undefined;
-        if (specialShortNames[region]) {
-          shortName = specialShortNames[region];
-        } else if (region.endsWith("区")) {
-          shortName = region.slice(0, -1);
-        }
-
-        console.log(`${region} -> 应该包含: ${region}, ${shortName || "无简称"}`);
-
-        expect(LOCATION_DICTIONARY.districts).toContain(region);
-        if (shortName) {
-          expect(LOCATION_DICTIONARY.districts).toContain(shortName);
-        }
+      expectedDistricts.forEach(district => {
+        expect(LOCATION_DICTIONARY.districts).toContain(district);
       });
     });
   });
@@ -477,7 +496,6 @@ describe("SmartExtractor - 调试位置提取", () => {
 
       // 首次调用构建缓存
       await SmartExtractor.extractBrands("肯德基有岗位吗");
-      const firstDictionary = BrandDictionaryCache.brandDictionary;
 
       // 手动设置过期时间戳
       const expiredTime = Date.now() - (BrandDictionaryCache.ttl + 1000);
@@ -488,9 +506,9 @@ describe("SmartExtractor - 调试位置提取", () => {
       await SmartExtractor.extractBrands("必胜客招聘吗");
       const secondDictionary = BrandDictionaryCache.brandDictionary;
 
-      // 字典对象应该不同（重新构建了）
-      expect(secondDictionary).not.toBe(firstDictionary);
+      // 缓存时间戳应该已更新（说明重新构建了）
       expect(BrandDictionaryCache.timestamp).toBeGreaterThan(expiredTime);
+      expect(secondDictionary).not.toBeNull();
       console.log("✓ 缓存已重新构建");
     });
 

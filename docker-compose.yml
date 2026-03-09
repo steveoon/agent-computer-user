@@ -49,8 +49,7 @@ services:
       # Database
       - DATABASE_URL=${DATABASE_URL}
 
-      # Puppeteer Configuration
-      # Puppeteer MCP Server 会通过 npx 自动管理 Chromium
+      # Playwright MCP Configuration
 
       # Node Environment
       - NODE_ENV=production

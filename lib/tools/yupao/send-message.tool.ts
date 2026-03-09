@@ -1,9 +1,8 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
-import { getPuppeteerMCPClient, getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
+import { getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
 import { YUPAO_INPUT_SELECTORS } from "./constants";
-import { randomDelay, wrapAntiDetectionScript } from "../zhipin/anti-detection-utils";
-import { parseEvaluateResult } from "../shared/puppeteer-utils";
+import { randomDelay } from "../zhipin/anti-detection-utils";
 import { SourcePlatform } from "@/db/types";
 import { recordMessageSentEvent } from "@/lib/services/recruitment-event";
 import {
@@ -13,14 +12,11 @@ import {
   type TabSelectionResult,
 } from "@/lib/tools/shared/playwright-utils";
 
-// Feature flag: 使用 Playwright MCP 而非 Puppeteer MCP
-const USE_PLAYWRIGHT_MCP = process.env.USE_PLAYWRIGHT_MCP === "true";
-
 /**
  * Yupao发送消息工具
  *
  * 功能：
- * - 使用 Puppeteer MCP 在 fb-editor 中输入消息
+ * - 使用 Playwright MCP 在 fb-editor 中输入消息
  * - 点击发送按钮发送消息
  * - 支持清空输入框
  * - 验证消息是否成功发送
@@ -34,7 +30,7 @@ export const yupaoSendMessageTool = () =>
     - 自动查找并点击发送按钮
     - 支持清空原有内容
     - 验证消息是否成功发送
-    ${USE_PLAYWRIGHT_MCP ? "- [Playwright] 支持自动切换到鱼泡标签页" : ""}
+    - [Playwright] 支持自动切换到鱼泡标签页
 
     注意：
     - 需要先打开候选人聊天窗口
@@ -114,10 +110,10 @@ export const yupaoSendMessageTool = () =>
       unreadCountBeforeReply,
     }) => {
       try {
-        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
+        const mcpBackend = "playwright" as const;
 
-        // Playwright 模式: 自动切换到鱼泡标签页
-        if (USE_PLAYWRIGHT_MCP && autoSwitchTab) {
+        // 自动切换到鱼泡标签页
+        if (autoSwitchTab) {
           console.log("[Playwright] 正在切换到鱼泡标签页...");
           const tabResult: TabSelectionResult = await selectYupaoTab();
 
@@ -133,55 +129,40 @@ export const yupaoSendMessageTool = () =>
           console.log(`[Playwright] 已切换到: ${tabResult.tab?.title} (${tabResult.tab?.url})`);
         }
 
-        // 获取适当的 MCP 客户端
-        const client = USE_PLAYWRIGHT_MCP
-          ? await getPlaywrightMCPClient()
-          : await getPuppeteerMCPClient();
+        // 获取 Playwright MCP 客户端
+        const client = await getPlaywrightMCPClient();
 
         const tools = await client.tools();
 
-        // 根据 MCP 类型选择工具名称
-        const evaluateToolName = USE_PLAYWRIGHT_MCP ? "browser_evaluate" : "puppeteer_evaluate";
-        const clickToolName = USE_PLAYWRIGHT_MCP ? "browser_click" : "puppeteer_click";
+        // Playwright 工具名称
+        const evaluateToolName = "browser_evaluate";
 
         if (!tools[evaluateToolName]) {
           throw new Error(
-            `MCP tool ${evaluateToolName} not available. ${
-              USE_PLAYWRIGHT_MCP
-                ? "请确保 Playwright MCP 正在运行且已连接浏览器。"
-                : "请确保 Puppeteer MCP 正在运行。"
-            }`
+            `MCP tool ${evaluateToolName} not available. 请确保 Playwright MCP 正在运行且已连接浏览器。`
           );
         }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const evaluateTool = tools[evaluateToolName] as any;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const clickTool = tools[clickToolName] as any;
 
         // 辅助函数：执行脚本
         const executeScript = async (scriptContent: string) => {
-          const script = USE_PLAYWRIGHT_MCP
-            ? wrapPlaywrightScript(scriptContent)
-            : wrapAntiDetectionScript(scriptContent);
-          const params = USE_PLAYWRIGHT_MCP ? { function: script } : { script };
+          const script = wrapPlaywrightScript(scriptContent);
+          const params = { function: script };
           const result = await evaluateTool.execute(params);
-          return USE_PLAYWRIGHT_MCP ? parsePlaywrightResult(result) : parseEvaluateResult(result);
+          return parsePlaywrightResult(result);
         };
 
         // 辅助函数：执行点击
         const executeClick = async (selector: string) => {
-          if (USE_PLAYWRIGHT_MCP) {
-            // Playwright MCP 的 browser_click 需要 accessibility ref，不支持 CSS 选择器
-            // 所以这里使用 evaluate 方式点击
-            await executeScript(`
-              const el = document.querySelector('${selector}');
-              if (el) { el.click(); return { success: true }; }
-              return { success: false };
-            `);
-          } else {
-            await clickTool.execute({ selector });
-          }
+          // Playwright MCP 的 browser_click 需要 accessibility ref，不支持 CSS 选择器
+          // 所以这里使用 evaluate 方式点击
+          await executeScript(`
+            const el = document.querySelector('${selector}');
+            if (el) { el.click(); return { success: true }; }
+            return { success: false };
+          `);
         };
 
         // 步骤1: 验证输入框是否存在
@@ -209,9 +190,6 @@ export const yupaoSendMessageTool = () =>
         }
 
         // 步骤2: 点击输入框获取焦点
-        if (!USE_PLAYWRIGHT_MCP) {
-          await randomDelay(100, 300);
-        }
         try {
           await executeClick(YUPAO_INPUT_SELECTORS.fbEditor);
         } catch {
@@ -233,19 +211,12 @@ export const yupaoSendMessageTool = () =>
               }
               return { cleared: false };
             `);
-            if (!USE_PLAYWRIGHT_MCP) {
-              await randomDelay(50, 150);
-            }
           } catch {
             // 静默处理错误
           }
         }
 
         // 步骤4: 输入消息内容
-        if (!USE_PLAYWRIGHT_MCP) {
-          await randomDelay(100, 200);
-        }
-
         const fillData = await executeScript(`
           const editor = document.querySelector('${YUPAO_INPUT_SELECTORS.fbEditor}');
           if (editor) {
@@ -278,11 +249,6 @@ export const yupaoSendMessageTool = () =>
           };
         }
 
-        // 随机等待确保文本已填充
-        if (!USE_PLAYWRIGHT_MCP) {
-          await randomDelay(300, 800);
-        }
-
         // 步骤5: 查找并点击发送按钮
         const sendButtonData = await executeScript(`
           const sendButton = document.querySelector('${YUPAO_INPUT_SELECTORS.sendButton}');
@@ -311,11 +277,6 @@ export const yupaoSendMessageTool = () =>
             message: "未找到发送按钮",
             mcpBackend,
           };
-        }
-
-        // 点击发送按钮前添加随机延迟
-        if (!USE_PLAYWRIGHT_MCP) {
-          await randomDelay(200, 400);
         }
 
         try {
@@ -375,13 +336,11 @@ export const yupaoSendMessageTool = () =>
         }
       } catch (error) {
         // 静默处理错误
-        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
-
         return {
           success: false,
           error: error instanceof Error ? error.message : "Unknown error occurred",
           message: "发送消息时发生错误",
-          mcpBackend,
+          mcpBackend: "playwright" as const,
         };
       }
     },

@@ -16,9 +16,11 @@ import {
   needsMigration,
 } from "../services/config.service";
 import type { BrandPriorityStrategy } from "../../types/config";
+import type { ReplyPolicyConfig } from "../../types/config";
 import type { CandidateInfo } from "@/lib/tools/zhipin/types";
 import type { SalaryDetails } from "../../types/zhipin";
 import type { BrandResolutionInput, BrandResolutionOutput } from "../../types/brand-resolution";
+import type { TurnPlan, ReplyNeed } from "@/types/reply-policy";
 import {
   geocodingService,
   extractCityFromAddress,
@@ -26,6 +28,7 @@ import {
   isValidCoordinates,
 } from "../services/geocoding.service";
 import type { StoreWithDistance } from "@/types/geocoding";
+import { getSharedBrandAliasMap } from "@/lib/services/brand-alias/brand-alias.service";
 
 /**
  * 🔧 智能薪资描述构建器
@@ -55,6 +58,11 @@ function buildSalaryDescription(salary: SalaryDetails): string {
     if (memo && memo.length < 50) {
       description += `（${memo.replace(/\n/g, " ").trim()}）`;
     }
+  }
+
+  // 追加场景摘要（阶梯薪资/综合薪资/节假日倍数等）
+  if (salary.scenarioSummary) {
+    description += `（${salary.scenarioSummary}）`;
   }
 
   return description;
@@ -161,10 +169,22 @@ export async function loadZhipinData(
  * @param availableBrands 可用的品牌列表
  * @returns 匹配的品牌名或null
  */
-export function fuzzyMatchBrand(inputBrand: string, availableBrands: string[]): string | null {
+export function fuzzyMatchBrand(
+  inputBrand: string,
+  availableBrands: string[],
+  aliasMap?: Map<string, string>
+): string | null {
   if (!inputBrand) return null;
-
   const normalizeBrandName = (value: string) => value.toLowerCase().replace(/[\s._-]+/g, "");
+
+  // 0. 别名字典查找（O(1)，优先级最高）
+  if (aliasMap) {
+    const aliasResult =
+      aliasMap.get(normalizeBrandName(inputBrand)) || aliasMap.get(inputBrand.toLowerCase());
+    if (aliasResult && availableBrands.includes(aliasResult)) {
+      return aliasResult;
+    }
+  }
 
   const inputLower = inputBrand.toLowerCase();
   const inputNormalized = normalizeBrandName(inputBrand);
@@ -233,6 +253,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
     conversationBrand,
     availableBrands,
     strategy = "smart",
+    aliasMap,
   } = input;
 
   // 记录解析尝试历史
@@ -250,7 +271,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
       return undefined;
     }
 
-    const matched = fuzzyMatchBrand(brand, availableBrands);
+    const matched = fuzzyMatchBrand(brand, availableBrands, aliasMap);
     if (matched) {
       const isExact = matched === brand;
       attempts.push({
@@ -842,12 +863,7 @@ function buildPositionInfo(
       info += `  每周工时：${position.minHoursPerWeek || 0}-${position.maxHoursPerWeek || "不限"}小时\n`;
     }
 
-    // 7. 工作日偏好
-    if (position.preferredDays && position.preferredDays.length > 0) {
-      info += `  工作日偏好：${position.preferredDays.map(day => getDayText(day)).join("、")}\n`;
-    }
-
-    // 8. 出勤要求
+    // 7. 出勤要求
     if (position.attendanceRequirement) {
       const req = position.attendanceRequirement;
       let reqText = `出勤要求：${req.description}`;
@@ -867,6 +883,9 @@ function buildPositionInfo(
 
 /**
  * 构建上下文信息，根据提取的信息筛选相关数据
+ * @deprecated Policy-first 主路径已切换到 buildContextInfoByNeeds。
+ * 该函数仅保留用于兼容旧调用方，不建议继续使用。
+ *
  * @param data 配置数据
  * @param classification 消息分类结果
  * @param uiSelectedBrand UI选择的品牌（来自brand-selector组件）
@@ -1129,6 +1148,254 @@ export async function buildContextInfo(
   };
 }
 
+interface PolicyContextDebugInfo {
+  relevantStores: StoreWithDistance[];
+  storeCount: number;
+  detailLevel: "minimal" | "focused";
+  turnPlan: TurnPlan;
+  aliasLookupError?: string;
+}
+
+/**
+ * Policy-First 上下文构建
+ * 按 needs 决定是否注入事实数据，不依赖 16 类 replyType
+ */
+export async function buildContextInfoByNeeds(
+  data: ZhipinData,
+  turnPlan: TurnPlan,
+  uiSelectedBrand?: string,
+  toolBrand?: string,
+  brandPriorityStrategy?: BrandPriorityStrategy,
+  candidateInfo?: CandidateInfo,
+  replyPolicy?: ReplyPolicyConfig,
+  industryVoiceId?: string
+): Promise<{
+  contextInfo: string;
+  resolvedBrand: string;
+  debugInfo: PolicyContextDebugInfo;
+}> {
+  const extractedInfo = turnPlan.extractedInfo;
+  const needs = new Set<ReplyNeed>(turnPlan.needs || []);
+  const requiresFacts =
+    needs.has("stores") ||
+    needs.has("location") ||
+    needs.has("salary") ||
+    needs.has("schedule") ||
+    needs.has("policy") ||
+    needs.has("availability") ||
+    needs.has("requirements");
+
+  // 预取品牌别名 Map，用于增强品牌名解析（如 "KFC" → "肯德基"）
+  // 失败时降级为原有 fuzzy 匹配，不中断智能回复流程。
+  let aliasMap: Map<string, string> | undefined;
+  let aliasLookupError: string | undefined;
+  try {
+    aliasMap = await getSharedBrandAliasMap();
+  } catch (error) {
+    const errorMessage =
+      typeof error === "object" &&
+      error !== null &&
+      "userMessage" in error &&
+      typeof (error as { userMessage?: unknown }).userMessage === "string"
+        ? (error as { userMessage: string }).userMessage
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    aliasLookupError = errorMessage;
+    console.warn(`[buildContextInfoByNeeds] 品牌别名服务不可用，回退 fuzzy 解析: ${errorMessage}`);
+  }
+
+  const brandResolution = resolveBrandConflict({
+    uiSelectedBrand,
+    configDefaultBrand: data.defaultBrand,
+    conversationBrand: toolBrand || undefined,
+    availableBrands: Object.keys(data.brands),
+    strategy: brandPriorityStrategy || "smart",
+    aliasMap,
+  });
+
+  const targetBrand = brandResolution.resolvedBrand;
+
+  // 品牌解析日志
+  const isAliasMatch = toolBrand && toolBrand !== targetBrand;
+  console.log(
+    `━━━ 🏷️ 品牌解析 ━━━\n` +
+      `   工具传参: ${toolBrand ?? "(未指定)"}\n` +
+      (isAliasMatch ? `   别名匹配: ${toolBrand} → ${targetBrand}\n` : "") +
+      `   解析结果: ${targetBrand} (${brandResolution.matchType}, 来源: ${brandResolution.source})\n` +
+      `   ${brandResolution.reason}`
+  );
+
+  const brandStores = data.stores.filter(store => store.brand === targetBrand);
+  let relevantStores = brandStores;
+
+  if (relevantStores.length > 0) {
+    const locations = extractedInfo.mentionedLocations || [];
+    if (locations.length > 0) {
+      const location = locations[0]?.location?.trim();
+      if (location) {
+        const filtered = relevantStores.filter(
+          store =>
+            store.name.includes(location) ||
+            store.location.includes(location) ||
+            store.district.includes(location) ||
+            store.subarea.includes(location)
+        );
+        if (filtered.length > 0) {
+          relevantStores = filtered;
+        }
+      }
+    }
+
+    const districts = extractedInfo.mentionedDistricts || [];
+    if (districts.length > 0) {
+      const filtered = relevantStores.filter(store =>
+        districts.some(
+          district =>
+            store.district.includes(district.district) || store.subarea.includes(district.district)
+        )
+      );
+      if (filtered.length > 0) {
+        relevantStores = filtered;
+      }
+    }
+
+    // 没有候选人位置信息时，用岗位地址做兜底过滤
+    if (
+      relevantStores.length === brandStores.length &&
+      candidateInfo?.jobAddress &&
+      (needs.has("stores") || needs.has("location"))
+    ) {
+      const filtered = relevantStores.filter(
+        store =>
+          store.name.includes(candidateInfo.jobAddress || "") ||
+          store.location.includes(candidateInfo.jobAddress || "") ||
+          store.district.includes(candidateInfo.jobAddress || "") ||
+          store.subarea.includes(candidateInfo.jobAddress || "")
+      );
+      if (filtered.length > 0) {
+        relevantStores = filtered;
+      }
+    }
+  }
+
+  let rankedStoresWithDistance: StoreWithDistance[] = [];
+  if (relevantStores.length > 0) {
+    const pseudoClassification: MessageClassification = {
+      replyType: "general_chat",
+      extractedInfo: {
+        mentionedBrand: extractedInfo.mentionedBrand ?? null,
+        city: extractedInfo.city ?? null,
+        mentionedLocations: extractedInfo.mentionedLocations ?? null,
+        mentionedDistricts: extractedInfo.mentionedDistricts ?? null,
+        specificAge: extractedInfo.specificAge ?? null,
+        hasUrgency: extractedInfo.hasUrgency ?? null,
+        preferredSchedule: extractedInfo.preferredSchedule ?? null,
+      },
+      reasoningText: turnPlan.reasoningText || "",
+    };
+
+    rankedStoresWithDistance = await rankStoresByRelevance(relevantStores, pseudoClassification);
+  }
+
+  const storeCount = Math.min(
+    needs.has("stores") || needs.has("location") ? 5 : 3,
+    rankedStoresWithDistance.length
+  );
+  const detailLevel: "minimal" | "focused" = requiresFacts ? "focused" : "minimal";
+
+  let context = `阶段目标：${turnPlan.stage}\n默认推荐品牌：${targetBrand}\n`;
+  if (aliasLookupError) {
+    context += `系统状态：品牌别名服务暂不可用，已回退为规则匹配（${aliasLookupError}）。\n`;
+  }
+
+  if (replyPolicy) {
+    const stageGoal = replyPolicy.stageGoals[turnPlan.stage];
+    const voiceId = industryVoiceId || replyPolicy.defaultIndustryVoiceId;
+    const voice = replyPolicy.industryVoices[voiceId];
+    context += `策略目标：${stageGoal.primaryGoal}\n`;
+    context += `推进方式：${stageGoal.ctaStrategy}\n`;
+    if (voice) {
+      context += `行业指纹：${voice.name} | 风格：${voice.styleKeywords.join("、")}\n`;
+    }
+    context += `红线：${replyPolicy.hardConstraints.rules.map(rule => rule.rule).join("；")}\n`;
+  }
+
+  if (!requiresFacts) {
+    context += "候选人当前未深入咨询岗位细节，请优先建立信任与推进下一步。\n";
+  } else if (storeCount === 0) {
+    context += "暂无可用的门店事实信息，请使用泛化回答，避免任何具体承诺。\n";
+  } else {
+    context += "匹配到的门店信息：\n";
+    rankedStoresWithDistance.slice(0, storeCount).forEach(({ store, distance }) => {
+      const distanceText =
+        distance !== undefined ? `【距离约${geocodingService.formatDistance(distance)}】` : "";
+      context += `• ${store.name}${distanceText}（${store.district}${store.subarea}）：${store.location}\n`;
+
+      store.positions.forEach(position => {
+        context += `  职位：${position.name}\n`;
+        if (needs.has("salary")) {
+          context += `  薪资：${buildSalaryDescription(position.salary)}\n`;
+        }
+        if (needs.has("schedule")) {
+          context += `  排班：${getScheduleTypeText(position.scheduleType)}\n`;
+          context += `  时间：${position.timeSlots.slice(0, 3).join("、")}\n`;
+          if (position.minHoursPerWeek || position.maxHoursPerWeek) {
+            context += `  每周工时：${position.minHoursPerWeek || 0}-${position.maxHoursPerWeek || "不限"}小时\n`;
+          }
+        }
+        if (needs.has("policy")) {
+          context += `  考勤：最多迟到${position.attendancePolicy.lateToleranceMinutes}分钟\n`;
+          if (position.attendanceRequirement?.description) {
+            context += `  出勤要求：${position.attendanceRequirement.description}\n`;
+          }
+        }
+        if (needs.has("availability")) {
+          const slots = position.availableSlots?.filter(slot => slot.isAvailable).slice(0, 3) || [];
+          if (slots.length > 0) {
+            context += `  可用时段：${slots.map(slot => slot.slot).join("、")}\n`;
+          }
+        }
+        if (needs.has("requirements")) {
+          if (position.hiringRequirements) {
+            const hr = position.hiringRequirements;
+            const parts: string[] = [];
+            if (hr.minAge != null || hr.maxAge != null) {
+              parts.push(`年龄${hr.minAge ?? "不限"}-${hr.maxAge ?? "不限"}岁`);
+            }
+            if (hr.genderRequirement && hr.genderRequirement !== "0") {
+              parts.push(`性别:${hr.genderRequirement}`);
+            }
+            if (hr.education && hr.education !== "1") {
+              parts.push(`学历:${hr.education}`);
+            }
+            if (parts.length > 0) {
+              context += `  要求：${parts.join("、")}\n`;
+            }
+          } else if (position.requirements?.length) {
+            context += `  要求：${position.requirements.filter(req => req !== "无").join("、")}\n`;
+          }
+        }
+      });
+    });
+  }
+
+  return {
+    contextInfo: context,
+    resolvedBrand: targetBrand,
+    debugInfo: {
+      relevantStores:
+        rankedStoresWithDistance.length > 0
+          ? rankedStoresWithDistance
+          : relevantStores.map(store => ({ store, distance: undefined })),
+      storeCount,
+      detailLevel,
+      turnPlan,
+      aliasLookupError,
+    },
+  };
+}
+
 /**
  * 获取排班类型的中文描述
  */
@@ -1144,22 +1411,6 @@ function getScheduleTypeText(
     on_call: "随叫随到",
   };
   return typeMap[scheduleType] || "灵活排班";
-}
-
-/**
- * 获取工作日的中文描述
- */
-function getDayText(day: string): string {
-  const dayMap: { [key: string]: string } = {
-    Monday: "周一",
-    Tuesday: "周二",
-    Wednesday: "周三",
-    Thursday: "周四",
-    Friday: "周五",
-    Saturday: "周六",
-    Sunday: "周日",
-  };
-  return dayMap[day] || day;
 }
 
 /**

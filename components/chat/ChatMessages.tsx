@@ -14,7 +14,7 @@ interface ChatMessagesProps {
   addToolOutput?: (params: {
     toolCallId: string;
     tool: string;
-    output: string;
+    output: unknown;
   }) => Promise<void>;
   sendMessage?: () => void;
 }

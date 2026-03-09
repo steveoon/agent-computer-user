@@ -272,7 +272,7 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
         <CardHeader>
           <CardTitle className="text-lg">Boss直聘招聘助手(本地版)</CardTitle>
           <CardDescription>
-            专用于Boss直聘平台的本地自动化招聘系统提示词，使用Puppeteer工具进行自动化操作
+            专用于Boss直聘平台的本地自动化招聘系统提示词，使用Playwright工具进行自动化操作
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -283,7 +283,7 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
             placeholder="输入Boss直聘本地版系统提示词..."
           />
           <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-            <span>定义AI使用本地Puppeteer工具进行Boss直聘自动化操作的行为规范</span>
+            <span>定义AI使用本地Playwright工具进行Boss直聘自动化操作的行为规范</span>
             <span>{prompts.bossZhipinLocalSystemPrompt?.length || 0} 字符</span>
           </div>
         </CardContent>
@@ -328,7 +328,7 @@ export const SystemPromptsEditor: React.FC<SystemPromptsEditorProps> = ({
             <div>
               <h4 className="font-medium mb-1">🤖 Boss直聘本地版提示词</h4>
               <p className="text-muted-foreground">
-                使用本地Puppeteer工具自动化处理Boss直聘招聘流程，包括获取未读消息、智能回复、批量处理等功能。
+                使用本地Playwright工具自动化处理Boss直聘招聘流程，包括获取未读消息、智能回复、批量处理等功能。
               </p>
             </div>
             <div>

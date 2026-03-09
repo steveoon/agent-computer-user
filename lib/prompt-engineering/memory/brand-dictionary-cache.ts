@@ -39,6 +39,8 @@ export type BrandDictionaryCacheState = {
   sortedBrands: BrandName[] | null;
   /** 实际业务品牌集合（用于快速查找） */
   actualBrandSet: Set<BrandName> | null;
+  /** 反向别名查找 Map: alias (lowercase) → 品牌标准名称 */
+  aliasMap: Map<string, string> | null;
   /** 缓存时间戳（毫秒） */
   timestamp: number | null;
   /** 缓存生存时间（毫秒，默认 5 分钟） */
@@ -49,6 +51,7 @@ export const BrandDictionaryCache: BrandDictionaryCacheState = {
   brandDictionary: null,
   sortedBrands: null,
   actualBrandSet: null,
+  aliasMap: null,
   timestamp: null,
   ttl: 5 * 60 * 1000, // 5 分钟（兜底保障）
 };
@@ -82,6 +85,7 @@ export function clearBrandDictionaryCache() {
   BrandDictionaryCache.brandDictionary = null;
   BrandDictionaryCache.sortedBrands = null;
   BrandDictionaryCache.actualBrandSet = null;
+  BrandDictionaryCache.aliasMap = null;
   BrandDictionaryCache.timestamp = null;
 
   // 只在实际清空缓存时打印

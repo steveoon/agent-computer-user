@@ -30,8 +30,9 @@ export interface PartialSuccessResponse {
 /**
  * Duliday API 端点配置
  */
-const DULIDAY_API_BASE = "https://k8s.duliday.com/persistence/a";
-const DULIDAY_LIST_ENDPOINT = `${DULIDAY_API_BASE}/job-requirement/hiring/list`;
+const DULIDAY_API_BASE = "https://k8s.duliday.com/persistence";
+const DULIDAY_LIST_ENDPOINT = `${DULIDAY_API_BASE}/ai/api/job/list`;
+const DEFAULT_CITY_NAME_LIST = ["上海市"];
 
 /**
  * 数据同步服务类
@@ -49,18 +50,29 @@ export class DulidaySyncService {
   /**
    * 从 Duliday API 获取岗位列表（带超时和重试机制）
    * 支持部分成功策略：即使部分岗位数据校验失败，也返回成功的数据
+   * cityNameList 不传视为全量城市同步（默认允许，仅记录日志）
    */
   async fetchJobList(
-    organizationIds: number[],
+    projectIdList: number[],
+    cityNameList?: string[],
     pageSize: number = 100,
     retryCount: number = 0
   ): Promise<PartialSuccessResponse> {
+    if (!cityNameList || cityNameList.length === 0) {
+      console.info("[DulidaySyncService] 未传 cityNameList，使用全量城市同步");
+    }
+
     const requestBody = {
-      organizationIds,
-      pageNum: 0,
-      pageSize,
-      listOrderBy: 0,
-      supportSupplier: null,
+      queryParam: {
+        projectIdList,
+        ...(cityNameList && cityNameList.length > 0 ? { cityNameList } : {}),
+      },
+      options: {
+        pageNum: 1,
+        pageSize,
+        listOrderBy: 0,
+        supportSupplier: null,
+      },
     };
 
     // 创建 AbortController 用于超时控制
@@ -107,9 +119,40 @@ export class DulidaySyncService {
         const positionData = data.data.result[index];
 
         try {
-          // 尝试验证单个岗位数据
-          const validatedPosition = DulidayRaw.PositionSchema.parse(positionData);
-          validPositions.push(validatedPosition);
+          // 尝试验证单个岗位数据（兼容新旧结构）
+          const parsed = DulidayRaw.PositionSchema.safeParse(positionData);
+          if (parsed.success) {
+            validPositions.push(parsed.data);
+            continue;
+          }
+
+          // 新 Duliday 结构兜底：避免误把可解析数据判定为 invalid
+          const looksLikeNewShape =
+            !!positionData?.basicInfo &&
+            !!positionData?.jobSalary &&
+            !!positionData?.welfare &&
+            !!positionData?.hiringRequirement &&
+            !!positionData?.workTime;
+
+          if (looksLikeNewShape) {
+            const jobLabel =
+              positionData?.basicInfo?.jobName ||
+              positionData?.jobName ||
+              `索引${index}`;
+            const issuesSummary = parsed.error.issues
+              .slice(0, 5)
+              .map((i: { path: (string | number)[]; message: string }) =>
+                `${i.path.join(".")}: ${i.message}`
+              )
+              .join("; ");
+            console.warn(
+              `[duliday-sync] 岗位「${jobLabel}」未通过严格校验，使用宽松模式: ${issuesSummary}`
+            );
+            validPositions.push(positionData as DulidayRaw.Position);
+            continue;
+          }
+
+          throw parsed.error;
         } catch (validationError) {
           // 记录失败的岗位和错误信息
           let errorMessage = "";
@@ -154,7 +197,12 @@ export class DulidaySyncService {
           console.warn(`网络错误，正在重试 (${retryCount + 1}/3)...`, error.message);
           // 延迟后重试，避免过快的重试
           await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-          return this.fetchJobList(organizationIds, pageSize, retryCount + 1);
+          return this.fetchJobList(
+            projectIdList,
+            cityNameList,
+            pageSize,
+            retryCount + 1
+          );
         }
 
         // 格式化网络错误信息
@@ -174,6 +222,7 @@ export class DulidaySyncService {
    */
   async syncOrganization(
     organizationId: number,
+    cityNameList?: string[],
     onProgress?: (progress: number, message: string) => void
   ): Promise<SyncResult & { convertedData?: Partial<ZhipinData> }> {
     const startTime = Date.now();
@@ -183,7 +232,12 @@ export class DulidaySyncService {
       onProgress?.(10, `正在从 Duliday API 获取组织 ${organizationId} 的数据...`);
 
       // 获取数据（支持部分成功）
-      const partialResponse = await this.fetchJobList([organizationId]);
+      const partialResponse = await this.fetchJobList(
+        [organizationId],
+        cityNameList,
+        100,
+        0
+      );
 
       const totalRecords = partialResponse.totalCount;
       const validCount = partialResponse.validPositions.length;
@@ -269,6 +323,7 @@ export class DulidaySyncService {
    */
   async syncMultipleOrganizations(
     organizationIds: number[],
+    cityNameList?: string[],
     onProgress?: (overallProgress: number, currentOrg: number, message: string) => void
   ): Promise<SyncRecord> {
     const startTime = Date.now();
@@ -282,12 +337,16 @@ export class DulidaySyncService {
       onProgress?.(orgProgress, orgId, `开始同步组织 ${orgId}...`);
 
       try {
-        const result = await this.syncOrganization(orgId, (progress, message) => {
-          const currentOrgProgress = Math.floor(
-            (i / organizationIds.length) * 100 + progress / organizationIds.length
-          );
-          onProgress?.(currentOrgProgress, orgId, message);
-        });
+        const result = await this.syncOrganization(
+          orgId,
+          cityNameList,
+          (progress, message) => {
+            const currentOrgProgress = Math.floor(
+              (i / organizationIds.length) * 100 + progress / organizationIds.length
+            );
+            onProgress?.(currentOrgProgress, orgId, message);
+          }
+        );
 
         results.push(result);
       } catch (error) {
@@ -343,9 +402,16 @@ export class DulidaySyncService {
           // Node.js fetch 会自动处理 keep-alive，不需要手动设置
         },
         body: JSON.stringify({
-          organizationIds: [1], // 使用一个测试的组织ID
-          pageNum: 0,
-          pageSize: 1,
+          queryParam: {
+            projectIdList: [1], // 使用一个测试的组织ID
+            cityNameList: DEFAULT_CITY_NAME_LIST,
+          },
+          options: {
+            pageNum: 1,
+            pageSize: 1,
+            listOrderBy: 0,
+            supportSupplier: null,
+          },
         }),
         signal: controller.signal,
         // Node.js 18+ 的 fetch 自动处理连接管理，不需要自定义 agent

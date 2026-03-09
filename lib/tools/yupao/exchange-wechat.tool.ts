@@ -1,14 +1,8 @@
 import { tool } from "ai";
 import { z } from 'zod/v3';
-import { getPuppeteerMCPClient, getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
+import { getPlaywrightMCPClient } from "@/lib/mcp/client-manager";
 import { YUPAO_EXCHANGE_WECHAT_SELECTORS } from "./constants";
-import {
-  wrapAntiDetectionScript,
-  randomDelay,
-  clickWithMouseTrajectory,
-} from "../zhipin/anti-detection-utils";
 import { createDynamicClassSelector } from "./dynamic-selector-utils";
-import { parseEvaluateResult } from "../shared/puppeteer-utils";
 import { SourcePlatform, WechatExchangeType } from "@/db/types";
 import { recordWechatExchangedEvent } from "@/lib/services/recruitment-event";
 import {
@@ -17,9 +11,6 @@ import {
   wrapPlaywrightScript,
   type TabSelectionResult,
 } from "@/lib/tools/shared/playwright-utils";
-
-// Feature flag: 使用 Playwright MCP 而非 Puppeteer MCP
-const USE_PLAYWRIGHT_MCP = process.env.USE_PLAYWRIGHT_MCP === "true";
 
 /**
  * Yupao交换微信工具
@@ -37,7 +28,7 @@ export const yupaoExchangeWechatTool = () =>
     - 自动点击"换微信"按钮
     - 在确认对话框中点击"确定"按钮
     - 完成微信号交换流程
-    ${USE_PLAYWRIGHT_MCP ? "- [Playwright] 支持自动切换到鱼泡标签页" : ""}
+    - [Playwright] 支持自动切换到鱼泡标签页
 
     注意：
     - 需要先打开候选人聊天窗口
@@ -106,10 +97,10 @@ export const yupaoExchangeWechatTool = () =>
       jobName,
     }) => {
       try {
-        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
+        const mcpBackend = "playwright" as const;
 
-        // Playwright 模式: 自动切换到鱼泡标签页
-        if (USE_PLAYWRIGHT_MCP && autoSwitchTab) {
+        // 自动切换到鱼泡标签页
+        if (autoSwitchTab) {
           console.log("[Playwright] 正在切换到鱼泡标签页...");
           const tabResult: TabSelectionResult = await selectYupaoTab();
 
@@ -125,24 +116,18 @@ export const yupaoExchangeWechatTool = () =>
           console.log(`[Playwright] 已切换到: ${tabResult.tab?.title} (${tabResult.tab?.url})`);
         }
 
-        // 获取适当的 MCP 客户端
-        const client = USE_PLAYWRIGHT_MCP
-          ? await getPlaywrightMCPClient()
-          : await getPuppeteerMCPClient();
+        // 获取 Playwright MCP 客户端
+        const client = await getPlaywrightMCPClient();
 
         const tools = await client.tools();
 
-        // 根据 MCP 类型选择工具名称
-        const evaluateToolName = USE_PLAYWRIGHT_MCP ? "browser_evaluate" : "puppeteer_evaluate";
+        // Playwright 工具名称
+        const evaluateToolName = "browser_evaluate";
 
         // 检查必需的工具是否可用
         if (!tools[evaluateToolName]) {
           throw new Error(
-            `MCP tool ${evaluateToolName} not available. ${
-              USE_PLAYWRIGHT_MCP
-                ? "请确保 Playwright MCP 正在运行且已连接浏览器。"
-                : "请确保 Puppeteer MCP 正在运行。"
-            }`
+            `MCP tool ${evaluateToolName} not available. 请确保 Playwright MCP 正在运行且已连接浏览器。`
           );
         }
 
@@ -151,36 +136,22 @@ export const yupaoExchangeWechatTool = () =>
 
         // 辅助函数：执行脚本
         const executeScript = async (scriptContent: string) => {
-          const script = USE_PLAYWRIGHT_MCP
-            ? wrapPlaywrightScript(scriptContent)
-            : wrapAntiDetectionScript(scriptContent);
-          const params = USE_PLAYWRIGHT_MCP ? { function: script } : { script };
+          const script = wrapPlaywrightScript(scriptContent);
+          const params = { function: script };
           const result = await evaluateTool.execute(params);
-          return USE_PLAYWRIGHT_MCP ? parsePlaywrightResult(result) : parseEvaluateResult(result);
+          return parsePlaywrightResult(result);
         };
 
         // 辅助函数：执行点击
         const executeClick = async (selector: string) => {
-          if (USE_PLAYWRIGHT_MCP) {
-            // Playwright MCP 的 browser_click 需要 accessibility ref，不支持 CSS 选择器
-            // 所以这里使用 evaluate 方式点击
-            await executeScript(`
-              const el = document.querySelector('${selector}');
-              if (el) { el.click(); return { success: true }; }
-              return { success: false };
-            `);
-          } else {
-            await clickWithMouseTrajectory(client, selector, {
-              preClickDelay: 100,
-              moveSteps: 20,
-            });
-          }
+          // Playwright MCP 的 browser_click 需要 accessibility ref，不支持 CSS 选择器
+          // 所以这里使用 evaluate 方式点击
+          await executeScript(`
+            const el = document.querySelector('${selector}');
+            if (el) { el.click(); return { success: true }; }
+            return { success: false };
+          `);
         };
-
-        // 添加初始延迟 (仅 Puppeteer 模式)
-        if (!USE_PLAYWRIGHT_MCP) {
-          await randomDelay(100, 300);
-        }
 
         // 优先策略：检查是否有待处理的"同意"按钮（对方发起的交换请求）
         const pendingResult = await executeScript(`
@@ -212,9 +183,7 @@ export const yupaoExchangeWechatTool = () =>
 
         if (pendingData?.handled) {
           // 等待交换完成
-          if (!USE_PLAYWRIGHT_MCP) {
-            await randomDelay(waitAfterExchangeMin, waitAfterExchangeMax);
-          } else {
+          {
             const delay = waitAfterExchangeMin + Math.random() * (waitAfterExchangeMax - waitAfterExchangeMin);
             await new Promise(r => setTimeout(r, delay));
           }
@@ -410,9 +379,7 @@ export const yupaoExchangeWechatTool = () =>
         }
 
         // 等待弹窗出现
-        if (!USE_PLAYWRIGHT_MCP) {
-          await randomDelay(waitBetweenClicksMin, waitBetweenClicksMax);
-        } else {
+        {
           const delay = waitBetweenClicksMin + Math.random() * (waitBetweenClicksMax - waitBetweenClicksMin);
           await new Promise(r => setTimeout(r, delay));
         }
@@ -452,11 +419,7 @@ export const yupaoExchangeWechatTool = () =>
 
         if (!dialogData?.visible || !dialogData?.hasConfirmButton) {
           // 如果弹窗还没出现，再等待一下
-          if (!USE_PLAYWRIGHT_MCP) {
-            await randomDelay(500, 800);
-          } else {
-            await new Promise(r => setTimeout(r, 650));
-          }
+          await new Promise(r => setTimeout(r, 650));
         }
 
         // 第二步：查找并点击确认按钮 - 使用动态选择器
@@ -576,11 +539,7 @@ export const yupaoExchangeWechatTool = () =>
         }
 
         // 添加点击前延迟
-        if (!USE_PLAYWRIGHT_MCP) {
-          await randomDelay(200, 400);
-        } else {
-          await new Promise(r => setTimeout(r, 300));
-        }
+        await new Promise(r => setTimeout(r, 300));
 
         // 点击确认按钮
         let confirmClicked = false;
@@ -635,9 +594,7 @@ export const yupaoExchangeWechatTool = () =>
         }
 
         // 等待交换完成
-        if (!USE_PLAYWRIGHT_MCP) {
-          await randomDelay(waitAfterExchangeMin, waitAfterExchangeMax);
-        } else {
+        {
           const delay = waitAfterExchangeMin + Math.random() * (waitAfterExchangeMax - waitAfterExchangeMin);
           await new Promise(r => setTimeout(r, delay));
         }
@@ -741,13 +698,11 @@ export const yupaoExchangeWechatTool = () =>
         };
       } catch (error) {
         // 静默处理错误
-        const mcpBackend = USE_PLAYWRIGHT_MCP ? "playwright" : "puppeteer";
-
         return {
           success: false,
           error: error instanceof Error ? error.message : "Unknown error occurred",
           message: "交换微信时发生错误",
-          mcpBackend,
+          mcpBackend: "playwright" as const,
         };
       }
     },
