@@ -42,6 +42,7 @@ vi.mock("@/lib/services/brand-alias/brand-alias.service", () => ({
 
 // ========== 导入被测模块 ==========
 
+const { getSharedBrandDictionary } = await import("@/lib/services/brand-alias/brand-alias.service");
 const { extractAndSaveFacts } = await import("../fact-extraction");
 const { WeworkSessionMemory } = await import("../session-memory");
 
@@ -222,6 +223,17 @@ describe("extractAndSaveFacts", () => {
       // mock 返回的品牌字典包含 "肯德基" 和 "必胜客"
       expect(call.prompt).toContain("肯德基");
       expect(call.prompt).toContain("必胜客");
+    });
+
+    it("应透传请求级 dulidayToken 到共享品牌服务", async () => {
+      mockSafeGenerateObject.mockResolvedValue({
+        success: true,
+        data: makeFacts({ name: "张三" }),
+      });
+
+      await extractAndSaveFacts(memory, makeMessages(3), "request-token-123");
+
+      expect(vi.mocked(getSharedBrandDictionary)).toHaveBeenCalledWith("request-token-123");
     });
   });
 

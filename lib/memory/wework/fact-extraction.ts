@@ -25,8 +25,8 @@ import { getSharedBrandDictionary } from "@/lib/services/brand-alias/brand-alias
 /**
  * 从共享品牌别名服务获取品牌数据，转换为 BrandDataList 格式
  */
-async function fetchBrandData(): Promise<BrandDataList> {
-  const dictionary = await getSharedBrandDictionary();
+async function fetchBrandData(dulidayToken?: string): Promise<BrandDataList> {
+  const dictionary = await getSharedBrandDictionary(dulidayToken);
   return Object.entries(dictionary).map(([name, aliases]) => ({
     name,
     aliases: aliases.filter(a => a !== name),
@@ -186,7 +186,7 @@ const FALLBACK: EntityExtractionResult = {
 export async function extractAndSaveFacts(
   sessionMemory: WeworkSessionMemory,
   processedMessages: UIMessage[],
-  _dulidayToken?: string
+  dulidayToken?: string
 ): Promise<void> {
   // 1. 提取对话历史
   const allHistory = processedMessages
@@ -204,7 +204,7 @@ export async function extractAndSaveFacts(
   const conversationHistory = allHistory.slice(0, -1);
 
   // 2. 获取品牌数据
-  const brandData = await fetchBrandData();
+  const brandData = await fetchBrandData(dulidayToken);
 
   // 3. 增量提取策略
   const previousFacts = await sessionMemory.getFacts();

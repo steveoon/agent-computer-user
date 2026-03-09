@@ -175,16 +175,16 @@ export function fuzzyMatchBrand(
   aliasMap?: Map<string, string>
 ): string | null {
   if (!inputBrand) return null;
+  const normalizeBrandName = (value: string) => value.toLowerCase().replace(/[\s._-]+/g, "");
 
   // 0. 别名字典查找（O(1)，优先级最高）
   if (aliasMap) {
-    const aliasResult = aliasMap.get(inputBrand.toLowerCase());
+    const aliasResult =
+      aliasMap.get(normalizeBrandName(inputBrand)) || aliasMap.get(inputBrand.toLowerCase());
     if (aliasResult && availableBrands.includes(aliasResult)) {
       return aliasResult;
     }
   }
-
-  const normalizeBrandName = (value: string) => value.toLowerCase().replace(/[\s._-]+/g, "");
 
   const inputLower = inputBrand.toLowerCase();
   const inputNormalized = normalizeBrandName(inputBrand);
@@ -1153,6 +1153,7 @@ interface PolicyContextDebugInfo {
   storeCount: number;
   detailLevel: "minimal" | "focused";
   turnPlan: TurnPlan;
+  aliasLookupError?: string;
 }
 
 /**
@@ -1185,7 +1186,24 @@ export async function buildContextInfoByNeeds(
     needs.has("requirements");
 
   // 预取品牌别名 Map，用于增强品牌名解析（如 "KFC" → "肯德基"）
-  const aliasMap = await getSharedBrandAliasMap();
+  // 失败时降级为原有 fuzzy 匹配，不中断智能回复流程。
+  let aliasMap: Map<string, string> | undefined;
+  let aliasLookupError: string | undefined;
+  try {
+    aliasMap = await getSharedBrandAliasMap();
+  } catch (error) {
+    const errorMessage =
+      typeof error === "object" &&
+      error !== null &&
+      "userMessage" in error &&
+      typeof (error as { userMessage?: unknown }).userMessage === "string"
+        ? (error as { userMessage: string }).userMessage
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    aliasLookupError = errorMessage;
+    console.warn(`[buildContextInfoByNeeds] 品牌别名服务不可用，回退 fuzzy 解析: ${errorMessage}`);
+  }
 
   const brandResolution = resolveBrandConflict({
     uiSelectedBrand,
@@ -1287,6 +1305,9 @@ export async function buildContextInfoByNeeds(
   const detailLevel: "minimal" | "focused" = requiresFacts ? "focused" : "minimal";
 
   let context = `阶段目标：${turnPlan.stage}\n默认推荐品牌：${targetBrand}\n`;
+  if (aliasLookupError) {
+    context += `系统状态：品牌别名服务暂不可用，已回退为规则匹配（${aliasLookupError}）。\n`;
+  }
 
   if (replyPolicy) {
     const stageGoal = replyPolicy.stageGoals[turnPlan.stage];
@@ -1370,6 +1391,7 @@ export async function buildContextInfoByNeeds(
       storeCount,
       detailLevel,
       turnPlan,
+      aliasLookupError,
     },
   };
 }

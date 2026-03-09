@@ -430,7 +430,6 @@ describe("Brand Resolution with Alias Map", () => {
   const aliasMap = new Map([
     ["kfc", "肯德基"],
     ["肯德基", "肯德基"],
-    ["pizza hut", "必胜客"],
     ["pizzahut", "必胜客"],
     ["必胜客", "必胜客"],
     ["sam", "山姆会员店"],
@@ -457,6 +456,23 @@ describe("Brand Resolution with Alias Map", () => {
   it("should resolve 'Pizza Hut' to '必胜客' via alias map", () => {
     const input: BrandResolutionInput = {
       uiSelectedBrand: "Pizza Hut",
+      configDefaultBrand: "肯德基",
+      conversationBrand: undefined,
+      availableBrands,
+      strategy: "user-selected",
+      aliasMap,
+    };
+
+    const result = resolveBrandConflict(input);
+
+    expect(result.resolvedBrand).toBe("必胜客");
+    expect(result.source).toBe("ui");
+    expect(result.matchType).toBe("fuzzy");
+  });
+
+  it("should resolve alias with separators normalized", () => {
+    const input: BrandResolutionInput = {
+      uiSelectedBrand: "Pizza-Hut",
       configDefaultBrand: "肯德基",
       conversationBrand: undefined,
       availableBrands,

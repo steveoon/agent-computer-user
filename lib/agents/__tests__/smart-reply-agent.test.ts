@@ -162,6 +162,22 @@ describe("Smart Reply Pipeline", () => {
       expect(result.suggestedReply).toBeDefined();
     });
 
+    it("should continue and expose context warning when alias lookup fails", async () => {
+      const { getSharedBrandAliasMap } = await import("@/lib/services/brand-alias/brand-alias.service");
+      vi.mocked(getSharedBrandAliasMap).mockRejectedValueOnce(new Error("alias timeout"));
+
+      const { generateSmartReply } = await import("../smart-reply-agent");
+      const result = await generateSmartReply({
+        candidateMessage: "肯德基有岗位吗？",
+        conversationHistory: [],
+        configData: sampleConfigData,
+      });
+
+      expect(result.suggestedReply.length).toBeGreaterThan(0);
+      expect(result.contextInfo).toContain("品牌别名服务暂不可用");
+      expect(result.debugInfo?.aliasLookupError).toContain("alias timeout");
+    });
+
     it("should calculate confidence based on extracted info", async () => {
       const { generateSmartReply } = await import("../smart-reply-agent");
 

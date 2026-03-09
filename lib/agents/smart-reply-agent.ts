@@ -49,6 +49,7 @@ export interface SmartReplyDebugInfo {
   storeCount: number;
   detailLevel: string;
   turnPlan: TurnPlan;
+  aliasLookupError?: string;
   classification: MessageClassification;
   gateStatus: AgeEligibilityStatus;
   appliedStrategy: AgeEligibilityAppliedStrategy;

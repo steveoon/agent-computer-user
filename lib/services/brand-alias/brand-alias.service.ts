@@ -34,8 +34,8 @@ const REQUEST_TIMEOUT_MS = 30_000;
  * 从 Duliday API 获取品牌列表（含别名）
  * @throws AppError 当 Token 缺失、网络错误或响应格式异常时
  */
-async function fetchBrandAliasesFromApi(): Promise<DulidayBrandItem[]> {
-  const token = process.env.DULIDAY_TOKEN;
+async function fetchBrandAliasesFromApi(dulidayToken?: string): Promise<DulidayBrandItem[]> {
+  const token = dulidayToken || process.env.DULIDAY_TOKEN;
   if (!token) {
     throw new AppError({
       code: ErrorCode.CONFIG_MISSING_FIELD,
@@ -119,12 +119,21 @@ async function fetchBrandAliasesFromApi(): Promise<DulidayBrandItem[]> {
 /**
  * 从 API 数据构建正向字典和反向别名 Map
  *
+ * 核心逻辑：
+ * 1. API 品牌直接注册别名
+ * 2. 通过 projectIdList 关联本地区域品牌，自动继承父品牌别名并加城市前缀
+ *    例：API 返回 肯德基(aliases=["KFC"], projectIdList=[5, 1142])
+ *        DB 有 mappingKey=1142 → 深圳肯德基
+ *        → 自动生成 "深圳kfc" → "深圳肯德基"
+ *
  * @param apiData API 返回的品牌列表
  * @param actualBrands 数据库中的实际业务品牌集合
+ * @param brandMapping 数据库品牌映射 { orgId/projectId: brandName }
  */
 function buildMapsFromApiData(
   apiData: DulidayBrandItem[],
-  actualBrands: Set<string>
+  actualBrands: Set<string>,
+  brandMapping?: Record<string, string>
 ): {
   dictionary: BrandDictionary;
   aliasMap: BrandAliasMap;
@@ -133,24 +142,78 @@ function buildMapsFromApiData(
 } {
   const dictionary: BrandDictionary = {};
   const aliasMap: BrandAliasMap = new Map();
+  const normalizeAlias = (value: string): string => value.trim();
+  const toAliasMapKey = (value: string): string =>
+    normalizeAlias(value).toLowerCase().replace(/[\s._-]+/g, "");
+
+  // 辅助：注册别名到反向 Map（冲突时保留更长品牌名）
+  const registerAlias = (alias: string, brandName: string): void => {
+    const key = toAliasMapKey(alias);
+    if (!key) return;
+    const existing = aliasMap.get(key);
+    if (!existing || brandName.length > existing.length) {
+      aliasMap.set(key, brandName);
+    }
+  };
 
   // 按品牌名称长度降序处理，确保长品牌名优先注册别名
   const sortedApiData = [...apiData].sort((a, b) => b.name.length - a.name.length);
 
   for (const item of sortedApiData) {
-    const brandName = item.name;
+    const brandName = normalizeAlias(item.name);
+    if (!brandName) continue;
 
     // 构建正向字典: brandName → [brandName, ...aliases]
-    const allAliases = [brandName, ...item.aliases.filter(a => a !== brandName)];
+    const allAliases = Array.from(
+      new Set(
+        [brandName, ...item.aliases.map(normalizeAlias).filter(Boolean)].filter(
+          alias => alias !== brandName
+        )
+      )
+    );
+    allAliases.unshift(brandName);
     dictionary[brandName] = allAliases;
 
-    // 构建反向 Map: 每个别名 (lowercase) → brandName
+    // 注册反向别名
     for (const alias of allAliases) {
-      const key = alias.toLowerCase();
-      // 冲突时保留更长品牌名（更具体的优先）
-      const existing = aliasMap.get(key);
-      if (!existing || brandName.length > existing.length) {
-        aliasMap.set(key, brandName);
+      registerAlias(alias, brandName);
+    }
+
+    // 通过 projectIdList 为区域品牌自动生成别名
+    if (brandMapping && item.projectIdList.length > 0) {
+      for (const projectId of item.projectIdList) {
+        const localBrandName = brandMapping[String(projectId)];
+        if (!localBrandName || localBrandName === brandName) continue;
+
+        // 提取城市前缀：如 "深圳肯德基" 去掉 "肯德基" = "深圳"
+        // 仅当本地品牌名包含父品牌名时才生成区域别名（防止不相关品牌名产生垃圾别名）
+        if (!localBrandName.includes(brandName)) continue;
+        const prefix = localBrandName.replace(brandName, "");
+        if (!prefix) continue;
+
+        // 为区域品牌生成别名：品牌名自身 + 前缀 + 父品牌别名
+        const regionalAliases = [localBrandName];
+        for (const parentAlias of allAliases) {
+          if (parentAlias === brandName) continue;
+          regionalAliases.push(`${prefix}${parentAlias}`);
+        }
+
+        // 注册区域品牌到字典和反向 Map
+        if (!dictionary[localBrandName]) {
+          dictionary[localBrandName] = regionalAliases;
+        } else {
+          // 合并新生成的别名到已有条目
+          const existing = new Set(dictionary[localBrandName]);
+          for (const alias of regionalAliases) {
+            if (!existing.has(alias)) {
+              dictionary[localBrandName].push(alias);
+            }
+          }
+        }
+
+        for (const alias of regionalAliases) {
+          registerAlias(alias, localBrandName);
+        }
       }
     }
   }
@@ -159,10 +222,7 @@ function buildMapsFromApiData(
   for (const brand of actualBrands) {
     if (!dictionary[brand]) {
       dictionary[brand] = [brand];
-      const key = brand.toLowerCase();
-      if (!aliasMap.has(key)) {
-        aliasMap.set(key, brand);
-      }
+      registerAlias(brand, brand);
     }
   }
 
@@ -178,21 +238,22 @@ function buildMapsFromApiData(
  * 确保缓存已填充（fetch + build + cache）
  * @throws AppError 当 API 不可用时
  */
-async function ensureCachePopulated(): Promise<void> {
+async function ensureCachePopulated(dulidayToken?: string): Promise<void> {
   if (BrandDictionaryCache.brandDictionary && BrandDictionaryCache.aliasMap && isCacheValid()) {
     return;
   }
 
   // 并行获取 API 数据和数据库品牌映射
   const [apiData, brandMapping] = await Promise.all([
-    fetchBrandAliasesFromApi(),
+    fetchBrandAliasesFromApi(dulidayToken),
     getAllBrandMappings(),
   ]);
 
   const actualBrands = new Set(Object.values(brandMapping));
   const { dictionary, aliasMap, sortedBrands, actualBrandSet } = buildMapsFromApiData(
     apiData,
-    actualBrands
+    actualBrands,
+    brandMapping
   );
 
   // 写入缓存
@@ -207,8 +268,8 @@ async function ensureCachePopulated(): Promise<void> {
  * 获取品牌正向字典 (brandName → aliases[])
  * @throws AppError 当 API 不可用时
  */
-export async function getSharedBrandDictionary(): Promise<BrandDictionary> {
-  await ensureCachePopulated();
+export async function getSharedBrandDictionary(dulidayToken?: string): Promise<BrandDictionary> {
+  await ensureCachePopulated(dulidayToken);
   return BrandDictionaryCache.brandDictionary!;
 }
 
@@ -216,8 +277,8 @@ export async function getSharedBrandDictionary(): Promise<BrandDictionary> {
  * 获取品牌反向别名 Map (alias → brandName)
  * @throws AppError 当 API 不可用时
  */
-export async function getSharedBrandAliasMap(): Promise<BrandAliasMap> {
-  await ensureCachePopulated();
+export async function getSharedBrandAliasMap(dulidayToken?: string): Promise<BrandAliasMap> {
+  await ensureCachePopulated(dulidayToken);
   return BrandDictionaryCache.aliasMap!;
 }
 
