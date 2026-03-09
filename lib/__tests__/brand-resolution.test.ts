@@ -425,6 +425,87 @@ describe("Brand Resolution Logic", () => {
   });
 });
 
+describe("Brand Resolution with Alias Map", () => {
+  const availableBrands = ["肯德基", "必胜客", "山姆会员店", "大连肯德基"];
+  const aliasMap = new Map([
+    ["kfc", "肯德基"],
+    ["肯德基", "肯德基"],
+    ["pizza hut", "必胜客"],
+    ["pizzahut", "必胜客"],
+    ["必胜客", "必胜客"],
+    ["sam", "山姆会员店"],
+    ["山姆", "山姆会员店"],
+    ["大连kfc", "大连肯德基"],
+  ]);
+
+  it("should resolve 'KFC' to '肯德基' via alias map", () => {
+    const input: BrandResolutionInput = {
+      uiSelectedBrand: undefined,
+      configDefaultBrand: "必胜客",
+      conversationBrand: "KFC",
+      availableBrands,
+      strategy: "smart",
+      aliasMap,
+    };
+
+    const result = resolveBrandConflict(input);
+
+    expect(result.resolvedBrand).toBe("肯德基");
+    expect(result.source).toBe("conversation");
+  });
+
+  it("should resolve 'Pizza Hut' to '必胜客' via alias map", () => {
+    const input: BrandResolutionInput = {
+      uiSelectedBrand: "Pizza Hut",
+      configDefaultBrand: "肯德基",
+      conversationBrand: undefined,
+      availableBrands,
+      strategy: "user-selected",
+      aliasMap,
+    };
+
+    const result = resolveBrandConflict(input);
+
+    expect(result.resolvedBrand).toBe("必胜客");
+    expect(result.source).toBe("ui");
+    expect(result.matchType).toBe("fuzzy");
+  });
+
+  it("should prefer alias match over heuristic contains match", () => {
+    const input: BrandResolutionInput = {
+      uiSelectedBrand: undefined,
+      configDefaultBrand: "肯德基",
+      conversationBrand: "大连KFC",
+      availableBrands,
+      strategy: "smart",
+      aliasMap,
+    };
+
+    const result = resolveBrandConflict(input);
+
+    // "大连KFC" via alias map → "大连肯德基"（不是 "肯德基"）
+    expect(result.resolvedBrand).toBe("大连肯德基");
+    expect(result.source).toBe("conversation");
+  });
+
+  it("should fall back to heuristic matching when alias map has no match", () => {
+    const input: BrandResolutionInput = {
+      uiSelectedBrand: undefined,
+      configDefaultBrand: "肯德基",
+      conversationBrand: "山姆会员",
+      availableBrands,
+      strategy: "smart",
+      aliasMap,
+    };
+
+    const result = resolveBrandConflict(input);
+
+    // "山姆会员" not in alias map, but heuristic contains match → "山姆会员店"
+    expect(result.resolvedBrand).toBe("山姆会员店");
+    expect(result.source).toBe("conversation");
+  });
+});
+
 describe("Brand Resolution Integration", () => {
   it("should work correctly with the complete data flow", async () => {
     // This would test the integration with loadZhipinData and generateSmartReplyWithLLM

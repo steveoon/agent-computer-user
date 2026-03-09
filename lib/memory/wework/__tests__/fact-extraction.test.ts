@@ -31,9 +31,14 @@ vi.mock("@/lib/config/models", () => ({
   DEFAULT_PROVIDER_CONFIGS: {},
 }));
 
-// Mock fetch for brand data API
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
+// Mock 共享品牌别名服务（替代原有 fetch mock）
+vi.mock("@/lib/services/brand-alias/brand-alias.service", () => ({
+  getSharedBrandDictionary: vi.fn(async () => ({
+    肯德基: ["肯德基", "KFC", "kfc"],
+    必胜客: ["必胜客", "Pizza Hut"],
+  })),
+  getSharedBrandAliasMap: vi.fn(async () => new Map()),
+}));
 
 // ========== 导入被测模块 ==========
 
@@ -95,11 +100,7 @@ describe("extractAndSaveFacts", () => {
     testId++;
     memory = new WeworkSessionMemory(`test-extract-${testId}`, `session-${testId}`);
 
-    // 默认品牌 API 返回空（不阻塞测试）
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ([]),
-    });
+    // 品牌数据通过共享服务 mock 提供（vi.mock 在文件顶部）
   });
 
   describe("无历史缓存（首次提取）", () => {
@@ -209,8 +210,7 @@ describe("extractAndSaveFacts", () => {
   });
 
   describe("品牌数据获取", () => {
-    it("品牌 API 失败时应继续提取（不阻塞）", async () => {
-      mockFetch.mockRejectedValue(new Error("Network error"));
+    it("应将品牌数据注入到 LLM 提示词中", async () => {
       mockSafeGenerateObject.mockResolvedValue({
         success: true,
         data: makeFacts({ name: "张三" }),
@@ -218,8 +218,10 @@ describe("extractAndSaveFacts", () => {
 
       await extractAndSaveFacts(memory, makeMessages(3));
 
-      const saved = await memory.getFacts();
-      expect(saved!.interview_info.name).toBe("张三");
+      const call = mockSafeGenerateObject.mock.calls[0][0];
+      // mock 返回的品牌字典包含 "肯德基" 和 "必胜客"
+      expect(call.prompt).toContain("肯德基");
+      expect(call.prompt).toContain("必胜客");
     });
   });
 

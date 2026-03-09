@@ -32,7 +32,10 @@ export const BrandResolutionInputSchema = z.object({
   strategy: BrandPriorityStrategySchema,
 });
 
-export type BrandResolutionInput = z.infer<typeof BrandResolutionInputSchema>;
+export type BrandResolutionInput = z.infer<typeof BrandResolutionInputSchema> & {
+  /** 品牌别名反向查找 Map (alias → brandName)，运行时注入，不参与 Zod 校验 */
+  aliasMap?: Map<string, string>;
+};
 
 /**
  * Match type for brand resolution

@@ -28,6 +28,7 @@ import {
   isValidCoordinates,
 } from "../services/geocoding.service";
 import type { StoreWithDistance } from "@/types/geocoding";
+import { getSharedBrandAliasMap } from "@/lib/services/brand-alias/brand-alias.service";
 
 /**
  * 🔧 智能薪资描述构建器
@@ -168,8 +169,20 @@ export async function loadZhipinData(
  * @param availableBrands 可用的品牌列表
  * @returns 匹配的品牌名或null
  */
-export function fuzzyMatchBrand(inputBrand: string, availableBrands: string[]): string | null {
+export function fuzzyMatchBrand(
+  inputBrand: string,
+  availableBrands: string[],
+  aliasMap?: Map<string, string>
+): string | null {
   if (!inputBrand) return null;
+
+  // 0. 别名字典查找（O(1)，优先级最高）
+  if (aliasMap) {
+    const aliasResult = aliasMap.get(inputBrand.toLowerCase());
+    if (aliasResult && availableBrands.includes(aliasResult)) {
+      return aliasResult;
+    }
+  }
 
   const normalizeBrandName = (value: string) => value.toLowerCase().replace(/[\s._-]+/g, "");
 
@@ -240,6 +253,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
     conversationBrand,
     availableBrands,
     strategy = "smart",
+    aliasMap,
   } = input;
 
   // 记录解析尝试历史
@@ -257,7 +271,7 @@ export function resolveBrandConflict(input: BrandResolutionInput): BrandResoluti
       return undefined;
     }
 
-    const matched = fuzzyMatchBrand(brand, availableBrands);
+    const matched = fuzzyMatchBrand(brand, availableBrands, aliasMap);
     if (matched) {
       const isExact = matched === brand;
       attempts.push({
@@ -1170,15 +1184,30 @@ export async function buildContextInfoByNeeds(
     needs.has("availability") ||
     needs.has("requirements");
 
+  // 预取品牌别名 Map，用于增强品牌名解析（如 "KFC" → "肯德基"）
+  const aliasMap = await getSharedBrandAliasMap();
+
   const brandResolution = resolveBrandConflict({
     uiSelectedBrand,
     configDefaultBrand: data.defaultBrand,
     conversationBrand: toolBrand || undefined,
     availableBrands: Object.keys(data.brands),
     strategy: brandPriorityStrategy || "smart",
+    aliasMap,
   });
 
   const targetBrand = brandResolution.resolvedBrand;
+
+  // 品牌解析日志
+  const isAliasMatch = toolBrand && toolBrand !== targetBrand;
+  console.log(
+    `━━━ 🏷️ 品牌解析 ━━━\n` +
+      `   工具传参: ${toolBrand ?? "(未指定)"}\n` +
+      (isAliasMatch ? `   别名匹配: ${toolBrand} → ${targetBrand}\n` : "") +
+      `   解析结果: ${targetBrand} (${brandResolution.matchType}, 来源: ${brandResolution.source})\n` +
+      `   ${brandResolution.reason}`
+  );
+
   const brandStores = data.stores.filter(store => store.brand === targetBrand);
   let relevantStores = brandStores;
 

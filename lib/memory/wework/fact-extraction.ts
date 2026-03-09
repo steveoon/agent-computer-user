@@ -9,7 +9,6 @@
  */
 
 import type { UIMessage } from "ai";
-import { z } from "zod/v3";
 import { getDynamicRegistry } from "@/lib/model-registry/dynamic-registry";
 import { DEFAULT_PROVIDER_CONFIGS, type ModelId } from "@/lib/config/models";
 import { safeGenerateObject } from "@/lib/ai";
@@ -19,152 +18,19 @@ import {
   type EntityExtractionResult,
 } from "@/lib/tools/wework/types";
 import type { WeworkSessionMemory } from "./session-memory";
+import { getSharedBrandDictionary } from "@/lib/services/brand-alias/brand-alias.service";
 
 // ========== 品牌数据获取 ==========
 
-const BRAND_LIST_API_URL = "https://k8s.duliday.com/persistence/ai/api/brand/list";
-
-const MEMORY_CACHE_TTL_MS = 30 * 60 * 1000;
-
-let memoryCache: { data: BrandDataList; expiry: number } | null = null;
-
-const BrandListItemSchema = z
-  .object({
-    name: z.string().optional(),
-    brandName: z.string().optional(),
-    brand: z.string().optional(),
-    brandAlias: z.string().optional(),
-    aliases: z.array(z.string()).optional(),
-    brandAliasList: z.array(z.string()).optional(),
-    aliasList: z.array(z.string()).optional(),
-    brandAliases: z.array(z.string()).optional(),
-  })
-  .passthrough();
-
-const BrandListResponseSchema = z.union([
-  z.array(BrandListItemSchema),
-  z
-    .object({
-      brands: z.array(BrandListItemSchema).optional(),
-      data: z
-        .object({
-          brands: z.array(BrandListItemSchema).optional(),
-          result: z.array(BrandListItemSchema).optional(),
-          list: z.array(BrandListItemSchema).optional(),
-        })
-        .optional(),
-    })
-    .passthrough(),
-]);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
-function toStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(isNonEmptyString);
-}
-
-function extractBrandListFromPayload(payload: unknown): BrandDataList | null {
-  const candidates: unknown[] = [];
-
-  if (Array.isArray(payload)) {
-    candidates.push(payload);
-  }
-
-  if (isRecord(payload)) {
-    if (Array.isArray(payload.brands)) candidates.push(payload.brands);
-    if (isRecord(payload.data)) {
-      if (Array.isArray(payload.data.brands)) candidates.push(payload.data.brands);
-      if (Array.isArray(payload.data.result)) candidates.push(payload.data.result);
-      if (Array.isArray(payload.data.list)) candidates.push(payload.data.list);
-    }
-  }
-
-  for (const candidate of candidates) {
-    if (!Array.isArray(candidate)) continue;
-
-    const mapped = candidate
-      .map(item => {
-        if (!isRecord(item)) return null;
-        const name =
-          (isNonEmptyString(item.name) && item.name) ||
-          (isNonEmptyString(item.brandName) && item.brandName) ||
-          (isNonEmptyString(item.brand) && item.brand) ||
-          (isNonEmptyString(item.brandAlias) && item.brandAlias) ||
-          "";
-        if (!name) return null;
-        const aliases = [
-          ...toStringArray(item.aliases),
-          ...toStringArray(item.brandAliasList),
-          ...toStringArray(item.aliasList),
-          ...toStringArray(item.brandAliases),
-        ];
-        return { name, aliases: Array.from(new Set(aliases)).filter(a => a !== name) };
-      })
-      .filter((item): item is { name: string; aliases: string[] } => item !== null);
-
-    if (mapped.length > 0) return mapped;
-  }
-
-  return null;
-}
-
-function parseBrandListResponse(payload: unknown): BrandDataList | null {
-  const parsed = BrandListResponseSchema.safeParse(payload);
-  if (!parsed.success) {
-    console.warn("[fetchBrandData] Response schema validation failed:", parsed.error);
-    return null;
-  }
-  return extractBrandListFromPayload(parsed.data);
-}
-
 /**
- * 从后端 API 获取品牌数据（内存缓存 30min → API）
- * @param dulidayToken 优先使用传入的 token，降级到环境变量
+ * 从共享品牌别名服务获取品牌数据，转换为 BrandDataList 格式
  */
-async function fetchBrandData(dulidayToken?: string): Promise<BrandDataList> {
-  try {
-    if (memoryCache && Date.now() < memoryCache.expiry) return memoryCache.data;
-
-    const token = dulidayToken || process.env.DULIDAY_TOKEN;
-    if (!token) {
-      console.warn("[fetchBrandData] Missing DULIDAY_TOKEN, skipping brand fetch");
-      return [];
-    }
-
-    const response = await fetch(BRAND_LIST_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Duliday-Token": token },
-      body: JSON.stringify({
-        page: 1,
-        pageSize: 1000,
-      }),
-    });
-
-    if (!response.ok) {
-      console.warn(`[fetchBrandData] HTTP error: ${response.status} ${response.statusText}`);
-      return [];
-    }
-
-    const data = await response.json();
-    const brands = parseBrandListResponse(data);
-    if (!brands) {
-      console.warn("[fetchBrandData] Invalid data format:", data);
-      return [];
-    }
-
-    memoryCache = { data: brands, expiry: Date.now() + MEMORY_CACHE_TTL_MS };
-    return brands;
-  } catch (error) {
-    console.warn("[fetchBrandData] Failed to fetch brand data:", error);
-    return [];
-  }
+async function fetchBrandData(): Promise<BrandDataList> {
+  const dictionary = await getSharedBrandDictionary();
+  return Object.entries(dictionary).map(([name, aliases]) => ({
+    name,
+    aliases: aliases.filter(a => a !== name),
+  }));
 }
 
 // ========== 提示词 ==========
@@ -320,7 +186,7 @@ const FALLBACK: EntityExtractionResult = {
 export async function extractAndSaveFacts(
   sessionMemory: WeworkSessionMemory,
   processedMessages: UIMessage[],
-  dulidayToken?: string
+  _dulidayToken?: string
 ): Promise<void> {
   // 1. 提取对话历史
   const allHistory = processedMessages
@@ -338,7 +204,7 @@ export async function extractAndSaveFacts(
   const conversationHistory = allHistory.slice(0, -1);
 
   // 2. 获取品牌数据
-  const brandData = await fetchBrandData(dulidayToken);
+  const brandData = await fetchBrandData();
 
   // 3. 增量提取策略
   const previousFacts = await sessionMemory.getFacts();

@@ -4,10 +4,30 @@
  * 内存管理的完整测试场景
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { ReplyPromptBuilder } from "../core/reply-builder";
 import { CellularMemoryManager } from "../memory/cellular-memory-manager";
+import { SmartExtractor } from "../memory/smart-patterns";
 import type { ReplyBuilderParams } from "@/types/context-engineering";
+
+// Mock 共享品牌别名服务（避免调用真实 Duliday API）
+vi.mock("@/lib/services/brand-alias/brand-alias.service", () => ({
+  getSharedBrandDictionary: vi.fn(async () => ({
+    肯德基: ["肯德基", "KFC", "kfc"],
+    必胜客: ["必胜客", "Pizza Hut"],
+    麦当劳: ["麦当劳", "金拱门", "McDonald"],
+    星巴克: ["星巴克", "Starbucks"],
+    海底捞: ["海底捞", "海捞"],
+    瑞幸: ["瑞幸", "luckin"],
+    汉堡王: ["汉堡王", "Burger King", "BK"],
+  })),
+  getSharedBrandAliasMap: vi.fn(async () => new Map()),
+}));
+
+// 预热品牌字典缓存，确保 CellularMemoryManager 的 fire-and-forget 提取能同步使用缓存
+beforeAll(async () => {
+  await SmartExtractor.extractBrands("");
+});
 
 describe("ReplyPromptBuilder - 内存管理详细测试", () => {
   describe("CellularMemoryManager 完整功能", () => {

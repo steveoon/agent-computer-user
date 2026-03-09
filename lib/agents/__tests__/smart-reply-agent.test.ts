@@ -44,6 +44,12 @@ vi.mock("../classification-agent", () => ({
   planTurn: vi.fn(async () => mockTurnPlan),
 }));
 
+// Mock 共享品牌别名服务（避免调用真实 Duliday API）
+vi.mock("@/lib/services/brand-alias/brand-alias.service", () => ({
+  getSharedBrandDictionary: vi.fn(async () => ({})),
+  getSharedBrandAliasMap: vi.fn(async () => new Map()),
+}));
+
 // Sample config data for testing (using 'as unknown as' to avoid complex type matching)
 // In real tests, you would use properly structured mock data
 const sampleConfigData = {

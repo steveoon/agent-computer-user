@@ -6,100 +6,33 @@
  * 基于数据库品牌映射构建，确保数据一致性
  */
 
-import { getAllBrandMappings } from "@/actions/brand-mapping";
+import { getSharedBrandDictionary } from "@/lib/services/brand-alias/brand-alias.service";
 import { BrandDictionaryCache, isCacheValid } from "./brand-dictionary-cache";
 
 /**
- * 品牌字典缓存（延迟初始化）
- * 改为使用独立缓存模块，便于在 Actions 中清空缓存且避免循环依赖
- */
-
-/**
- * 餐饮品牌字典
- * 基于数据库品牌映射构建，包含常见别名
+ * 品牌字典构建
  *
- * 双重保障机制：
- * 1. 手动清空：写操作后立即失效（0 延迟）
- * 2. TTL 过期：5 分钟后自动失效（兜底保障）
+ * 数据源：Duliday API (POST /ai/api/brand/list) + 数据库品牌映射
+ * 缓存：复用 BrandDictionaryCache（5 分钟 TTL）
+ * 错误：API 不可用时抛出 AppError，不降级
  */
 async function buildBrandDictionary() {
-  // 如果缓存存在且有效，直接返回
-  if (BrandDictionaryCache.brandDictionary && isCacheValid()) {
+  // 如果缓存完整且有效，直接返回
+  if (BrandDictionaryCache.brandDictionary && BrandDictionaryCache.sortedBrands && isCacheValid()) {
     return BrandDictionaryCache.brandDictionary;
   }
 
-  // 从数据库获取品牌列表
-  const brandMapping = await getAllBrandMappings();
-  const actualBrands = Object.values(brandMapping);
-  const actualBrandsSet = new Set(actualBrands); // 用 Set 优化性能
+  // 通过共享服务获取（内部处理 fetch + build + cache）
+  const dictionary = await getSharedBrandDictionary();
 
-  // TODO: 待 Duliday 提供品牌别名查询接口后，从 API 动态获取别名数据，删除此硬编码。
-  //  需注意：1) 接口数据需走 TTL 缓存；2) API 不可用时降级到品牌名本身；3) 非业务品牌（麦当劳等）可能需保留少量 fallback。
-  const brandAliases: Record<string, string[]> = {
-    // 基础品牌（只保留真别名，不包含区域品牌）
-    肯德基: ["肯德基", "KFC", "kfc"],
-    必胜客: ["必胜客", "Pizza Hut", "PizzaHut"],
-    奥乐齐: ["奥乐齐", "ALDI", "Aldi"],
-    大米先生: ["大米先生"],
-    成都你六姐: ["成都你六姐", "你六姐"], // ✓ 真别名
-    海底捞: ["海底捞", "海捞"],
-
-    // 区域品牌（每个都是独立品牌，有自己的变体）
-    大连肯德基: ["大连肯德基", "大连KFC", "大连kfc"],
-    天津肯德基: ["天津肯德基", "天津KFC", "天津kfc"],
-    北京肯德基: ["北京肯德基", "北京KFC", "北京kfc"],
-    成都肯德基: ["成都肯德基", "成都KFC", "成都kfc"],
-    深圳肯德基: ["深圳肯德基", "深圳KFC", "深圳kfc"],
-    广州肯德基: ["广州肯德基", "广州KFC", "广州kfc"],
-    杭州肯德基: ["杭州肯德基", "杭州KFC", "杭州kfc"],
-    上海必胜客: ["上海必胜客", "上海Pizza Hut", "上海PizzaHut"],
-    北京必胜客: ["北京必胜客", "北京Pizza Hut", "北京PizzaHut"],
-    成都必胜客: ["成都必胜客", "成都Pizza Hut", "成都PizzaHut"],
-    佛山必胜客: ["佛山必胜客", "佛山Pizza Hut", "佛山PizzaHut"],
-
-    // 常见品牌别名（即使不在 ORGANIZATION_MAPPING 中，也可能在对话中提到）
-    麦当劳: ["麦当劳", "金拱门", "McDonald", "M记"],
-    星巴克: ["星巴克", "Starbucks", "星爸爸"],
-    汉堡王: ["汉堡王", "Burger King", "BK"],
-    瑞幸: ["瑞幸", "luckin", "Luckin"],
-    Manner: ["Manner", "manner"],
-    蜜雪冰城: ["蜜雪冰城", "蜜雪"],
-    喜茶: ["喜茶", "HEYTEA"],
-    奈雪: ["奈雪", "奈雪的茶"],
-    全家: ["全家", "FamilyMart"],
-    罗森: ["罗森", "LAWSON", "Lawson"],
-    "7-11": ["7-11", "711", "Seven Eleven"],
-  };
-
-  // 构建最终字典，优先包含实际业务品牌
-  const dictionary: Record<string, string[]> = {};
-
-  // 首先添加所有实际业务品牌
-  actualBrands.forEach(brand => {
-    // 获取预定义的别名
-    const predefinedAliases = brandAliases[brand] || [];
-
-    // 过滤掉那些同时也是独立品牌的别名（除了自己）
-    const validAliases = predefinedAliases.filter(
-      alias => !actualBrandsSet.has(alias) || alias === brand
-    );
-
-    // 如果没有别名，至少包含自己
-    dictionary[brand] = validAliases.length > 0 ? validAliases : [brand];
-  });
-
-  // 然后添加其他常见品牌（用于识别但不在业务范围内）
-  Object.entries(brandAliases).forEach(([brand, aliases]) => {
-    if (!dictionary[brand]) {
-      dictionary[brand] = aliases;
-    }
-  });
-
-  // 缓存结果并记录时间戳
-  BrandDictionaryCache.brandDictionary = dictionary;
-  BrandDictionaryCache.sortedBrands = [...actualBrands].sort((a, b) => b.length - a.length);
-  BrandDictionaryCache.actualBrandSet = actualBrandsSet;
-  BrandDictionaryCache.timestamp = Date.now();
+  // 确保派生字段已填充（共享服务正常情况下会填充，此处为防御性检查）
+  if (!BrandDictionaryCache.sortedBrands || !isCacheValid()) {
+    const allBrands = Object.keys(dictionary);
+    BrandDictionaryCache.sortedBrands = allBrands.sort((a, b) => b.length - a.length);
+    BrandDictionaryCache.actualBrandSet = new Set(allBrands);
+    BrandDictionaryCache.brandDictionary = dictionary;
+    BrandDictionaryCache.timestamp = Date.now();
+  }
 
   return dictionary;
 }
