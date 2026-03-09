@@ -2,6 +2,34 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.1...v1.29.0-develop.2) (2026-03-09)
+
+
+### Bug Fixes
+
+* **duliday:** 门店名模糊匹配回退 & 会话记忆字段标签 ([8b7d43d](https://github.com/steveoon/agent-computer-user/commit/8b7d43d9a6c58683bf15f8a8f3691555b787b180))
+* **lint:** suppress no-explicit-any errors and remove unused schema const ([ebab188](https://github.com/steveoon/agent-computer-user/commit/ebab1889b96a85425777ce1e88aa6e4747760175))
+* **test:** align session-memory test assertions with actual output format ([ccccc1c](https://github.com/steveoon/agent-computer-user/commit/ccccc1c18ad725473b8e67e0435c59638ea93998))
+* **types:** add MCP SDK subpath type declaration for CI tsc ([51241d4](https://github.com/steveoon/agent-computer-user/commit/51241d4945046d57527e87e914311436923cd150))
+* **wecom:** 冷启动场景同步提取事实，保证首轮即有结构化记忆 ([2566d31](https://github.com/steveoon/agent-computer-user/commit/2566d315cfa45c1b8ca4fb105ec39a54d226723e))
+* 使用 origin/develop 版本恢复 model-registry 文件 ([09a2c76](https://github.com/steveoon/agent-computer-user/commit/09a2c762b8d26fd2762f4c41dc24519504e48db3))
+
+
+### Features
+
+* **duliday:** add duliday_job_list_for_llm tool for WeCom intelligent reply ([a09dcce](https://github.com/steveoon/agent-computer-user/commit/a09dcceb992aeec9e3fd04a3048391319d3391be))
+* **duliday:** implement progressive disclosure for job list tool ([9a0c6cd](https://github.com/steveoon/agent-computer-user/commit/9a0c6cd2d4f9f131692df577fe8307f9d6da2b80))
+* **duliday:** 岗位列表工具支持 responseFormat 按需返回格式 ([1f1d2b4](https://github.com/steveoon/agent-computer-user/commit/1f1d2b4a51ddbe49fc256a74fc9a814c0fe8dd8a))
+* **wecom:** add entity extraction agent with three-tier cache ([13390aa](https://github.com/steveoon/agent-computer-user/commit/13390aaee4744257a197015af8cab8e6e0827616))
+* **wecom:** planTurn 支持 stageGoals 注入，阶段枚举附带 description ([d1e738d](https://github.com/steveoon/agent-computer-user/commit/d1e738dc806adb053ea8176e1085ea2fcbc62abb))
+
+
+### Reverts
+
+* 回滚 PR[#57](https://github.com/steveoon/agent-computer-user/issues/57) 中 MCP SDK .js 后缀移除和 as any 类型绕过 ([7e061e6](https://github.com/steveoon/agent-computer-user/commit/7e061e66044bd6c3c61e901fe84a09744f5b7569))
+* 完全回滚 client-manager.ts 到 develop 状态 ([4e722e8](https://github.com/steveoon/agent-computer-user/commit/4e722e8336df74e74fa66f9aa0f9962176e69558))
+* 完全回滚 model-registry 下两个文件到 develop 状态 ([b9f6229](https://github.com/steveoon/agent-computer-user/commit/b9f62292e5fc2209784dfde1e5bae00a2daeb96e))
+
 # [1.29.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.28.1...v1.29.0-develop.1) (2026-03-06)
 
 
