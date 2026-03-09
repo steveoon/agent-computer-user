@@ -15,10 +15,11 @@
 ### 1. Playwright MCP（推荐）
 
 - **功能**: 现代化的浏览器自动化，Docker友好
-- **命令**: `npx -y @playwright/mcp@latest --isolated`
+- **命令**: `node node_modules/@playwright/mcp/cli.js ...`
 - **特点**:
+  - 使用项目内固定版本（避免 `@latest` 漂移）
+  - 若本地 CLI 不存在，回退到 `npx -y @playwright/mcp@0.0.68`
   - 更好的 Docker 支持
-  - 隔离模式运行
   - 性能更优
 - **用途**: 网页抓取、表单填充、页面截图、UI测试
 

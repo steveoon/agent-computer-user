@@ -24,6 +24,7 @@
 | 命令 | 用途 | 输出 | 使用场景 |
 |------|------|------|----------|
 | `pnpm electron:dev` | 开发模式 | 无文件输出 | **日常开发**，支持热更新 |
+| `pnpm electron:bundle-main` | Bundle 主进程 | `build/main.js` | 解决 pnpm + electron-builder 传递依赖漏打包 |
 | `pnpm electron:build` | 仅编译 | `build/` + `.next/standalone/` | 编译但不打包 |
 | `pnpm electron:start` | 运行编译后代码 | 无 | 测试生产模式（需先 build） |
 | `pnpm electron:pack` | 打包成目录 | `dist/mac-arm64/*.app` | **快速测试**打包结果 |
@@ -46,9 +47,11 @@ concurrently \
 
 ```bash
 next build && \                             # 1. 构建 Next.js 生产版本
-cp -r .next/static .next/standalone/.next/ && \  # 2. 复制静态资源到 standalone
-cp -r public/* .next/standalone/public/ && \     # 3. 复制 public 资源
-tsc -p tsconfig-electron.json               # 4. 编译 Electron TypeScript
+rm -rf build && \                           # 2. 清理旧的 Electron 构建产物（避免残留文件进包）
+cp -r .next/static .next/standalone/.next/ && \  # 3. 复制静态资源到 standalone
+cp -r public/* .next/standalone/public/ && \     # 4. 复制 public 资源
+tsc -p tsconfig-electron.json && \          # 5. 编译 Electron TypeScript
+pnpm electron:bundle-main                   # 6. Bundle 主进程，避免打包漏传递依赖
 ```
 
 ### electron:pack / electron:dist
