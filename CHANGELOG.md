@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.29.0-develop.4](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.3...v1.29.0-develop.4) (2026-03-09)
+
+
+### Bug Fixes
+
+* 显式添加 esbuild devDependency，修复 Windows CI 打包失败 ([e814243](https://github.com/steveoon/agent-computer-user/commit/e814243876a642a9072403641dfdfc7485d76080))
+
 # [1.29.0-develop.3](https://github.com/steveoon/agent-computer-user/compare/v1.29.0-develop.2...v1.29.0-develop.3) (2026-03-09)
 
 
