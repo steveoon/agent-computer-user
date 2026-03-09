@@ -18,12 +18,14 @@ import { dulidayJobDetailsTool } from "./duliday/duliday-job-details-tool";
 import { dulidayInterviewBookingTool } from "./duliday/duliday-interview-booking-tool";
 import { dulidayBiReportTool } from "./duliday/bi-report-tool";
 import { dulidayBiRefreshTool } from "./duliday/bi-refresh-tool";
+import { dulidayJobListForLlmTool } from "./duliday-job-list-for-llm.tool";
+import { createWeworkPlanTurnTool } from "./wework/plan_turn.tool";
 import { replyPolicyReadTool } from "./reply-policy/reply-policy-read-tool";
 import { replyPolicyAskTool } from "./reply-policy/reply-policy-ask-tool";
 import { replyPolicySaveTool } from "./reply-policy/reply-policy-save-tool";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
 import { ZhipinDataSchema } from "@/types/zhipin";
-import { ReplyPolicyConfigSchema } from "@/types/reply-policy";
+import { ReplyPolicyConfigSchema, StageGoalsSchema } from "@/types/reply-policy";
 
 // Import types from centralized location
 import type {
@@ -345,6 +347,27 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     create: () => dulidayBiRefreshTool(),
   }),
 
+  duliday_job_list_for_llm: createToolDefinition({
+    name: "duliday_job_list_for_llm",
+    description: "查询在招岗位列表（LLM优化格式），返回 Markdown 格式化的岗位信息，包含薪资、招聘要求、工作时间、面试安排等完整信息，适用于自动回复求职者场景",
+    category: "business",
+    requiresSandbox: false,
+    requiredContext: ["dulidayToken"],
+    create: ctx => dulidayJobListForLlmTool(ctx.dulidayToken, ctx.onJobsFetched),
+  }),
+
+  wework_plan_turn: createToolDefinition({
+    name: "wework_plan_turn",
+    description: "企微智能化：识别当前对话阶段、检测回复需求、标记风险因子，并返回当前阶段的运营目标配置",
+    category: "business",
+    requiresSandbox: false,
+    requiredContext: ["stageGoals"],
+    contextSchemas: {
+      stageGoals: StageGoalsSchema,
+    },
+    create: ctx => ctx.stageGoals ? createWeworkPlanTurnTool(ctx.stageGoals, ctx.modelConfig?.classifyModel, ctx.processedMessages, ctx.channelType) : null,
+  }),
+
   // ===== 策略配置工具 =====
   reply_policy_read: createToolDefinition({
     name: "reply_policy_read",
@@ -380,6 +403,7 @@ export const OPEN_API_PROMPT_TYPES = [
   "bossZhipinSystemPrompt",
   "bossZhipinLocalSystemPrompt",
   "generalComputerSystemPrompt",
+  "weworkSystemPrompt",
 ] as const;
 
 export type OpenApiPromptType = typeof OPEN_API_PROMPT_TYPES[number];
@@ -453,6 +477,12 @@ const PROMPT_TOOL_MAPPING: Record<string, string[]> = {
     "reply_policy_read",
     "reply_policy_ask",
     "reply_policy_save",
+  ],
+
+  // 企微智能化 - 对话阶段规划 + 岗位信息（事实提取已移至预处理器）
+  weworkSystemPrompt: [
+    "wework_plan_turn",
+    "duliday_job_list_for_llm",
   ],
 
   // 通用计算机使用 - 包含E2B和Puppeteer，但不包含Boss直聘业务工具

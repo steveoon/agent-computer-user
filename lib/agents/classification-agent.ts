@@ -38,14 +38,16 @@ function normalizeChannelType(channelType: unknown): ChannelType {
 
 function getActiveStages(channelType: unknown = "public"): FunnelStage[] {
   const normalizedChannelType = normalizeChannelType(channelType);
-  const activeStages = FunnelStageSchema.options.filter(
-    stage => STAGE_DEFINITIONS[stage].applicableChannels.includes(normalizedChannelType)
+  const activeStages = FunnelStageSchema.options.filter(stage =>
+    STAGE_DEFINITIONS[stage].applicableChannels.includes(normalizedChannelType)
   );
   // 防止异常输入或配置导致空枚举，避免 z.enum([]) 直接抛错。
   return activeStages.length > 0 ? activeStages : [...FunnelStageSchema.options];
 }
 
-function buildDynamicPlanningSchema(activeStages: FunnelStage[]): z.ZodObject<Record<string, z.ZodTypeAny>> {
+function buildDynamicPlanningSchema(
+  activeStages: FunnelStage[]
+): z.ZodObject<Record<string, z.ZodTypeAny>> {
   return z.object({
     stage: z.enum(activeStages as [FunnelStage, ...FunnelStage[]]),
     subGoals: TurnPlanSchema.shape.subGoals,
@@ -69,7 +71,10 @@ const NEED_RULES: Array<{ need: ReplyNeed; patterns: RegExp[] }> = [
   { need: "wechat", patterns: [/微信|vx|私聊|联系方式|加你/i] },
 ];
 
-function detectRuleNeeds(message: string, history: string[]): Set<ReplyNeed> {
+function detectRuleNeeds(
+  message: string,
+  history: string[]
+): Set<ReplyNeed> {
   const text = `${history.slice(-4).join(" ")} ${message}`;
   const needs = new Set<ReplyNeed>();
 
@@ -88,7 +93,10 @@ function detectRuleNeeds(message: string, history: string[]): Set<ReplyNeed> {
   return needs;
 }
 
-function sanitizePlan(plan: TurnPlan, ruleNeeds: Set<ReplyNeed>): TurnPlan {
+function sanitizePlan(
+  plan: TurnPlan,
+  ruleNeeds: Set<ReplyNeed>
+): TurnPlan {
   const mergedNeeds = new Set<ReplyNeed>([...plan.needs, ...Array.from(ruleNeeds)]);
   if (mergedNeeds.size > 1 && mergedNeeds.has("none")) {
     mergedNeeds.delete("none");
@@ -106,7 +114,7 @@ function buildPlanningPrompt(
   history: string[],
   brandData?: z.infer<typeof BrandDataSchema>,
   channelType: ChannelType = "public",
-  replyPolicy?: ReplyPolicyConfig
+  replyPolicy?: Pick<ReplyPolicyConfig, "stageGoals">
 ): { system: string; prompt: string } {
   const system = [
     "你是招聘对话回合规划器，不直接回复候选人。",
@@ -116,15 +124,19 @@ function buildPlanningPrompt(
 
   const normalizedChannelType = normalizeChannelType(channelType);
   const activeStages = getActiveStages(normalizedChannelType);
+
   const stageLines = activeStages.map(stage => {
     const def = STAGE_DEFINITIONS[stage];
-    const desc = replyPolicy?.stageGoals[stage]?.description || def.description;
+    const desc =
+      replyPolicy?.stageGoals[stage]?.description ||
+      def.description;
     return `- ${stage}: ${desc} (转入条件: ${def.transitionSignal})`;
   });
 
-  const needsLine = normalizedChannelType === "private"
-    ? "- stores, location, salary, schedule, policy, availability, requirements, interview, none\n- 注意: 当前已在私域渠道，wechat need 仅在候选人主动提及联系方式时使用"
-    : "- stores, location, salary, schedule, policy, availability, requirements, interview, wechat, none";
+  const needsLine =
+    normalizedChannelType === "private"
+      ? "- stores, location, salary, schedule, policy, availability, requirements, interview, none"
+      : "- stores, location, salary, schedule, policy, availability, requirements, interview, wechat, none";
 
   const prompt = [
     "[阶段枚举与定义]",
@@ -155,8 +167,10 @@ function buildPlanningPrompt(
   return { system, prompt };
 }
 
-
-function stageToFallbackNeeds(stage: FunnelStage, channelType: ChannelType = "public"): ReplyNeed[] {
+function stageToFallbackNeeds(
+  stage: FunnelStage,
+  channelType: ChannelType = "public"
+): ReplyNeed[] {
   const map: Record<FunnelStage, ReplyNeed[]> = {
     trust_building: ["none"],
     private_channel: channelType === "private" ? ["none"] : ["wechat"],
@@ -172,7 +186,7 @@ export async function planTurn(
   message: string,
   options: Omit<ClassificationOptions, "candidateMessage"> & {
     providerConfigs?: ProviderConfigs;
-    replyPolicy?: ReplyPolicyConfig;
+    replyPolicy?: Pick<ReplyPolicyConfig, "stageGoals">;
   }
 ): Promise<TurnPlan> {
   const {
@@ -185,7 +199,8 @@ export async function planTurn(
   } = options;
 
   const registry = getDynamicRegistry(providerConfigs);
-  const classifyModel = (modelConfig?.classifyModel || DEFAULT_MODEL_CONFIG.classifyModel) as ModelId;
+  const classifyModel = (modelConfig?.classifyModel ||
+    DEFAULT_MODEL_CONFIG.classifyModel) as ModelId;
 
   const normalizedChannelType = normalizeChannelType(channelType);
   const activeStages = getActiveStages(normalizedChannelType);
@@ -239,7 +254,7 @@ export async function classifyMessage(
   message: string,
   options: Omit<ClassificationOptions, "candidateMessage"> & {
     providerConfigs?: ProviderConfigs;
-    replyPolicy?: ReplyPolicyConfig;
+    replyPolicy?: Pick<ReplyPolicyConfig, "stageGoals">;
   }
 ): Promise<MessageClassification> {
   const plan = await planTurn(message, options);

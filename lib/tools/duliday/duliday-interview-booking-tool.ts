@@ -44,7 +44,7 @@ export const dulidayInterviewBookingTool = (customToken?: string) =>
         .optional()
         .default([])
         .describe("客户标签列表，默认为空数组"),
-      operateType: z.number().optional().default(3).describe("操作类型，默认为3"),
+      operateType: z.number().optional().default(6).describe("操作类型（6=企微渠道预约），默认为6"),
       // 埋点上下文（可选）- 来自用户输入或 duliday_job_list 结果
       candidatePosition: z.string().optional().describe("候选人应聘的岗位类型，来自用户输入（如'兼职'、'服务员'）"),
       jobName: z.string().optional().describe("Duliday 岗位名称，来自 duliday_job_list 返回的岗位名称，用于提取品牌信息"),
@@ -59,7 +59,7 @@ export const dulidayInterviewBookingTool = (customToken?: string) =>
       education = "大专",
       hasHealthCertificate = 1,
       customerLabelList = [],
-      operateType = 3,
+      operateType = 6,
       candidatePosition,
       jobName,
     }) => {

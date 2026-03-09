@@ -324,11 +324,7 @@ export const computerTool35 = (sandboxId: string) =>
           throw new Error(`Unsupported action: ${action}`);
       }
     },
-    toModelOutput(
-      {
-        output
-      }
-    ) {
+    toModelOutput({ output }) {
       // AI SDK v5 格式：返回带有 type: 'content' 的对象
       if (typeof output === "string") {
         return {
@@ -468,11 +464,7 @@ export const anthropicComputerTool = (sandboxId: string) =>
           throw new Error(`Unsupported action: ${action}`);
       }
     },
-    toModelOutput(
-      {
-        output
-      }
-    ) {
+    toModelOutput({ output }) {
       // AI SDK v5 格式：返回带有 type: 'content' 的对象
       if (typeof output === "string") {
         return {
@@ -1148,9 +1140,7 @@ export const computerTool = (
               candidate_message || "无"
             }\n• 阶段: ${replyResult.turnPlan.stage}\n• Needs: ${
               replyResult.turnPlan.needs.join("、") || "none"
-            }\n• 对话历史: ${
-              processedHistory.length
-            }条消息\n• 使用数据: ${
+            }\n• 对话历史: ${processedHistory.length}条消息\n• 使用数据: ${
               storeDatabase.stores.length
             }家门店，${storeDatabase.stores.reduce(
               (sum: number, store: Store) => sum + store.positions.length,
@@ -1193,11 +1183,7 @@ export const computerTool = (
           throw new Error(`Unsupported action: ${action}`);
       }
     },
-    toModelOutput(
-      {
-        output
-      }
-    ) {
+    toModelOutput({ output }) {
       // AI SDK v5 格式：返回带有 type: 'content' 的对象
       if (typeof output === "string") {
         return {
@@ -1243,7 +1229,9 @@ export const bashToolSandbox = (sandboxId: string) =>
       description: z
         .string()
         .max(50)
-        .describe("Brief description of what this command does (max 50 chars, e.g. '启动Chrome远程调试')"),
+        .describe(
+          "Brief description of what this command does (max 50 chars, e.g. '启动Chrome远程调试')"
+        ),
     }),
     execute: async ({ command }) => {
       const desktop = await getDesktop(sandboxId);
@@ -1275,7 +1263,9 @@ export const bashToolLocal = () =>
       description: z
         .string()
         .max(50)
-        .describe("Brief description of what this command does (max 50 chars, e.g. '启动Chrome远程调试')"),
+        .describe(
+          "Brief description of what this command does (max 50 chars, e.g. '启动Chrome远程调试')"
+        ),
     }),
     // outputSchema is required for tools without execute function
     outputSchema: z.string().describe("The command output or error message"),

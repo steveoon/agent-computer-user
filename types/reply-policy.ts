@@ -110,10 +110,14 @@ export const TurnPlanSchema = z.object({
 });
 
 export const StageGoalPolicySchema = z.object({
+  /** 阶段简述 — 供 LLM 规划时理解每个阶段的含义 */
   description: z.string().optional(),
   primaryGoal: z.string(),
   successCriteria: z.array(z.string()),
-  ctaStrategy: z.string(),
+  ctaStrategy: z.preprocess(
+    (val) => (Array.isArray(val) ? (val as string[]).join('\n') : val),
+    z.string()
+  ),
   disallowedActions: z.array(z.string()).optional(),
 });
 
@@ -189,14 +193,19 @@ export const QualificationPolicySchema = z
     },
   });
 
-const StageGoalsSchema = z.object({
-  trust_building: StageGoalPolicySchema,
-  private_channel: StageGoalPolicySchema,
-  qualify_candidate: StageGoalPolicySchema,
-  job_consultation: StageGoalPolicySchema,
-  interview_scheduling: StageGoalPolicySchema,
-  onboard_followup: StageGoalPolicySchema,
-});
+export const StageGoalsSchema = z
+  .object({
+    trust_building: StageGoalPolicySchema,
+    private_channel: StageGoalPolicySchema.optional(),
+    qualify_candidate: StageGoalPolicySchema,
+    job_consultation: StageGoalPolicySchema,
+    interview_scheduling: StageGoalPolicySchema,
+    onboard_followup: StageGoalPolicySchema,
+  })
+  .transform(data => ({
+    ...data,
+    private_channel: data.private_channel ?? data.trust_building,
+  }));
 
 export const ReplyPolicyConfigSchema = z.object({
   stageGoals: StageGoalsSchema,
@@ -214,6 +223,7 @@ export type RiskFlag = z.infer<typeof RiskFlagSchema>;
 export type TurnExtractedInfo = z.infer<typeof TurnExtractedInfoSchema>;
 export type TurnPlan = z.infer<typeof TurnPlanSchema>;
 export type StageGoalPolicy = z.infer<typeof StageGoalPolicySchema>;
+export type StageGoals = z.infer<typeof StageGoalsSchema>;
 export type PersonaPolicy = z.infer<typeof PersonaPolicySchema>;
 export type IndustryVoicePolicy = z.infer<typeof IndustryVoicePolicySchema>;
 export type HardConstraintRule = z.infer<typeof HardConstraintRuleSchema>;

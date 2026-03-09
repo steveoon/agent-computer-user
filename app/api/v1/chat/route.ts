@@ -37,8 +37,14 @@ import { SourcePlatform, ApiSource } from "@/db/types";
 import {
   recruitmentContext,
   processStepToolResults,
-  type RecruitmentContext,
 } from "@/lib/services/recruitment-event";
+import type {
+  RecruitmentContext,
+  ToolCallLike,
+  ToolResultLike,
+} from "@/lib/services/recruitment-event";
+import { runPreprocessor } from "@/lib/preprocessors/registry";
+import "@/lib/preprocessors/wework-preprocessor"; // 触发自注册
 
 export const maxDuration = 300;
 
@@ -82,6 +88,7 @@ export async function POST(req: Request) {
       contextStrategy = "error",
       sandboxId,
       context = {},
+      thinking,
       validateOnly = false,
     } = requestData;
 
@@ -118,12 +125,25 @@ export async function POST(req: Request) {
       }
     }
 
-    // Step 4: Tool set construction
+    // Step 3.5: Model config + preprocessor (before tool creation)
     const effectiveModelConfig: ModelConfig = {
       ...context.modelConfig,
       providerConfigs: context.modelConfig?.providerConfigs || DEFAULT_PROVIDER_CONFIGS,
     };
 
+    const preprocessorResult = promptType
+      ? await runPreprocessor({
+          promptType,
+          processedMessages,
+          modelConfig: effectiveModelConfig,
+          userId: context.userId,
+          sessionId: context.sessionId,
+          dulidayToken: context.dulidayToken,
+          correlationId,
+        })
+      : { systemPromptSuffix: "" };
+
+    // Step 4: Tool set construction
     const toolCreationContext = {
       sandboxId: sandboxId ?? null,
       preferredBrand: context.preferredBrand,
@@ -139,6 +159,10 @@ export async function POST(req: Request) {
       industryVoiceId: context.industryVoiceId,
       dulidayToken: context.dulidayToken,
       defaultWechatId: context.defaultWechatId,
+      processedMessages,
+      userId: context.userId,
+      sessionId: context.sessionId,
+      onJobsFetched: preprocessorResult.onJobsFetched,
       channelType: context.channelType,
     };
 
@@ -224,8 +248,28 @@ export async function POST(req: Request) {
       }
     }
 
+    // Step 6.5: Append preprocessor result to system prompt
+    if (preprocessorResult.systemPromptSuffix) {
+      systemPrompt += preprocessorResult.systemPromptSuffix;
+    }
+
     // Step 7: Generate and output
     const dynamicRegistry = getDynamicRegistry(effectiveModelConfig.providerConfigs!);
+
+    const thinkingOptions = thinking?.type === "enabled" ? {
+      providerOptions: {
+        anthropic: {
+          thinking: { type: "enabled" as const, budgetTokens: thinking.budgetTokens },
+        },
+      },
+    } : {};
+
+    function handleStepFinish({ toolCalls, toolResults }: { toolCalls?: ReadonlyArray<ToolCallLike>; toolResults?: ReadonlyArray<ToolResultLike> }): void {
+      const ctx = recruitmentContext.getContext();
+      if (ctx && toolCalls && toolResults) {
+        processStepToolResults(ctx, toolCalls, toolResults);
+      }
+    }
 
     if (stream) {
       // Streaming output
@@ -237,11 +281,11 @@ export async function POST(req: Request) {
         messages: await convertToModelMessages(processedMessages),
         tools: Object.keys(tools).length > 0 ? tools : undefined,
         stopWhen: stepCountIs(30),
-        onStepFinish: async ({ toolCalls, toolResults }) => {
-          // 📊 Process tool results for recruitment event tracking
-          const ctx = recruitmentContext.getContext();
-          if (ctx && toolCalls && toolResults) {
-            processStepToolResults(ctx, toolCalls, toolResults);
+        ...thinkingOptions,
+        onStepFinish: handleStepFinish,
+        onFinish: () => {
+          try { preprocessorResult.afterResponse?.(); } catch (e) {
+            console.warn(`[${correlationId}] afterResponse sync error:`, e);
           }
         },
       });
@@ -276,14 +320,14 @@ export async function POST(req: Request) {
         messages: await convertToModelMessages(processedMessages),
         tools: Object.keys(tools).length > 0 ? tools : undefined,
         stopWhen: stepCountIs(30),
-        onStepFinish: async ({ toolCalls, toolResults }) => {
-          // 📊 Process tool results for recruitment event tracking
-          const ctx = recruitmentContext.getContext();
-          if (ctx && toolCalls && toolResults) {
-            processStepToolResults(ctx, toolCalls, toolResults);
-          }
-        },
+        ...thinkingOptions,
+        onStepFinish: handleStepFinish,
       });
+
+      // LLM 响应结束，触发异步后处理（如事实提取）
+      try { preprocessorResult.afterResponse?.(); } catch (e) {
+        console.warn(`[${correlationId}] afterResponse sync error:`, e);
+      }
 
       // Convert generateText result to UIMessage array
       // This preserves complete tool call history from all steps

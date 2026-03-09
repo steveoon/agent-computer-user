@@ -61,7 +61,7 @@ export const ClassificationOptionsSchema = z.object({
   // 对话上下文
   conversationHistory: z.array(z.string()).default([]),
   // 品牌数据
-  brandData: BrandDataSchema,
+  brandData: BrandDataSchema.optional(),
   // 渠道类型：public=公域平台（BOSS直聘/鱼泡），private=私域（微信等）
   channelType: ChannelTypeSchema.optional(),
 });
@@ -93,3 +93,4 @@ export type ClassificationOptions = z.infer<typeof ClassificationOptionsSchema>;
 
 // 重新导出供外部使用
 export type { ProviderConfig, ModelConfig };
+

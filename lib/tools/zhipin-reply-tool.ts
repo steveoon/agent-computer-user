@@ -1,5 +1,5 @@
 import { tool } from "ai";
-import { z } from 'zod/v3';
+import { z } from "zod/v3";
 import { loadZhipinData } from "@/lib/loaders/zhipin-data.loader";
 import { generateSmartReply } from "@/lib/agents";
 import type { StoreWithDistance } from "@/types/geocoding";
@@ -256,14 +256,11 @@ export const zhipinReplyTool = (
       }
     },
 
-    toModelOutput(
-      {
-        output
-      }
-    ) {
+    toModelOutput({ output }) {
       // 检查是否有错误
       if (output.error) {
-        const content = `❌ 智能回复生成失败\n\n` +
+        const content =
+          `❌ 智能回复生成失败\n\n` +
           `🔴 错误: ${output.error.userMessage}\n` +
           `🎯 阶段: ${output.stage}\n` +
           `💬 候选人消息: "${output.candidateMessage}"`;
