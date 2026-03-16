@@ -7,7 +7,7 @@ import type { ZhipinData, MessageClassification } from "@/types/zhipin";
 import type { ReplyPolicyConfig, BrandPriorityStrategy } from "@/types/config";
 import type { ModelConfig } from "@/lib/config/models";
 import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
-import { CandidateInfoSchema } from "@/lib/tools/zhipin/types";
+import { CandidateInfoSchema, type CandidateInfo } from "@/lib/tools/zhipin/types";
 import type { SafeGenerateTextUsage } from "@/lib/ai";
 import type { TurnPlan } from "@/types/reply-policy";
 import type {
@@ -15,6 +15,53 @@ import type {
   AgeEligibilityStatus,
   AgeEligibilitySummary,
 } from "@/lib/services/eligibility/age-eligibility";
+
+const CandidateInfoInputSchema = CandidateInfoSchema.extend({
+  candidateName: z.string().optional(),
+  candidatePosition: z.string().optional(),
+  candidateAge: z.string().optional(),
+  candidateGender: z.string().optional(),
+  candidateEducation: z.string().optional(),
+  candidateExpectedSalary: z.string().optional(),
+  candidateExpectedLocation: z.string().optional(),
+  jobName: z.string().optional(),
+}).passthrough();
+
+type CandidateInfoInput = z.infer<typeof CandidateInfoInputSchema>;
+
+function normalizeCandidateInfo(candidateInfo?: CandidateInfoInput): CandidateInfo | undefined {
+  if (!candidateInfo) {
+    return undefined;
+  }
+
+  const normalized: CandidateInfo = {
+    name: candidateInfo.name || candidateInfo.candidateName,
+    position:
+      candidateInfo.position ||
+      candidateInfo.expectedPosition ||
+      candidateInfo.candidatePosition,
+    expectedPosition:
+      candidateInfo.expectedPosition ||
+      candidateInfo.position ||
+      candidateInfo.candidatePosition,
+    communicationPosition: candidateInfo.communicationPosition || candidateInfo.jobName,
+    age: candidateInfo.age || candidateInfo.candidateAge,
+    gender: candidateInfo.gender || candidateInfo.candidateGender,
+    experience: candidateInfo.experience,
+    education: candidateInfo.education || candidateInfo.candidateEducation,
+    expectedSalary: candidateInfo.expectedSalary || candidateInfo.candidateExpectedSalary,
+    expectedLocation: candidateInfo.expectedLocation || candidateInfo.candidateExpectedLocation,
+    jobAddress: candidateInfo.jobAddress,
+    height: candidateInfo.height,
+    weight: candidateInfo.weight,
+    healthCertificate: candidateInfo.healthCertificate,
+    activeTime: candidateInfo.activeTime,
+    info: candidateInfo.info,
+    fullText: candidateInfo.fullText,
+  };
+
+  return normalized;
+}
 
 /**
  * 调试信息类型
@@ -115,8 +162,8 @@ export const zhipinReplyTool = (
         .optional()
         .describe("对话历史记录，用于提供上下文。可以是字符串数组或JSON字符串"),
 
-      candidate_info: CandidateInfoSchema.optional().describe(
-        "候选人基本信息，包括姓名、求职职位、年龄、经验、学历等"
+      candidate_info: CandidateInfoInputSchema.optional().describe(
+        "候选人基本信息。优先传 get_chat_details 返回的 data.candidateInfo；如果传 summary 风格字段（如 candidateAge），工具会自动归一化。"
       ),
 
       brand: z
@@ -141,6 +188,7 @@ export const zhipinReplyTool = (
         brand,
         include_stats = false,
       } = params;
+      const normalizedCandidateInfo = normalizeCandidateInfo(candidate_info);
 
       try {
         console.log("🤖 开始生成Boss直聘智能回复...");
@@ -186,7 +234,7 @@ export const zhipinReplyTool = (
           },
           configData: effectiveConfigData,
           replyPolicy,
-          candidateInfo: candidate_info,
+          candidateInfo: normalizedCandidateInfo,
           defaultWechatId,
           industryVoiceId,
           channelType,

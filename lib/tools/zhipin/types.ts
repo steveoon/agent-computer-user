@@ -10,6 +10,8 @@ import { z } from 'zod/v3';
 export const CandidateInfoSchema = z.object({
   name: z.string().optional(),
   position: z.string().optional(), // 期望职位
+  expectedPosition: z.string().optional(), // 明确的期望职位
+  communicationPosition: z.string().optional(), // 沟通职位/待招岗位
   age: z.string().optional(),
   gender: z.string().optional(), // 性别
   experience: z.string().optional(),

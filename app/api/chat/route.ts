@@ -6,6 +6,7 @@ import {
   createUIMessageStreamResponse,
   isToolUIPart,
   getToolName,
+  consumeStream,
 } from "ai";
 import type { UIMessage } from "ai";
 import { killDesktop } from "@/lib/e2b/utils";
@@ -463,7 +464,10 @@ export async function POST(req: Request) {
       });
 
       // 创建响应流
-      return createUIMessageStreamResponse({ stream });
+      return createUIMessageStreamResponse({
+        stream,
+        consumeSseStream: consumeStream,
+      });
     } catch (error) {
       console.error("Chat API error:", error);
 

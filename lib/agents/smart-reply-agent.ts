@@ -23,6 +23,7 @@ import {
   type AgeEligibilityStatus,
   type AgeEligibilitySummary,
 } from "@/lib/services/eligibility/age-eligibility";
+import { parseAge } from "@/lib/services/recruitment-event/candidate-parser";
 
 export interface SmartReplyAgentOptions {
   modelConfig?: {
@@ -93,6 +94,13 @@ function toClassification(turnPlan: TurnPlan): MessageClassification {
 function resolveCandidateAge(turnPlan: TurnPlan, candidateInfo?: CandidateInfo): number | undefined {
   if (typeof candidateInfo?.age === "number") {
     return candidateInfo.age;
+  }
+  const parsedAge = parseAge(candidateInfo?.age);
+  if (parsedAge) {
+    const age = Number(parsedAge);
+    if (Number.isFinite(age)) {
+      return age;
+    }
   }
   if (typeof turnPlan.extractedInfo.specificAge === "number") {
     return turnPlan.extractedInfo.specificAge;

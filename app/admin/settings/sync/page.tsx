@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { RefreshCw, CheckCircle, XCircle, Database } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
+import { useRouter } from "next/navigation";
 import { useSyncStore, formatDuration } from "@/lib/stores/sync-store";
 import { BrandSelector } from "@/components/admin/sync/brand-selector";
 import { SyncProgress } from "@/components/admin/sync/sync-progress";
@@ -37,6 +38,7 @@ function SidebarSyncProgress() {
 }
 
 export default function SyncPage() {
+  const router = useRouter();
   // 只订阅必要的字段；用派生 boolean 避免数组引用变化触发 re-render
   const isSyncing = useSyncStore(s => s.isSyncing);
   const hasSelectedBrands = useSyncStore(s => s.selectedBrands.length > 0);
@@ -70,7 +72,12 @@ export default function SyncPage() {
         {/* 页面头部 */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <BackButton size="sm" className="flex items-center gap-2" title="返回设置" />
+            <BackButton
+              href="/admin/settings"
+              size="sm"
+              className="flex items-center gap-2"
+              title="返回设置"
+            />
             <div>
               <h1 className="text-3xl font-bold tracking-tight">数据同步管理</h1>
               <p className="text-muted-foreground mt-2">
@@ -78,6 +85,9 @@ export default function SyncPage() {
               </p>
             </div>
           </div>
+          <Button variant="outline" onClick={() => router.push("/admin/settings")}>
+            配置 Token
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

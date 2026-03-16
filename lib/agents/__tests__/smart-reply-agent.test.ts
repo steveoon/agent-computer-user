@@ -50,6 +50,30 @@ vi.mock("@/lib/services/brand-alias/brand-alias.service", () => ({
   getSharedBrandAliasMap: vi.fn(async () => new Map()),
 }));
 
+vi.mock("@/lib/services/eligibility/age-eligibility", () => ({
+  evaluateAgeEligibility: vi.fn(async ({ age }: { age?: number }) => ({
+    status: typeof age === "number" ? "pass" : "unknown",
+    summary: {
+      minAgeObserved: 18,
+      maxAgeObserved: 45,
+      matchedCount: 1,
+      total: 1,
+    },
+    appliedStrategy: {
+      enabled: true,
+      revealRange: false,
+      failStrategy: "礼貌说明不匹配，避免承诺",
+      unknownStrategy: "先核实年龄或资格条件",
+      passStrategy: "确认匹配后推进下一步",
+      allowRedirect: false,
+      redirectPriority: "low",
+      status: typeof age === "number" ? "pass" : "unknown",
+      strategy:
+        typeof age === "number" ? "确认匹配后推进下一步" : "先核实年龄或资格条件",
+    },
+  })),
+}));
+
 // Sample config data for testing (using 'as unknown as' to avoid complex type matching)
 // In real tests, you would use properly structured mock data
 const sampleConfigData = {
@@ -145,6 +169,7 @@ describe("Smart Reply Pipeline", () => {
 
     it("should include candidate info in reply generation", async () => {
       const { generateSmartReply } = await import("../smart-reply-agent");
+      const { evaluateAgeEligibility } = await import("@/lib/services/eligibility/age-eligibility");
 
       const result = await generateSmartReply({
         candidateMessage: "有适合我的岗位吗？",
@@ -160,6 +185,10 @@ describe("Smart Reply Pipeline", () => {
 
       expect(result).toBeDefined();
       expect(result.suggestedReply).toBeDefined();
+      expect(vi.mocked(evaluateAgeEligibility)).toHaveBeenCalledWith(
+        expect.objectContaining({ age: 25 })
+      );
+      expect(result.debugInfo?.gateStatus).toBe("pass");
     });
 
     it("should continue and expose context warning when alias lookup fails", async () => {

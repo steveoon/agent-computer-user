@@ -204,7 +204,7 @@ export function getBossZhipinLocalSystemPrompt(): string {
     • 必须提供的参数：
       - candidate_message: 候选人的最新消息
       - conversation_history: 格式化的对话历史（从聊天详情获取）
-      - candidate_info: 候选人基本信息（可选但推荐）
+      - candidate_info: 优先使用 get_chat_details 返回的 data.candidateInfo；不要把 summary 直接当成 candidate_info
       - brand: 品牌名称，需要从 'zhipin_get_chat_details'工具中获取的岗位信息中招聘岗位的品牌
 
     4. **发送消息：**
@@ -274,7 +274,7 @@ export function getBossZhipinLocalSystemPrompt(): string {
     2. 调用 zhipin_reply_generator，传入：
        - candidate_message: "你们还招人吗？工资多少？"
        - conversation_history: [之前的对话历史]
-       - candidate_info: {候选人信息}
+       - candidate_info: get_chat_details.data.candidateInfo
     3. 获取工具返回的 reply 字段
     4. 使用 send_message 发送该回复
     
