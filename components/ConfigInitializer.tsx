@@ -61,6 +61,9 @@ export function ConfigInitializer() {
               "检测到旧版本配置，需要完成全量同步后才能继续使用。部分品牌失败不会阻断使用，可后续单独重试。"}
           </p>
           <div className="mt-5 flex flex-col gap-2">
+            <Button variant="secondary" onClick={() => router.push("/admin/settings")}>
+              前往通用配置设置 Token
+            </Button>
             <Button onClick={handleResetAndSync} disabled={isSyncing}>
               {isSyncing ? "同步进行中..." : "清空本地品牌数据并重试同步"}
             </Button>

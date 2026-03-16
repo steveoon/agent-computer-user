@@ -13,7 +13,7 @@ const SyncRequestSchema = z.object({
   validateOnly: z.boolean().optional().default(false),
   // 未传 cityNameList 视为“全量城市同步”（默认允许）
   cityNameList: z.array(z.string().min(1)).min(1, "至少需要提供一个城市").optional(),
-  token: z.string().optional(), // 支持从客户端传递token
+  token: z.string().nullish(), // 支持从客户端传递token，兼容客户端显式传 null
   existingCoordinates: z
     .record(z.string(), z.object({ lat: z.number(), lng: z.number() }))
     .optional(),

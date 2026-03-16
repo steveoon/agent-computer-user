@@ -193,9 +193,11 @@ export const useSyncStore = create<SyncState>()(
           const configData = await configResponse.json();
 
           if (!configData.configured || !configData.tokenValid) {
-            throw new Error(
-              `Duliday Token 配置无效：${configData.error || "请检查Token或环境变量"}`
-            );
+            const baseMessage = configData.error || "请检查Token或环境变量";
+            const helpText = !configData.configured
+              ? "请前往 /admin/settings 配置 Duliday Token。"
+              : "";
+            throw new Error(`Duliday Token 配置无效：${baseMessage}${helpText ? ` ${helpText}` : ""}`);
           }
 
           if (needsFullResync) {
@@ -225,16 +227,25 @@ export const useSyncStore = create<SyncState>()(
 
           // 调用 API 端点进行同步 (流式响应)
           // ✅ 不传 cityNameList == 全量城市同步（默认允许）
+          const requestBody: {
+            organizationIds: string[];
+            existingCoordinates: Record<string, { lat: number; lng: number }>;
+            token?: string;
+          } = {
+            organizationIds: selectedBrands,
+            existingCoordinates,
+          };
+
+          if (localToken) {
+            requestBody.token = localToken;
+          }
+
           const response = await fetch("/api/sync", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              organizationIds: selectedBrands,
-              token: localToken,
-              existingCoordinates, // 发送已知坐标
-            }),
+            body: JSON.stringify(requestBody),
           });
 
           if (!response.ok) {
