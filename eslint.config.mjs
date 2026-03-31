@@ -1,13 +1,4 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
+import nextConfig from "eslint-config-next";
 
 const eslintConfig = [
   // 首先定义要忽略的文件
@@ -35,12 +26,13 @@ const eslintConfig = [
       "drizzle/**",
     ],
   },
-  // 然后应用规则到其他文件
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
-  ...compat.extends("plugin:@typescript-eslint/recommended"),
+  // Next.js 16 flat config (includes React, TypeScript, core-web-vitals)
+  ...nextConfig,
+  // TypeScript 文件规则覆盖
   {
+    files: ["**/*.ts", "**/*.tsx"],
     rules: {
-      // TypeScript 严格类型检查 - 这些是最重要的规则
+      // TypeScript 严格类型检查
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": [
         "error",
@@ -50,21 +42,23 @@ const eslintConfig = [
           caughtErrorsIgnorePattern: "^_",
         },
       ],
-
-      // React Hooks 严格依赖检查
-      "react-hooks/exhaustive-deps": "error",
-
-      // 基础 TypeScript 规则（不需要类型信息）
       "@typescript-eslint/prefer-as-const": "error",
       "@typescript-eslint/ban-ts-comment": "warn",
       "@typescript-eslint/no-non-null-assertion": "warn",
+    },
+  },
+  // 通用规则覆盖
+  {
+    rules: {
+      // React Hooks 严格依赖检查
+      "react-hooks/exhaustive-deps": "error",
 
       // 通用最佳实践
       "prefer-const": "error",
       "no-var": "error",
       "no-console": "off",
 
-      // 禁用一些可能产生噪音的规则
+      // 禁用噪音规则
       "react/no-unescaped-entities": "off",
     },
   },

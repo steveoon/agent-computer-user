@@ -202,9 +202,9 @@ async function handleOpenApiAuth(request: NextRequest): Promise<NextResponse | n
   return null;
 }
 
-// ========== 主 Middleware 函数 ==========
+// ========== 主 Proxy 函数 ==========
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 1. 处理 CORS 预检请求（OPTIONS）
@@ -237,7 +237,7 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
-// 🎯 配置middleware匹配规则
+// 🎯 配置 proxy 匹配规则
 export const config = {
   matcher: [
     /*

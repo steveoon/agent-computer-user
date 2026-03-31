@@ -1,12 +1,12 @@
 /**
- * Middleware 鉴权和 CORS 逻辑测试
+ * Proxy 鉴权和 CORS 逻辑测试
  *
  * 注意：这个测试模拟外部鉴权服务的响应
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import { middleware, clearTokenCache } from "../middleware";
+import { proxy, clearTokenCache } from "../proxy";
 
 // Mock fetch 全局函数
 const mockFetch = vi.fn();
@@ -17,7 +17,7 @@ vi.mock("../lib/utils/supabase/middleware", () => ({
   updateSession: vi.fn(() => NextResponse.next()),
 }));
 
-describe("Middleware - CORS 处理", () => {
+describe("Proxy - CORS 处理", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
@@ -38,7 +38,7 @@ describe("Middleware - CORS 处理", () => {
         },
       });
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       // 应该返回 200 状态码
       expect(response.status).toBe(200);
@@ -60,7 +60,7 @@ describe("Middleware - CORS 处理", () => {
         },
       });
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       // 应该返回 200 而不是 401
       expect(response.status).toBe(200);
@@ -84,7 +84,7 @@ describe("Middleware - CORS 处理", () => {
         },
       });
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       // 应该包含 CORS 头
       expect(response.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3001");
@@ -100,7 +100,7 @@ describe("Middleware - CORS 处理", () => {
         },
       });
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       // 应该返回 401
       expect(response?.status).toBe(401);
@@ -124,7 +124,7 @@ describe("Middleware - CORS 处理", () => {
         },
       });
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       // 不应该设置 Access-Control-Allow-Origin
       expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
@@ -147,7 +147,7 @@ describe("Middleware - CORS 处理", () => {
         },
       });
 
-      const response1 = await middleware(request1);
+      const response1 = await proxy(request1);
       expect(response1.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3000");
 
       // 测试 localhost:3001（也在默认白名单中）
@@ -163,7 +163,7 @@ describe("Middleware - CORS 处理", () => {
         },
       });
 
-      const response2 = await middleware(request2);
+      const response2 = await proxy(request2);
       expect(response2.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3001");
     });
 
@@ -174,7 +174,7 @@ describe("Middleware - CORS 处理", () => {
         },
       });
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       // 非 API 路径不应该有 CORS 头
       expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
@@ -188,7 +188,7 @@ describe("Middleware - CORS 处理", () => {
         },
       });
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       // 其他 API 路径也应该有 CORS 头
       expect(response.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:3001");
@@ -197,7 +197,7 @@ describe("Middleware - CORS 处理", () => {
   });
 });
 
-describe("Middleware - Open API 鉴权", () => {
+describe("Proxy - Open API 鉴权", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch.mockReset(); // 完全重置 mock
@@ -215,7 +215,7 @@ describe("Middleware - Open API 鉴权", () => {
     it("应该拒绝没有 Authorization header 的请求", async () => {
       const request = new NextRequest("http://localhost:3000/api/v1/tools");
 
-      const response = await middleware(request);
+      const response = await proxy(request);
       expect(response?.status).toBe(401);
 
       const body = await response?.json();
@@ -233,7 +233,7 @@ describe("Middleware - Open API 鉴权", () => {
         },
       });
 
-      const response = await middleware(request);
+      const response = await proxy(request);
       expect(response?.status).toBe(401);
 
       const body = await response?.json();
@@ -257,7 +257,7 @@ describe("Middleware - Open API 鉴权", () => {
         },
       });
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       // 应该放行请求
       expect(response.status).toBe(200); // NextResponse.next() 返回 200
@@ -289,7 +289,7 @@ describe("Middleware - Open API 鉴权", () => {
       });
 
       // 第一次请求
-      await middleware(request1);
+      await proxy(request1);
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       // 第二次请求（应该从缓存读取）
@@ -299,7 +299,7 @@ describe("Middleware - Open API 鉴权", () => {
         },
       });
 
-      await middleware(request2);
+      await proxy(request2);
       // 不应该再次调用外部服务
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
@@ -314,7 +314,7 @@ describe("Middleware - Open API 鉴权", () => {
         },
       });
 
-      const response = await middleware(request);
+      const response = await proxy(request);
       expect(response?.status).toBe(401);
 
       const body = await response?.json();
@@ -335,7 +335,7 @@ describe("Middleware - Open API 鉴权", () => {
         },
       });
 
-      const response = await middleware(request);
+      const response = await proxy(request);
       expect(response?.status).toBe(401);
 
       const body = await response?.json();
@@ -360,17 +360,17 @@ describe("Middleware - Open API 鉴权", () => {
       });
 
       // 第一次请求，应该调用外部服务
-      await middleware(request);
+      await proxy(request);
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       // 59秒后，仍然使用缓存
       vi.advanceTimersByTime(59 * 1000);
-      await middleware(request);
+      await proxy(request);
       expect(mockFetch).toHaveBeenCalledTimes(1); // 仍然是1次，因为使用了缓存
 
       // 61秒后，缓存过期，需要重新验证
       vi.advanceTimersByTime(2 * 1000);
-      await middleware(request);
+      await proxy(request);
       expect(mockFetch).toHaveBeenCalledTimes(2); // 现在应该是2次，因为缓存过期了
     });
   });
@@ -380,7 +380,7 @@ describe("Middleware - Open API 鉴权", () => {
       const { updateSession } = await import("../lib/utils/supabase/middleware");
       const request = new NextRequest("http://localhost:3000/dashboard");
 
-      await middleware(request);
+      await proxy(request);
 
       // 应该调用 Supabase 的 updateSession
       expect(updateSession).toHaveBeenCalledWith(request);
@@ -392,7 +392,7 @@ describe("Middleware - Open API 鉴权", () => {
       const request = new NextRequest("http://localhost:3000/");
       // 没有 Authorization header，但应该正常处理
 
-      const response = await middleware(request);
+      const response = await proxy(request);
       // 不应该返回 401
       expect(response?.status).not.toBe(401);
     });
@@ -412,7 +412,7 @@ describe("Middleware - Open API 鉴权", () => {
         const request = new NextRequest("http://localhost:3000/api/v1/tools", {
           headers: { "Authorization": `Bearer ${token}` },
         });
-        await middleware(request);
+        await proxy(request);
       }
 
       // 验证调用了外部服务3次
@@ -425,7 +425,7 @@ describe("Middleware - Open API 鉴权", () => {
       const newRequest = new NextRequest("http://localhost:3000/api/v1/tools", {
         headers: { "Authorization": "Bearer new-token" },
       });
-      await middleware(newRequest);
+      await proxy(newRequest);
 
       // 验证过期的 token 被清理（通过再次请求验证）
       for (const token of tokens) {
@@ -433,7 +433,7 @@ describe("Middleware - Open API 鉴权", () => {
         const request = new NextRequest("http://localhost:3000/api/v1/tools", {
           headers: { "Authorization": `Bearer ${token}` },
         });
-        await middleware(request);
+        await proxy(request);
         // 应该重新调用外部服务（因为缓存已过期）
         expect(mockFetch).toHaveBeenCalledTimes(1);
       }

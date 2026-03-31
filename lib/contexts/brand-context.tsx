@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { createContext, useContext, useState, type ReactNode, useEffect } from "react";
 import { useConfigManager } from "@/hooks/useConfigManager";
 import { saveBrandPreference, loadBrandPreference } from "../utils/brand-storage";
 import type { ZhipinData } from "@/types";

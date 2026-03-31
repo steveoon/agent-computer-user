@@ -1,8 +1,10 @@
 # CLAUDE.md
 
+@AGENTS.md
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Environment:** Node.js 18.18+, pnpm 8+ recommended
+**Environment:** Node.js 20.9+, pnpm 8+ recommended
 
 ## Development Commands
 
@@ -57,7 +59,7 @@ Manage multiple Agent instances with isolated browser sessions. See [MULTI_AGENT
 
 ### Core Application Structure
 
-Next.js 15 AI recruitment assistant platform with AI SDK v6:
+Next.js 16 AI recruitment assistant platform with AI SDK v6:
 
 **Multi-Provider AI Integration:**
 - Primary: Anthropic Claude Sonnet for computer use
@@ -108,7 +110,7 @@ z.string({ error: issue => issue.input === undefined ? "Required" : "Invalid" })
 ### File Organization
 
 - **Components**: `components/` with domain subdirectories
-- **API Routes**: `app/api/*/route.ts` (Next.js 15 App Router)
+- **API Routes**: `app/api/*/route.ts` (Next.js 16 App Router)
 - **Server Actions**: `actions/` for Next.js Server Actions
 - **Tools**: `lib/tools/` with tool-specific subdirectories
 - **Stores**: `lib/stores/` (Zustand)

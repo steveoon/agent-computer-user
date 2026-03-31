@@ -1,7 +1,15 @@
+<!-- BEGIN:nextjs-agent-rules -->
+
+# Next.js: ALWAYS read docs before coding
+
+Before any Next.js work, find and read the relevant doc in `node_modules/next/dist/docs/`. Your training data is outdated — the docs are the source of truth.
+
+<!-- END:nextjs-agent-rules -->
+
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `app/` holds Next.js 15 route groups, layouts, server actions, and MCP entry points; add new surfaces under descriptive segments.
+- `app/` holds Next.js 16 route groups, layouts, server actions, and MCP entry points; add new surfaces under descriptive segments.
 - `components/` contains UI primitives; `hooks/` holds state/effect hooks; shared services, registries, and stores live in `lib/`.
 - Platform wiring stays in `configs/`, `drizzle/`, `db/`, and `scripts/`—avoid product logic there.
 - Tests go in `__tests__/` for integration suites or colocated `*.test.ts(x)` files; assets belong in `public/`.
