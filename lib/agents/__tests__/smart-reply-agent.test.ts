@@ -77,27 +77,28 @@ vi.mock("@/lib/services/eligibility/age-eligibility", () => ({
 // Sample config data for testing (using 'as unknown as' to avoid complex type matching)
 // In real tests, you would use properly structured mock data
 const sampleConfigData = {
-  city: "成都",
-  defaultBrand: "蜀地源冒菜",
-  brands: {
-    "蜀地源冒菜": {
-      templates: {},
-      screening: {
-        ageRange: { min: 18, max: 45 },
-      },
-    },
+  meta: {
+    defaultBrandId: "1",
+    syncedAt: new Date().toISOString(),
+    source: "test",
   },
-  stores: [
+  brands: [
     {
-      id: "store-1",
-      name: "蜀地源冒菜（春熙路店）",
-      brand: "蜀地源冒菜",
-      location: "成都市锦江区春熙路123号",
-      district: "锦江区",
-      subarea: "春熙路",
-      coordinates: { lat: 30.6571, lng: 104.0665 },
-      transportation: "地铁春熙路站",
-      positions: [],
+      id: "1",
+      name: "蜀地源冒菜",
+      stores: [
+        {
+          id: "store-1",
+          brandId: "1",
+          name: "蜀地源冒菜（春熙路店）",
+          city: "成都",
+          location: "成都市锦江区春熙路123号",
+          district: "锦江区",
+          subarea: "春熙路",
+          coordinates: { lat: 30.6571, lng: 104.0665 },
+          positions: [],
+        },
+      ],
     },
   ],
 } as unknown as import("@/types/zhipin").ZhipinData;

@@ -43,7 +43,8 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useBrandEditorStore } from "@/lib/stores/brand-editor-store";
-import type { ScheduleType, SchedulingFlexibility, ZhipinData } from "@/types";
+import type { ScheduleType, SchedulingFlexibility, ZhipinData, Store } from "@/types";
+import { getAllStores, findBrandByNameOrAlias } from "@/types";
 
 interface ScheduleEditorProps {
   brandName: string;
@@ -114,9 +115,12 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
 
   const brandStores = useMemo(() => {
     if (!localData) return [];
-    return localData.stores
-      .map((store, index) => ({ ...store, originalIndex: index }))
-      .filter(store => store.brand === brandName)
+    const brand = findBrandByNameOrAlias(localData, brandName);
+    if (!brand) return [];
+    const allStores = getAllStores(localData);
+    return allStores
+      .map((store: Store, index: number) => ({ ...store, originalIndex: index }))
+      .filter(store => store.brandId === brand.id)
       .filter(store => {
         if (!searchKeyword.trim()) return true;
         return (
@@ -232,9 +236,10 @@ export function ScheduleEditor({ brandName, onDataUpdate }: ScheduleEditorProps)
     if (isApplying) return;
 
     // 获取当前品牌下的门店数量和岗位数量
-    const currentBrandStores = localData?.stores.filter(store => store.brand === brandName) || [];
+    const brand = localData ? findBrandByNameOrAlias(localData, brandName) : undefined;
+    const currentBrandStores = brand?.stores ?? [];
     const totalPositions = currentBrandStores.reduce(
-      (total, store) => total + store.positions.length,
+      (total: number, store: Store) => total + store.positions.length,
       0
     );
 

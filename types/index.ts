@@ -12,11 +12,9 @@ export type {
   SchedulingFlexibility,
   Position,
   Store,
-  Templates,
-  ScreeningRules,
-  BrandConfig,
+  Brand,
+  BrandDatasetMeta,
   ZhipinData,
-  SampleData,
   ReplyContext,
   CandidateInfo,
   ConversationMessage,
@@ -26,7 +24,15 @@ export type {
   LLMToolArgs,
 } from "./zhipin";
 
-export { ATTENDANCE_PATTERNS } from "./zhipin";
+export {
+  ATTENDANCE_PATTERNS,
+  getAllStores,
+  getBrandById,
+  findBrandByNameOrAlias,
+  getDefaultBrand,
+  getStoresByBrandId,
+  getPrimaryCity,
+} from "./zhipin";
 
 // 从config.ts导出配置相关类型
 export type {

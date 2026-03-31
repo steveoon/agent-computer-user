@@ -3,7 +3,7 @@ import {
   Store,
   Position,
   ZhipinData,
-  BrandConfig,
+  Brand,
   SalaryDetails,
   Benefits,
   AttendancePolicy,
@@ -26,16 +26,12 @@ export async function convertDulidayListToZhipinData(
   const brandName = (await getBrandNameByOrgId(organizationId)) || "未知品牌";
 
   // 遍历所有岗位数据，聚合成门店（每条数据只 normalize 一次）
-  let firstCity = "上海市";
-  dulidayResponse.data.result.forEach((item, index) => {
+  dulidayResponse.data.result.forEach((item) => {
     const normalized = normalizePosition(item);
-    if (index === 0) {
-      firstCity = normalized.cityName[0] || "上海市";
-    }
     const storeKey = `store_${normalized.storeId}`;
 
     if (!stores.has(storeKey)) {
-      stores.set(storeKey, convertToStore(normalized, brandName));
+      stores.set(storeKey, convertToStore(normalized, String(organizationId)));
     }
 
     const position = convertToPosition(normalized);
@@ -45,49 +41,23 @@ export async function convertDulidayListToZhipinData(
     }
   });
 
-  // 构建品牌配置（使用默认模板）
-  const brandConfig: BrandConfig = {
-    templates: {
-      initial_inquiry: [`你好，${brandName}在上海各区有兼职，排班{hours}小时，时薪{salary}元。`],
-      location_inquiry: [
-        `离你比较近在{location}的${brandName}门店有空缺，排班{schedule}，时薪{salary}元，有兴趣吗？`,
-      ],
-      no_location_match: [`你附近暂时没岗位，{alternative_location}的门店考虑吗？{transport_info}`],
-      interview_request: [`可以帮你和店长约面试，加我微信吧，需要几个简单的个人信息。`],
-      salary_inquiry: [`基本薪资是{salary}元/小时，{level_salary}。`],
-      schedule_inquiry: [`排班比较灵活，一般是2-4小时，具体可以和店长商量。`],
-      general_chat: [`好的，有什么其他问题可以问我。`],
-      age_concern: [`你的年龄没问题的。`],
-      insurance_inquiry: [`有商业保险。`],
-      followup_chat: [`这家门店不合适也没关系，以后还有其他店空缺的，到时候可以再报名。`],
-      attendance_inquiry: [`出勤要求是{attendance_description}，{minimum_days}天起，比较灵活的。`],
-      flexibility_inquiry: [
-        `排班{schedule_type}，{can_swap_shifts}换班，{part_time_allowed}兼职。`,
-      ],
-      attendance_policy_inquiry: [
-        `考勤要求：{punctuality_required}准时到岗，最多可以迟到{late_tolerance_minutes}分钟。`,
-      ],
-      work_hours_inquiry: [
-        `每周工作{min_hours_per_week}-{max_hours_per_week}小时，可以根据你的时间来安排。`,
-      ],
-      availability_inquiry: [
-        `{time_slot}班次还有{available_spots}个位置，{priority}优先级，可以报名。`,
-      ],
-      part_time_support: [`完全支持兼职，{part_time_allowed}，时间可以和其他工作错开安排。`],
-    },
-  };
-
   // 获取门店列表
   // Note: 地理编码在 API route 中进行，此处只做数据转换
   const storeList = Array.from(stores.values());
 
-  return {
-    city: firstCity,
+  const brand: Brand = {
+    id: String(organizationId),
+    name: brandName,
     stores: storeList,
-    brands: {
-      [brandName]: brandConfig,
+  };
+
+  return {
+    meta: {
+      defaultBrandId: brand.id,
+      syncedAt: new Date().toISOString(),
+      source: "duliday",
     },
-    defaultBrand: brandName,
+    brands: [brand],
   };
 }
 
@@ -524,11 +494,12 @@ function normalizePosition(dulidayData: DulidayRaw.Position | undefined): Normal
 /**
  * 转换为门店数据
  */
-function convertToStore(normalized: NormalizedDulidayPosition, brandName: string): Store {
+function convertToStore(normalized: NormalizedDulidayPosition, brandId: string): Store {
   return {
     id: `store_${normalized.storeId}`,
+    brandId,
     name: normalized.storeName,
-    city: normalized.cityName[0], // 门店所在城市（从 API cityName 获取）
+    city: normalized.cityName[0],
     location: normalized.storeAddress,
     district: extractDistrict(normalized.storeAddress, normalized.storeRegionName),
     subarea: extractSubarea(normalized.storeName),
@@ -536,8 +507,7 @@ function convertToStore(normalized: NormalizedDulidayPosition, brandName: string
       typeof normalized.latitude === "number" && typeof normalized.longitude === "number"
         ? { lat: normalized.latitude, lng: normalized.longitude }
         : { lat: 0, lng: 0 },
-    brand: brandName,
-    positions: [], // 将在后续添加
+    positions: [],
   };
 }
 

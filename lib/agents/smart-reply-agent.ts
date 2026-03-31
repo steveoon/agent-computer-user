@@ -6,7 +6,7 @@
 
 import { getDynamicRegistry } from "@/lib/model-registry/dynamic-registry";
 import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS, type ModelId } from "@/lib/config/models";
-import { type ZhipinData, type MessageClassification } from "@/types/zhipin";
+import { type ZhipinData, type MessageClassification, getAllStores, getDefaultBrand, getPrimaryCity } from "@/types/zhipin";
 import type { ReplyPolicyConfig, BrandPriorityStrategy } from "@/types/config";
 import type { CandidateInfo } from "@/lib/tools/zhipin/types";
 import type { StoreWithDistance } from "@/types/geocoding";
@@ -316,11 +316,12 @@ export async function generateSmartReply(
   } = options;
 
   const providerConfigs = modelConfig?.providerConfigs || DEFAULT_PROVIDER_CONFIGS;
+  const defaultBrand = getDefaultBrand(configData);
   const brandData = {
-    city: configData.city,
-    defaultBrand: configData.defaultBrand || Object.keys(configData.brands)[0] || "",
-    availableBrands: Object.keys(configData.brands),
-    storeCount: configData.stores.length,
+    city: getPrimaryCity(configData),
+    defaultBrand: defaultBrand?.name || "",
+    availableBrands: configData.brands.map(b => b.name),
+    storeCount: getAllStores(configData).length,
   };
 
   const turnPlan = await planTurn(candidateMessage, {
@@ -348,7 +349,7 @@ export async function generateSmartReply(
   const ageEligibility = await evaluateAgeEligibility({
     age: resolveCandidateAge(turnPlan, candidateInfo),
     brandAlias: resolvedBrand,
-    cityName: turnPlan.extractedInfo.city ?? configData.city,
+    cityName: turnPlan.extractedInfo.city ?? getPrimaryCity(configData),
     regionName: resolveRegionName(turnPlan, candidateInfo),
     strategy: replyPolicy?.qualificationPolicy?.age,
   });

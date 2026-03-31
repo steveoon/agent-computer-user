@@ -3,6 +3,24 @@ import { createSyncService } from "@/lib/services/duliday-sync.service";
 import { geocodingService } from "@/lib/services/geocoding.service";
 import { hasNumericCoordinates } from "@/lib/utils/coordinates";
 import { z } from "zod/v3";
+import type { Store, ZhipinData } from "@/types/zhipin";
+
+/** Extract all stores from a Partial<ZhipinData> */
+function getStoresFromPartial(data: Partial<ZhipinData> | undefined): Store[] {
+  return data?.brands?.flatMap(b => b.stores) ?? [];
+}
+
+/** Write updated stores back into their original nested brands */
+function setStoresInPartial(data: Partial<ZhipinData>, stores: Store[]): void {
+  if (!data.brands || data.brands.length === 0) {
+    return;
+  }
+
+  const storeMap = new Map(stores.map(store => [store.id, store]));
+  for (const brand of data.brands) {
+    brand.stores = brand.stores.map(store => storeMap.get(store.id) ?? store);
+  }
+}
 
 /**
  * 同步请求体 Schema
@@ -149,7 +167,7 @@ export async function POST(request: NextRequest) {
           const totalStoresToGeocode = syncRecord.results.reduce(
             (sum, r) =>
               sum +
-              (r.convertedData?.stores?.filter(s => !hasNumericCoordinates(s.coordinates))
+              (getStoresFromPartial(r.convertedData).filter(s => !hasNumericCoordinates(s.coordinates))
                 .length || 0),
             0
           );
@@ -158,12 +176,14 @@ export async function POST(request: NextRequest) {
           let totalGeocodingProcessed = 0;
 
           for (const result of syncRecord.results) {
-            if (result.convertedData?.stores && result.convertedData.stores.length > 0) {
+            const resultStores = getStoresFromPartial(result.convertedData);
+            if (resultStores.length > 0) {
               try {
                 // 🔄 注入已知坐标
+                let currentStores = resultStores;
                 if (existingCoordinates) {
                   let matchedCount = 0;
-                  result.convertedData.stores = result.convertedData.stores.map(store => {
+                  currentStores = currentStores.map(store => {
                     const knownCoords = existingCoordinates[store.location];
                     if (knownCoords) {
                       matchedCount++;
@@ -178,22 +198,23 @@ export async function POST(request: NextRequest) {
                   }
                 }
 
-                const storesNeedGeocoding = result.convertedData.stores.filter(
+                const storesNeedGeocoding = currentStores.filter(
                   s => !hasNumericCoordinates(s.coordinates)
                 );
 
                 if (storesNeedGeocoding.length === 0) {
+                  if (result.convertedData) setStoresInPartial(result.convertedData, currentStores);
                   result.geocodingStats = {
-                    total: result.convertedData.stores.length,
+                    total: currentStores.length,
                     success: 0,
                     failed: 0,
-                    skipped: result.convertedData.stores.length,
+                    skipped: currentStores.length,
                     failedStores: [],
                   };
                 } else {
                   const { stores: geocodedStores, stats } =
                     await geocodingService.batchGeocodeStoresWithStats(
-                      result.convertedData.stores,
+                      currentStores,
                       (processed, total, currentStats) => {
                         const previousProgress = geocodingProgressByBrand.get(result.brandName);
                         const previousProcessed = previousProgress?.processed ?? 0;
@@ -221,8 +242,7 @@ export async function POST(request: NextRequest) {
                       }
                     );
 
-                  result.convertedData.stores = geocodedStores;
-                  // 添加地理编码统计到结果中
+                  if (result.convertedData) setStoresInPartial(result.convertedData, geocodedStores);
                   result.geocodingStats = {
                     total: stats.needsGeocoding,
                     success: stats.success,
@@ -236,13 +256,12 @@ export async function POST(request: NextRequest) {
                 );
               } catch (geocodeError) {
                 console.warn(`[SYNC API] ${result.brandName} 地理编码失败，跳过:`, geocodeError);
-                // 地理编码失败时设置默认统计
                 result.geocodingStats = {
-                  total: result.convertedData.stores.length,
+                  total: resultStores.length,
                   success: 0,
-                  failed: result.convertedData.stores.length,
+                  failed: resultStores.length,
                   skipped: 0,
-                  failedStores: result.convertedData.stores.map(s => s.name),
+                  failedStores: resultStores.map(s => s.name),
                 };
               }
             }

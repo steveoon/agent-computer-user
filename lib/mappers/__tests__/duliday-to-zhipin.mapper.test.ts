@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { convertDulidayListToZhipinData } from "../duliday-to-zhipin.mapper";
-import { DulidayRaw, ZhipinDataSchema } from "@/types/zhipin";
+import { DulidayRaw, ZhipinDataSchema, getAllStores, type Store, type Position, type ZhipinData } from "@/types/zhipin";
 
 describe("Duliday to Zhipin Mapper", () => {
   describe("数据验证和转换", () => {
@@ -127,10 +127,10 @@ describe("Duliday to Zhipin Mapper", () => {
       const result = await convertDulidayListToZhipinData(mockResponse, 865); // 奥乐齐的组织ID
 
       // 验证转换结果
-      expect(result.stores).toHaveLength(1);
-      expect(result.stores![0].positions).toHaveLength(1);
+      expect(result.brands![0].stores).toHaveLength(1);
+      expect(result.brands![0].stores[0].positions).toHaveLength(1);
 
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       // 验证关键字段正确处理
       expect(position.attendanceRequirement?.minimumDays).toBe(5); // 应该使用 perWeekWorkDays 的值
@@ -242,7 +242,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 100);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       // 验证使用了 customWorkTimes 的值
       expect(position.attendanceRequirement?.minimumDays).toBe(3); // 使用 customWorkTimes.minWorkDays
@@ -360,7 +360,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 100);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       // 验证选择了最小的非 null minWorkDays
       expect(position.attendanceRequirement?.minimumDays).toBe(2); // 最小的非 null 值
@@ -471,7 +471,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 100);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       // 验证使用了 perWeekNeedWorkDays 的值
       expect(position.attendanceRequirement?.minimumDays).toBe(3); // 使用 perWeekNeedWorkDays
@@ -578,7 +578,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result1 = await convertDulidayListToZhipinData(mockResponse1, 100);
-      const position1 = result1.stores![0].positions[0];
+      const position1 = result1.brands![0].stores[0].positions[0];
 
       // 应该使用 perWeekWorkDays = 4
       expect(position1.attendanceRequirement?.minimumDays).toBe(4);
@@ -616,7 +616,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result2 = await convertDulidayListToZhipinData(mockResponse2, 100);
-      const position2 = result2.stores![0].positions[0];
+      const position2 = result2.brands![0].stores[0].positions[0];
 
       // 应该使用 customWorkTimes.minWorkDays = 3
       expect(position2.attendanceRequirement?.minimumDays).toBe(3);
@@ -722,7 +722,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 100);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       // 应该使用默认值 5
       expect(position.attendanceRequirement?.minimumDays).toBe(5);
@@ -827,7 +827,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 100);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       expect(position.brandId).toBe("202");
       expect(position.brandName).toBe("品牌名称");
@@ -944,7 +944,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 100);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       expect(position.brandId).toBe("701");
       expect(position.brandName).toBe("品牌-新");
@@ -1015,7 +1015,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 100);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       expect(Number.isNaN(position.schedulingFlexibility?.advanceNoticeHours)).toBe(false);
       expect(position.schedulingFlexibility?.advanceNoticeHours).toBe(0);
@@ -1115,7 +1115,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 100);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       expect(position.brandId).toBe("404");
       expect(position.brandName).toBe("旧组织名称");
@@ -1189,7 +1189,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 100);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       // welfare 归一化验证
       expect(position.benefits.items).toContain("五险一金");
@@ -1250,7 +1250,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 100);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       // 无保险/住宿/餐饮 → 应只有默认项
       expect(position.benefits.items).not.toContain("五险一金");
@@ -1295,7 +1295,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 100);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       // customnWorkTimeList 的 customMinWorkDays=3 应作为 minWorkDays 被提取
       // perWeekWorkDays 不存在，所以走 customWorkTimes 路径
@@ -1345,7 +1345,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 100);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       // hiringRequirements 应从 basicPersonalRequirements + certificate 提取
       expect(position.hiringRequirements).toBeDefined();
@@ -1360,7 +1360,7 @@ describe("Duliday to Zhipin Mapper", () => {
       expect(position.requirements).toContain("高中及以上");
       expect(position.requirements).toContain("需食品健康证");
       // genderRequirement="0" 表示不限，不应出现在 requirements 中
-      expect(position.requirements.some(r => r.includes("性别"))).toBe(false);
+      expect(position.requirements.some((r: string) => r.includes("性别"))).toBe(false);
 
       // description 应从 jobContent 填充
       expect(position.description).toBe("负责餐厅日常服务工作，包括点餐、上菜、清洁等");
@@ -1416,7 +1416,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 100);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       // salary.scenarioSummary 应包含阶梯薪资、综合薪资和节假日倍数
       expect(position.salary.scenarioSummary).toBeDefined();
@@ -1507,7 +1507,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 1167);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       // 时间段应正确解析 "14:00"/"23:00" → "14:00~23:00"
       expect(position.timeSlots).toContain("14:00~23:00");
@@ -1530,7 +1530,7 @@ describe("Duliday to Zhipin Mapper", () => {
       expect(position.requirements).toContain("初中及以上");
       expect(position.requirements).toContain("需食品健康证");
       // "男性,女性" 表示不限性别，不应出现性别要求
-      expect(position.requirements.some(r => r.includes("性别"))).toBe(false);
+      expect(position.requirements.some((r: string) => r.includes("性别"))).toBe(false);
 
       // hiringRequirements 应正确提取
       expect(position.hiringRequirements).toBeDefined();
@@ -1577,7 +1577,7 @@ describe("Duliday to Zhipin Mapper", () => {
       };
 
       const result = await convertDulidayListToZhipinData(mockResponse, 100);
-      const position = result.stores![0].positions[0];
+      const position = result.brands![0].stores[0].positions[0];
 
       // 无 basicPersonalRequirements → hiringRequirements 应为 undefined
       expect(position.hiringRequirements).toBeUndefined();
@@ -1711,31 +1711,32 @@ describe("Duliday to Zhipin Mapper", () => {
           JSON.stringify(parseResult.error.issues, null, 2)
         );
         // 同时打印 convertedData 的结构概览，方便对比
+        const allStores = convertedData.brands ? getAllStores(convertedData as ZhipinData) : [];
+        const firstStore = allStores[0];
         console.error(
           "=== convertedData 结构概览 ===\n",
           JSON.stringify(
             {
-              city: convertedData.city,
-              storeCount: convertedData.stores?.length,
-              firstStore: convertedData.stores?.[0]
+              brandCount: convertedData.brands?.length,
+              storeCount: allStores.length,
+              firstStore: firstStore
                 ? {
-                    id: convertedData.stores[0].id,
-                    name: convertedData.stores[0].name,
-                    positionCount: convertedData.stores[0].positions?.length,
-                    firstPosition: convertedData.stores[0].positions?.[0]
+                    id: firstStore.id,
+                    name: firstStore.name,
+                    positionCount: firstStore.positions?.length,
+                    firstPosition: firstStore.positions?.[0]
                       ? {
-                          id: convertedData.stores[0].positions[0].id,
-                          name: convertedData.stores[0].positions[0].name,
-                          salary: convertedData.stores[0].positions[0].salary,
-                          scheduleType: convertedData.stores[0].positions[0].scheduleType,
-                          attendancePolicy: convertedData.stores[0].positions[0].attendancePolicy,
-                          workHours: convertedData.stores[0].positions[0].workHours,
+                          id: firstStore.positions[0].id,
+                          name: firstStore.positions[0].name,
+                          salary: firstStore.positions[0].salary,
+                          scheduleType: firstStore.positions[0].scheduleType,
+                          attendancePolicy: firstStore.positions[0].attendancePolicy,
+                          workHours: firstStore.positions[0].workHours,
                         }
                       : "无岗位",
                   }
                 : "无门店",
-              brandKeys: convertedData.brands ? Object.keys(convertedData.brands) : [],
-              defaultBrand: convertedData.defaultBrand,
+              defaultBrandId: convertedData.meta?.defaultBrandId,
             },
             null,
             2
@@ -1864,31 +1865,32 @@ describe("Duliday to Zhipin Mapper", () => {
           "=== ZhipinDataSchema.partial() 验证失败（旧格式）===\n",
           JSON.stringify(parseResult.error.issues, null, 2)
         );
+        const allStores = convertedData.brands ? getAllStores(convertedData as ZhipinData) : [];
+        const firstStore = allStores[0];
         console.error(
           "=== convertedData 结构概览（旧格式）===\n",
           JSON.stringify(
             {
-              city: convertedData.city,
-              storeCount: convertedData.stores?.length,
-              firstStore: convertedData.stores?.[0]
+              brandCount: convertedData.brands?.length,
+              storeCount: allStores.length,
+              firstStore: firstStore
                 ? {
-                    id: convertedData.stores[0].id,
-                    name: convertedData.stores[0].name,
-                    positionCount: convertedData.stores[0].positions?.length,
-                    firstPosition: convertedData.stores[0].positions?.[0]
+                    id: firstStore.id,
+                    name: firstStore.name,
+                    positionCount: firstStore.positions?.length,
+                    firstPosition: firstStore.positions?.[0]
                       ? {
-                          id: convertedData.stores[0].positions[0].id,
-                          name: convertedData.stores[0].positions[0].name,
-                          salary: convertedData.stores[0].positions[0].salary,
-                          scheduleType: convertedData.stores[0].positions[0].scheduleType,
-                          attendancePolicy: convertedData.stores[0].positions[0].attendancePolicy,
-                          workHours: convertedData.stores[0].positions[0].workHours,
+                          id: firstStore.positions[0].id,
+                          name: firstStore.positions[0].name,
+                          salary: firstStore.positions[0].salary,
+                          scheduleType: firstStore.positions[0].scheduleType,
+                          attendancePolicy: firstStore.positions[0].attendancePolicy,
+                          workHours: firstStore.positions[0].workHours,
                         }
                       : "无岗位",
                   }
                 : "无门店",
-              brandKeys: convertedData.brands ? Object.keys(convertedData.brands) : [],
-              defaultBrand: convertedData.defaultBrand,
+              defaultBrandId: convertedData.meta?.defaultBrandId,
             },
             null,
             2
@@ -2004,8 +2006,9 @@ describe("Duliday to Zhipin Mapper", () => {
       const convertedData = await convertDulidayListToZhipinData(mockResponse, 1167);
 
       // 先验证基本结构
-      expect(convertedData.stores).toBeDefined();
-      expect(convertedData.stores!.length).toBe(2);
+      const allStores = convertedData.brands ? getAllStores(convertedData as ZhipinData) : [];
+      expect(allStores).toBeDefined();
+      expect(allStores.length).toBe(2);
 
       // 关键诊断：ZhipinDataSchema.partial().safeParse()
       const parseResult = ZhipinDataSchema.partial().safeParse(convertedData);
@@ -2016,10 +2019,11 @@ describe("Duliday to Zhipin Mapper", () => {
           JSON.stringify(parseResult.error.issues, null, 2)
         );
         // 遍历每个门店/岗位，逐个诊断
-        convertedData.stores?.forEach((store, si) => {
-          store.positions.forEach((pos, pi) => {
-            const storeSchema = ZhipinDataSchema.shape.stores.element;
-            const posSchema = storeSchema.shape.positions.element;
+        const brandSchema = ZhipinDataSchema.shape.brands.element;
+        const storeSchema = brandSchema.shape.stores.element;
+        const posSchema = storeSchema.shape.positions.element;
+        allStores.forEach((store: Store, si: number) => {
+          store.positions.forEach((pos: Position, pi: number) => {
             const posResult = posSchema.safeParse(pos);
             if (!posResult.success) {
               console.error(

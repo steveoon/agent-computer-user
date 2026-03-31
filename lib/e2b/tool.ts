@@ -9,6 +9,7 @@ import { loadZhipinData } from "../loaders/zhipin-data.loader";
 import { generateSmartReply } from "@/lib/agents";
 import { activeConfig } from "./display-config";
 import type { Store } from "../../types/zhipin";
+import { getAllStores } from "../../types/zhipin";
 import type { ModelConfig } from "../config/models";
 import type { ZhipinData, ReplyPolicyConfig } from "@/types";
 
@@ -1141,8 +1142,8 @@ export const computerTool = (
             }\n• 阶段: ${replyResult.turnPlan.stage}\n• Needs: ${
               replyResult.turnPlan.needs.join("、") || "none"
             }\n• 对话历史: ${processedHistory.length}条消息\n• 使用数据: ${
-              storeDatabase.stores.length
-            }家门店，${storeDatabase.stores.reduce(
+              getAllStores(storeDatabase).length
+            }家门店，${getAllStores(storeDatabase).reduce(
               (sum: number, store: Store) => sum + store.positions.length,
               0
             )}个岗位`;

@@ -9,12 +9,56 @@ import {
 import { getAvailableBrands } from "@/actions/brand-mapping";
 import { configService, getBrandData } from "@/lib/services/config.service";
 import { CONFIG_VERSION } from "@/types";
-import { ZhipinData } from "@/types/zhipin";
+import { ZhipinData, Brand, Store, BrandDatasetMeta, getAllStores } from "@/types/zhipin";
 import { toast } from "sonner";
 import { configStore } from "@/hooks/useConfigManager";
 import { hasNumericCoordinates } from "@/lib/utils/coordinates";
 import { consumeNdjsonStream } from "@/lib/utils/ndjson-stream";
 import { createSyncStreamHandler } from "@/lib/utils/sync-stream";
+
+/** 旧版 sample-data.ts 中使用的 Brand.id（迁移前的遗留格式） */
+const LEGACY_SAMPLE_IDS = new Set(["brand_chengduniliujie", "brand_damixiansheng"]);
+const isSampleBrandId = (id: string): boolean => id.startsWith("sample:") || LEGACY_SAMPLE_IDS.has(id);
+
+/**
+ * 检测现有数据是否为 sample 初始化数据或空数据
+ * 用于自动将 merge 提升为 replace，避免 sample 假 Brand.id 残留
+ */
+function isSampleSeededData(data: ZhipinData | undefined): boolean {
+  if (!data) return true;
+  // 空数据集
+  if (!data.brands || data.brands.length === 0) return true;
+  // 明确标记为 sample 来源
+  if (data.meta?.source === "sample") return true;
+  // 检测 sample Brand.id（所有品牌都是 sample 数据）
+  if (data.brands.every(b => isSampleBrandId(b.id))) return true;
+  return false;
+}
+
+/**
+ * 确保 defaultBrandId 指向 brands 中实际存在的品牌
+ * 如果当前值无效，按优先级回退：同步结果 → 第一个品牌 → undefined
+ */
+function ensureValidDefaultBrandId(
+  finalData: ZhipinData,
+  syncDefaultBrandId: string | undefined
+): void {
+  const currentDefault = finalData.meta?.defaultBrandId;
+  const brandExists = currentDefault && finalData.brands.some(b => b.id === currentDefault);
+  if (brandExists) return;
+
+  const newDefault =
+    syncDefaultBrandId && finalData.brands.some(b => b.id === syncDefaultBrandId)
+      ? syncDefaultBrandId
+      : finalData.brands[0]?.id;
+
+  if (currentDefault !== newDefault) {
+    console.log(
+      `🔄 defaultBrandId 修正: "${currentDefault ?? "(空)"}" → "${newDefault ?? "(空)"}"`
+    );
+    finalData.meta = { ...finalData.meta, defaultBrandId: newDefault };
+  }
+}
 
 const buildFullResyncSelectionMessage = (
   totalBrands: number,
@@ -41,6 +85,46 @@ const buildFullResyncSelectionMessage = (
 
 const fetchAvailableBrandIds = async (): Promise<Array<{ id: string; name: string }>> => {
   return await getAvailableBrands();
+};
+
+const parseTimestamp = (value: string | undefined): number | undefined => {
+  if (!value) return undefined;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? undefined : timestamp;
+};
+
+const mergeDatasetMeta = (
+  existingMeta: BrandDatasetMeta | undefined,
+  incomingData: Partial<ZhipinData>[],
+  defaultBrandId: string | undefined
+): BrandDatasetMeta => {
+  const latestSyncedAt = incomingData.reduce<string | undefined>((latest, data) => {
+    const current = data.meta?.syncedAt;
+    if (!current) return latest;
+
+    const latestTimestamp = parseTimestamp(latest);
+    const currentTimestamp = parseTimestamp(current);
+    if (currentTimestamp === undefined) {
+      return latest;
+    }
+    if (latestTimestamp === undefined || currentTimestamp > latestTimestamp) {
+      return current;
+    }
+    return latest;
+  }, existingMeta?.syncedAt);
+
+  const source =
+    [...incomingData]
+      .reverse()
+      .map(data => data.meta?.source)
+      .find((value): value is string => Boolean(value)) ?? existingMeta?.source;
+
+  return {
+    ...existingMeta,
+    defaultBrandId,
+    syncedAt: latestSyncedAt,
+    source,
+  };
 };
 
 /**
@@ -216,8 +300,8 @@ export const useSyncStore = create<SyncState>()(
           const existingData = currentConfig?.brandData ?? (await getBrandData());
           const existingCoordinates: Record<string, { lat: number; lng: number }> = {};
 
-          if (existingData?.stores) {
-            existingData.stores.forEach(store => {
+          if (existingData) {
+            getAllStores(existingData).forEach((store: Store) => {
               if (hasNumericCoordinates(store.coordinates)) {
                 // 使用地址作为键
                 existingCoordinates[store.location] = store.coordinates;
@@ -530,7 +614,7 @@ export async function mergeAndSaveSyncData(
   syncResults: SyncResult[],
   options: SyncSaveOptions = {}
 ): Promise<void> {
-  const mode = options.mode ?? "merge";
+  let mode = options.mode ?? "merge";
   const currentConfig = await configService.getConfig();
 
   if (!currentConfig) {
@@ -538,6 +622,12 @@ export async function mergeAndSaveSyncData(
   }
 
   const existingData = currentConfig.brandData;
+
+  // 🛡️ Sample 污染检测：如果现有数据来自 sample 或为空，自动提升为 replace
+  if (mode === "merge" && isSampleSeededData(existingData)) {
+    console.log("🔄 检测到现有数据为 sample 初始化数据或空数据，自动提升为 replace 模式");
+    mode = "replace";
+  }
 
   // 合并所有同步结果的数据
   const allConvertedData: Partial<ZhipinData>[] = syncResults
@@ -547,6 +637,7 @@ export async function mergeAndSaveSyncData(
 
   // 收集 API 正常返回 0 岗位的品牌（需清理旧数据）
   // 区分：errors 为空 = API 正常返回空数据；errors 非空 = 网络/API 异常，保留旧数据
+  const emptyBrandIds = new Set<string>();
   const emptyBrandNames = new Set<string>();
   for (const result of syncResults) {
     if (
@@ -555,6 +646,9 @@ export async function mergeAndSaveSyncData(
       result.errors.length === 0 &&
       result.brandName
     ) {
+      if (result.organizationId !== undefined) {
+        emptyBrandIds.add(String(result.organizationId));
+      }
       emptyBrandNames.add(result.brandName);
     }
   }
@@ -573,68 +667,50 @@ export async function mergeAndSaveSyncData(
       `没有新数据，但需清理 ${emptyBrandNames.size} 个已无在招岗位的品牌: ${Array.from(emptyBrandNames).join(", ")}`
     );
 
-    const mergedBrands = { ...(existingData?.brands || {}) };
-    let mergedStores = [...(existingData?.stores || [])];
-
-    mergedStores = mergedStores.filter(store => !emptyBrandNames.has(store.brand));
-    for (const brandName of emptyBrandNames) {
-      delete mergedBrands[brandName];
-      console.log(`🗑️ 已清理品牌 "${brandName}" 的本地门店和配置`);
-    }
+    const mergedBrands = (existingData?.brands || []).filter(brand => {
+      if (emptyBrandIds.has(brand.id) || emptyBrandNames.has(brand.name)) {
+        console.log(`🗑️ 已清理品牌 "${brand.name}" 的本地门店和配置`);
+        return false;
+      }
+      return true;
+    });
 
     const finalData: ZhipinData = {
-      city: existingData?.city || "上海市",
-      stores: mergedStores,
+      meta: existingData?.meta || {},
       brands: mergedBrands,
-      defaultBrand: existingData?.defaultBrand,
     };
+    ensureValidDefaultBrandId(finalData, undefined);
 
     await configService.updateBrandData(finalData);
-    console.log(`✅ 空品牌清理完成，剩余门店: ${mergedStores.length} 个，品牌: ${Object.keys(mergedBrands).length} 个`);
+    const totalStores = getAllStores(finalData).length;
+    console.log(`✅ 空品牌清理完成，剩余门店: ${totalStores} 个，品牌: ${mergedBrands.length} 个`);
     return;
   }
 
   if (mode === "replace") {
-    const backupTemplates = currentConfig.metadata.backup?.brandTemplates || {};
+    // Determine defaultBrandId from sync results or existing data
+    const mergedDefaultBrandId =
+      allConvertedData.find(data => data.meta?.defaultBrandId)?.meta?.defaultBrandId ||
+      existingData?.meta?.defaultBrandId;
 
-    let mergedCity =
-      allConvertedData.find(data => data.city)?.city || existingData?.city || "上海市";
-    let mergedDefaultBrand =
-      allConvertedData.find(data => data.defaultBrand)?.defaultBrand || existingData?.defaultBrand;
-
-    const mergedBrands: ZhipinData["brands"] = {};
-    const mergedStores: ZhipinData["stores"] = [];
+    // Merge brands by id: later results overwrite earlier ones
+    const brandMap = new Map<string, Brand>();
 
     for (const data of allConvertedData) {
-      if (data.city && !mergedCity) {
-        mergedCity = data.city;
-      }
-      if (data.defaultBrand && !mergedDefaultBrand) {
-        mergedDefaultBrand = data.defaultBrand;
-      }
-
       if (data.brands) {
-        const brands = data.brands;
-        Object.keys(brands).forEach(brandName => {
-          const newBrandConfig = brands[brandName];
-          const preservedTemplates = backupTemplates[brandName];
-          mergedBrands[brandName] = preservedTemplates
-            ? { ...newBrandConfig, templates: preservedTemplates }
-            : newBrandConfig;
-        });
-      }
-
-      if (data.stores) {
-        mergedStores.push(...data.stores);
+        for (const brand of data.brands) {
+          brandMap.set(brand.id, brand);
+        }
       }
     }
 
+    const mergedBrands = Array.from(brandMap.values());
+
     const finalData: ZhipinData = {
-      city: mergedCity,
-      stores: mergedStores,
+      meta: mergeDatasetMeta(existingData?.meta, allConvertedData, mergedDefaultBrandId),
       brands: mergedBrands,
-      defaultBrand: mergedDefaultBrand,
     };
+    ensureValidDefaultBrandId(finalData, mergedDefaultBrandId);
 
     await configService.saveConfig({
       ...currentConfig,
@@ -648,17 +724,22 @@ export async function mergeAndSaveSyncData(
       },
     });
 
+    const totalStores = getAllStores(finalData).length;
     console.log(`✅ 数据全量替换完成:`);
-    console.log(`   📊 总门店数: ${mergedStores.length} 个`);
-    console.log(`   🏢 总品牌数: ${Object.keys(mergedBrands).length} 个`);
+    console.log(`   📊 总门店数: ${totalStores} 个`);
+    console.log(`   🏢 总品牌数: ${mergedBrands.length} 个`);
     return;
   }
 
-  // 收集所有同步的品牌名称
+  // 收集所有同步的品牌 ID
+  const syncedBrandIds = new Set<string>();
   const syncedBrandNames = new Set<string>();
   for (const data of allConvertedData) {
     if (data.brands) {
-      Object.keys(data.brands).forEach(brandName => syncedBrandNames.add(brandName));
+      for (const brand of data.brands) {
+        syncedBrandIds.add(brand.id);
+        syncedBrandNames.add(brand.name);
+      }
     }
   }
 
@@ -670,92 +751,82 @@ export async function mergeAndSaveSyncData(
     console.log(`🔄 开始合并数据，将替换品牌: ${Array.from(syncedBrandNames).join(", ")}`);
   }
 
-  // 基础数据保持不变
-  let mergedCity = existingData?.city || "上海市";
-  let mergedDefaultBrand = existingData?.defaultBrand;
+  // 基础元数据保持不变
+  let mergedDefaultBrandId = existingData?.meta?.defaultBrandId;
 
-  // 品牌数据：保留现有品牌 + 完全替换同步的品牌
-  const mergedBrands = { ...(existingData?.brands || {}) };
+  // 品牌数据：保留现有品牌（排除被同步的和空的），然后添加同步的品牌
+  const existingBrands = (existingData?.brands || []).filter(
+    brand =>
+      !syncedBrandIds.has(brand.id) &&
+      !emptyBrandIds.has(brand.id) &&
+      !emptyBrandNames.has(brand.name)
+  );
 
   // 清理 API 正常返回 0 岗位的品牌配置
   for (const brandName of emptyBrandNames) {
-    if (mergedBrands[brandName]) {
-      delete mergedBrands[brandName];
-      console.log(`🗑️ 已清理品牌 "${brandName}" 的本地配置（API 返回 0 岗位）`);
+    const found = existingData?.brands?.find(
+      b => emptyBrandIds.has(b.id) || b.name === brandName
+    );
+    if (found) {
+      console.log(`🗑️ 已清理品牌 "${found.name}" 的本地配置（API 返回 0 岗位）`);
     }
   }
 
-  // 门店数据：移除被同步品牌 + 空品牌的现有门店，然后添加新门店
-  let mergedStores = [...(existingData?.stores || [])];
+  console.log(`🗑️ 移除被同步品牌和空品牌，剩余品牌: ${existingBrands.length} 个`);
 
-  // 第一步：移除所有即将被同步品牌和空品牌的现有门店
-  mergedStores = mergedStores.filter(
-    store => !syncedBrandNames.has(store.brand) && !emptyBrandNames.has(store.brand)
-  );
-
-  console.log(`🗑️ 移除现有门店数据，剩余门店: ${mergedStores.length} 个`);
-
-  // 第二步：处理每个同步结果的数据
+  // 合并新品牌数据：按 brand.id 去重（后来者覆盖）
+  const newBrandMap = new Map<string, Brand>();
   for (const data of allConvertedData) {
-    // 更新城市（使用第一个非空的）
-    if (data.city && !mergedCity) {
-      mergedCity = data.city;
-    }
-
     // 更新默认品牌（使用第一个非空的）
-    if (data.defaultBrand && !mergedDefaultBrand) {
-      mergedDefaultBrand = data.defaultBrand;
+    if (data.meta?.defaultBrandId && !mergedDefaultBrandId) {
+      mergedDefaultBrandId = data.meta.defaultBrandId;
     }
 
-    // 智能合并品牌配置：保留现有品牌的话术模板，只更新其他配置
     if (data.brands) {
-      const brands = data.brands;
-      Object.keys(brands).forEach(brandName => {
-        const newBrandConfig = brands[brandName];
-        const existingBrandConfig = mergedBrands[brandName];
-
-        if (existingBrandConfig) {
-          // 品牌已存在：保留现有的 templates（用户可能已修改），只更新其他配置
-          mergedBrands[brandName] = {
-            ...newBrandConfig,
-            templates: existingBrandConfig.templates, // 保留用户修改过的话术
-          };
-          console.log(`🔄 保留品牌 "${brandName}" 的现有话术模板`);
+      for (const brand of data.brands) {
+        const existingBrand = existingBrands.find(b => b.id === brand.id);
+        if (existingBrand) {
+          // 品牌已存在于本地：保留 aliases 等已有信息，更新门店
+          newBrandMap.set(brand.id, {
+            ...brand,
+            aliases: brand.aliases || existingBrand.aliases,
+          });
+          console.log(`🔄 更新品牌 "${brand.name}" 的门店数据`);
         } else {
-          // 新品牌：使用完整的新配置（包括默认话术）
-          mergedBrands[brandName] = newBrandConfig;
-          console.log(`🆕 添加新品牌 "${brandName}" 及其默认话术模板`);
+          // 新品牌：使用完整的新配置
+          newBrandMap.set(brand.id, brand);
+          console.log(`🆕 添加新品牌 "${brand.name}"`);
         }
-      });
-    }
 
-    // 添加新的门店数据（完全替换）
-    if (data.stores) {
-      mergedStores.push(...data.stores);
-      console.log(`➕ 添加品牌 "${data.stores[0]?.brand}" 的门店: ${data.stores.length} 个`);
+        const storeCount = brand.stores.length;
+        console.log(`➕ 添加品牌 "${brand.name}" 的门店: ${storeCount} 个`);
+      }
     }
   }
+
+  // 合并：保留的现有品牌 + 新同步的品牌
+  const mergedBrands = [...existingBrands, ...Array.from(newBrandMap.values())];
 
   // 构建最终数据
   const finalData: ZhipinData = {
-    city: mergedCity,
-    stores: mergedStores,
+    meta: mergeDatasetMeta(existingData?.meta, allConvertedData, mergedDefaultBrandId),
     brands: mergedBrands,
-    defaultBrand: mergedDefaultBrand,
   };
+  ensureValidDefaultBrandId(finalData, mergedDefaultBrandId);
 
   // 保存到配置
   await configService.updateBrandData(finalData);
 
-  const totalBrands = Object.keys(mergedBrands).length;
-  const syncedBrandCount = syncedBrandNames.size;
+  const totalBrands = mergedBrands.length;
+  const syncedBrandCount = syncedBrandIds.size;
+  const totalStores = getAllStores(finalData).length;
   const newStoresCount = allConvertedData.reduce(
-    (sum, data) => sum + (data.stores?.length || 0),
+    (sum, data) => sum + (data.brands?.reduce((s, b) => s + b.stores.length, 0) || 0),
     0
   );
 
   console.log(`✅ 数据同步完成:`);
-  console.log(`   📊 总门店数: ${mergedStores.length} 个`);
+  console.log(`   📊 总门店数: ${totalStores} 个`);
   console.log(`   🏢 总品牌数: ${totalBrands} 个`);
   console.log(
     `   🔄 替换品牌: ${syncedBrandCount} 个 (${Array.from(syncedBrandNames).join(", ")})`

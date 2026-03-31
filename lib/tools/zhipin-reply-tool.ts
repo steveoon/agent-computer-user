@@ -3,7 +3,7 @@ import { z } from "zod/v3";
 import { loadZhipinData } from "@/lib/loaders/zhipin-data.loader";
 import { generateSmartReply } from "@/lib/agents";
 import type { StoreWithDistance } from "@/types/geocoding";
-import type { ZhipinData, MessageClassification } from "@/types/zhipin";
+import { type ZhipinData, type MessageClassification, getAllStores, getDefaultBrand } from "@/types/zhipin";
 import type { ReplyPolicyConfig, BrandPriorityStrategy } from "@/types/config";
 import type { ModelConfig } from "@/lib/config/models";
 import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
@@ -286,15 +286,16 @@ export const zhipinReplyTool = (
         // 如果需要包含统计信息
         if (include_stats) {
           const storeDatabase = configData || (await loadZhipinData(preferredBrand));
-          const totalPositions = storeDatabase.stores.reduce(
+          const allStores = getAllStores(storeDatabase);
+          const totalPositions = allStores.reduce(
             (sum, store) => sum + store.positions.length,
             0
           );
 
           response.stats = {
-            totalStores: storeDatabase.stores.length,
+            totalStores: allStores.length,
             totalPositions: totalPositions,
-            brand: brand || preferredBrand || storeDatabase.defaultBrand || "未知品牌",
+            brand: brand || preferredBrand || getDefaultBrand(storeDatabase)?.name || "未知品牌",
           };
         }
 

@@ -65,8 +65,8 @@ async function migrate() {
     if (savedConfig) {
       console.log("✅ 数据迁移成功！");
       console.log(`📊 统计信息:`);
-      console.log(`  - 品牌数量: ${Object.keys(savedConfig.brandData.brands).length}`);
-      console.log(`  - 门店数量: ${savedConfig.brandData.stores.length}`);
+      console.log(`  - 品牌数量: ${savedConfig.brandData.brands.length}`);
+      console.log(`  - 门店数量: ${savedConfig.brandData.brands.flatMap((b: { stores: unknown[] }) => b.stores).length}`);
       console.log(`  - 系统提示词: ${Object.keys(savedConfig.systemPrompts).length} 个`);
       console.log(`  - 回复指令: ${Object.keys(savedConfig.replyPolicy).length} 个`);
       console.log(`  - 配置版本: ${savedConfig.metadata.version}`);

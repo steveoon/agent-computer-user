@@ -481,87 +481,62 @@ export const PositionSchema = z.object({
 // 门店Schema
 export const StoreSchema = z.object({
   id: z.string(),
+  brandId: z.string(),
   name: z.string(),
-  city: z.string().optional(), // 门店所在城市（从 API cityName 获取）
+  city: z.string().optional(),
   location: z.string(),
   district: z.string(),
   subarea: z.string(),
-  coordinates: CoordinatesSchema, // 引用统一的坐标 Schema
+  coordinates: CoordinatesSchema,
   positions: z.array(PositionSchema),
-  brand: z.string(),
 });
 
-// 用于智能回复系统的消息分类和模板匹配
+// ========== 品牌与数据集 ==========
+
+export const BrandDatasetMetaSchema = z.object({
+  defaultBrandId: z.string().optional(),
+  syncedAt: z.string().optional(),
+  source: z.string().optional(),
+});
+
+export const BrandSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  aliases: z.array(z.string()).optional(),
+  stores: z.array(StoreSchema),
+});
+
+export const ZhipinDataSchema = z.object({
+  meta: BrandDatasetMetaSchema,
+  brands: z.array(BrandSchema),
+});
+
+// 用于智能回复系统的消息分类
 export const ReplyContextSchema = z.enum([
   // 基础咨询类
-  "initial_inquiry", // 初次咨询工作机会
-  "location_inquiry", // 询问位置但无具体指向
-  "no_location_match", // 提到位置但无法匹配
-  "schedule_inquiry", // 询问工作时间安排
-  "interview_request", // 表达面试意向
-  "general_chat", // 一般性对话
+  "initial_inquiry",
+  "location_inquiry",
+  "no_location_match",
+  "schedule_inquiry",
+  "interview_request",
+  "general_chat",
 
   // 敏感信息类
-  "salary_inquiry", // 询问薪资待遇
-  "age_concern", // 年龄相关问题（敏感）
-  "insurance_inquiry", // 保险福利问题（敏感）
+  "salary_inquiry",
+  "age_concern",
+  "insurance_inquiry",
 
   // 跟进沟通类
-  "followup_chat", // 需要跟进的聊天
+  "followup_chat",
 
-  // 考勤排班类（🆕 新增）
-  "attendance_inquiry", // 出勤要求咨询
-  "flexibility_inquiry", // 排班灵活性咨询
-  "attendance_policy_inquiry", // 考勤政策咨询
-  "work_hours_inquiry", // 工时要求咨询
-  "availability_inquiry", // 时间段可用性咨询
-  "part_time_support", // 兼职支持咨询
+  // 考勤排班类
+  "attendance_inquiry",
+  "flexibility_inquiry",
+  "attendance_policy_inquiry",
+  "work_hours_inquiry",
+  "availability_inquiry",
+  "part_time_support",
 ]);
-
-// 基础模板Schema（仅支持标准回复类型）
-export const BaseTemplatesSchema = z.record(ReplyContextSchema, z.array(z.string()));
-
-// 可选的模板Schema
-export const OptionalTemplatesSchema = BaseTemplatesSchema.optional();
-
-// 必需的模板Schema（用于品牌配置）
-export const RequiredTemplatesSchema = BaseTemplatesSchema.refine(
-  val => {
-    return val !== undefined && typeof val === "object";
-  },
-  {
-    message: "品牌配置必须包含templates字段",
-  }
-);
-
-// 筛选规则Schema
-export const ScreeningRulesSchema = z.object({
-  age: z.object({
-    min: z.number().min(0),
-    max: z.number().min(0),
-    preferred: z.array(z.number()),
-  }),
-  blacklistKeywords: z.array(z.string()),
-  preferredKeywords: z.array(z.string()),
-});
-
-// 品牌配置Schema
-export const BrandConfigSchema = z.object({
-  templates: RequiredTemplatesSchema,
-});
-
-// Boss直聘数据Schema
-export const ZhipinDataSchema = z.object({
-  city: z.string(),
-  stores: z.array(StoreSchema),
-  brands: z.record(z.string(), BrandConfigSchema),
-  defaultBrand: z.string().optional(),
-});
-
-// 示例数据Schema
-export const SampleDataSchema = z.object({
-  zhipin: ZhipinDataSchema,
-});
 
 // 候选人信息从统一源导入，避免重复定义
 export { CandidateInfoSchema } from "@/lib/tools/zhipin/types";
@@ -622,11 +597,9 @@ export type TimeSlotAvailability = z.infer<typeof TimeSlotAvailabilitySchema>;
 export type SchedulingFlexibility = z.infer<typeof SchedulingFlexibilitySchema>;
 export type Position = z.infer<typeof PositionSchema>;
 export type Store = z.infer<typeof StoreSchema>;
-export type Templates = z.infer<typeof BaseTemplatesSchema>;
-export type ScreeningRules = z.infer<typeof ScreeningRulesSchema>;
-export type BrandConfig = z.infer<typeof BrandConfigSchema>;
+export type BrandDatasetMeta = z.infer<typeof BrandDatasetMetaSchema>;
+export type Brand = z.infer<typeof BrandSchema>;
 export type ZhipinData = z.infer<typeof ZhipinDataSchema>;
-export type SampleData = z.infer<typeof SampleDataSchema>;
 export type ReplyContext = z.infer<typeof ReplyContextSchema>;
 export { type CandidateInfo } from "@/lib/tools/zhipin/types"; // 从统一源导出类型
 export type ConversationMessage = z.infer<typeof ConversationMessageSchema>;
@@ -706,3 +679,63 @@ export const REPLY_TYPE_NAMES: Record<ReplyContext, string> = {
   availability_inquiry: "时段可用性",
   part_time_support: "兼职支持",
 };
+
+// ========== ZhipinData 辅助函数 ==========
+
+export function getAllStores(data: ZhipinData): Store[] {
+  return data.brands.flatMap(brand => brand.stores);
+}
+
+export function getBrandById(data: ZhipinData, brandId: string): Brand | undefined {
+  return data.brands.find(b => b.id === brandId);
+}
+
+export function findBrandByNameOrAlias(data: ZhipinData, name: string): Brand | undefined {
+  const lower = name.trim().toLowerCase();
+  const normalized = lower.replace(/[\s._-]+/g, "");
+  if (!lower) return undefined;
+
+  return data.brands.find(
+    b => {
+      const candidates = [b.name, ...(b.aliases ?? [])];
+      return candidates.some(candidate => {
+        const candidateLower = candidate.trim().toLowerCase();
+        return (
+          candidateLower === lower ||
+          candidateLower.replace(/[\s._-]+/g, "") === normalized
+        );
+      });
+    }
+  );
+}
+
+export function getDefaultBrand(data: ZhipinData): Brand | undefined {
+  if (data.meta?.defaultBrandId) {
+    return getBrandById(data, data.meta.defaultBrandId);
+  }
+  return data.brands[0];
+}
+
+export function getStoresByBrandId(data: ZhipinData, brandId: string): Store[] {
+  const brand = getBrandById(data, brandId);
+  return brand?.stores ?? [];
+}
+
+export function getPrimaryCity(data: ZhipinData): string {
+  const allStores = getAllStores(data);
+  const cityCount = new Map<string, number>();
+  for (const store of allStores) {
+    if (store.city) {
+      cityCount.set(store.city, (cityCount.get(store.city) ?? 0) + 1);
+    }
+  }
+  let maxCity = "";
+  let maxCount = 0;
+  for (const [city, count] of cityCount) {
+    if (count > maxCount) {
+      maxCity = city;
+      maxCount = count;
+    }
+  }
+  return maxCity || "未知城市";
+}

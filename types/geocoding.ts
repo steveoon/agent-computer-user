@@ -27,7 +27,9 @@ export type Coordinates = z.infer<typeof CoordinatesSchema>;
  * 用于位置匹配后的门店排序和展示
  */
 export interface StoreWithDistance {
-  store: Store;
+  store: Store & {
+    brandName?: string;
+  };
   distance?: number; // 距离（米），undefined 表示无法计算
 }
 

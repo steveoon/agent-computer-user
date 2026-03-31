@@ -9,6 +9,10 @@ import {
   ReplyContext,
   Store,
   Position,
+  getAllStores,
+  getBrandById,
+  getDefaultBrand,
+  getPrimaryCity,
 } from "../../types/zhipin";
 import {
   getBrandData,
@@ -68,6 +72,13 @@ function buildSalaryDescription(salary: SalaryDetails): string {
   return description;
 }
 
+function withBrandName(data: ZhipinData, store: Store): StoreWithDistance["store"] {
+  return {
+    ...store,
+    brandName: getBrandById(data, store.brandId)?.name,
+  };
+}
+
 /**
  * 🎯 加载Boss直聘相关数据 - 重构版
  * 优先使用传入的配置数据，仅在浏览器环境中作为备用加载器
@@ -87,12 +98,13 @@ export async function loadZhipinData(
       // 不再在这里修改 defaultBrand，保持原始配置数据不变
       // 品牌解析逻辑将在 resolveBrandConflict 中统一处理
 
-      const totalPositions = configData.stores.reduce(
-        (sum, store) => sum + store.positions.length,
+      const allStores = getAllStores(configData);
+      const totalPositions = allStores.reduce(
+        (sum: number, store: Store) => sum + store.positions.length,
         0
       );
       console.log(
-        `📊 数据统计: ${configData.stores.length} 家门店，${totalPositions} 个岗位${
+        `📊 数据统计: ${allStores.length} 家门店，${totalPositions} 个岗位${
           preferredBrand ? ` - UI选择品牌: ${preferredBrand}` : ""
         }`
       );
@@ -122,10 +134,11 @@ export async function loadZhipinData(
       }
 
       // 应用品牌选择（与上面的逻辑保持一致）
-      let effectiveBrand = brandData.defaultBrand || Object.keys(brandData.brands)[0];
+      const availableBrandNames = brandData.brands.map(b => b.name);
+      let effectiveBrand = getDefaultBrand(brandData)?.name || availableBrandNames[0];
 
       if (preferredBrand) {
-        const matchedBrand = fuzzyMatchBrand(preferredBrand, Object.keys(brandData.brands));
+        const matchedBrand = fuzzyMatchBrand(preferredBrand, availableBrandNames);
         if (matchedBrand) {
           effectiveBrand = matchedBrand;
           if (matchedBrand === preferredBrand) {
@@ -138,21 +151,17 @@ export async function loadZhipinData(
         }
       }
 
-      const effectiveData = {
-        ...brandData,
-        defaultBrand: effectiveBrand,
-      };
-
-      const totalPositions = effectiveData.stores.reduce(
-        (sum, store) => sum + store.positions.length,
+      const allBrandStores = getAllStores(brandData);
+      const totalPositions = allBrandStores.reduce(
+        (sum: number, store: Store) => sum + store.positions.length,
         0
       );
       console.log(
-        `✅ 已从配置服务加载 ${effectiveData.stores.length} 家门店数据 (${totalPositions} 个岗位)${
+        `✅ 已从配置服务加载 ${allBrandStores.length} 家门店数据 (${totalPositions} 个岗位)${
           preferredBrand ? ` - 当前品牌: ${preferredBrand}` : ""
         }`
       );
-      return effectiveData;
+      return brandData;
     }
 
     // 🚨 服务端环境必须提供配置数据
@@ -919,23 +928,25 @@ export async function buildContextInfo(
   const jobAddressForFilter = candidateInfo?.jobAddress;
 
   // 使用新的冲突解析逻辑，传入三个独立的品牌源
+  const configDefaultBrandName = getDefaultBrand(data)?.name;
+  const availableBrandNames = data.brands.map(b => b.name);
   const brandResolution = resolveBrandConflict({
     uiSelectedBrand: uiSelectedBrand, // UI选择的品牌
-    configDefaultBrand: data.defaultBrand, // 配置中的默认品牌
+    configDefaultBrand: configDefaultBrandName, // 配置中的默认品牌
     conversationBrand: toolBrand || undefined, // 工具调用时从职位详情识别的品牌
-    availableBrands: Object.keys(data.brands),
+    availableBrands: availableBrandNames,
     strategy: brandPriorityStrategy || "smart",
   });
 
   const targetBrand = brandResolution.resolvedBrand;
   console.log(
     `\n━━━ 🏢 品牌解析 ━━━\n` +
-      `   输入: UI=${uiSelectedBrand || "无"} | 工具=${toolBrand || "无"} | 默认=${data.defaultBrand}\n` +
+      `   输入: UI=${uiSelectedBrand || "无"} | 工具=${toolBrand || "无"} | 默认=${configDefaultBrandName}\n` +
       `   结果: ${targetBrand} (${brandResolution.reason})`
   );
 
   // 获取目标品牌的所有门店
-  const brandStores = data.stores.filter(store => store.brand === targetBrand);
+  const brandStores = getAllStores(data).filter((store: Store) => store.brandId === targetBrand);
   let relevantStores = brandStores; // 保持品牌过滤，即使为空
 
   // 如果没有门店数据，构建空的上下文
@@ -953,8 +964,8 @@ export async function buildContextInfo(
   }
 
   // 优先使用明确提到的工作城市进行过滤
-  // 🔧 优先级: 门店 store.city → 门店地址提取 → data.city (fallback)
-  const brandCity = inferCityFromStores(relevantStores, data.city);
+  // 🔧 优先级: 门店 store.city → 门店地址提取 → getPrimaryCity (fallback)
+  const brandCity = inferCityFromStores(relevantStores, getPrimaryCity(data));
 
   // 位置过滤日志收集
   const locationLogs: string[] = [];
@@ -1080,55 +1091,14 @@ export async function buildContextInfo(
     context += `⚠️ 无匹配时必须：主动要微信联系方式，告知"以后有其他门店空了可以再推给你"\n`;
   }
 
-  // 添加品牌专属模板话术参考 - 仅添加当前分类对应的话术
-  const brandConfig = data.brands[targetBrand];
-  if (brandConfig && brandConfig.templates && classification.replyType) {
-    const templateMap: Record<ReplyContext, string> = {
-      initial_inquiry: "初次咨询",
-      location_inquiry: "位置咨询",
-      no_location_match: "无位置匹配",
-      schedule_inquiry: "排班咨询",
-      interview_request: "面试邀约",
-      general_chat: "一般对话",
-      salary_inquiry: "薪资咨询",
-      age_concern: "年龄问题",
-      insurance_inquiry: "保险咨询",
-      followup_chat: "跟进话术",
-      // 🆕 新增：出勤和排班相关模板映射
-      attendance_inquiry: "出勤要求咨询",
-      flexibility_inquiry: "排班灵活性咨询",
-      attendance_policy_inquiry: "考勤政策咨询",
-      work_hours_inquiry: "工时要求咨询",
-      availability_inquiry: "时间段可用性咨询",
-      part_time_support: "兼职支持咨询",
-    };
-
-    // 只获取当前分类对应的话术模板
-    const currentReplyType = classification.replyType as ReplyContext;
-    const templates = brandConfig.templates[currentReplyType];
-
-    if (templates && templates.length > 0) {
-      const templateName = templateMap[currentReplyType];
-      context += `\n📋 ${targetBrand}品牌专属话术模板（${templateName}）：\n`;
-
-      // 如果有多个模板，全部列出供LLM参考
-      templates.forEach((template, index) => {
-        if (templates.length > 1) {
-          context += `模板${index + 1}：${template}\n`;
-        } else {
-          context += `${template}\n`;
-        }
-      });
-    } else {
-      context += `\n⚠️ 注意：${targetBrand}品牌暂无此场景的专属话术模板，请参考通用回复指令\n`;
-    }
-  }
-
   // 如果没有排序结果，将原始门店转换为带距离的结构
   const finalStoresWithDistance: StoreWithDistance[] =
     rankedStoresWithDistance.length > 0
-      ? rankedStoresWithDistance
-      : relevantStores.map(store => ({ store, distance: undefined }));
+      ? rankedStoresWithDistance.map(({ store, distance }) => ({
+          store: withBrandName(data, store),
+          distance,
+        }))
+      : relevantStores.map(store => ({ store: withBrandName(data, store), distance: undefined }));
 
   return {
     contextInfo: context,
@@ -1205,11 +1175,13 @@ export async function buildContextInfoByNeeds(
     console.warn(`[buildContextInfoByNeeds] 品牌别名服务不可用，回退 fuzzy 解析: ${errorMessage}`);
   }
 
+  const policyDefaultBrandName = getDefaultBrand(data)?.name;
+  const policyAvailableBrandNames = data.brands.map(b => b.name);
   const brandResolution = resolveBrandConflict({
     uiSelectedBrand,
-    configDefaultBrand: data.defaultBrand,
+    configDefaultBrand: policyDefaultBrandName,
     conversationBrand: toolBrand || undefined,
-    availableBrands: Object.keys(data.brands),
+    availableBrands: policyAvailableBrandNames,
     strategy: brandPriorityStrategy || "smart",
     aliasMap,
   });
@@ -1226,7 +1198,7 @@ export async function buildContextInfoByNeeds(
       `   ${brandResolution.reason}`
   );
 
-  const brandStores = data.stores.filter(store => store.brand === targetBrand);
+  const brandStores = getAllStores(data).filter((store: Store) => store.brandId === targetBrand);
   let relevantStores = brandStores;
 
   if (relevantStores.length > 0) {
@@ -1386,8 +1358,14 @@ export async function buildContextInfoByNeeds(
     debugInfo: {
       relevantStores:
         rankedStoresWithDistance.length > 0
-          ? rankedStoresWithDistance
-          : relevantStores.map(store => ({ store, distance: undefined })),
+          ? rankedStoresWithDistance.map(({ store, distance }) => ({
+              store: withBrandName(data, store),
+              distance,
+            }))
+          : relevantStores.map(store => ({
+              store: withBrandName(data, store),
+              distance: undefined,
+            })),
       storeCount,
       detailLevel,
       turnPlan,

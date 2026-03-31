@@ -16,7 +16,8 @@ import {
 } from "@/types";
 import { AppConfigDataSchema } from "@/types/config";
 import { ReplyPolicyConfigSchema } from "@/types/reply-policy";
-import { ZhipinDataSchema } from "@/types/zhipin";
+import { ZhipinDataSchema, getAllStores } from "@/types/zhipin";
+import type { Store } from "@/types/zhipin";
 
 const isClient = typeof window !== "undefined";
 
@@ -158,71 +159,8 @@ function extractLegacyPrompts(raw: Record<string, unknown>): LegacyPromptMap | n
   return null;
 }
 
-function extractBrandTemplatesBackup(brandData: unknown): Record<string, Record<string, string[]>> {
-  if (!isRecord(brandData) || !isRecord(brandData.brands)) {
-    return {};
-  }
-
-  const backup: Record<string, Record<string, string[]>> = {};
-
-  for (const [brandName, config] of Object.entries(brandData.brands)) {
-    if (!isRecord(config) || !isRecord(config.templates)) {
-      continue;
-    }
-
-    const templateRecord: Record<string, string[]> = {};
-    for (const [templateKey, templateVal] of Object.entries(config.templates)) {
-      if (Array.isArray(templateVal)) {
-        const values = templateVal.filter(item => typeof item === "string");
-        if (values.length > 0) {
-          templateRecord[templateKey] = values;
-        }
-      }
-    }
-
-    if (Object.keys(templateRecord).length > 0) {
-      backup[brandName] = templateRecord;
-    }
-  }
-
-  return backup;
-}
-
-function normalizeBrandTemplatesBackup(
-  value: unknown
-): Record<string, Record<string, string[]>> | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-
-  const backup: Record<string, Record<string, string[]>> = {};
-
-  for (const [brandName, templates] of Object.entries(value)) {
-    if (!isRecord(templates)) {
-      continue;
-    }
-
-    const templateRecord: Record<string, string[]> = {};
-    for (const [templateKey, templateVal] of Object.entries(templates)) {
-      if (Array.isArray(templateVal)) {
-        const values = templateVal.filter(item => typeof item === "string");
-        if (values.length > 0) {
-          templateRecord[templateKey] = values;
-        }
-      }
-    }
-
-    if (Object.keys(templateRecord).length > 0) {
-      backup[brandName] = templateRecord;
-    }
-  }
-
-  return Object.keys(backup).length > 0 ? backup : undefined;
-}
-
 function buildReplyPolicyFromLegacy(
   legacyPrompts: LegacyPromptMap | null,
-  brandTemplates: Record<string, Record<string, string[]>> = {}
 ): ReplyPolicyConfig {
   const next = cloneDefaultReplyPolicy();
 
@@ -262,29 +200,6 @@ function buildReplyPolicyFromLegacy(
     next.stageGoals.onboard_followup.ctaStrategy = onboardPrompt;
   }
 
-  const templateTexts = Object.values(brandTemplates)
-    .flatMap(templates => Object.values(templates).flat())
-    .map(text => text.trim())
-    .filter(text => text.length > 0);
-
-  if (templateTexts.length > 0) {
-    const uniqueGuidance = Array.from(new Set(templateTexts)).slice(0, 6);
-    const jargonDictionary = ["排班", "到岗", "门店", "班次", "面试", "微信", "薪资", "时薪"];
-    const detectedJargon = jargonDictionary.filter(keyword =>
-      templateTexts.some(text => text.includes(keyword))
-    );
-
-    next.industryVoices.default = {
-      ...next.industryVoices.default,
-      industryBackground: `${next.industryVoices.default.industryBackground}（迁移自品牌模板）`,
-      jargon:
-        detectedJargon.length > 0
-          ? Array.from(new Set([...next.industryVoices.default.jargon, ...detectedJargon]))
-          : next.industryVoices.default.jargon,
-      guidance: uniqueGuidance,
-    };
-  }
-
   const parsed = ReplyPolicyConfigSchema.safeParse(next);
   return parsed.success ? parsed.data : cloneDefaultReplyPolicy();
 }
@@ -293,8 +208,13 @@ function ensurePositionAttendance(
   brandData: ZhipinData,
   sampleData: ZhipinData
 ): ZhipinData {
-  const stores = brandData.stores.map((store, storeIndex) => {
-    const sampleStore = sampleData.stores[storeIndex];
+  const allStores = getAllStores(brandData);
+  const sampleStores = getAllStores(sampleData);
+
+  const updatedStoreMap = new Map<string, Store>();
+
+  allStores.forEach((store: Store, storeIndex: number) => {
+    const sampleStore = sampleStores[storeIndex];
 
     const positions = store.positions.map((position, positionIndex) => {
       if (position.attendanceRequirement) {
@@ -315,15 +235,15 @@ function ensurePositionAttendance(
       };
     });
 
-    return {
-      ...store,
-      positions,
-    };
+    updatedStoreMap.set(store.id, { ...store, positions });
   });
 
   return {
     ...brandData,
-    stores,
+    brands: brandData.brands.map(brand => ({
+      ...brand,
+      stores: brand.stores.map(store => updatedStoreMap.get(store.id) ?? store),
+    })),
   };
 }
 
@@ -357,25 +277,52 @@ async function normalizeToLatestConfig(
   rawInput: unknown,
   forceRepair = false
 ): Promise<AppConfigData> {
-  const [{ zhipinData }, defaultSystemPrompts] = await Promise.all([
-    import("@/lib/data/sample-data"),
-    buildDefaultSystemPrompts(),
-  ]);
+  const defaultSystemPrompts = await buildDefaultSystemPrompts();
 
   const raw = isRecord(rawInput) ? rawInput : {};
 
   const brandDataParsed = ZhipinDataSchema.safeParse(raw.brandData);
-  const brandData = ensurePositionAttendance(
-    brandDataParsed.success ? brandDataParsed.data : zhipinData,
-    zhipinData
-  );
+  // 校验失败时降级为空数据集，不再回退 sample-data（避免假 Brand.id 污染）
+  const emptyBrandData: ZhipinData = { meta: {}, brands: [] };
+  let parsedBrandData = brandDataParsed.success ? brandDataParsed.data : emptyBrandData;
 
-  const brandTemplates = extractBrandTemplatesBackup(raw.brandData);
+  // 🛡️ 老库迁移：清除残留的 sample 数据
+  // 检测条件：sample: 前缀（新格式）或已知旧格式 sample ID
+  const LEGACY_SAMPLE_IDS = new Set(["brand_chengduniliujie", "brand_damixiansheng"]);
+  if (parsedBrandData.brands.length > 0) {
+    const cleanedBrands = parsedBrandData.brands.filter(brand => {
+      const isSampleBrand = brand.id.startsWith("sample:") || LEGACY_SAMPLE_IDS.has(brand.id);
+      if (isSampleBrand) {
+        console.log(`🧹 迁移清理: 移除 sample 品牌 "${brand.name}" (id: ${brand.id})`);
+      }
+      return !isSampleBrand;
+    });
+    if (cleanedBrands.length < parsedBrandData.brands.length) {
+      parsedBrandData = { ...parsedBrandData, brands: cleanedBrands };
+      // 清理 sample 来源标记
+      if (parsedBrandData.meta?.source === "sample") {
+        parsedBrandData = { ...parsedBrandData, meta: { ...parsedBrandData.meta, source: undefined } };
+      }
+      // 修正 defaultBrandId（清理后可能指向已不存在的品牌）
+      const currentDefault = parsedBrandData.meta?.defaultBrandId;
+      if (currentDefault && !cleanedBrands.some(b => b.id === currentDefault)) {
+        parsedBrandData = {
+          ...parsedBrandData,
+          meta: { ...parsedBrandData.meta, defaultBrandId: cleanedBrands[0]?.id },
+        };
+      }
+    }
+  }
+
+  const brandData = parsedBrandData.brands.length > 0
+    ? ensurePositionAttendance(parsedBrandData, parsedBrandData)
+    : parsedBrandData;
+
   const replyPolicyParsed = ReplyPolicyConfigSchema.safeParse(raw.replyPolicy);
   const legacyPrompts = extractLegacyPrompts(raw);
   const replyPolicy = replyPolicyParsed.success
     ? replyPolicyParsed.data
-    : buildReplyPolicyFromLegacy(legacyPrompts, brandTemplates);
+    : buildReplyPolicyFromLegacy(legacyPrompts);
 
   const rawSystemPrompts = isRecord(raw.systemPrompts) ? raw.systemPrompts : {};
   const systemPrompts: SystemPromptsConfig = {
@@ -401,7 +348,9 @@ async function normalizeToLatestConfig(
       : CONFIG_VERSION;
   const needsFullResync =
     (typeof rawMetadata.needsFullResync === "boolean" && rawMetadata.needsFullResync) ||
-    isLegacyConfigVersion(currentVersion);
+    isLegacyConfigVersion(currentVersion) ||
+    !brandDataParsed.success || // brandData 校验失败时强制标记需要全量重同步
+    parsedBrandData.brands.length === 0; // 清理 sample 后为空，或初始就是空数据
 
   const backupBase = isRecord(rawMetadata.backup) ? rawMetadata.backup : undefined;
   const backupReplyPrompts = (() => {
@@ -413,9 +362,6 @@ async function normalizeToLatestConfig(
     }
     return legacyReplyPrompts;
   })();
-  const backupBrandTemplates =
-    normalizeBrandTemplatesBackup(backupBase?.brandTemplates) ||
-    (Object.keys(brandTemplates).length > 0 ? brandTemplates : undefined);
   const backupReplyPolicy = (() => {
     if (backupBase && "replyPolicy" in backupBase) {
       const parsed = ReplyPolicyConfigSchema.safeParse(backupBase.replyPolicy);
@@ -452,12 +398,10 @@ async function normalizeToLatestConfig(
     needsFullResync,
     backup:
       backupReplyPrompts ||
-      backupBrandTemplates ||
       backupReplyPolicy ||
       backupBrandPriorityStrategy
         ? {
             replyPrompts: backupReplyPrompts,
-            brandTemplates: backupBrandTemplates,
             replyPolicy: backupReplyPolicy,
             brandPriorityStrategy: backupBrandPriorityStrategy,
             createdAt:
@@ -501,7 +445,36 @@ class AppConfigService implements ConfigService {
 
       const parsed = AppConfigDataSchema.safeParse(config);
       if (parsed.success) {
-        return parsed.data;
+        // 🛡️ 在正常加载路径也做 sample 品牌清理（覆盖已污染但 schema 合法的老库）
+        const data = parsed.data;
+        const LEGACY_SAMPLE_IDS = new Set(["brand_chengduniliujie", "brand_damixiansheng"]);
+        const isSampleId = (id: string): boolean => id.startsWith("sample:") || LEGACY_SAMPLE_IDS.has(id);
+        const hasSampleBrands = data.brandData.brands.some(b => isSampleId(b.id));
+        if (hasSampleBrands) {
+          const cleanedBrands = data.brandData.brands.filter(b => !isSampleId(b.id));
+          const currentDefault = data.brandData.meta?.defaultBrandId;
+          const defaultValid = currentDefault && cleanedBrands.some(b => b.id === currentDefault);
+          const cleanedData: AppConfigData = {
+            ...data,
+            brandData: {
+              ...data.brandData,
+              brands: cleanedBrands,
+              meta: {
+                ...data.brandData.meta,
+                source: data.brandData.meta?.source === "sample" ? undefined : data.brandData.meta?.source,
+                defaultBrandId: defaultValid ? currentDefault : cleanedBrands[0]?.id,
+              },
+            },
+            metadata: {
+              ...data.metadata,
+              needsFullResync: cleanedBrands.length === 0 ? true : data.metadata.needsFullResync,
+            },
+          };
+          console.log(`🧹 getConfig: 清理 ${data.brandData.brands.length - cleanedBrands.length} 个 sample 品牌`);
+          await this.saveConfig(cleanedData);
+          return cleanedData;
+        }
+        return data;
       }
 
       // 读取时兜底修复一次，避免脏数据阻断应用。
@@ -577,10 +550,8 @@ class AppConfigService implements ConfigService {
     }
 
     const clearedBrandData: ZhipinData = {
-      city: currentConfig.brandData?.city || "上海市",
-      stores: [],
-      brands: {},
-      defaultBrand: undefined,
+      meta: {},
+      brands: [],
     };
 
     await this.saveConfig({
@@ -662,8 +633,8 @@ class AppConfigService implements ConfigService {
       isConfigured: true,
       version: config.metadata.version,
       lastUpdated: config.metadata.lastUpdated,
-      brandCount: Object.keys(config.brandData.brands).length,
-      storeCount: config.brandData.stores.length,
+      brandCount: config.brandData.brands.length,
+      storeCount: getAllStores(config.brandData).length,
     };
   }
 }
@@ -704,7 +675,7 @@ export async function needsDataUpgrade(): Promise<boolean> {
       return true;
     }
 
-    const hasAttendanceRequirements = config.brandData.stores.every(store =>
+    const hasAttendanceRequirements = getAllStores(config.brandData).every((store: Store) =>
       store.positions.every(position => position.attendanceRequirement !== undefined)
     );
 
@@ -762,13 +733,12 @@ export async function migrateFromHardcodedData(): Promise<void> {
     return;
   }
 
-  const [{ zhipinData }, defaultSystemPrompts] = await Promise.all([
-    import("@/lib/data/sample-data"),
-    buildDefaultSystemPrompts(),
-  ]);
+  const defaultSystemPrompts = await buildDefaultSystemPrompts();
+
+  const emptyBrandData: ZhipinData = { meta: {}, brands: [] };
 
   const config: AppConfigData = {
-    brandData: ensurePositionAttendance(zhipinData, zhipinData),
+    brandData: emptyBrandData,
     systemPrompts: defaultSystemPrompts,
     replyPolicy: cloneDefaultReplyPolicy(),
     activeSystemPrompt: "bossZhipinSystemPrompt",
@@ -777,7 +747,7 @@ export async function migrateFromHardcodedData(): Promise<void> {
       version: CONFIG_VERSION,
       lastUpdated: new Date().toISOString(),
       migratedAt: new Date().toISOString(),
-      needsFullResync: false,
+      needsFullResync: true,
     },
   };
 

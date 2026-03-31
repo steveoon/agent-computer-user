@@ -272,7 +272,7 @@ export class DulidaySyncService {
 
         zhipinData = await convertDulidayListToZhipinData(validListResponse, organizationId);
 
-        storeCount = zhipinData.stores?.length || 0;
+        storeCount = zhipinData.brands?.flatMap(b => b.stores).length || 0;
       }
 
       onProgress?.(100, `数据转换完成！`);
@@ -284,6 +284,7 @@ export class DulidaySyncService {
       const isSuccess = partialResponse.validPositions.length > 0;
 
       return {
+        organizationId,
         success: isSuccess,
         totalRecords,
         processedRecords: validCount,
@@ -307,6 +308,7 @@ export class DulidaySyncService {
       const duration = Date.now() - startTime;
 
       return {
+        organizationId,
         success: false,
         totalRecords: 0,
         processedRecords: 0,

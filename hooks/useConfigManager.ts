@@ -5,6 +5,7 @@ import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { configService, migrateFromHardcodedData } from "@/lib/services/config.service";
 import type { AppConfigData, ZhipinData, ReplyPolicyConfig, SystemPromptsConfig, BrandPriorityStrategy } from "@/types";
+import { getAllStores } from "@/types/zhipin";
 // 🔧 导入预定义的 Zod Schema，避免重复定义
 import { AppConfigDataSchema } from "@/types/config";
 import { ReplyPolicyConfigSchema } from "@/types/reply-policy";
@@ -73,8 +74,8 @@ const useConfigStore = create<ConfigState>()(
           }
 
           console.log("✅ 应用配置加载成功", {
-            brands: Object.keys(config.brandData?.brands || {}).length,
-            stores: config.brandData?.stores?.length || 0,
+            brands: config.brandData?.brands?.length || 0,
+            stores: config.brandData ? getAllStores(config.brandData).length : 0,
             systemPrompts: Object.keys(config.systemPrompts || {}).length,
             replyPolicy: Object.keys(config.replyPolicy || {}).length,
             version: config.metadata?.version || "unknown",
@@ -115,8 +116,8 @@ const useConfigStore = create<ConfigState>()(
           set({ config: updatedConfig, error: null });
 
           const stats = {
-            brands: Object.keys(brandData.brands).length,
-            stores: brandData.stores.length,
+            brands: brandData.brands.length,
+            stores: getAllStores(brandData).length,
           };
 
           console.log("✅ 品牌数据更新成功", stats);
@@ -432,8 +433,8 @@ const useConfigStore = create<ConfigState>()(
           console.log("✅ 数据格式校验通过");
 
           // 📊 额外的业务逻辑检查
-          const brands = Object.keys(importedConfig.brandData.brands);
-          const stores = importedConfig.brandData.stores;
+          const brands = importedConfig.brandData.brands;
+          const allStores = getAllStores(importedConfig.brandData);
           const replyPolicy = Object.keys(
             importedConfig.replyPolicy
           ) as (keyof ReplyPolicyConfig)[];
@@ -441,14 +442,15 @@ const useConfigStore = create<ConfigState>()(
 
           console.log("📊 导入数据统计:", {
             brands: brands.length,
-            stores: stores.length,
+            stores: allStores.length,
             replyPolicy: replyPolicy.length,
             systemPrompts: systemPrompts.length,
           });
 
-          // 检查品牌一致性
-          const storesBrands = [...new Set(stores.map(store => store.brand))];
-          const missingBrands = storesBrands.filter(brand => !brands.includes(brand));
+          // 检查品牌一致性：每个 store.brandId 应匹配所属 brand.id
+          const brandIds = new Set(brands.map(b => b.id));
+          const storesBrandIds = [...new Set(allStores.map(store => store.brandId))];
+          const missingBrands = storesBrandIds.filter(id => !brandIds.has(id));
 
           if (missingBrands.length > 0) {
             throw new Error(`门店数据中引用了未定义的品牌: ${missingBrands.join(", ")}`);
@@ -483,8 +485,8 @@ const useConfigStore = create<ConfigState>()(
           set({ config: configWithTimestamp, loading: false, error: null });
 
           const stats = {
-            brands: Object.keys(configWithTimestamp.brandData.brands).length,
-            stores: configWithTimestamp.brandData.stores.length,
+            brands: configWithTimestamp.brandData.brands.length,
+            stores: getAllStores(configWithTimestamp.brandData).length,
             systemPrompts: Object.keys(configWithTimestamp.systemPrompts).length,
             industryVoices: Object.keys(configWithTimestamp.replyPolicy.industryVoices).length,
           };

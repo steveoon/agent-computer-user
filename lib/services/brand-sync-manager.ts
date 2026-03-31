@@ -78,11 +78,12 @@ export class BrandSyncManager {
     try {
       // 获取当前配置
       const config = await configService.getConfig();
-      const existingBrands = Object.keys(config?.brandData?.brands || {});
+      const existingBrands = config?.brandData?.brands || [];
+      const existingBrandIds = new Set(existingBrands.map(brand => brand.id));
 
       // 获取所有映射的品牌（从数据库）
       const mappedBrands = await getAvailableBrands();
-      const mappedBrandNames = mappedBrands.map(b => b.name);
+      const mappedBrandIds = new Set(mappedBrands.map(brand => brand.id));
 
       const needsFullResync = config?.metadata?.needsFullResync === true;
       if (needsFullResync && !forceSync) {
@@ -99,12 +100,14 @@ export class BrandSyncManager {
       // 找出缺失的映射品牌（只同步数据库中定义的品牌）
       const missingBrands = forceSync
         ? mappedBrands
-        : mappedBrands.filter(brand => !existingBrands.includes(brand.name));
+        : mappedBrands.filter(brand => !existingBrandIds.has(brand.id));
 
       // 记录非映射品牌（用户导入的额外品牌）
-      const customBrands = existingBrands.filter(brand => !mappedBrandNames.includes(brand));
+      const customBrands = existingBrands.filter(brand => !mappedBrandIds.has(brand.id));
       if (customBrands.length > 0) {
-        console.log(`🛡️ 检测到用户自定义品牌（不会被同步影响）: ${customBrands.join("、")}`);
+        console.log(
+          `🛡️ 检测到用户自定义品牌（不会被同步影响）: ${customBrands.map(brand => brand.name).join("、")}`
+        );
       }
 
       if (missingBrands.length === 0) {
@@ -230,15 +233,15 @@ export class BrandSyncManager {
     syncedBrands: string[];
   }> {
     const config = await configService.getConfig();
-    const existingBrands = Object.keys(config?.brandData?.brands || {});
+    const existingBrandIds = new Set((config?.brandData?.brands || []).map(brand => brand.id));
     const mappedBrands = await getAvailableBrands();
 
     const missingBrands = mappedBrands
-      .filter(brand => !existingBrands.includes(brand.name))
+      .filter(brand => !existingBrandIds.has(brand.id))
       .map(brand => brand.name);
 
     const syncedBrands = mappedBrands
-      .filter(brand => existingBrands.includes(brand.name))
+      .filter(brand => existingBrandIds.has(brand.id))
       .map(brand => brand.name);
 
     return {
