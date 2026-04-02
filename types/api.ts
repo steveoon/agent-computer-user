@@ -295,10 +295,10 @@ export const OpenChatRequestSchema = z.object({
   // 系统提示词
   systemPrompt: z.string().optional().describe("直接指定系统提示词，优先级高于 promptType"),
   promptType: z
-    .enum(["bossZhipinSystemPrompt", "bossZhipinLocalSystemPrompt", "generalComputerSystemPrompt", "weworkSystemPrompt"])
+    .enum(["bossZhipinSystemPrompt", "bossZhipinLocalSystemPrompt", "generalComputerSystemPrompt"])
     .optional()
     .describe(
-      `系统提示词类型，从 context.systemPrompts 中查找。可选值: bossZhipinSystemPrompt, bossZhipinLocalSystemPrompt, generalComputerSystemPrompt, weworkSystemPrompt`
+      `系统提示词类型，从 context.systemPrompts 中查找。可选值: bossZhipinSystemPrompt, bossZhipinLocalSystemPrompt, generalComputerSystemPrompt`
     ),
 
   // 工具控制
@@ -325,8 +325,6 @@ export const OpenChatRequestSchema = z.object({
       industryVoiceId: z.string().optional(),
       dulidayToken: z.string().optional(),
       defaultWechatId: z.string().optional(),
-      userId: z.string().optional(),
-      sessionId: z.string().optional(),
       channelType: z.enum(["public", "private"]).optional(),
     })
     .optional()
@@ -391,8 +389,6 @@ export interface OpenChatRequest {
     industryVoiceId?: string;
     dulidayToken?: string;
     defaultWechatId?: string;
-    userId?: string;
-    sessionId?: string;
     channelType?: "public" | "private";
   };
 
