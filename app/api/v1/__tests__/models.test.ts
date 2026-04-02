@@ -14,8 +14,8 @@ import type { ModelsResponseBody, ModelInfo } from "@/types/api";
 vi.mock("@/lib/config/models", () => ({
   getOpenApiModels: vi.fn().mockReturnValue([
     {
-      id: "anthropic/claude-3-7-sonnet-20250219",
-      name: "Claude 3.7 Sonnet",
+      id: "anthropic/claude-sonnet-4-6",
+      name: "Claude Sonnet 4.6",
       categories: ["chat", "general"],
     },
     {
@@ -24,13 +24,13 @@ vi.mock("@/lib/config/models", () => ({
       categories: ["general"],
     },
     {
-      id: "openai/gpt-4o",
-      name: "GPT-4o",
-      categories: ["general"],
+      id: "openai/gpt-5.4",
+      name: "GPT-5.4",
+      categories: ["chat", "general"],
     },
     {
-      id: "moonshotai/kimi-k2-0905-preview",
-      name: "Kimi K2 0905 Preview",
+      id: "moonshotai/kimi-k2.5",
+      name: "Kimi K2.5",
       categories: ["chat", "general"],
     },
   ]),
@@ -74,10 +74,10 @@ describe("GET /api/v1/models", () => {
 
       // 验证特定模型存在
       const modelIds = data.data.models.map(m => m.id);
-      expect(modelIds).toContain("anthropic/claude-3-7-sonnet-20250219");
+      expect(modelIds).toContain("anthropic/claude-sonnet-4-6");
       expect(modelIds).toContain("qwen/qwen-max-latest");
-      expect(modelIds).toContain("openai/gpt-4o");
-      expect(modelIds).toContain("moonshotai/kimi-k2-0905-preview");
+      expect(modelIds).toContain("openai/gpt-5.4");
+      expect(modelIds).toContain("moonshotai/kimi-k2.5");
     });
 
     it("应该正确处理空模型列表", async () => {
@@ -111,7 +111,7 @@ describe("GET /api/v1/models", () => {
       expect(generalModels.length).toBeGreaterThan(0);
 
       // 验证特定模型的类别
-      const claudeModel = data.data.models.find(m => m.id === "anthropic/claude-3-7-sonnet-20250219");
+      const claudeModel = data.data.models.find(m => m.id === "anthropic/claude-sonnet-4-6");
       expect(claudeModel?.categories).toEqual(["chat", "general"]);
 
       const qwenModel = data.data.models.find(m => m.id === "qwen/qwen-max-latest");

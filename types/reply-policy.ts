@@ -101,8 +101,9 @@ export const TurnExtractedInfoSchema = z.object({
 
 export const TurnPlanSchema = z.object({
   stage: FunnelStageSchema,
-  subGoals: z.array(z.string()).max(6),
+  subGoals: z.array(z.string()).max(2),
   needs: z.array(ReplyNeedSchema).max(8),
+  primaryNeed: ReplyNeedSchema,
   riskFlags: z.array(RiskFlagSchema).max(6),
   confidence: z.number().min(0).max(1),
   extractedInfo: TurnExtractedInfoSchema,
@@ -193,6 +194,27 @@ export const QualificationPolicySchema = z
     },
   });
 
+export const DEFAULT_OUTPUT_GUARDS = {
+  maxQuestionsByMode: { minimal: 1, focused: 2 },
+  blockedAuditPhrases: [
+    "是否满足",
+    "是否符合",
+    "基本入职要求",
+    "先确认资格",
+    "年龄是否符合",
+  ],
+  blockFirstTurnSpecificFacts: true,
+};
+
+export const OutputGuardsPolicySchema = z.object({
+  maxQuestionsByMode: z.object({
+    minimal: z.number().int().min(0),
+    focused: z.number().int().min(0),
+  }),
+  blockedAuditPhrases: z.array(z.string()),
+  blockFirstTurnSpecificFacts: z.boolean(),
+});
+
 export const StageGoalsSchema = z
   .object({
     trust_building: StageGoalPolicySchema,
@@ -215,6 +237,7 @@ export const ReplyPolicyConfigSchema = z.object({
   hardConstraints: HardConstraintsPolicySchema,
   factGate: FactGatePolicySchema,
   qualificationPolicy: QualificationPolicySchema,
+  outputGuards: OutputGuardsPolicySchema.default(DEFAULT_OUTPUT_GUARDS),
 });
 
 export type FunnelStage = z.infer<typeof FunnelStageSchema>;
@@ -230,6 +253,7 @@ export type HardConstraintRule = z.infer<typeof HardConstraintRuleSchema>;
 export type HardConstraintsPolicy = z.infer<typeof HardConstraintsPolicySchema>;
 export type FactGatePolicy = z.infer<typeof FactGatePolicySchema>;
 export type AgeQualificationPolicy = z.infer<typeof AgeQualificationPolicySchema>;
+export type OutputGuardsPolicy = z.infer<typeof OutputGuardsPolicySchema>;
 export type QualificationPolicy = z.infer<typeof QualificationPolicySchema>;
 export type ReplyPolicyConfig = z.infer<typeof ReplyPolicyConfigSchema>;
 
@@ -336,4 +360,5 @@ export const DEFAULT_REPLY_POLICY: ReplyPolicyConfig = {
       redirectPriority: "medium",
     },
   },
+  outputGuards: DEFAULT_OUTPUT_GUARDS,
 };

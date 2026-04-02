@@ -14,7 +14,7 @@ import type { ToolDefinition } from "@/types/tool-common";
 vi.mock("@/lib/config/models", () => ({
   getOpenApiModels: vi.fn().mockReturnValue([
     {
-      id: "anthropic/claude-3-7-sonnet-20250219",
+      id: "anthropic/claude-sonnet-4-6",
       name: "Claude 3.7 Sonnet",
       categories: ["chat", "general"],
     },
@@ -41,7 +41,7 @@ vi.mock("@/lib/config/models", () => ({
 vi.mock("@/lib/model-registry/dynamic-registry", () => ({
   getDynamicRegistry: vi.fn().mockReturnValue({
     languageModel: vi.fn().mockReturnValue({
-      modelId: "anthropic/claude-3-7-sonnet-20250219",
+      modelId: "anthropic/claude-sonnet-4-6",
       provider: "anthropic",
     }),
   }),
@@ -158,7 +158,7 @@ describe("POST /api/v1/chat", () => {
     const { getOpenApiModels } = await import("@/lib/config/models");
     vi.mocked(getOpenApiModels).mockReturnValue([
       {
-        id: "anthropic/claude-3-7-sonnet-20250219",
+        id: "anthropic/claude-sonnet-4-6",
         name: "Claude 3.7 Sonnet",
         categories: ["chat", "general"],
       },
@@ -177,7 +177,7 @@ describe("POST /api/v1/chat", () => {
     const { getDynamicRegistry } = await import("@/lib/model-registry/dynamic-registry");
     vi.mocked(getDynamicRegistry).mockReturnValue({
       languageModel: vi.fn().mockReturnValue({
-        modelId: "anthropic/claude-3-7-sonnet-20250219",
+        modelId: "anthropic/claude-sonnet-4-6",
         provider: "anthropic",
       }),
     } as never);
@@ -263,7 +263,7 @@ describe("POST /api/v1/chat", () => {
     // 创建模拟请求的辅助函数
     mockRequest = (body: Partial<OpenChatRequest>) => {
       const fullBody: OpenChatRequest = {
-        model: "anthropic/claude-3-7-sonnet-20250219",
+        model: "anthropic/claude-sonnet-4-6",
         messages: [{ role: "user", content: "Hello" }],
         stream: true,
         ...body,
@@ -386,7 +386,7 @@ describe("POST /api/v1/chat", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "anthropic/claude-3-7-sonnet-20250219",
+          model: "anthropic/claude-sonnet-4-6",
         }),
       });
 

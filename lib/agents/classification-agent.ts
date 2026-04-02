@@ -2,7 +2,7 @@
  * Turn Planner Agent
  *
  * Policy-First 模式下的回合规划器：
- * - 输出 stage / subGoals / needs / riskFlags
+ * - 输出 stage / subGoals / needs / primaryNeed / riskFlags
  * - 保留 extractedInfo 供后续门店过滤使用
  * - 规则层先触发 needs，LLM 仅可追加
  */
@@ -52,6 +52,7 @@ function buildDynamicPlanningSchema(
     stage: z.enum(activeStages as [FunnelStage, ...FunnelStage[]]),
     subGoals: TurnPlanSchema.shape.subGoals,
     needs: TurnPlanSchema.shape.needs,
+    primaryNeed: TurnPlanSchema.shape.primaryNeed,
     riskFlags: TurnPlanSchema.shape.riskFlags,
     confidence: TurnPlanSchema.shape.confidence,
     extractedInfo: TurnPlanSchema.shape.extractedInfo,
@@ -71,11 +72,20 @@ const NEED_RULES: Array<{ need: ReplyNeed; patterns: RegExp[] }> = [
   { need: "wechat", patterns: [/微信|vx|私聊|联系方式|加你/i] },
 ];
 
-function detectRuleNeeds(
-  message: string,
-  history: string[]
-): Set<ReplyNeed> {
-  const text = `${history.slice(-4).join(" ")} ${message}`;
+const PRIMARY_NEED_PRIORITY: ReplyNeed[] = [
+  "salary",
+  "schedule",
+  "location",
+  "stores",
+  "policy",
+  "requirements",
+  "availability",
+  "interview",
+  "wechat",
+  "none",
+];
+
+function detectNeedsFromText(text: string): Set<ReplyNeed> {
   const needs = new Set<ReplyNeed>();
 
   for (const rule of NEED_RULES) {
@@ -93,9 +103,49 @@ function detectRuleNeeds(
   return needs;
 }
 
+function detectRuleNeeds(
+  message: string,
+  history: string[]
+): Set<ReplyNeed> {
+  return detectNeedsFromText(`${history.slice(-4).join(" ")} ${message}`);
+}
+
+function selectPrimaryNeed(
+  primaryNeed: ReplyNeed | undefined,
+  availableNeedsInput: Iterable<ReplyNeed>,
+  message: string
+): ReplyNeed {
+  const availableNeeds = new Set<ReplyNeed>(availableNeedsInput);
+  if (availableNeeds.size > 1 && availableNeeds.has("none")) {
+    availableNeeds.delete("none");
+  }
+
+  if (primaryNeed && availableNeeds.has(primaryNeed)) {
+    return primaryNeed;
+  }
+
+  const messageNeeds = detectNeedsFromText(message);
+  messageNeeds.delete("none");
+
+  for (const need of PRIMARY_NEED_PRIORITY) {
+    if (messageNeeds.has(need) && availableNeeds.has(need)) {
+      return need;
+    }
+  }
+
+  for (const need of PRIMARY_NEED_PRIORITY) {
+    if (availableNeeds.has(need)) {
+      return need;
+    }
+  }
+
+  return "none";
+}
+
 function sanitizePlan(
   plan: TurnPlan,
-  ruleNeeds: Set<ReplyNeed>
+  ruleNeeds: Set<ReplyNeed>,
+  message: string
 ): TurnPlan {
   const mergedNeeds = new Set<ReplyNeed>([...plan.needs, ...Array.from(ruleNeeds)]);
   if (mergedNeeds.size > 1 && mergedNeeds.has("none")) {
@@ -104,7 +154,9 @@ function sanitizePlan(
 
   return {
     ...plan,
+    subGoals: plan.subGoals.slice(0, 2),
     needs: Array.from(mergedNeeds),
+    primaryNeed: selectPrimaryNeed(plan.primaryNeed, mergedNeeds, message),
     confidence: Number.isFinite(plan.confidence) ? Math.max(0, Math.min(1, plan.confidence)) : 0.5,
   };
 }
@@ -119,7 +171,7 @@ function buildPlanningPrompt(
   const system = [
     "你是招聘对话回合规划器，不直接回复候选人。",
     "你只输出结构化规划结果，用于后续回复生成。",
-    "规划目标：确定阶段目标(stage)、子目标(subGoals)、事实需求(needs)、风险标记(riskFlags)。",
+    "规划目标：确定阶段目标(stage)、子目标(subGoals)、事实需求(needs)、主回答轴(primaryNeed)、风险标记(riskFlags)。",
   ].join("\n");
 
   const normalizedChannelType = normalizeChannelType(channelType);
@@ -149,8 +201,9 @@ function buildPlanningPrompt(
     "- insurance_promise_risk, age_sensitive, confrontation_emotion, urgency_high, qualification_mismatch",
     "",
     "[规则]",
-    "- 优先判断本轮主阶段(stage)；subGoals 可多项。",
+    "- 优先判断本轮主阶段(stage)；subGoals 最多 2 项，只保留最关键的。",
     "- 候选人追问事实时，必须打开对应 needs。",
+    "- primaryNeed 必须从 needs 中选择一个最主的 need；如果没有明确事实轴则填 none。",
     "- 不确定时 confidence 降低，不要臆断。",
     "- 根据转入条件判断阶段转化，不要停留在不匹配的阶段。",
     "",
@@ -228,6 +281,7 @@ export async function planTurn(
       stage: "trust_building",
       subGoals: ["保持对话并澄清需求"],
       needs: Array.from(ruleNeeds),
+      primaryNeed: selectPrimaryNeed(undefined, ruleNeeds, message),
       riskFlags: [],
       confidence: 0.35,
       extractedInfo: {
@@ -243,7 +297,7 @@ export async function planTurn(
     };
   }
 
-  return sanitizePlan(result.data as TurnPlan, ruleNeeds);
+  return sanitizePlan(result.data as TurnPlan, ruleNeeds, message);
 }
 
 /**

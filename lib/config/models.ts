@@ -22,75 +22,63 @@ export const MODEL_DICTIONARY = {
   },
 
   // Google 模型
-  "google/gemini-2.5-flash-preview-04-17": {
+  "google/gemini-3.1-flash-lite-preview": {
     provider: "google",
-    name: "Gemini 2.5 Flash Preview",
-    description: "Google Gemini 2.5 Flash 预览版",
+    name: "Gemini 3.1 Flash Lite Preview",
+    description: "Google Gemini 3.1 Flash Lite 预览版",
     categories: ["general"] as ModelCategory[],
   },
-  "google/gemini-2.5-pro-preview-05-06": {
+  "google/gemini-3.1-pro-preview": {
     provider: "google",
-    name: "Gemini 2.5 Pro Preview",
-    description: "Google Gemini 2.5 Pro 预览版",
-    categories: ["general"] as ModelCategory[],
-  },
-  "google/gemini-3-pro-preview": {
-    provider: "google",
-    name: "Gemini 3 Pro Preview",
-    description: "Google Gemini 3 Pro 预览版",
+    name: "Gemini 3.1 Pro Preview",
+    description: "Google Gemini 3.1 Pro 预览版",
     categories: ["chat", "general"] as ModelCategory[],
   },
 
-  // Anthropic 模型 - 既可以做Chat也可以做General任务
-  "anthropic/claude-3-7-sonnet-20250219": {
+  // Anthropic 模型
+  "anthropic/claude-opus-4-6": {
     provider: "anthropic",
-    name: "Claude 3.7 Sonnet",
-    description: "Anthropic Claude 3.7 Sonnet",
+    name: "Claude Opus 4.6",
+    description: "Anthropic Claude Opus 4.6",
     categories: ["chat", "general"] as ModelCategory[],
   },
-  "anthropic/claude-sonnet-4-5-20250929": {
+  "anthropic/claude-sonnet-4-6": {
     provider: "anthropic",
-    name: "Claude Sonnet 4.5",
-    description: "Anthropic Claude Sonnet 4.5 (最新)",
-    categories: ["chat", "general"] as ModelCategory[],
-  },
-  "anthropic/claude-sonnet-4-20250514": {
-    provider: "anthropic",
-    name: "Claude Sonnet 4",
-    description: "Anthropic Claude Sonnet 4",
+    name: "Claude Sonnet 4.6",
+    description: "Anthropic Claude Sonnet 4.6",
     categories: ["chat", "general"] as ModelCategory[],
   },
   "anthropic/claude-haiku-4-5": {
     provider: "anthropic",
     name: "Claude Haiku 4.5",
-    description: "Anthropic Claude Haiku 4.5 (最新)",
+    description: "Anthropic Claude Haiku 4.5",
     categories: ["chat", "general"] as ModelCategory[],
   },
 
   // OpenAI 模型
+  "openai/gpt-5.4": {
+    provider: "openai",
+    name: "GPT-5.4",
+    description: "OpenAI GPT-5.4",
+    categories: ["chat", "general"] as ModelCategory[],
+  },
+  "openai/gpt-5.2": {
+    provider: "openai",
+    name: "GPT-5.2",
+    description: "OpenAI GPT-5.2",
+    categories: ["general"] as ModelCategory[],
+  },
   "openai/gpt-5.1": {
     provider: "openai",
     name: "GPT-5.1",
     description: "OpenAI GPT-5.1",
     categories: ["chat", "general"] as ModelCategory[],
   },
-  "openai/gpt-5-chat-latest": {
-    provider: "openai",
-    name: "GPT-5 Chat (最新)",
-    description: "OpenAI GPT-5 Chat (最新)",
-    categories: ["general"] as ModelCategory[],
-  },
   "openai/gpt-5-mini": {
     provider: "openai",
     name: "GPT-5 Mini",
     description: "OpenAI GPT-5 Mini",
     categories: ["chat", "general"] as ModelCategory[],
-  },
-  "openai/gpt-4o": {
-    provider: "openai",
-    name: "GPT-4o",
-    description: "OpenAI GPT-4o",
-    categories: ["general"] as ModelCategory[],
   },
 
   // OpenRouter 模型
@@ -138,24 +126,24 @@ export const MODEL_DICTIONARY = {
   },
 
   // OhMyGPT 模型
-  "ohmygpt/gemini-2.5-pro-preview-06-05": {
+  "ohmygpt/gemini-3.1-pro-preview": {
     provider: "ohmygpt",
-    name: "Gemini 2.5 Pro Preview (OhMyGPT)",
-    description: "通过OhMyGPT访问的Gemini 2.5 Pro Preview",
+    name: "Gemini 3.1 Pro Preview (OhMyGPT)",
+    description: "通过OhMyGPT访问的Gemini 3.1 Pro Preview",
     categories: ["general"] as ModelCategory[],
   },
-  "ohmygpt/gemini-2.5-flash-preview-05-20": {
+  "ohmygpt/gemini-3.1-flash-lite-preview": {
     provider: "ohmygpt",
-    name: "Gemini 2.5 Flash Preview (OhMyGPT)",
-    description: "通过OhMyGPT访问的Gemini 2.5 Flash Preview",
+    name: "Gemini 3.1 Flash Lite Preview (OhMyGPT)",
+    description: "通过OhMyGPT访问的Gemini 3.1 Flash Lite Preview",
     categories: ["general"] as ModelCategory[],
   },
 
   // MoonshotAI 模型
-  "moonshotai/kimi-k2-0905-preview": {
+  "moonshotai/kimi-k2.5": {
     provider: "moonshotai",
-    name: "Kimi K2 0905 Preview",
-    description: "通过MoonshotAI访问的Kimi K2 0905 Preview",
+    name: "Kimi K2.5",
+    description: "MoonshotAI Kimi K2.5",
     categories: ["chat", "general"] as ModelCategory[],
   },
   "moonshotai/kimi-k2-thinking-turbo": {
@@ -282,7 +270,7 @@ export function getModelCategories(modelId: ModelId): ModelCategory[] {
 export const DEFAULT_MODEL_CONFIG = {
   chatModel: "anthropic/claude-haiku-4-5" as ModelId,
   classifyModel: "openai/gpt-5-mini" as ModelId,
-  replyModel: "openai/gpt-5-chat-latest" as ModelId,
+  replyModel: "openai/gpt-5.4" as ModelId,
 } as const;
 
 // ========== Open API 对外开放模型 ==========

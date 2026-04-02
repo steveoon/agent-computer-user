@@ -243,7 +243,7 @@ export const zhipinReplyTool = (
         // 检查是否有错误
         if (replyResult.error) {
           console.error(`❌ 回复生成失败: ${replyResult.error.userMessage}`);
-          return {
+          const errorResponse: ZhipinReplyToolResult = {
             reply: "",
             stage: replyResult.turnPlan.stage,
             subGoals: replyResult.turnPlan.subGoals,
@@ -260,6 +260,7 @@ export const zhipinReplyTool = (
               userMessage: replyResult.error.userMessage,
             },
           };
+          return errorResponse;
         }
 
         console.log(`✅ 回复生成成功`);
