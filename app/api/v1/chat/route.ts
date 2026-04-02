@@ -43,8 +43,6 @@ import type {
   ToolCallLike,
   ToolResultLike,
 } from "@/lib/services/recruitment-event";
-import { runPreprocessor } from "@/lib/preprocessors/registry";
-import "@/lib/preprocessors/wework-preprocessor"; // 触发自注册
 
 export const maxDuration = 300;
 
@@ -125,25 +123,11 @@ export async function POST(req: Request) {
       }
     }
 
-    // Step 3.5: Model config + preprocessor (before tool creation)
+    // Step 4: Model config + tool set construction
     const effectiveModelConfig: ModelConfig = {
       ...context.modelConfig,
       providerConfigs: context.modelConfig?.providerConfigs || DEFAULT_PROVIDER_CONFIGS,
     };
-
-    const preprocessorResult = promptType
-      ? await runPreprocessor({
-          promptType,
-          processedMessages,
-          modelConfig: effectiveModelConfig,
-          userId: context.userId,
-          sessionId: context.sessionId,
-          dulidayToken: context.dulidayToken,
-          correlationId,
-        })
-      : { systemPromptSuffix: "" };
-
-    // Step 4: Tool set construction
     const toolCreationContext = {
       sandboxId: sandboxId ?? null,
       preferredBrand: context.preferredBrand,
@@ -159,10 +143,6 @@ export async function POST(req: Request) {
       industryVoiceId: context.industryVoiceId,
       dulidayToken: context.dulidayToken,
       defaultWechatId: context.defaultWechatId,
-      processedMessages,
-      userId: context.userId,
-      sessionId: context.sessionId,
-      onJobsFetched: preprocessorResult.onJobsFetched,
       channelType: context.channelType,
     };
 
@@ -248,11 +228,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // Step 6.5: Append preprocessor result to system prompt
-    if (preprocessorResult.systemPromptSuffix) {
-      systemPrompt += preprocessorResult.systemPromptSuffix;
-    }
-
     // Step 7: Generate and output
     const dynamicRegistry = getDynamicRegistry(effectiveModelConfig.providerConfigs!);
 
@@ -283,11 +258,6 @@ export async function POST(req: Request) {
         stopWhen: stepCountIs(30),
         ...thinkingOptions,
         onStepFinish: handleStepFinish,
-        onFinish: () => {
-          try { preprocessorResult.afterResponse?.(); } catch (e) {
-            console.warn(`[${correlationId}] afterResponse sync error:`, e);
-          }
-        },
       });
 
       const response = result.toUIMessageStreamResponse();
@@ -323,11 +293,6 @@ export async function POST(req: Request) {
         ...thinkingOptions,
         onStepFinish: handleStepFinish,
       });
-
-      // LLM 响应结束，触发异步后处理（如事实提取）
-      try { preprocessorResult.afterResponse?.(); } catch (e) {
-        console.warn(`[${correlationId}] afterResponse sync error:`, e);
-      }
 
       // Convert generateText result to UIMessage array
       // This preserves complete tool call history from all steps
