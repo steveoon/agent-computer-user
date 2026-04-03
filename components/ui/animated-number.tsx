@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSpring, motion, MotionValue } from "motion/react";
 
 /**
@@ -112,18 +112,18 @@ export function AnimatedNumber({
   showDirection = false,
   directionColors = { up: "text-green-500", down: "text-red-500" },
 }: AnimatedNumberProps) {
-  const prevValueRef = useRef(value);
-  const directionRef = useRef<"up" | "down" | "none">("none");
+  const [prevValue, setPrevValue] = useState(value);
+  const [direction, setDirection] = useState<"up" | "down" | "none">("none");
 
-  // 计算变化方向
-  useEffect(() => {
-    if (value > prevValueRef.current) {
-      directionRef.current = "up";
-    } else if (value < prevValueRef.current) {
-      directionRef.current = "down";
+  // 计算变化方向 (state-based previous value tracking)
+  if (value !== prevValue) {
+    if (value > prevValue) {
+      setDirection("up");
+    } else {
+      setDirection("down");
     }
-    prevValueRef.current = value;
-  }, [value]);
+    setPrevValue(value);
+  }
 
   // 使用 spring 动画
   const spring = useSpring(value, {
@@ -138,7 +138,6 @@ export function AnimatedNumber({
     spring.set(value);
   }, [spring, value]);
 
-  const direction = directionRef.current;
   const directionIndicator =
     showDirection && direction !== "none" ? (
       <motion.span

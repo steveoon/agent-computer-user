@@ -88,8 +88,8 @@ importers:
         specifier: ^1.2.7
         version: 1.2.7(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@roll-agent/smart-reply-agent':
-        specifier: ^0.1.1
-        version: 0.1.1(hono@4.11.3)
+        specifier: ^0.1.2
+        version: 0.1.2(hono@4.11.3)
       '@supabase/ssr':
         specifier: ^0.7.0
         version: 0.7.0(@supabase/supabase-js@2.76.1)
@@ -2114,8 +2114,8 @@ packages:
     resolution: {integrity: sha512-zg4u+QoHjk2Ff91m31NXDH/UCBSh0gZaZjbQ74LO7VIWzzs0QKBUZi/vfWVDRcXBFR4l5FY2GMX+C9Ip/gtYJg==}
     engines: {node: '>=22.6.0'}
 
-  '@roll-agent/smart-reply-agent@0.1.1':
-    resolution: {integrity: sha512-BHl5WAstOFpaha2UA7/TP13zGzZYN898e0wKtRRa6tlNxRY0TinX21n9pmcPWJHuxZwBbAe1xlaeZsr46uJsAg==}
+  '@roll-agent/smart-reply-agent@0.1.2':
+    resolution: {integrity: sha512-xY1z44R6pK3pJ0Hyf41GI9PHzwmicI5sk3Fm1sEFt9kvEPK3dcWX5e3pvmJR+0kVHMzZ3r2IgsJcjathDjEnQQ==}
     engines: {node: '>=22.6.0'}
 
   '@rolldown/pluginutils@1.0.0-beta.19':
@@ -4356,8 +4356,8 @@ packages:
     resolution: {integrity: sha512-Z4XaCL6dUDHfP/jT25jJKMmtxvuwbkrD1vNSMFlo9lNLY2c5FHYSQgHPRZUjAB26TpDEoW9HCOgplrdbaPV/ew==}
     engines: {node: '>=14.14'}
 
-  fs-extra@11.3.3:
-    resolution: {integrity: sha512-VWSRii4t0AFm6ixFFmLLx1t7wS1gh+ckoa84aOeapGum0h+EZd1EhEumSB+ZdDLnEPuucsVB9oB7cxJHap6Afg==}
+  fs-extra@11.3.4:
+    resolution: {integrity: sha512-CTXd6rk/M3/ULNQj8FBqBWHYBVYybQ3VPBw0xGKFe3tuH7ytT6ACnvzpIQ3UZtB8yvUKC2cXn1a+x+5EVQLovA==}
     engines: {node: '>=14.14'}
 
   fs-extra@7.0.1:
@@ -5190,8 +5190,8 @@ packages:
   lodash@4.17.21:
     resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
 
-  lodash@4.17.23:
-    resolution: {integrity: sha512-LgVTMpQtIopCi79SJeDiP0TfWi5CNEc/L/aRdTh3yIvmZXTnheWpKjSZhnvMl8iXbC1tFg9gdHHDMLoV7CnG+w==}
+  lodash@4.18.1:
+    resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
 
   log-symbols@4.1.0:
     resolution: {integrity: sha512-8XPvpAA8uyhfteu8pIvQxpJZ7SYYdpUivZpGy6sFsBuKRY/7rQGavedeB8aK+Zkyq6upMFVL/9AW6vOYzfRyLg==}
@@ -7982,7 +7982,7 @@ snapshots:
     dependencies:
       cross-dirname: 0.1.0
       debug: 4.4.3
-      fs-extra: 11.3.3
+      fs-extra: 11.3.4
       minimist: 1.2.8
       postject: 1.0.0-alpha.6
     transitivePeerDependencies:
@@ -9300,7 +9300,7 @@ snapshots:
       - hono
       - supports-color
 
-  '@roll-agent/smart-reply-agent@0.1.1(hono@4.11.3)':
+  '@roll-agent/smart-reply-agent@0.1.2(hono@4.11.3)':
     dependencies:
       '@ai-sdk/alibaba': 1.0.13(zod@3.25.76)
       '@ai-sdk/anthropic': 3.0.53(zod@3.25.76)
@@ -11166,7 +11166,7 @@ snapshots:
       '@electron/asar': 3.4.1
       debug: 4.4.3
       fs-extra: 7.0.1
-      lodash: 4.17.23
+      lodash: 4.18.1
       temp: 0.9.4
     optionalDependencies:
       '@electron/windows-sign': 1.2.2
@@ -11947,7 +11947,7 @@ snapshots:
       jsonfile: 6.1.0
       universalify: 2.0.1
 
-  fs-extra@11.3.3:
+  fs-extra@11.3.4:
     dependencies:
       graceful-fs: 4.2.11
       jsonfile: 6.2.0
@@ -12786,7 +12786,7 @@ snapshots:
 
   lodash@4.17.21: {}
 
-  lodash@4.17.23: {}
+  lodash@4.18.1: {}
 
   log-symbols@4.1.0:
     dependencies:

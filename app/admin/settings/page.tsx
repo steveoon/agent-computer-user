@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -101,7 +101,7 @@ export default function AdminSettingsPage() {
 
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
-  const [currentTime, setCurrentTime] = useState<string>("");
+  const [currentTime] = useState(() => new Date().toLocaleString());
 
   const handleImportConfig = async () => {
     const pickerWindow: FilePickerWindow = window;
@@ -170,10 +170,6 @@ export default function AdminSettingsPage() {
     window.addEventListener("focus", cleanup, { once: true });
     input.click();
   };
-
-  useEffect(() => {
-    setCurrentTime(new Date().toLocaleString());
-  }, []);
 
   if (loading) {
     return (

@@ -364,7 +364,7 @@ const useConfigStore = create<ConfigState>()(
           let parsedData: unknown;
           try {
             parsedData = JSON.parse(text);
-          } catch (parseError) {
+          } catch (_parseError) {
             throw new Error("配置文件不是有效的JSON格式");
           }
 

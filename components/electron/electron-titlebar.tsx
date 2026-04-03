@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 interface PlatformInfo {
   platform: string;
@@ -14,17 +14,16 @@ interface PlatformInfo {
  * 仅在 Electron 环境中渲染
  */
 export function ElectronTitlebar() {
-  const [isElectron, setIsElectron] = useState(false);
+  const [isElectron] = useState(
+    () => typeof window !== "undefined" && window.electronApi?.isElectron === true
+  );
   const [platform, setPlatform] = useState<string>("unknown");
+  const hasFetchedPlatform = useRef(false);
 
   useEffect(() => {
-    // 检测 Electron 环境
-    const electronEnv =
-      typeof window !== "undefined" && window.electronApi?.isElectron === true;
-    setIsElectron(electronEnv);
-
     // 异步获取平台信息
-    if (electronEnv && window.electronApi?.system) {
+    if (isElectron && !hasFetchedPlatform.current && window.electronApi?.system) {
+      hasFetchedPlatform.current = true;
       const systemApi = window.electronApi.system as {
         getPlatform?: () => Promise<PlatformInfo>;
       };
@@ -34,7 +33,7 @@ export function ElectronTitlebar() {
         });
       }
     }
-  }, []);
+  }, [isElectron]);
 
   // 非 Electron 环境不渲染
   if (!isElectron) {

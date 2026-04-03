@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { X, Send, Edit3 } from "lucide-react";
 import type { PromptSuggestion } from "@/components/prompt-suggestions";
 
@@ -25,14 +25,17 @@ export function TemplateEditor({
   onSubmit,
   onClose,
 }: TemplateEditorProps) {
-  const [editedContent, setEditedContent] = useState(template);
+  // editedContent is derived from template + field edits (computed via useMemo below)
   const [fields, setFields] = useState<TemplateField[]>([]);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [isVisible, setIsVisible] = useState(false);
 
-  // Show animation
+  // Show animation - deferred to next frame to trigger CSS transition
   useEffect(() => {
-    setIsVisible(true);
+    const raf = requestAnimationFrame(() => {
+      setIsVisible(true);
+    });
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   // Initialize fields only once when component mounts or template changes
@@ -129,9 +132,9 @@ export function TemplateEditor({
     parseTemplate();
   }, [template, editableFields]);
 
-  // Update editedContent when field values change
-  useEffect(() => {
-    if (fields.length === 0) return;
+  // Derive editedContent from template + field edits
+  const editedContent = useMemo(() => {
+    if (fields.length === 0) return template;
 
     let newContent = template;
     // Sort fields by position in reverse to avoid position shifts
@@ -144,7 +147,7 @@ export function TemplateEditor({
       newContent = before + currentValue + after;
     });
 
-    setEditedContent(newContent);
+    return newContent;
   }, [fieldValues, fields, template]);
 
   const handleFieldEdit = (fieldId: string, newValue: string) => {

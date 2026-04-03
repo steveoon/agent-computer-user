@@ -18,6 +18,17 @@ import type { ToolPart } from "@/types/tool-common";
 // 同构 useLayoutEffect，避免 SSR 问题
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
+/**
+ * 模块级可变存储，用于 transport body 的间接读取
+ * 避免在 useState 初始化器中引用 React ref（react-hooks/refs 规则限制）
+ * key = chatId, value = 最新请求体数据
+ */
+const chatBodyStore = new Map<string, Record<string, unknown>>();
+
+function getChatBodyForId(chatId: string): Record<string, unknown> {
+  return chatBodyStore.get(chatId) ?? {};
+}
+
 interface UseCustomChatProps {
   sandboxId: string | null;
   sandboxStatus: "running" | "paused" | "unknown";
@@ -44,11 +55,11 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
     error: configError,
   } = useConfigDataForChat();
 
-  // 🔄 防止飞书通知循环调用的标志
-  const [isProcessingError, setIsProcessingError] = useState(false);
+  // 🔄 防止飞书通知循环调用的标志（使用 ref 因为仅在 effect/callback 中读写，不影响渲染）
+  const isProcessingErrorRef = useRef(false);
 
-  // 🛡️ 防止短时间内重复处理载荷错误的时间戳
-  const [lastPayloadErrorTime, setLastPayloadErrorTime] = useState<number>(0);
+  // 🛡️ 防止短时间内重复处理载荷错误的时间戳（使用 ref 因为仅在 effect 中读写）
+  const lastPayloadErrorTimeRef = useRef(0);
 
   // 🌍 环境信息状态 - 使用 isomorphic effect 避免 hydration 不匹配
   const [envInfo, setEnvInfo] = useState(() => {
@@ -99,18 +110,14 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
     return error.message.includes("请求频率过高");
   };
 
-  // 从 localStorage 获取 dulidayToken
-  const [dulidayToken, setDulidayToken] = useState<string | null>(null);
+  // 从 localStorage 获取 dulidayToken（使用 lazy initializer 避免 set-state-in-effect）
+  const [dulidayToken] = useState<string | null>(
+    () => (typeof window !== "undefined" ? localStorage.getItem("duliday_token") : null)
+  );
   // 从 localStorage 获取默认微信号
-  const [defaultWechatId, setDefaultWechatId] = useState<string | null>(null);
-
-  useEffect(() => {
-    // 在客户端获取 token 和默认微信号
-    const token = localStorage.getItem("duliday_token");
-    const wechatId = localStorage.getItem("default_wechat_id");
-    setDulidayToken(token);
-    setDefaultWechatId(wechatId);
-  }, []);
+  const [defaultWechatId] = useState<string | null>(
+    () => (typeof window !== "undefined" ? localStorage.getItem("default_wechat_id") : null)
+  );
 
   // 🎯 AI SDK v5: 手动管理 input 状态
   const [input, setInput] = useState("");
@@ -122,9 +129,9 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
   const [stableChatId] = useState(() => `chat-${crypto.randomUUID()}`);
   const chatId = sandboxId || stableChatId;
 
-  // 🔧 HITL 修复：用 ref 存储最新的请求体数据，供 DefaultChatTransport.body 读取
+  // 🔧 HITL 修复：用模块级 Map 存储最新的请求体数据，供 DefaultChatTransport.body 读取
   // 这样 HITL 恢复（addToolOutput + sendMessage()）时也能带上 modelConfig 等上下文
-  const chatBodyRef = useRef<Record<string, unknown>>({});
+  // 使用模块级 chatBodyStore 而非 useRef，避免 react-hooks/refs 在 useState 初始化器中报错
   useEffect(() => {
     const body: Record<string, unknown> = { sandboxId: sandboxId || null };
     if (currentBrand) body.preferredBrand = currentBrand;
@@ -138,8 +145,10 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
     if (defaultWechatId) body.defaultWechatId = defaultWechatId;
     if (maxSteps) body.maxSteps = maxSteps;
     if (agentId) body.agentId = agentId;
-    chatBodyRef.current = body;
+    chatBodyStore.set(chatId, body);
+    return () => { chatBodyStore.delete(chatId); };
   }, [
+    chatId,
     sandboxId, currentBrand, brandPriorityStrategy,
     chatModel, classifyModel, replyModel, providerConfigs,
     configData, systemPrompts, replyPolicy, activeSystemPrompt,
@@ -147,10 +156,11 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
   ]);
 
   // 🎯 transport 实例需要稳定引用（避免每次 render 重建）
+  // body 回调通过 chatId 间接读取模块级 store（不引用 React ref）
   const [transport] = useState(() => new DefaultChatTransport({
     api: "/api/chat",
     credentials: "include",
-    body: () => chatBodyRef.current,
+    body: () => getChatBodyForId(chatId),
   }));
 
   // 🎯 AI SDK v5: 使用 DefaultChatTransport 配置
@@ -188,7 +198,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
   const { sendFeishuNotification } = useFeishuNotification({
     append: async (message: { role: "user"; content: string }) => {
       // 构建简化的请求体
-      const requestBody: any = { sandboxId: sandboxId || null };
+      const requestBody: Record<string, unknown> = { sandboxId: sandboxId || null };
 
       // 构建 modelConfig 对象
       const modelConfig = {
@@ -226,7 +236,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
     });
 
     // 🔄 防止错误处理循环
-    if (isProcessingError) {
+    if (isProcessingErrorRef.current) {
       console.warn("🚫 正在处理错误中，跳过重复处理");
       return;
     }
@@ -236,13 +246,13 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       const now = Date.now();
 
       // 🛡️ 防止短时间内重复处理同样的错误（30秒内）
-      if (now - lastPayloadErrorTime < 30000) {
+      if (now - lastPayloadErrorTimeRef.current < 30000) {
         console.warn("🚫 短时间内已处理过载荷错误，跳过重复处理");
         return;
       }
 
-      setIsProcessingError(true);
-      setLastPayloadErrorTime(now);
+      isProcessingErrorRef.current = true;
+      lastPayloadErrorTimeRef.current = now;
       console.warn("💾 检测到请求载荷过大错误，准备智能清理");
 
       // 🎯 立即尝试清理，不先发送通知避免循环
@@ -256,7 +266,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
 
         setTimeout(() => {
           console.log("🔄 载荷过大错误处理完成，自动重试请求");
-          setIsProcessingError(false);
+          isProcessingErrorRef.current = false;
           regenerate();
         }, 1000);
       } else {
@@ -271,7 +281,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
           ).toFixed(2)}MB，清理失败，仍然触发载荷过大限制。错误信息：${error.message}`,
         });
 
-        setIsProcessingError(false);
+        isProcessingErrorRef.current = false;
         toast.error("请求过大", {
           description: "智能清理失败，请考虑手动清空部分对话历史后重试",
           richColors: true,
@@ -315,7 +325,6 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
     }
   }, [
     error,
-    isProcessingError,
     messages,
     sendFeishuNotification,
     handlePayloadTooLargeError,
@@ -420,7 +429,7 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
 
       // 发送消息 (AI SDK v5 格式 - sendMessage 使用简化格式)
       // 简化 body 参数，只传递必要的数据
-      const requestBody: any = {
+      const requestBody: Record<string, unknown> = {
         sandboxId: sandboxId || null,
       };
 
@@ -475,7 +484,6 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       defaultWechatId,
       maxSteps,
       agentId,
-      chatId,
     ]
   );
 
@@ -544,7 +552,6 @@ export function useCustomChat({ sandboxId, sandboxStatus: _sandboxStatus }: UseC
       replyPolicy,
       activeSystemPrompt,
       dulidayToken,
-      defaultWechatId,
       maxSteps,
       agentId,
     ]

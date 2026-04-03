@@ -86,8 +86,11 @@ function cleanupExpiredCache() {
 }
 
 // 定期清理缓存（每5分钟）
-if (typeof global !== "undefined" && !global.__cacheCleanupInterval) {
-  global.__cacheCleanupInterval = setInterval(cleanupExpiredCache, 5 * 60 * 1000);
+const _globalCache = globalThis as typeof globalThis & {
+  __cacheCleanupInterval?: NodeJS.Timeout;
+};
+if (typeof globalThis !== "undefined" && !_globalCache.__cacheCleanupInterval) {
+  _globalCache.__cacheCleanupInterval = setInterval(cleanupExpiredCache, 5 * 60 * 1000);
 }
 
 /**
@@ -252,8 +255,3 @@ export const config = {
     "/((?!_next/static|_next/image|favicon.ico|api/auth-status|api/diagnose|api/sandbox-status|api/kill-desktop|api/pause-desktop).*)",
   ],
 };
-
-// TypeScript 全局类型声明
-declare global {
-  var __cacheCleanupInterval: NodeJS.Timeout | undefined;
-}

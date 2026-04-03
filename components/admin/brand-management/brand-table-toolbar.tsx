@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -25,9 +25,12 @@ export function BrandTableToolbar({ params, onParamsChange }: BrandTableToolbarP
   const [localKeyword, setLocalKeyword] = useState(params.keyword || "");
 
   // 同步外部 params 变化到本地状态（例如清除筛选时）
-  useEffect(() => {
+  // Using state to track previous prop value (React recommended pattern)
+  const [prevKeyword, setPrevKeyword] = useState(params.keyword);
+  if (prevKeyword !== params.keyword) {
+    setPrevKeyword(params.keyword);
     setLocalKeyword(params.keyword || "");
-  }, [params.keyword]);
+  }
 
   // 防抖处理：300ms 后才更新父组件的查询参数，触发查询
   const debouncedSearch = useDebounce((value: string) => {

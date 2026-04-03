@@ -300,8 +300,9 @@ export function createValidator<T>(schema: z.ZodSchema<T>) {
       // 尝试使用 schema 的 partial 方法（如果存在）
       try {
         // 检查 schema 是否有 partial 方法
-        if ("partial" in schema && typeof (schema as any).partial === "function") {
-          const partialSchema = (schema as any).partial();
+        const schemaRecord = schema as unknown as Record<string, unknown>;
+        if ("partial" in schema && typeof schemaRecord.partial === "function") {
+          const partialSchema = (schemaRecord.partial as () => z.ZodSchema<Partial<T>>)();
           const result = partialSchema.safeParse(value);
           if (result.success) {
             return result.data;
