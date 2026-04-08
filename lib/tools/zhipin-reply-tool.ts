@@ -2,19 +2,14 @@ import { tool } from "ai";
 import { z } from "zod/v3";
 import { loadZhipinData } from "@/lib/loaders/zhipin-data.loader";
 import { generateSmartReply } from "@/lib/agents";
-import type { StoreWithDistance } from "@/types/geocoding";
-import { type ZhipinData, type MessageClassification, getAllStores, getDefaultBrand } from "@/types/zhipin";
+import type { SmartReplyAgentResult } from "@/lib/agents";
+import { type ZhipinData, getAllStores, getDefaultBrand } from "@/types/zhipin";
 import type { ReplyPolicyConfig, BrandPriorityStrategy } from "@/types/config";
 import type { ModelConfig } from "@/lib/config/models";
 import { DEFAULT_MODEL_CONFIG, DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
 import { CandidateInfoSchema, type CandidateInfo } from "@/lib/tools/zhipin/types";
 import type { SafeGenerateTextUsage } from "@/lib/ai";
 import type { TurnPlan } from "@/types/reply-policy";
-import type {
-  AgeEligibilityAppliedStrategy,
-  AgeEligibilityStatus,
-  AgeEligibilitySummary,
-} from "@/lib/services/eligibility/age-eligibility";
 
 const CandidateInfoInputSchema = CandidateInfoSchema.extend({
   candidateName: z.string().optional(),
@@ -63,20 +58,7 @@ function normalizeCandidateInfo(candidateInfo?: CandidateInfoInput): CandidateIn
   return normalized;
 }
 
-/**
- * 调试信息类型
- */
-type ReplyDebugInfo = {
-  relevantStores: StoreWithDistance[];
-  storeCount: number;
-  detailLevel: string;
-  turnPlan: TurnPlan;
-  aliasLookupError?: string;
-  classification: MessageClassification;
-  gateStatus: AgeEligibilityStatus;
-  appliedStrategy: AgeEligibilityAppliedStrategy;
-  ageRangeSummary: AgeEligibilitySummary;
-};
+type ReplyDebugInfo = NonNullable<SmartReplyAgentResult["debugInfo"]>;
 
 /**
  * 智能回复工具的执行结果类型

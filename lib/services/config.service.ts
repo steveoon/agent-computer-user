@@ -226,7 +226,6 @@ function ensurePositionAttendance(
         samplePosition?.attendanceRequirement ||
         generateDefaultAttendanceRequirement({
           name: position.name,
-          urgent: position.urgent,
         });
 
       return {
@@ -247,23 +246,14 @@ function ensurePositionAttendance(
   };
 }
 
-function generateDefaultAttendanceRequirement(position: { name?: string; urgent?: boolean }) {
+function generateDefaultAttendanceRequirement(position: { name?: string }) {
   const positionName = position.name?.toLowerCase() || "";
-  const urgent = position.urgent || false;
 
   if (positionName.includes("后厨") || positionName.includes("厨房")) {
     return {
       requiredDays: [6, 7],
       minimumDays: 5,
       description: "周六、日上岗，一周至少上岗5天",
-    };
-  }
-
-  if (urgent) {
-    return {
-      requiredDays: [1, 2, 3, 4, 5],
-      minimumDays: 4,
-      description: "周一到周五优先，一周至少上岗4天",
     };
   }
 

@@ -6,10 +6,7 @@
 // 从zhipin.ts导出核心业务类型
 export type {
   AttendanceRequirement,
-  ScheduleType,
-  AttendancePolicy,
   TimeSlotAvailability,
-  SchedulingFlexibility,
   Position,
   Store,
   Brand,

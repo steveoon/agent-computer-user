@@ -76,7 +76,7 @@
     "@radix-ui/react-switch": "^1.2.5",
     "@radix-ui/react-tabs": "^1.1.12",
     "@radix-ui/react-tooltip": "^1.2.7",
-    "@roll-agent/smart-reply-agent": "^0.1.2",
+    "@roll-agent/smart-reply-agent": "^0.3.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.76.1",
     "@toon-format/toon": "^2.1.0",

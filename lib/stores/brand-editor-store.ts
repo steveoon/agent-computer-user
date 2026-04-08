@@ -5,7 +5,7 @@
 
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
-import type { ZhipinData, ScheduleType, SchedulingFlexibility } from "@/types";
+import type { ZhipinData } from "@/types";
 import { findBrandByNameOrAlias, getAllStores } from "@/types";
 
 interface BrandEditorState {
@@ -30,10 +30,10 @@ interface BrandEditorState {
   setEditMode: (mode: "overview" | "json") => void;
   setEditingBrand: (brand: string | null) => void;
   setEditingType: (type: "schedule" | null) => void;
-  updateSchedulingInfo: (
+  updatePositionFields: (
     brandName: string,
-    scheduleType: ScheduleType,
-    schedulingFlexibility: SchedulingFlexibility,
+    laborForm: string | null,
+    employmentForm: string | null,
     targetType: "all" | "store",
     storeIndex?: number,
     positionIndex?: number
@@ -86,11 +86,11 @@ export const useBrandEditorStore = create<BrandEditorState>()(
         set({ editingType: type });
       },
 
-      // 更新排班信息
-      updateSchedulingInfo: (
+      // 更新岗位用工信息
+      updatePositionFields: (
         brandName,
-        scheduleType,
-        schedulingFlexibility,
+        laborForm,
+        employmentForm,
         targetType,
         storeIndex,
         positionIndex
@@ -102,41 +102,36 @@ export const useBrandEditorStore = create<BrandEditorState>()(
         const brand = findBrandByNameOrAlias(updatedData, brandName);
         if (!brand) return null;
 
+        const applyToPosition = (position: { laborForm: string | null; employmentForm: string | null }): void => {
+          position.laborForm = laborForm;
+          position.employmentForm = employmentForm;
+        };
+
         if (targetType === "all") {
-          // 批量更新该品牌下所有门店的所有岗位
           for (const b of updatedData.brands) {
             if (b.id === brand.id) {
               for (const store of b.stores) {
                 for (const position of store.positions) {
-                  position.scheduleType = scheduleType;
-                  position.schedulingFlexibility = { ...schedulingFlexibility };
+                  applyToPosition(position);
                 }
               }
             }
           }
         } else if (targetType === "store" && storeIndex !== undefined) {
-          // storeIndex is a global index across all stores (from getAllStores flat list)
           const allStoresFlat = getAllStores(updatedData);
           const targetStore = allStoresFlat[storeIndex];
           if (!targetStore) return null;
 
-          // Find and mutate the store in the nested brands structure
           for (const b of updatedData.brands) {
             for (const store of b.stores) {
               if (store.id === targetStore.id) {
                 if (positionIndex !== undefined) {
-                  // 更新指定岗位
                   if (store.positions[positionIndex]) {
-                    store.positions[positionIndex].scheduleType = scheduleType;
-                    store.positions[positionIndex].schedulingFlexibility = {
-                      ...schedulingFlexibility,
-                    };
+                    applyToPosition(store.positions[positionIndex]);
                   }
                 } else {
-                  // 更新门店下所有岗位
                   for (const position of store.positions) {
-                    position.scheduleType = scheduleType;
-                    position.schedulingFlexibility = { ...schedulingFlexibility };
+                    applyToPosition(position);
                   }
                 }
                 break;

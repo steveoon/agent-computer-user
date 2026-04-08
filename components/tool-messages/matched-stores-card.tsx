@@ -104,7 +104,7 @@ export function MatchedStoresCard({
                 </div>
                 {!compact && (
                   <div className="text-gray-500 dark:text-gray-400 truncate">
-                    {store.district} - {store.location}
+                    {store.district ? `${store.district} - ${store.location}` : store.location}
                   </div>
                 )}
               </div>

@@ -11,6 +11,7 @@ import type {
   SmartReplyAgentResult as PipelineResult,
 } from "@roll-agent/smart-reply-agent/pipeline";
 import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
+import type { ZhipinData } from "@/types/zhipin";
 
 function createMockPipelineResult(): PipelineResult {
   const turnPlan: PipelineResult["turnPlan"] = {
@@ -85,7 +86,7 @@ vi.mock("@roll-agent/smart-reply-agent/pipeline", () => ({
   generateSmartReply: mockGenerateSmartReply,
 }));
 
-const sampleConfigData = {
+const sampleConfigData: ZhipinData = {
   meta: {
     defaultBrandId: "1",
     syncedAt: new Date().toISOString(),
@@ -102,15 +103,70 @@ const sampleConfigData = {
           name: "蜀地源冒菜（春熙路店）",
           city: "成都",
           location: "成都市锦江区春熙路123号",
-          district: "锦江区",
-          subarea: "春熙路",
+          district: null,
+          subarea: null,
           coordinates: { lat: 30.6571, lng: 104.0665 },
-          positions: [],
+          positions: [
+            {
+              id: "pos-1",
+              name: "服务员",
+              sourceJobName: "蜀地源冒菜-春熙路店-服务员-兼职",
+              brandId: "1",
+              brandName: "蜀地源冒菜",
+              projectId: "1",
+              projectName: "蜀地源冒菜",
+              jobCategory: null,
+              laborForm: "兼职",
+              employmentForm: "长期用工",
+              timeSlots: ["09:00~17:00"],
+              salary: {
+                base: null,
+                memo: null,
+                unit: null,
+              },
+              workHours: null,
+              benefits: {
+                insurance: null,
+                accommodation: null,
+                catering: null,
+                moreWelfares: null,
+                memo: null,
+                promotion: null,
+              },
+              availableSlots: [
+                {
+                  slot: "09:00~17:00",
+                  maxCapacity: 3,
+                  currentBooked: 1,
+                  isAvailable: true,
+                  priority: "medium",
+                },
+              ],
+              minHoursPerWeek: null,
+              maxHoursPerWeek: null,
+              attendanceRequirement: {
+                minimumDays: null,
+                description: null,
+              },
+              hiringRequirements: {
+                minAge: 18,
+                maxAge: 30,
+                genderRequirement: "不限",
+                education: "高中",
+                healthCertificate: "有健康证",
+              },
+              description: null,
+              trainingRequired: null,
+              probationRequired: null,
+              perMonthMinWorkTime: null,
+              perMonthMinWorkTimeUnit: null,
+            },
+          ],
         },
       ],
     },
   ],
-} as unknown as import("@/types/zhipin").ZhipinData;
+};
 
 function getFirstPipelineCall(): PipelineOptions | undefined {
   return mockGenerateSmartReply.mock.calls[0]?.[0];
@@ -156,6 +212,12 @@ describe("Smart Reply Adapter", () => {
 
   it("should pass options through to pipeline with normalized modelConfig", async () => {
     const { generateSmartReply } = await import("../smart-reply-agent");
+    const ageEligibilitySources: NonNullable<PipelineOptions["ageEligibilitySources"]> = [
+      {
+        name: "custom-source",
+        collect: vi.fn().mockResolvedValue([]),
+      },
+    ];
 
     const options = {
       candidateMessage: "你们工资多少？",
@@ -168,28 +230,40 @@ describe("Smart Reply Adapter", () => {
       defaultWechatId: "hr_123",
       industryVoiceId: "default",
       channelType: "public" as const,
+      ageEligibilitySources,
     };
 
     await generateSmartReply(options);
 
     const calledOptions = getFirstPipelineCall();
+    const calledPosition = calledOptions?.configData.brands[0]?.stores[0]?.positions[0];
 
     expect(calledOptions).toMatchObject({
       candidateMessage: options.candidateMessage,
       conversationHistory: options.conversationHistory,
-      configData: options.configData,
       preferredBrand: options.preferredBrand,
       toolBrand: options.toolBrand,
       brandPriorityStrategy: options.brandPriorityStrategy,
       defaultWechatId: options.defaultWechatId,
       industryVoiceId: options.industryVoiceId,
       channelType: options.channelType,
+      ageEligibilitySources: options.ageEligibilitySources,
       modelConfig: {
         chatModel: DEFAULT_MODEL_CONFIG.chatModel,
         classifyModel: DEFAULT_MODEL_CONFIG.classifyModel,
         replyModel: "qwen/qwen-plus-latest",
       },
     });
+
+    expect(calledOptions?.configData.meta.defaultBrandId).toBe("1");
+    expect(calledOptions?.configData.brands[0]?.name).toBe("蜀地源冒菜");
+    expect(calledOptions?.configData.brands[0]?.stores[0]?.district).toBeNull();
+    expect(calledPosition?.salary.base).toBeNull();
+    expect(calledPosition?.salary.memo).toBeNull();
+    expect(calledPosition?.workHours).toBeNull();
+    expect(calledPosition?.laborForm).toBe("兼职");
+    expect(calledPosition?.employmentForm).toBe("长期用工");
+    expect(calledPosition?.hiringRequirements?.minAge).toBe(18);
   });
 
   it("should pass through supported provider models and downgrade openrouter", async () => {

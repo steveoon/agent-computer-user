@@ -98,8 +98,8 @@ export const jobPostingGeneratorTool = (preferredBrand?: string, configData?: Zh
         const displayStores = matchingStores.slice(0, limit);
 
         // 获取基础薪资（假设所有同类岗位薪资相同）
-        const baseSalary = displayStores[0]?.position.salary.base || 24;
-        const salaryMemo = displayStores[0]?.position.salary.memo || "";
+        const baseSalary = displayStores[0]?.position.salary.base ?? 24;
+        const salaryMemo = displayStores[0]?.position.salary.memo ?? "";
 
         // 默认薪资信息
         const defaultStepSalary: z.infer<typeof stepSalarySchema> = {
@@ -147,7 +147,7 @@ export const jobPostingGeneratorTool = (preferredBrand?: string, configData?: Zh
         // 添加门店信息
         for (const { store, position } of displayStores) {
           const timeSlots = position.timeSlots.join("、");
-          message += `📍${store.district} - ${store.name}\n`;
+          message += `📍${store.district ? `${store.district} - ` : ""}${store.name}\n`;
           message += `时段：${timeSlots}\n\n`;
         }
 

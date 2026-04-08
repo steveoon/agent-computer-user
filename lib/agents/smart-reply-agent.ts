@@ -35,6 +35,7 @@ export interface SmartReplyAgentOptions {
   industryVoiceId?: string;
   channelType?: PipelineOptions["channelType"];
   turnIndex?: PipelineOptions["turnIndex"];
+  ageEligibilitySources?: PipelineOptions["ageEligibilitySources"];
 }
 
 export type SmartReplyDebugInfo = PipelineDebugInfo & {
@@ -166,7 +167,7 @@ function normalizeSmartReplyModelConfig(
 export async function generateSmartReply(
   options: SmartReplyAgentOptions
 ): Promise<SmartReplyAgentResult> {
-  const normalizedOptions = {
+  const normalizedOptions: PipelineOptions = {
     ...options,
     modelConfig: normalizeSmartReplyModelConfig(options.modelConfig),
   };

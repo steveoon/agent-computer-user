@@ -223,7 +223,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
                       </div>
                       <div className="text-right">
                         <Badge variant="secondary">{brand?.name ?? store.brandId}</Badge>
-                        <p className="text-xs text-muted-foreground mt-1">{store.district}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{store.district ?? ""}</p>
                       </div>
                     </div>
                     <div className="text-sm text-muted-foreground">
