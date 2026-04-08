@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.30.1-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.30.0...v1.30.1-develop.1) (2026-04-08)
+
+
+### Bug Fixes
+
+* **electron:** replace Unix find with cross-platform symlink cleanup script ([4994049](https://github.com/steveoon/agent-computer-user/commit/49940493eb4a851559ab882822bd8e18b04b5b68))
+
 # [1.30.0](https://github.com/steveoon/agent-computer-user/compare/v1.29.0...v1.30.0) (2026-04-08)
 
 
