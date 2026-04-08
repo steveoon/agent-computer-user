@@ -2,6 +2,19 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.30.0](https://github.com/steveoon/agent-computer-user/compare/v1.29.0...v1.30.0) (2026-04-08)
+
+
+### Bug Fixes
+
+* **lint:** resolve all 21 ESLint errors for React 19 / Next.js 16 compliance ([0595637](https://github.com/steveoon/agent-computer-user/commit/059563755932e8d1016fa34ab359d0e08ddb1111))
+
+
+### Features
+
+* migrate ZhipinData to Brand→Store hierarchy and fix sample data pollution ([e07a657](https://github.com/steveoon/agent-computer-user/commit/e07a65707c01c3e88b25a9f4103849b01006f96a))
+* upgrade Next.js 15.4.10 → 16.2.1 ([942af23](https://github.com/steveoon/agent-computer-user/commit/942af23b9ea087fc9a94a7d494f240cbf2c5985f))
+
 # [1.30.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.29.0...v1.30.0-develop.1) (2026-04-03)
 
 
