@@ -43,7 +43,7 @@
     "db:init": "npx tsx scripts/init-brand-data.ts",
     "electron:dev": "concurrently \"next dev\" \"tsc -w -p tsconfig-electron.json\" \"wait-on http://localhost:3000 && cross-env ELECTRON_RUN_AS_NODE= NODE_ENV=development electron .\"",
     "electron:bundle-main": "pnpm exec esbuild src-electron/main.ts --bundle --platform=node --format=cjs --target=node20 --outfile=build/main.js --external:electron",
-    "electron:build": "shx rm -rf build dist && cross-env ELECTRON_BUILD=true next build && find .next/standalone -type l ! -exec test -e {} \\; -delete && shx cp -r .next/static .next/standalone/.next/ && shx mkdir -p .next/standalone/public && shx cp -r public/* .next/standalone/public/ && tsc -p tsconfig-electron.json && pnpm electron:bundle-main",
+    "electron:build": "shx rm -rf build dist && cross-env ELECTRON_BUILD=true next build && node scripts/prune-broken-symlinks.mjs .next/standalone && shx cp -r .next/static .next/standalone/.next/ && shx mkdir -p .next/standalone/public && shx cp -r public/* .next/standalone/public/ && tsc -p tsconfig-electron.json && pnpm electron:bundle-main",
     "electron:start": "cross-env ELECTRON_RUN_AS_NODE= electron .",
     "electron:pack": "pnpm electron:build && electron-builder --dir",
     "electron:dist": "pnpm electron:build && electron-builder",
