@@ -22,7 +22,7 @@ relevantStores.slice(0, 3).forEach(store => {
 **痛点**：
 
 1. **不适应品牌差异**：像"成都你六姐"有57个门店，只显示3个门店信息不足；而小品牌可能只有1-2个门店
-2. **Token 浪费**：所有意图都显示完整字段，即使用户只问薪资也会返回排班、考勤等无关信息
+2. **Token 浪费**：所有意图都显示完整字段，即使用户只问薪资也会返回出勤要求等无关信息
 3. **Context Window 溢出**：大品牌的门店数据会导致 prompt 被截断，影响生成质量
 
 ### 症状示例
@@ -34,10 +34,9 @@ relevantStores.slice(0, 3).forEach(store => {
 匹配到的门店信息：
 • 上海长泰广场店...
   职位：收银员，时间：11:00~13:30，薪资：24元/时
-  福利：五险一金
-  排班类型：灵活排班（可换班）
+  福利：有社保
+  用工形式：小时工，长期用工
   可预约时段：11:00~13:30(0/1人，中优先级)
-  排班特点：可换班、兼职
   每周工时：21-21小时
   出勤要求：...
 • 上海鑫耀光环店...
@@ -47,7 +46,7 @@ relevantStores.slice(0, 3).forEach(store => {
 ```
 
 **问题分析**：
-- 用户只关心薪资，但系统返回了排班、考勤、福利等所有字段
+- 用户只关心薪资，但系统返回了出勤要求、福利等所有字段
 - 导致 token 消耗过大，超过 3000 token 预算被截断
 - 截断后的 prompt 可能缺少关键信息，影响回复质量
 
@@ -86,13 +85,12 @@ lib/loaders/zhipin-data.loader.ts:
 | | 奖金 | 15 | 奖金说明 |
 | | 福利 | 25 | 五险一金、晋升等 |
 | **时间相关** | 工作时段 | 15 | 时间段列表 |
-| | 排班类型 | 20 | 固定/灵活/轮班 + 可换班 |
 | | 可预约时段 | 40 | 详细的时间段 + 容量 + 优先级 |
 | | 每周工时 | 15 | 最小/最大工时要求 |
 | | 工作日偏好 | 15 | 偏好的工作日 |
-| **考勤要求** | 考勤政策 | 25 | 准时到岗、迟到容忍等 |
-| | 出勤要求 | 40 | 详细描述 + 必需天数 + 最少天数 |
-| **灵活性** | 排班灵活性 | 30 | 可换班、兼职、需周末等 |
+| **用工信息** | 用工形式 | 10 | laborForm（兼职/全职/小时工等） |
+| | 用工类型 | 10 | employmentForm（长期用工/短期用工等） |
+| **考勤要求** | 出勤要求 | 40 | 详细描述 + 必需天数 + 最少天数 |
 
 **单个门店完整信息估算**: ~300 tokens
 **单个门店摘要估算**: ~50 tokens（仅门店名+地址+岗位数）
@@ -111,8 +109,7 @@ lib/loaders/zhipin-data.loader.ts:
 - ✅ 薪资（简化）
 - ✅ 工作时段
 - ✅ 福利（主要福利）
-- ✅ 排班类型
-- ❌ 详细考勤政策
+- ✅ 用工形式
 - ❌ 可预约时段
 - ❌ 出勤要求
 
@@ -134,9 +131,7 @@ lib/loaders/zhipin-data.loader.ts:
 - ✅ 薪资（简化）
 - ✅ 工作时段
 - ❌ 福利
-- ❌ 考勤政策
-- ❌ 排班类型
-- ❌ 灵活性信息
+- ❌ 用工信息
 
 **Token 预算**: 1200 tokens
 **门店数量**: 最多 8 个
@@ -174,13 +169,11 @@ lib/loaders/zhipin-data.loader.ts:
 - ✅ 门店基础信息
 - ✅ 职位名称
 - ✅ 工作时段
-- ✅ 排班类型
-- ✅ 排班灵活性（可换班、兼职等）
+- ✅ 用工形式 / 用工类型
 - ✅ 每周工时
 - ✅ 工作日偏好
 - ❌ 薪资
 - ❌ 福利
-- ❌ 详细考勤政策
 
 **Token 预算**: 1200 tokens
 **门店数量**: 最多 5 个
@@ -295,8 +288,8 @@ lib/loaders/zhipin-data.loader.ts:
 - ✅ 职位名称
 - ✅ 薪资（简化）
 - ✅ 工作时段
-- ✅ 排班类型
-- ❌ 详细考勤、灵活性
+- ✅ 用工形式
+- ❌ 详细出勤要求
 
 **Token 预算**: 1000 tokens
 **门店数量**: 最多 3 个
@@ -317,7 +310,7 @@ lib/loaders/zhipin-data.loader.ts:
 - ✅ 职位名称
 - ✅ 工作时段
 - ✅ 出勤要求（完整：描述 + 必需天数 + 最少天数）
-- ✅ 排班类型
+- ✅ 用工形式 / 用工类型
 - ✅ 每周工时
 - ❌ 薪资
 - ❌ 福利
@@ -339,12 +332,10 @@ lib/loaders/zhipin-data.loader.ts:
 - ✅ 门店基础信息
 - ✅ 职位名称
 - ✅ 工作时段
-- ✅ 排班类型
-- ✅ 排班灵活性（完整：可换班、兼职、需周末、需节假日）
+- ✅ 用工形式 / 用工类型
 - ✅ 每周工时
 - ❌ 薪资
 - ❌ 福利
-- ❌ 考勤政策
 
 **Token 预算**: 1200 tokens
 **门店数量**: 最多 6 个
@@ -361,7 +352,7 @@ lib/loaders/zhipin-data.loader.ts:
 **显示字段**:
 - ✅ 门店基础信息
 - ✅ 职位名称
-- ✅ 考勤政策（完整：准时到岗、迟到容忍、考勤跟踪、补班）
+- ✅ 出勤要求（完整）
 - ❌ 所有其他字段
 
 **Token 预算**: 1000 tokens
@@ -381,8 +372,7 @@ lib/loaders/zhipin-data.loader.ts:
 - ✅ 职位名称
 - ✅ 工作时段
 - ✅ 每周工时（完整：最小-最大）
-- ✅ 排班类型
-- ✅ 排班灵活性（兼职相关）
+- ✅ 用工形式 / 用工类型
 - ❌ 薪资
 - ❌ 福利
 
@@ -422,11 +412,10 @@ lib/loaders/zhipin-data.loader.ts:
 - ✅ 职位名称
 - ✅ 薪资（简化）
 - ✅ 工作时段
-- ✅ 排班类型
-- ✅ 排班灵活性（兼职相关）
+- ✅ 用工形式 / 用工类型
 - ✅ 每周工时
-- ❌ 福利（兼职不提供五险一金）
-- ❌ 考勤政策
+- ❌ 福利
+- ❌ 出勤要求
 
 **Token 预算**: 1000 tokens
 **门店数量**: 最多 5 个
@@ -608,9 +597,7 @@ interface FieldDisplayConfig {
   showBonus: boolean;
   showBenefits: boolean;
   showTimeSlots: boolean;
-  showScheduleType: boolean;
-  showAttendancePolicy: boolean;
-  showFlexibility: boolean;
+  showLaborForm: boolean;
   showAvailableSlots: boolean;
   showWorkHours: boolean;
   showPreferredDays: boolean;
@@ -683,20 +670,25 @@ function buildPositionInfo(
   }
 
   // 福利
-  if (config.showBenefits && pos.benefits?.items?.length > 0) {
-    const benefitsList = pos.benefits.items.filter(item => item !== "无");
-    if (benefitsList.length > 0) {
-      info += `  福利：${benefitsList.join("、")}\n`;
+  if (config.showBenefits) {
+    const benefitParts: string[] = [];
+    if (pos.benefits.insurance) benefitParts.push(pos.benefits.insurance);
+    if (pos.benefits.accommodation) benefitParts.push(pos.benefits.accommodation);
+    if (pos.benefits.catering) benefitParts.push(pos.benefits.catering);
+    if (pos.benefits.moreWelfares?.length) benefitParts.push(...pos.benefits.moreWelfares);
+    if (benefitParts.length > 0) {
+      info += `  福利：${benefitParts.join("、")}\n`;
     }
   }
 
-  // 排班类型
-  if (config.showScheduleType) {
-    const scheduleTypeText = getScheduleTypeText(pos.scheduleType);
-    const canSwapText = pos.schedulingFlexibility.canSwapShifts
-      ? "（可换班）"
-      : "（不可换班）";
-    info += `  排班类型：${scheduleTypeText}${canSwapText}\n`;
+  // 用工形式
+  if (config.showLaborForm) {
+    const parts: string[] = [];
+    if (pos.laborForm) parts.push(pos.laborForm);
+    if (pos.employmentForm) parts.push(pos.employmentForm);
+    if (parts.length > 0) {
+      info += `  用工形式：${parts.join("，")}\n`;
+    }
   }
 
   // 可预约时段
@@ -711,33 +703,9 @@ function buildPositionInfo(
     }
   }
 
-  // 考勤政策
-  if (config.showAttendancePolicy && pos.attendancePolicy.punctualityRequired) {
-    info += `  考勤要求：准时到岗，最多迟到${pos.attendancePolicy.lateToleranceMinutes}分钟\n`;
-  }
-
-  // 排班灵活性
-  if (config.showFlexibility) {
-    const flexibility = pos.schedulingFlexibility;
-    const flexibilityFeatures = [];
-    if (flexibility.canSwapShifts) flexibilityFeatures.push("可换班");
-    if (flexibility.partTimeAllowed) flexibilityFeatures.push("兼职");
-    if (flexibility.weekendRequired) flexibilityFeatures.push("需周末");
-    if (flexibility.holidayRequired) flexibilityFeatures.push("需节假日");
-
-    if (flexibilityFeatures.length > 0) {
-      info += `  排班特点：${flexibilityFeatures.join("、")}\n`;
-    }
-  }
-
   // 每周工时
-  if (config.showWorkHours && (pos.minHoursPerWeek || pos.maxHoursPerWeek)) {
-    info += `  每周工时：${pos.minHoursPerWeek || 0}-${pos.maxHoursPerWeek || "不限"}小时\n`;
-  }
-
-  // 偏好工作日
-  if (config.showPreferredDays && pos.preferredDays?.length > 0) {
-    info += `  工作日偏好：${pos.preferredDays.map(day => getDayText(day)).join("、")}\n`;
+  if (config.showWorkHours && (pos.minHoursPerWeek != null || pos.maxHoursPerWeek != null)) {
+    info += `  每周工时：${pos.minHoursPerWeek ?? "不限"}-${pos.maxHoursPerWeek ?? "不限"}小时\n`;
   }
 
   // 出勤要求
@@ -750,7 +718,7 @@ function buildPositionInfo(
       reqText += `（需要：${dayNames.join("、")}）`;
     }
 
-    if (req.minimumDays) {
+    if (req.minimumDays != null) {
       reqText += `，最少${req.minimumDays}天/周`;
     }
 
@@ -771,7 +739,7 @@ function buildStoreSummary(store: Store): string {
   const positionCount = store.positions.length;
   const positionNames = [...new Set(store.positions.map(p => p.name))].join("、");
 
-  return `• ${store.name}（${store.district}${store.subarea}）：${positionCount}个岗位（${positionNames}）\n`;
+  return `• ${store.name}（${store.district ?? ""}${store.subarea ?? ""}）：${positionCount}个岗位（${positionNames}）\n`;
 }
 ```
 
@@ -817,7 +785,7 @@ function buildContextInfo(
 
       if (isDetailed) {
         // 详细信息
-        storeInfo = `• ${store.name}（${store.district}${store.subarea}）：${store.location}\n`;
+        storeInfo = `• ${store.name}（${store.district ?? ""}${store.subarea ?? ""}）：${store.location}\n`;
         store.positions.forEach(pos => {
           storeInfo += buildPositionInfo(pos, fieldConfig);
         });
@@ -880,15 +848,13 @@ describe("意图驱动字段过滤", () => {
 
       expect(config.showSalary).toBe(true);
       expect(config.showBenefits).toBe(true);
-      expect(config.showScheduleType).toBe(false);
-      expect(config.showAttendancePolicy).toBe(false);
+      expect(config.showLaborForm).toBe(false);
     });
 
     test("schedule_inquiry 应只显示排班相关字段", () => {
       const config = getFieldDisplayConfig("schedule_inquiry");
 
-      expect(config.showScheduleType).toBe(true);
-      expect(config.showFlexibility).toBe(true);
+      expect(config.showLaborForm).toBe(true);
       expect(config.showWorkHours).toBe(true);
       expect(config.showSalary).toBe(false);
     });
@@ -970,16 +936,16 @@ console.log(`⏱️ buildContextInfo 耗时: ${elapsedTime}ms`);
 salary_inquiry → {
   showSalary: true,
   showBenefits: true,
-  showSchedule: false,  // 🚫 不显示排班
-  tokenBudget: 1500,    // 可显示更多门店
+  showLaborForm: false,  // 🚫 不显示用工形式
+  tokenBudget: 1500,     // 可显示更多门店
   maxStores: 8
 }
 
-// 排班咨询 - 只显示排班相关信息
+// 排班咨询 - 只显示时间和用工相关信息
 schedule_inquiry → {
-  showSalary: false,    // 🚫 不显示薪资
-  showSchedule: true,
-  showFlexibility: true,
+  showSalary: false,     // 🚫 不显示薪资
+  showLaborForm: true,
+  showWorkHours: true,
   tokenBudget: 1200,
   maxStores: 5
 }

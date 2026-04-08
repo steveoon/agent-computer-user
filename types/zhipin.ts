@@ -5,13 +5,15 @@ import { CoordinatesSchema } from "./geocoding";
 
 // 🔧 结构化薪资与福利模型
 export const SalaryDetailsSchema = z.object({
-  base: z.number(),
+  base: z.number().nullable(),
   // 例如: "5250元-5750元"
   range: z.string().optional(),
   // 例如: "季度奖金1000～1500"
   bonus: z.string().optional(),
   // 保留原始文本以供参考
-  memo: z.string(),
+  memo: z.string().nullable(),
+  // 薪资单位
+  unit: z.string().nullable(),
   // 从 salaryScenarioList 提炼的可读摘要（阶梯薪资/综合薪资/节假日倍数等）
   scenarioSummary: z.string().optional(),
   // 结算周期："日结"/"周结"/"月结" 等
@@ -19,10 +21,12 @@ export const SalaryDetailsSchema = z.object({
 });
 
 export const BenefitsSchema = z.object({
-  // 一个包含关键福利的数组，如 ["五险一金", "带薪年假"]
-  items: z.array(z.string()),
-  // 完整的晋升福利文本
-  promotion: z.string().optional(),
+  insurance: z.string().nullable(),
+  accommodation: z.string().nullable(),
+  catering: z.string().nullable(),
+  moreWelfares: z.array(z.string()).nullable(),
+  memo: z.string().nullable(),
+  promotion: z.string().nullable(),
 });
 
 // 🔧 Duliday 原始 API 数据结构定义
@@ -305,10 +309,15 @@ export namespace DulidayRaw {
       jobId: z.number().optional(),
       createTime: z.string().optional(),
       jobName: z.string().optional(),
+      jobNickName: z.string().nullable().optional(),
+      jobCategory: z.string().nullable().optional(),
       brandId: z.number().optional(),
       brandName: z.string().optional(),
       projectId: z.number().optional(),
       projectName: z.string().optional(),
+      laborForm: z.union([z.string(), z.number()]).nullable().optional(),
+      trainingRequired: z.union([z.string(), z.number()]).nullable().optional(),
+      probationRequired: z.union([z.string(), z.number()]).nullable().optional(),
       storeInfo: z
         .object({
           storeId: z.number().optional(),
@@ -353,6 +362,32 @@ export namespace DulidayRaw {
       requirementNum: z.number().optional(),
       thresholdNum: z.number().optional(),
       signUpNum: z.number().nullable().optional(),
+      basicPersonalRequirements: z
+        .object({
+          minAge: z.number().nullable().optional(),
+          maxAge: z.number().nullable().optional(),
+          genderRequirement: z.string().nullable().optional(),
+        })
+        .nullable()
+        .optional(),
+      certificate: z
+        .object({
+          education: z.string().nullable().optional(),
+          healthCertificate: z.string().nullable().optional(),
+        })
+        .nullable()
+        .optional(),
+      figure: z.union([z.string(), z.number()]).nullable().optional(),
+      socialIdentity: z.union([z.string(), z.number()]).nullable().optional(),
+      certificates: z.array(z.union([z.string(), z.number()])).nullable().optional(),
+      certificatesRaw: z.string().nullable().optional(),
+      languages: z
+        .union([z.string(), z.array(z.union([z.string(), z.number()]))])
+        .nullable()
+        .optional(),
+      languageRemark: z.string().nullable().optional(),
+      remark: z.string().nullable().optional(),
+      recruitmentRemark: z.string().nullable().optional(),
     })
     .passthrough();
 
@@ -404,19 +439,8 @@ export const ATTENDANCE_PATTERNS = {
 // 出勤要求Schema
 export const AttendanceRequirementSchema = z.object({
   requiredDays: z.array(z.number().min(1).max(7)).optional(),
-  minimumDays: z.number().min(0).optional(),
-  description: z.string(),
-});
-
-// 排班类型Schema
-export const ScheduleTypeSchema = z.enum(["fixed", "flexible", "rotating", "on_call"]);
-
-// 考勤政策Schema
-export const AttendancePolicySchema = z.object({
-  punctualityRequired: z.boolean(),
-  lateToleranceMinutes: z.number().min(0),
-  attendanceTracking: z.enum(["strict", "flexible", "none"]),
-  makeupShiftsAllowed: z.boolean(),
+  minimumDays: z.number().min(0).nullable(),
+  description: z.string().nullable(),
 });
 
 // 时间段可用性Schema
@@ -428,15 +452,6 @@ export const TimeSlotAvailabilitySchema = z.object({
   priority: z.enum(["high", "medium", "low"]),
 });
 
-// 排班灵活性Schema
-export const SchedulingFlexibilitySchema = z.object({
-  canSwapShifts: z.boolean(),
-  advanceNoticeHours: z.number().min(0),
-  partTimeAllowed: z.boolean(),
-  weekendRequired: z.boolean(),
-  holidayRequired: z.boolean(),
-});
-
 // 招聘要求Schema（从新 API hiringRequirement.basicPersonalRequirements 提取）
 export const HiringRequirementsSchema = z.object({
   minAge: z.number().nullable().optional(),
@@ -444,6 +459,10 @@ export const HiringRequirementsSchema = z.object({
   genderRequirement: z.string().nullable().optional(),
   education: z.string().nullable().optional(),
   healthCertificate: z.string().nullable().optional(),
+  languages: z.string().nullable().optional(),
+  certificatesRaw: z.string().nullable().optional(),
+  recruitmentRemark: z.string().nullable().optional(),
+  socialIdentity: z.string().nullable().optional(),
 });
 
 export type HiringRequirements = z.infer<typeof HiringRequirementsSchema>;
@@ -452,116 +471,99 @@ export type HiringRequirements = z.infer<typeof HiringRequirementsSchema>;
 export const PositionSchema = z.object({
   id: z.string(),
   name: z.string(),
-  // 新增：品牌/项目追踪字段（IndexedDB 持久化）
+  // 接口原始 jobName
+  sourceJobName: z.string(),
+  // 品牌/项目追踪字段（IndexedDB 持久化）
   brandId: z.string().optional(),
   brandName: z.string().optional(),
   projectId: z.string().optional(),
   projectName: z.string().optional(),
+  // 岗位分类
+  jobCategory: z.string().nullable(),
+  // 用工形式（兼职/全职等）
+  laborForm: z.string().nullable(),
+  // 用工类型（长期用工/短期用工等）
+  employmentForm: z.string().nullable(),
   timeSlots: z.array(z.string()),
-  // 🔧 使用结构化的薪资模型替代原有的 baseSalary 和 levelSalary
   salary: SalaryDetailsSchema,
-  workHours: z.string(),
-  // 🔧 使用结构化的福利模型替代原有的 benefits
+  workHours: z.string().nullable(),
   benefits: BenefitsSchema,
-  requirements: z.array(z.string()),
-  urgent: z.boolean(),
-  scheduleType: ScheduleTypeSchema,
-  attendancePolicy: AttendancePolicySchema,
   availableSlots: z.array(TimeSlotAvailabilitySchema),
-  schedulingFlexibility: SchedulingFlexibilitySchema,
-  minHoursPerWeek: z.number().min(0).optional(),
-  maxHoursPerWeek: z.number().min(0).optional(),
+  minHoursPerWeek: z.number().min(0).nullable(),
+  maxHoursPerWeek: z.number().min(0).nullable(),
   attendanceRequirement: AttendanceRequirementSchema.optional(),
-  // 新增：结构化招聘要求（年龄/性别/学历/健康证）
   hiringRequirements: HiringRequirementsSchema.optional(),
-  // 新增：岗位描述（来自 basicInfo.jobContent）
-  description: z.string().optional(),
+  // 岗位描述（来自 basicInfo.jobContent）
+  description: z.string().nullable(),
+  // 是否需要培训
+  trainingRequired: z.string().nullable(),
+  // 是否需要试工
+  probationRequired: z.string().nullable(),
+  // 月最低工时
+  perMonthMinWorkTime: z.number().nullable(),
+  // 月最低工时单位
+  perMonthMinWorkTimeUnit: z.union([z.string(), z.number()]).nullable(),
 });
 
 // 门店Schema
 export const StoreSchema = z.object({
   id: z.string(),
+  brandId: z.string(),
   name: z.string(),
-  city: z.string().optional(), // 门店所在城市（从 API cityName 获取）
+  city: z.string().optional(),
   location: z.string(),
-  district: z.string(),
-  subarea: z.string(),
-  coordinates: CoordinatesSchema, // 引用统一的坐标 Schema
+  district: z.string().nullable(),
+  subarea: z.string().nullable(),
+  coordinates: CoordinatesSchema,
   positions: z.array(PositionSchema),
-  brand: z.string(),
 });
 
-// 用于智能回复系统的消息分类和模板匹配
+// ========== 品牌与数据集 ==========
+
+export const BrandDatasetMetaSchema = z.object({
+  defaultBrandId: z.string().optional(),
+  syncedAt: z.string().optional(),
+  source: z.string().optional(),
+});
+
+export const BrandSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  aliases: z.array(z.string()).optional(),
+  stores: z.array(StoreSchema),
+});
+
+export const ZhipinDataSchema = z.object({
+  meta: BrandDatasetMetaSchema,
+  brands: z.array(BrandSchema),
+});
+
+// 用于智能回复系统的消息分类
 export const ReplyContextSchema = z.enum([
   // 基础咨询类
-  "initial_inquiry", // 初次咨询工作机会
-  "location_inquiry", // 询问位置但无具体指向
-  "no_location_match", // 提到位置但无法匹配
-  "schedule_inquiry", // 询问工作时间安排
-  "interview_request", // 表达面试意向
-  "general_chat", // 一般性对话
+  "initial_inquiry",
+  "location_inquiry",
+  "no_location_match",
+  "schedule_inquiry",
+  "interview_request",
+  "general_chat",
 
   // 敏感信息类
-  "salary_inquiry", // 询问薪资待遇
-  "age_concern", // 年龄相关问题（敏感）
-  "insurance_inquiry", // 保险福利问题（敏感）
+  "salary_inquiry",
+  "age_concern",
+  "insurance_inquiry",
 
   // 跟进沟通类
-  "followup_chat", // 需要跟进的聊天
+  "followup_chat",
 
-  // 考勤排班类（🆕 新增）
-  "attendance_inquiry", // 出勤要求咨询
-  "flexibility_inquiry", // 排班灵活性咨询
-  "attendance_policy_inquiry", // 考勤政策咨询
-  "work_hours_inquiry", // 工时要求咨询
-  "availability_inquiry", // 时间段可用性咨询
-  "part_time_support", // 兼职支持咨询
+  // 考勤排班类
+  "attendance_inquiry",
+  "flexibility_inquiry",
+  "attendance_policy_inquiry",
+  "work_hours_inquiry",
+  "availability_inquiry",
+  "part_time_support",
 ]);
-
-// 基础模板Schema（仅支持标准回复类型）
-export const BaseTemplatesSchema = z.record(ReplyContextSchema, z.array(z.string()));
-
-// 可选的模板Schema
-export const OptionalTemplatesSchema = BaseTemplatesSchema.optional();
-
-// 必需的模板Schema（用于品牌配置）
-export const RequiredTemplatesSchema = BaseTemplatesSchema.refine(
-  val => {
-    return val !== undefined && typeof val === "object";
-  },
-  {
-    message: "品牌配置必须包含templates字段",
-  }
-);
-
-// 筛选规则Schema
-export const ScreeningRulesSchema = z.object({
-  age: z.object({
-    min: z.number().min(0),
-    max: z.number().min(0),
-    preferred: z.array(z.number()),
-  }),
-  blacklistKeywords: z.array(z.string()),
-  preferredKeywords: z.array(z.string()),
-});
-
-// 品牌配置Schema
-export const BrandConfigSchema = z.object({
-  templates: RequiredTemplatesSchema,
-});
-
-// Boss直聘数据Schema
-export const ZhipinDataSchema = z.object({
-  city: z.string(),
-  stores: z.array(StoreSchema),
-  brands: z.record(z.string(), BrandConfigSchema),
-  defaultBrand: z.string().optional(),
-});
-
-// 示例数据Schema
-export const SampleDataSchema = z.object({
-  zhipin: ZhipinDataSchema,
-});
 
 // 候选人信息从统一源导入，避免重复定义
 export { CandidateInfoSchema } from "@/lib/tools/zhipin/types";
@@ -616,17 +618,12 @@ export const MessageClassificationSchema = z.object({
 export type SalaryDetails = z.infer<typeof SalaryDetailsSchema>;
 export type Benefits = z.infer<typeof BenefitsSchema>;
 export type AttendanceRequirement = z.infer<typeof AttendanceRequirementSchema>;
-export type ScheduleType = z.infer<typeof ScheduleTypeSchema>;
-export type AttendancePolicy = z.infer<typeof AttendancePolicySchema>;
 export type TimeSlotAvailability = z.infer<typeof TimeSlotAvailabilitySchema>;
-export type SchedulingFlexibility = z.infer<typeof SchedulingFlexibilitySchema>;
 export type Position = z.infer<typeof PositionSchema>;
 export type Store = z.infer<typeof StoreSchema>;
-export type Templates = z.infer<typeof BaseTemplatesSchema>;
-export type ScreeningRules = z.infer<typeof ScreeningRulesSchema>;
-export type BrandConfig = z.infer<typeof BrandConfigSchema>;
+export type BrandDatasetMeta = z.infer<typeof BrandDatasetMetaSchema>;
+export type Brand = z.infer<typeof BrandSchema>;
 export type ZhipinData = z.infer<typeof ZhipinDataSchema>;
-export type SampleData = z.infer<typeof SampleDataSchema>;
 export type ReplyContext = z.infer<typeof ReplyContextSchema>;
 export { type CandidateInfo } from "@/lib/tools/zhipin/types"; // 从统一源导出类型
 export type ConversationMessage = z.infer<typeof ConversationMessageSchema>;
@@ -706,3 +703,63 @@ export const REPLY_TYPE_NAMES: Record<ReplyContext, string> = {
   availability_inquiry: "时段可用性",
   part_time_support: "兼职支持",
 };
+
+// ========== ZhipinData 辅助函数 ==========
+
+export function getAllStores(data: ZhipinData): Store[] {
+  return data.brands.flatMap(brand => brand.stores);
+}
+
+export function getBrandById(data: ZhipinData, brandId: string): Brand | undefined {
+  return data.brands.find(b => b.id === brandId);
+}
+
+export function findBrandByNameOrAlias(data: ZhipinData, name: string): Brand | undefined {
+  const lower = name.trim().toLowerCase();
+  const normalized = lower.replace(/[\s._-]+/g, "");
+  if (!lower) return undefined;
+
+  return data.brands.find(
+    b => {
+      const candidates = [b.name, ...(b.aliases ?? [])];
+      return candidates.some(candidate => {
+        const candidateLower = candidate.trim().toLowerCase();
+        return (
+          candidateLower === lower ||
+          candidateLower.replace(/[\s._-]+/g, "") === normalized
+        );
+      });
+    }
+  );
+}
+
+export function getDefaultBrand(data: ZhipinData): Brand | undefined {
+  if (data.meta?.defaultBrandId) {
+    return getBrandById(data, data.meta.defaultBrandId);
+  }
+  return data.brands[0];
+}
+
+export function getStoresByBrandId(data: ZhipinData, brandId: string): Store[] {
+  const brand = getBrandById(data, brandId);
+  return brand?.stores ?? [];
+}
+
+export function getPrimaryCity(data: ZhipinData): string {
+  const allStores = getAllStores(data);
+  const cityCount = new Map<string, number>();
+  for (const store of allStores) {
+    if (store.city) {
+      cityCount.set(store.city, (cityCount.get(store.city) ?? 0) + 1);
+    }
+  }
+  let maxCity = "";
+  let maxCount = 0;
+  for (const [city, count] of cityCount) {
+    if (count > maxCount) {
+      maxCity = city;
+      maxCount = count;
+    }
+  }
+  return maxCity || "未知城市";
+}

@@ -3,11 +3,9 @@ import {
   Store,
   Position,
   ZhipinData,
-  BrandConfig,
+  Brand,
   SalaryDetails,
   Benefits,
-  AttendancePolicy,
-  SchedulingFlexibility,
   TimeSlotAvailability,
   AttendanceRequirement,
   HiringRequirements,
@@ -26,16 +24,12 @@ export async function convertDulidayListToZhipinData(
   const brandName = (await getBrandNameByOrgId(organizationId)) || "未知品牌";
 
   // 遍历所有岗位数据，聚合成门店（每条数据只 normalize 一次）
-  let firstCity = "上海市";
-  dulidayResponse.data.result.forEach((item, index) => {
+  dulidayResponse.data.result.forEach((item) => {
     const normalized = normalizePosition(item);
-    if (index === 0) {
-      firstCity = normalized.cityName[0] || "上海市";
-    }
     const storeKey = `store_${normalized.storeId}`;
 
     if (!stores.has(storeKey)) {
-      stores.set(storeKey, convertToStore(normalized, brandName));
+      stores.set(storeKey, convertToStore(normalized, String(organizationId)));
     }
 
     const position = convertToPosition(normalized);
@@ -45,49 +39,23 @@ export async function convertDulidayListToZhipinData(
     }
   });
 
-  // 构建品牌配置（使用默认模板）
-  const brandConfig: BrandConfig = {
-    templates: {
-      initial_inquiry: [`你好，${brandName}在上海各区有兼职，排班{hours}小时，时薪{salary}元。`],
-      location_inquiry: [
-        `离你比较近在{location}的${brandName}门店有空缺，排班{schedule}，时薪{salary}元，有兴趣吗？`,
-      ],
-      no_location_match: [`你附近暂时没岗位，{alternative_location}的门店考虑吗？{transport_info}`],
-      interview_request: [`可以帮你和店长约面试，加我微信吧，需要几个简单的个人信息。`],
-      salary_inquiry: [`基本薪资是{salary}元/小时，{level_salary}。`],
-      schedule_inquiry: [`排班比较灵活，一般是2-4小时，具体可以和店长商量。`],
-      general_chat: [`好的，有什么其他问题可以问我。`],
-      age_concern: [`你的年龄没问题的。`],
-      insurance_inquiry: [`有商业保险。`],
-      followup_chat: [`这家门店不合适也没关系，以后还有其他店空缺的，到时候可以再报名。`],
-      attendance_inquiry: [`出勤要求是{attendance_description}，{minimum_days}天起，比较灵活的。`],
-      flexibility_inquiry: [
-        `排班{schedule_type}，{can_swap_shifts}换班，{part_time_allowed}兼职。`,
-      ],
-      attendance_policy_inquiry: [
-        `考勤要求：{punctuality_required}准时到岗，最多可以迟到{late_tolerance_minutes}分钟。`,
-      ],
-      work_hours_inquiry: [
-        `每周工作{min_hours_per_week}-{max_hours_per_week}小时，可以根据你的时间来安排。`,
-      ],
-      availability_inquiry: [
-        `{time_slot}班次还有{available_spots}个位置，{priority}优先级，可以报名。`,
-      ],
-      part_time_support: [`完全支持兼职，{part_time_allowed}，时间可以和其他工作错开安排。`],
-    },
-  };
-
   // 获取门店列表
   // Note: 地理编码在 API route 中进行，此处只做数据转换
   const storeList = Array.from(stores.values());
 
-  return {
-    city: firstCity,
+  const brand: Brand = {
+    id: String(organizationId),
+    name: brandName,
     stores: storeList,
-    brands: {
-      [brandName]: brandConfig,
+  };
+
+  return {
+    meta: {
+      defaultBrandId: brand.id,
+      syncedAt: new Date().toISOString(),
+      source: "duliday",
     },
-    defaultBrand: brandName,
+    brands: [brand],
   };
 }
 
@@ -108,8 +76,8 @@ type NormalizedDulidayPosition = {
   projectId?: number;
   projectName?: string;
   cityName: string[];
-  salary: number;
-  salaryUnitStr: string;
+  salary: number | null;
+  salaryUnitStr: string | null;
   workTimeArrangement: DulidayRaw.WorkTimeArrangement;
   welfare: DulidayRaw.Welfare;
   cooperationMode: number;
@@ -132,6 +100,18 @@ type NormalizedDulidayPosition = {
     education?: string | null;
     healthCertificate?: string | null;
   } | null;
+  // hiringRequirement.figure → 社会身份（"不限"/"社会人士"/"全日制在校生"等）
+  figure?: string | null;
+  // basicInfo.laborForm → 用工形式（"小时工"/"全职"等）
+  laborForm?: string | null;
+  // workTime.employmentForm 原始字符串（"长期用工"/"短期用工"等）
+  employmentFormStr?: string | null;
+  jobCategory?: string | null;
+  trainingRequired?: string | null;
+  probationRequired?: string | null;
+  languages?: string | null;
+  certificatesRaw?: string | null;
+  recruitmentRemark?: string | null;
   salaryScenarioList?: Array<{
     salaryType?: string;          // "正式"/"培训期" (新) 或 "0"/"1" (旧)
     salaryPeriod?: string;        // "月结算"/"日结算" (新) 或 "1"/"3" (旧)
@@ -246,6 +226,44 @@ function parseTimeStringToSeconds(timeStr: unknown): number {
   return Number(match[1]) * 3600 + Number(match[2]) * 60;
 }
 
+function normalizeNullableString(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return null;
+}
+
+function normalizeNullableNumber(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function joinArrayValues(value: unknown): string | null {
+  if (!Array.isArray(value)) {
+    return normalizeNullableString(value);
+  }
+
+  const normalized = value
+    .map(item => normalizeNullableString(item))
+    .filter((item): item is string => item !== null);
+
+  return normalized.length > 0 ? normalized.join("、") : null;
+}
+
 /**
  * 将新 API 嵌套 workTime 结构归一化为旧扁平 WorkTimeArrangement 类型
  */
@@ -308,9 +326,6 @@ function normalizeNewWorkTime(nwt: DulidayRaw.NewWorkTime): DulidayRaw.WorkTimeA
     };
   }) ?? null;
 
-  const toNum = (v: unknown): number | null =>
-    typeof v === "number" ? v : typeof v === "string" ? (Number(v) || null) : null;
-
   return {
     id: 0,
     jobBasicInfoId: 0,
@@ -321,11 +336,11 @@ function normalizeNewWorkTime(nwt: DulidayRaw.NewWorkTime): DulidayRaw.WorkTimeA
     employmentDescription: nwt.employmentDescription ?? null,
     monthWorkTimeRequirement,
     perMonthMinWorkTime: month?.perMonthMinWorkTime ?? null,
-    perMonthMinWorkTimeUnit: null,
+    perMonthMinWorkTimeUnit: normalizeNullableNumber(month?.perMonthMinWorkTimeUnit),
     perMonthMaxRestTime: month?.perMonthMaxRestTime ?? null,
     perMonthMaxRestTimeUnit: month?.perMonthMaxRestTimeUnit ?? null,
     weekWorkTimeRequirement,
-    perWeekNeedWorkDays: week?.perWeekNeedWorkDays != null ? Number(week.perWeekNeedWorkDays) : null,
+    perWeekNeedWorkDays: normalizeNullableNumber(week?.perWeekNeedWorkDays),
     perWeekWorkDays: week?.perWeekWorkDays ?? null,
     perWeekRestDays: week?.perWeekRestDays ?? null,
     evenOddType: null,
@@ -335,10 +350,10 @@ function normalizeNewWorkTime(nwt: DulidayRaw.NewWorkTime): DulidayRaw.WorkTimeA
     arrangementType,
     fixedArrangementTimes,
     combinedArrangementTimes,
-    goToWorkStartTime: toNum(fixedTime?.goToWorkStartTime),
-    goToWorkEndTime: toNum(fixedTime?.goToWorkEndTime),
-    goOffWorkStartTime: toNum(fixedTime?.goOffWorkStartTime),
-    goOffWorkEndTime: toNum(fixedTime?.goOffWorkEndTime),
+    goToWorkStartTime: normalizeNullableNumber(fixedTime?.goToWorkStartTime),
+    goToWorkEndTime: normalizeNullableNumber(fixedTime?.goToWorkEndTime),
+    goOffWorkStartTime: normalizeNullableNumber(fixedTime?.goOffWorkStartTime),
+    goOffWorkEndTime: normalizeNullableNumber(fixedTime?.goOffWorkEndTime),
     maxWorkTakingTime: nwt.maxWorkTakingTime ?? 0,
     restTimeDesc: nwt.restTimeDesc ?? null,
     workTimeRemark: nwt.workTimeRemark ?? null,
@@ -376,7 +391,12 @@ function normalizePosition(dulidayData: DulidayRaw.Position | undefined): Normal
     basicInfo?: Partial<NormalizedDulidayPosition> & {
       jobId?: number;
       createTime?: string;
+      jobNickName?: string | null;
+      jobCategory?: string | null;
       jobContent?: string;
+      laborForm?: string | number | null;
+      trainingRequired?: string | number | null;
+      probationRequired?: string | number | null;
       storeInfo?: {
         storeId?: number;
         storeName?: string;
@@ -409,8 +429,18 @@ function normalizePosition(dulidayData: DulidayRaw.Position | undefined): Normal
         education?: string | null;
         healthCertificate?: string | null;
       };
+      figure?: string | number | null;
+      socialIdentity?: string | number | null;
+      languages?: Array<string | number> | string | null;
+      languageRemark?: string | null;
+      certificates?: Array<string | number> | string | null;
+      certificatesRaw?: string | null;
+      remark?: string | null;
+      recruitmentRemark?: string | null;
     };
-    workTime?: unknown;
+    workTime?: {
+      employmentForm?: string | number | null;
+    } & Record<string, unknown>;
   };
 
   const basic = newFormat.basicInfo;
@@ -478,13 +508,15 @@ function normalizePosition(dulidayData: DulidayRaw.Position | undefined): Normal
     cityName:
       (dulidayData as { cityName?: string[] }).cityName ??
       basic?.cityName ??
-      (storeInfo?.storeCityName ? [storeInfo.storeCityName] : ["上海市"]),
+      (storeInfo?.storeCityName ? [storeInfo.storeCityName] : []),
     salary: (dulidayData as { salary?: number }).salary ?? salary?.salary
       ?? salary?.salaryScenarioList?.find(s => s.salaryType === "正式" || s.salaryType === "0")?.basicSalary?.basicSalary
-      ?? salary?.salaryScenarioList?.[0]?.basicSalary?.basicSalary ?? 0,
+      ?? salary?.salaryScenarioList?.[0]?.basicSalary?.basicSalary
+      ?? null,
     salaryUnitStr: (dulidayData as { salaryUnitStr?: string }).salaryUnitStr ?? salary?.salaryUnitStr
       ?? salary?.salaryScenarioList?.find(s => s.salaryType === "正式" || s.salaryType === "0")?.basicSalary?.basicSalaryUnit
-      ?? salary?.salaryScenarioList?.[0]?.basicSalary?.basicSalaryUnit ?? "元/小时",
+      ?? salary?.salaryScenarioList?.[0]?.basicSalary?.basicSalaryUnit
+      ?? null,
     workTimeArrangement: resolveWorkTime(
       (dulidayData as { workTimeArrangement?: unknown }).workTimeArrangement,
       newFormat.workTime
@@ -516,6 +548,17 @@ function normalizePosition(dulidayData: DulidayRaw.Position | undefined): Normal
     // 新 API 扩展字段
     basicPersonalRequirements: hiring?.basicPersonalRequirements ?? null,
     certificate: hiring?.certificate ?? null,
+    figure: normalizeNullableString(hiring?.socialIdentity ?? hiring?.figure),
+    laborForm: normalizeNullableString(basic?.laborForm),
+    employmentFormStr: normalizeNullableString(newFormat.workTime?.employmentForm),
+    jobCategory: normalizeNullableString(basic?.jobCategory ?? basic?.jobNickName),
+    trainingRequired: normalizeNullableString(basic?.trainingRequired),
+    probationRequired: normalizeNullableString(basic?.probationRequired),
+    languages: normalizeNullableString(hiring?.languageRemark) ?? joinArrayValues(hiring?.languages),
+    certificatesRaw:
+      normalizeNullableString(hiring?.certificatesRaw) ?? joinArrayValues(hiring?.certificates),
+    recruitmentRemark:
+      normalizeNullableString(hiring?.recruitmentRemark) ?? normalizeNullableString(hiring?.remark),
     salaryScenarioList: salary?.salaryScenarioList ?? null,
     jobContent: basic?.jobContent ?? (dulidayData as { jobContent?: string }).jobContent ?? null,
   };
@@ -524,11 +567,12 @@ function normalizePosition(dulidayData: DulidayRaw.Position | undefined): Normal
 /**
  * 转换为门店数据
  */
-function convertToStore(normalized: NormalizedDulidayPosition, brandName: string): Store {
+function convertToStore(normalized: NormalizedDulidayPosition, brandId: string): Store {
   return {
     id: `store_${normalized.storeId}`,
+    brandId,
     name: normalized.storeName,
-    city: normalized.cityName[0], // 门店所在城市（从 API cityName 获取）
+    city: normalized.cityName[0],
     location: normalized.storeAddress,
     district: extractDistrict(normalized.storeAddress, normalized.storeRegionName),
     subarea: extractSubarea(normalized.storeName),
@@ -536,8 +580,7 @@ function convertToStore(normalized: NormalizedDulidayPosition, brandName: string
       typeof normalized.latitude === "number" && typeof normalized.longitude === "number"
         ? { lat: normalized.latitude, lng: normalized.longitude }
         : { lat: 0, lng: 0 },
-    brand: brandName,
-    positions: [], // 将在后续添加
+    positions: [],
   };
 }
 
@@ -562,36 +605,41 @@ function convertToPosition(normalized: NormalizedDulidayPosition): Position {
   return {
     id: `pos_${normalized.jobId}`,
     name: extractPositionType(normalized.jobName),
+    sourceJobName: normalized.jobName,
     brandId: normalizedBrandId !== undefined ? String(normalizedBrandId) : undefined,
     brandName: normalizedBrandName,
     projectId: normalizedProjectId !== undefined ? String(normalizedProjectId) : undefined,
     projectName: normalizedProjectName,
+    jobCategory: normalized.jobCategory ?? null,
+    laborForm: normalized.laborForm ?? null,
+    employmentForm: normalized.employmentFormStr ?? null,
     timeSlots,
     salary: {
-      ...parseSalaryDetails(normalized.salary, normalized.welfare),
+      ...parseSalaryDetails(normalized.salary, normalized.welfare, normalized.salaryUnitStr),
       scenarioSummary: buildScenarioSummary(normalized.salaryScenarioList),
       settlementCycle: extractSettlementCycle(normalized.salaryScenarioList),
     },
-    workHours: String(workTimeArrangement.perDayMinWorkHours ?? 8),
+    workHours: workTimeArrangement.perDayMinWorkHours != null
+      ? String(workTimeArrangement.perDayMinWorkHours)
+      : null,
     benefits: parseBenefits(normalized.welfare),
-    requirements: generateRequirements(normalized),
-    urgent: normalized.requirementNum > 3,
-    scheduleType: normalized.cooperationMode === 2 ? "flexible" : "fixed",
-    attendancePolicy: generateAttendancePolicy(normalized.cooperationMode),
     availableSlots: generateAvailableSlots(normalized),
-    schedulingFlexibility: generateSchedulingFlexibility(normalized),
     minHoursPerWeek: calculateMinHoursPerWeek(workTimeArrangement),
     maxHoursPerWeek: calculateMaxHoursPerWeek(workTimeArrangement),
     attendanceRequirement: generateAttendanceRequirement(workTimeArrangement),
     hiringRequirements: extractHiringRequirements(normalized),
-    description: normalized.jobContent || undefined,
+    description: normalized.jobContent ?? null,
+    trainingRequired: normalized.trainingRequired ?? null,
+    probationRequired: normalized.probationRequired ?? null,
+    perMonthMinWorkTime: workTimeArrangement.perMonthMinWorkTime ?? null,
+    perMonthMinWorkTimeUnit: workTimeArrangement.perMonthMinWorkTimeUnit ?? null,
   };
 }
 
 /**
  * 从地址中提取区域
  */
-function extractDistrict(storeAddress: string, storeRegionName?: string): string {
+function extractDistrict(storeAddress: string, storeRegionName?: string): string | null {
   // 优先使用 API 直接提供的区域名称
   if (storeRegionName) {
     return storeRegionName;
@@ -599,7 +647,7 @@ function extractDistrict(storeAddress: string, storeRegionName?: string): string
 
   // 降级：解析 storeAddress（如 "上海-浦东新区-张江" → "浦东新区"）
   const parts = storeAddress.split("-");
-  return parts[1] || "未知区域";
+  return parts[1] || null;
 }
 
 /**
@@ -617,7 +665,7 @@ function extractSubarea(storeName: string): string {
 function extractPositionType(jobName: string): string {
   const parts = jobName.split("-");
   // 倒数第二个部分通常是岗位类型
-  return parts[parts.length - 2] || "服务员";
+  return parts[parts.length - 2] || jobName;
 }
 
 /**
@@ -651,144 +699,42 @@ function convertFixedTimeSlots(fixedArrangementTimes: DulidayRaw.FixedTimeSlot[]
 /**
  * 解析薪资详情
  */
-function parseSalaryDetails(baseSalary: number, welfare: DulidayRaw.Welfare): SalaryDetails {
-  const memo = welfare.memo || "";
+function parseSalaryDetails(
+  baseSalary: number | null,
+  welfare: DulidayRaw.Welfare,
+  salaryUnitStr: string | null
+): SalaryDetails {
+  const memo = welfare.memo ?? null;
 
   // 提取薪资范围，如 "5250元-5750元"
-  const rangeMatch = memo.match(/(\d+元?-\d+元?)/);
+  const rangeMatch = memo?.match(/(\d+元?-\d+元?)/);
   const range = rangeMatch ? rangeMatch[1] : undefined;
 
   // 提取奖金信息，如 "季度奖金1000～1500"
-  const bonusMatch = memo.match(/(奖金[\d～\-~元]+)/);
+  const bonusMatch = memo?.match(/(奖金[\d～\-~元]+)/);
   const bonus = bonusMatch ? bonusMatch[1] : undefined;
 
   return {
     base: baseSalary,
     range,
     bonus,
-    memo: memo,
+    memo,
+    unit: salaryUnitStr,
   };
 }
 
 /**
- * 解析福利信息
+ * 解析福利信息（透传接口原值，不捏造）
  */
 function parseBenefits(welfare: DulidayRaw.Welfare): Benefits {
-  const benefitItems: string[] = [];
-
-  // 基础福利检测
-  if (welfare.haveInsurance > 0) {
-    benefitItems.push("五险一金");
-  }
-
-  // 住宿福利
-  if (welfare.accommodation > 0) {
-    benefitItems.push("住宿");
-  }
-
-  // 餐饮福利
-  if (welfare.catering > 0) {
-    benefitItems.push("餐饮");
-  }
-
-  // 从 moreWelfares 数组中提取福利项目
-  if (welfare.moreWelfares && Array.isArray(welfare.moreWelfares)) {
-    welfare.moreWelfares.forEach(item => {
-      const content = item.content;
-      const benefitKeywords = ["保险", "年假", "补贴", "福利", "股票", "学历提升"];
-      benefitKeywords.forEach(keyword => {
-        if (
-          content.includes(keyword) &&
-          !benefitItems.some(existingItem => existingItem.includes(keyword))
-        ) {
-          // 提取关键信息
-          const match = content.match(new RegExp(`\\d*[天个月年]*${keyword}[^，。]*`));
-          benefitItems.push(match ? match[0] : keyword);
-        }
-      });
-    });
-  }
-
-  // 从memo中智能提取其他福利（作为补充）
-  if (welfare.memo) {
-    const benefitKeywords = ["年假", "补贴", "商保", "股票", "学历提升"];
-    benefitKeywords.forEach(keyword => {
-      if (welfare.memo?.includes(keyword) && !benefitItems.some(item => item.includes(keyword))) {
-        benefitItems.push(keyword);
-      }
-    });
-  }
-
-  // 如果没有找到任何福利，添加默认项
-  if (benefitItems.length === 0) {
-    benefitItems.push("按国家规定");
-  }
-
   return {
-    items: benefitItems,
-    promotion: welfare.promotionWelfare || undefined,
+    insurance: welfare.haveInsurance > 0 ? "有社保" : null,
+    accommodation: welfare.accommodation > 0 ? "提供住宿" : null,
+    catering: welfare.catering > 0 ? "提供餐饮" : null,
+    moreWelfares: welfare.moreWelfares?.map(item => item.content) ?? null,
+    memo: welfare.memo ?? null,
+    promotion: welfare.promotionWelfare ?? null,
   };
-}
-
-/**
- * 生成默认岗位要求
- */
-function generateDefaultRequirements(jobName: string): string[] {
-  const base = ["工作认真负责", "团队合作精神"];
-
-  if (jobName.includes("服务员")) {
-    return [...base, "有服务行业经验优先", "沟通能力强"];
-  }
-  if (jobName.includes("经理")) {
-    return [...base, "有管理经验", "责任心强"];
-  }
-
-  return [...base, "有相关工作经验者优先"];
-}
-
-/**
- * 从新 API 的结构化数据生成招聘要求（优先使用真实数据，回退到旧默认逻辑）
- */
-function generateRequirements(normalized: NormalizedDulidayPosition): string[] {
-  const reqs: string[] = [];
-  const bpr = normalized.basicPersonalRequirements;
-  const cert = normalized.certificate;
-
-  if (bpr?.minAge != null || bpr?.maxAge != null) {
-    const min = bpr?.minAge ?? "不限";
-    const max = bpr?.maxAge ?? "不限";
-    reqs.push(`年龄${min}-${max}岁`);
-  }
-  // 性别要求（兼容旧数字格式 "0"/"1"/"2" 和新中文格式 "男性"/"女性"/"男性,女性"）
-  if (bpr?.genderRequirement && bpr.genderRequirement !== "0") {
-    const noRestriction = /男性.*女性|女性.*男性|不限/.test(bpr.genderRequirement);
-    if (!noRestriction) {
-      const genderMap: Record<string, string> = { "1": "限男性", "2": "限女性", "男性": "限男性", "女性": "限女性" };
-      reqs.push(genderMap[bpr.genderRequirement] ?? `性别要求:${bpr.genderRequirement}`);
-    }
-  }
-  // 学历要求（兼容旧数字格式和新中文格式）
-  if (cert?.education && cert.education !== "1" && cert.education !== "不限") {
-    const eduMap: Record<string, string> = {
-      "2": "本科及以上", "3": "专科及以上", "4": "高中及以上", "5": "初中及以上",
-      "本科": "本科及以上", "专科": "专科及以上", "高中": "高中及以上", "初中": "初中及以上",
-    };
-    reqs.push(eduMap[cert.education] ?? `学历${cert.education}`);
-  }
-  // 健康证要求（兼容旧数字格式和新中文格式）
-  if (cert?.healthCertificate) {
-    const hcMap: Record<string, string> = {
-      "1": "需食品健康证", "2": "需零售健康证",
-      "食品健康证": "需食品健康证", "零售健康证": "需零售健康证",
-    };
-    reqs.push(hcMap[cert.healthCertificate] ?? "需健康证");
-  }
-
-  // 真实数据不足时回退到旧默认逻辑
-  if (reqs.length === 0) {
-    return generateDefaultRequirements(normalized.jobName);
-  }
-  return reqs;
 }
 
 /**
@@ -797,7 +743,16 @@ function generateRequirements(normalized: NormalizedDulidayPosition): string[] {
 function extractHiringRequirements(normalized: NormalizedDulidayPosition): HiringRequirements | undefined {
   const bpr = normalized.basicPersonalRequirements;
   const cert = normalized.certificate;
-  if (!bpr && !cert) return undefined;
+  if (
+    !bpr &&
+    !cert &&
+    !normalized.figure &&
+    !normalized.languages &&
+    !normalized.certificatesRaw &&
+    !normalized.recruitmentRemark
+  ) {
+    return undefined;
+  }
 
   return {
     minAge: bpr?.minAge ?? null,
@@ -805,6 +760,10 @@ function extractHiringRequirements(normalized: NormalizedDulidayPosition): Hirin
     genderRequirement: bpr?.genderRequirement ?? null,
     education: cert?.education ?? null,
     healthCertificate: cert?.healthCertificate ?? null,
+    languages: normalized.languages ?? null,
+    certificatesRaw: normalized.certificatesRaw ?? null,
+    recruitmentRemark: normalized.recruitmentRemark ?? null,
+    socialIdentity: normalized.figure ?? null,
   };
 }
 
@@ -873,20 +832,6 @@ function extractSettlementCycle(
 }
 
 /**
- * 生成考勤政策
- */
-function generateAttendancePolicy(cooperationMode: number): AttendancePolicy {
-  const isFullTime = cooperationMode === 3;
-
-  return {
-    punctualityRequired: isFullTime,
-    lateToleranceMinutes: isFullTime ? 5 : 15,
-    attendanceTracking: isFullTime ? "strict" : "flexible",
-    makeupShiftsAllowed: !isFullTime,
-  };
-}
-
-/**
  * 生成可用时段
  */
 function generateAvailableSlots(dulidayData: NormalizedDulidayPosition): TimeSlotAvailability[] {
@@ -916,37 +861,11 @@ function generateAvailableSlots(dulidayData: NormalizedDulidayPosition): TimeSlo
 }
 
 /**
- * 生成排班灵活性
- */
-function generateSchedulingFlexibility(dulidayData: NormalizedDulidayPosition): SchedulingFlexibility {
-  const isFlexible = dulidayData.cooperationMode === 2;
-  const arrangementType = dulidayData.workTimeArrangement.arrangementType ?? 0;
-
-  return {
-    canSwapShifts: arrangementType === 3 || isFlexible,
-    advanceNoticeHours: (dulidayData.workTimeArrangement.maxWorkTakingTime ?? 0) / 60,
-    partTimeAllowed: isFlexible,
-    weekendRequired: hasWeekendInSchedule(dulidayData.workTimeArrangement),
-    holidayRequired: false, // 默认值
-  };
-}
-
-/**
- * 检查是否包含周末班
- */
-function hasWeekendInSchedule(workTimeArrangement: DulidayRaw.WorkTimeArrangement): boolean {
-  if (!workTimeArrangement.combinedArrangementTimes) return false;
-
-  return workTimeArrangement.combinedArrangementTimes.some(
-    slot => slot.weekdays.includes(0) || slot.weekdays.includes(6)
-  );
-}
-
-/**
  * 计算每周最少工时
  */
-function calculateMinHoursPerWeek(workTimeArrangement: DulidayRaw.WorkTimeArrangement): number {
-  const dailyHours = workTimeArrangement.perDayMinWorkHours ?? 8;
+function calculateMinHoursPerWeek(workTimeArrangement: DulidayRaw.WorkTimeArrangement): number | null {
+  if (workTimeArrangement.perDayMinWorkHours == null) return null;
+  const dailyHours = workTimeArrangement.perDayMinWorkHours;
 
   // 获取工作天数（三层备用逻辑）
   let workDays: number | null = null;
@@ -979,9 +898,9 @@ function calculateMinHoursPerWeek(workTimeArrangement: DulidayRaw.WorkTimeArrang
     workDays = workTimeArrangement.perWeekNeedWorkDays;
   }
 
-  // 最终默认值
+  // 无法确定工作天数时返回 null
   if (workDays === null) {
-    workDays = 5;
+    return null;
   }
 
   return dailyHours * workDays;
@@ -990,9 +909,9 @@ function calculateMinHoursPerWeek(workTimeArrangement: DulidayRaw.WorkTimeArrang
 /**
  * 计算每周最多工时
  */
-function calculateMaxHoursPerWeek(workTimeArrangement: DulidayRaw.WorkTimeArrangement): number {
-  const dailyHours = workTimeArrangement.perDayMinWorkHours ?? 8;
-  return dailyHours * 7; // 最多每天都工作
+function calculateMaxHoursPerWeek(workTimeArrangement: DulidayRaw.WorkTimeArrangement): number | null {
+  if (workTimeArrangement.perDayMinWorkHours == null) return null;
+  return workTimeArrangement.perDayMinWorkHours * 7;
 }
 
 /**
@@ -1056,15 +975,10 @@ function generateAttendanceRequirement(
     minimumDays = workTimeArrangement.perWeekNeedWorkDays;
   }
 
-  // 最终默认值
-  if (minimumDays === null) {
-    minimumDays = 5;
-  }
-
   return {
     minimumDays,
     requiredDays: convertWeekdays(requiredDays),
-    description: workTimeArrangement.workTimeRemark || "",
+    description: workTimeArrangement.workTimeRemark ?? null,
   };
 }
 

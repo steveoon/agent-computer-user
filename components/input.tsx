@@ -157,14 +157,20 @@ export const Input = ({
     }
   }, [status]);
 
-  // Reset stop cooldown when streaming ends
-  useEffect(() => {
+  // Reset stop cooldown when streaming ends (sync during render via state-based tracking)
+  const [prevStatus, setPrevStatus] = useState(status);
+  if (prevStatus !== status) {
+    setPrevStatus(status);
     if (status !== "streaming" && status !== "submitted") {
       setIsStopping(false);
-      if (stopCooldownRef.current !== null) {
-        window.clearTimeout(stopCooldownRef.current);
-        stopCooldownRef.current = null;
-      }
+    }
+  }
+
+  // Clean up the timeout ref in an effect (refs can be accessed in effects)
+  useEffect(() => {
+    if (status !== "streaming" && status !== "submitted" && stopCooldownRef.current !== null) {
+      window.clearTimeout(stopCooldownRef.current);
+      stopCooldownRef.current = null;
     }
   }, [status]);
 

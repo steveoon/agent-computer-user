@@ -1,9 +1,10 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { createContext, useContext, useState, type ReactNode, useEffect } from "react";
 import { useConfigManager } from "@/hooks/useConfigManager";
 import { saveBrandPreference, loadBrandPreference } from "../utils/brand-storage";
-import type { ZhipinData } from "@/types";
+import type { ZhipinData, Brand } from "@/types";
+import { getAllStores, getDefaultBrand, findBrandByNameOrAlias } from "@/types/zhipin";
 
 // 🔧 品牌上下文类型定义
 interface BrandContextType {
@@ -36,15 +37,17 @@ export function BrandProvider({ children }: BrandProviderProps) {
   useEffect(() => {
     if (!brandData) return;
 
+    const brandNames = brandData.brands.map(b => b.name);
     // 如果当前品牌不存在或为空，设置默认品牌
-    if (!currentBrand || !brandData.brands[currentBrand]) {
-      const defaultBrand = brandData.defaultBrand || Object.keys(brandData.brands)[0] || "";
-      setCurrentBrand(defaultBrand);
+    if (!currentBrand || !brandNames.includes(currentBrand)) {
+      const defaultBrand = getDefaultBrand(brandData);
+      const defaultName = defaultBrand?.name ?? "";
+      setCurrentBrand(defaultName);
 
       console.log("✅ 品牌上下文：配置数据已更新", {
-        brands: Object.keys(brandData.brands),
-        defaultBrand,
-        stores: brandData.stores.length,
+        brands: brandNames,
+        defaultBrand: defaultName,
+        stores: getAllStores(brandData).length,
       });
     }
   }, [brandData, currentBrand]);
@@ -53,12 +56,12 @@ export function BrandProvider({ children }: BrandProviderProps) {
   useEffect(() => {
     if (!isConfigLoaded || !brandData) return;
 
-    const loadSavedBrand = async () => {
+    const loadSavedBrand = async (): Promise<void> => {
       try {
         const savedBrand = await loadBrandPreference();
 
         // 验证保存的品牌是否在可用品牌列表中
-        if (savedBrand && brandData.brands[savedBrand]) {
+        if (savedBrand && findBrandByNameOrAlias(brandData, savedBrand)) {
           setCurrentBrand(savedBrand);
           console.log("✅ 品牌上下文：已恢复保存的品牌选择:", savedBrand);
         }
@@ -73,12 +76,12 @@ export function BrandProvider({ children }: BrandProviderProps) {
   }, [isConfigLoaded, brandData]);
 
   // 📋 获取可用品牌列表（仅来自已导入的配置数据）
-  const availableBrands = brandData ? Object.keys(brandData.brands).sort() : [];
+  const availableBrands = brandData ? brandData.brands.map(b => b.name).sort() : [];
 
   // 💾 品牌切换时保存到本地存储
-  const handleSetCurrentBrand = async (brand: string) => {
+  const handleSetCurrentBrand = async (brand: string): Promise<void> => {
     // 验证品牌是否存在
-    if (!brandData || !brandData.brands[brand]) {
+    if (!brandData || !findBrandByNameOrAlias(brandData, brand)) {
       console.warn("品牌上下文：尝试设置不存在的品牌:", brand);
       return;
     }
@@ -114,7 +117,11 @@ export function useBrand() {
 }
 
 // 🔧 Hook：获取当前品牌的数据
-export function useCurrentBrandData() {
+export function useCurrentBrandData(): {
+  brandName: string;
+  brandData: Brand | null;
+  storesForBrand: Brand["stores"];
+} {
   const { currentBrand, brandData } = useBrand();
 
   if (!brandData) {
@@ -125,16 +132,16 @@ export function useCurrentBrandData() {
     };
   }
 
+  const brand = findBrandByNameOrAlias(brandData, currentBrand);
   return {
     brandName: currentBrand,
-    brandData: brandData.brands[currentBrand] || null,
-    storesForBrand: brandData.stores.filter(store => store.brand === currentBrand),
+    brandData: brand ?? null,
+    storesForBrand: brand?.stores ?? [],
   };
 }
 
 // 🎯 动态导出可用品牌列表（向后兼容）
 export function getAvailableBrands(): string[] {
-  // 这个函数现在只是一个占位符，实际的品牌列表通过 useBrand Hook 获取
   console.warn("getAvailableBrands 已废弃，请使用 useBrand Hook 的 availableBrands 属性");
   return [];
 }

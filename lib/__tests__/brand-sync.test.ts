@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mergeAndSaveSyncData } from "../stores/sync-store";
 import { configService } from "../services/config.service";
-import type { ZhipinData, Store } from "@/types";
+import type { ZhipinData, Store, Brand } from "@/types";
+import { getAllStores } from "@/types/zhipin";
 import type { SyncResult } from "../services/duliday-sync.service";
 
 // Mock 品牌映射数据（用于测试）
@@ -43,50 +44,44 @@ describe("品牌同步和导入功能测试", () => {
   });
 
   describe("自动同步场景", () => {
-    it("应该只同步 ORGANIZATION_MAPPING 中的品牌，保留非映射品牌的数据和话术", async () => {
+    it("应该只同步 ORGANIZATION_MAPPING 中的品牌，保留非映射品牌的数据", async () => {
       // 准备测试数据
       const existingBrandData: ZhipinData = {
-        city: "上海市",
-        defaultBrand: "肯德基",
-        brands: {
+        meta: { defaultBrandId: "kfc" },
+        brands: [
           // 映射品牌（会被更新）
-          肯德基: {
-            templates: {
-              initial_inquiry: ["旧的肯德基话术模板"],
-              location_inquiry: ["旧的位置询问模板"],
-              // ... 其他必要的模板
-            } as any,
+          {
+            id: "kfc",
+            name: "肯德基",
+            stores: [
+              {
+                id: "store_kfc_001",
+                name: "肯德基上海店",
+                brandId: "kfc",
+                location: "上海市浦东新区",
+                district: "浦东新区",
+                subarea: "陆家嘴",
+                coordinates: { lat: 0, lng: 0 },
+                positions: [],
+              },
+            ],
           },
           // 非映射品牌（应该保持不变）
-          测试品牌: {
-            templates: {
-              initial_inquiry: ["测试品牌的自定义话术模板"],
-              location_inquiry: ["测试品牌的位置询问模板"],
-            } as any,
-          },
-        },
-        stores: [
-          // 映射品牌的门店（会被替换）
           {
-            id: "store_kfc_001",
-            name: "肯德基上海店",
-            brand: "肯德基",
-            location: "上海市浦东新区",
-            district: "浦东新区",
-            subarea: "陆家嘴",
-            coordinates: { lat: 0, lng: 0 },
-            positions: [],
-          },
-          // 非映射品牌的门店（应该保持不变）
-          {
-            id: "store_test_001",
-            name: "测试品牌门店",
-            brand: "测试品牌",
-            location: "上海市静安区",
-            district: "静安区",
-            subarea: "南京西路",
-            coordinates: { lat: 0, lng: 0 },
-            positions: [],
+            id: "test_brand",
+            name: "测试品牌",
+            stores: [
+              {
+                id: "store_test_001",
+                name: "测试品牌门店",
+                brandId: "test_brand",
+                location: "上海市静安区",
+                district: "静安区",
+                subarea: "南京西路",
+                coordinates: { lat: 0, lng: 0 },
+                positions: [],
+              },
+            ],
           },
         ],
       };
@@ -118,35 +113,33 @@ describe("品牌同步和导入功能测试", () => {
           errors: [],
           duration: 1000,
           convertedData: {
-            city: "上海市",
-            defaultBrand: "肯德基",
-            brands: {
-              肯德基: {
-                templates: {
-                  initial_inquiry: ["新的肯德基话术模板（应该被保留）"],
-                } as any,
-              },
-            },
-            stores: [
+            meta: { defaultBrandId: "kfc" },
+            brands: [
               {
-                id: "store_kfc_new_001",
-                name: "肯德基浦东新店",
-                brand: "肯德基",
-                location: "上海市浦东新区",
-                district: "浦东新区",
-                subarea: "张江",
-                coordinates: { lat: 0, lng: 0 },
-                positions: [],
-              },
-              {
-                id: "store_kfc_new_002",
-                name: "肯德基徐汇店",
-                brand: "肯德基",
-                location: "上海市徐汇区",
-                district: "徐汇区",
-                subarea: "徐家汇",
-                coordinates: { lat: 0, lng: 0 },
-                positions: [],
+                id: "kfc",
+                name: "肯德基",
+                stores: [
+                  {
+                    id: "store_kfc_new_001",
+                    name: "肯德基浦东新店",
+                    brandId: "kfc",
+                    location: "上海市浦东新区",
+                    district: "浦东新区",
+                    subarea: "张江",
+                    coordinates: { lat: 0, lng: 0 },
+                    positions: [],
+                  },
+                  {
+                    id: "store_kfc_new_002",
+                    name: "肯德基徐汇店",
+                    brandId: "kfc",
+                    location: "上海市徐汇区",
+                    district: "徐汇区",
+                    subarea: "徐家汇",
+                    coordinates: { lat: 0, lng: 0 },
+                    positions: [],
+                  },
+                ],
               },
             ],
           },
@@ -161,24 +154,23 @@ describe("品牌同步和导入功能测试", () => {
       const updatedData = mockUpdateBrandData.mock.calls[0][0] as ZhipinData;
 
       // 验证品牌数据
-      expect(Object.keys(updatedData.brands)).toHaveLength(2); // 应该有2个品牌
-      expect(updatedData.brands["测试品牌"]).toBeDefined(); // 测试品牌应该存在
-      expect(updatedData.brands["肯德基"]).toBeDefined(); // 肯德基应该存在
+      expect(updatedData.brands).toHaveLength(2); // 应该有2个品牌
+      expect(updatedData.brands.find((b: Brand) => b.name === "测试品牌")).toBeDefined();
+      expect(updatedData.brands.find((b: Brand) => b.name === "肯德基")).toBeDefined();
 
       // 验证测试品牌的数据完全保持不变
-      expect(updatedData.brands["测试品牌"]).toEqual(existingBrandData.brands["测试品牌"]);
+      const testBrand = updatedData.brands.find((b: Brand) => b.name === "测试品牌");
+      const existingTestBrand = existingBrandData.brands.find((b: Brand) => b.name === "测试品牌");
+      expect(testBrand).toEqual(existingTestBrand);
 
-      // 验证肯德基保留了原有的话术模板
-      expect(updatedData.brands["肯德基"].templates.initial_inquiry).toEqual([
-        "旧的肯德基话术模板",
-      ]);
       // 验证门店数据
-      const testBrandStores = updatedData.stores.filter((s: Store) => s.brand === "测试品牌");
-      const kfcStores = updatedData.stores.filter((s: Store) => s.brand === "肯德基");
+      const allStores = getAllStores(updatedData);
+      const testBrandStores = allStores.filter((s: Store) => s.brandId === "test_brand");
+      const kfcStores = allStores.filter((s: Store) => s.brandId === "kfc");
 
       // 测试品牌的门店应该保持不变
       expect(testBrandStores).toHaveLength(1);
-      expect(testBrandStores[0]).toEqual(existingBrandData.stores[1]);
+      expect(testBrandStores[0]).toEqual(existingTestBrand!.stores[0]);
 
       // 肯德基的门店应该被完全替换为新的
       expect(kfcStores).toHaveLength(2);
@@ -187,25 +179,23 @@ describe("品牌同步和导入功能测试", () => {
 
     it("应该能添加新的映射品牌而不影响现有品牌", async () => {
       const existingBrandData: ZhipinData = {
-        city: "上海市",
-        defaultBrand: "测试品牌",
-        brands: {
-          测试品牌: {
-            templates: {
-              initial_inquiry: ["测试品牌话术"],
-            } as any,
-          },
-        },
-        stores: [
+        meta: { defaultBrandId: "test_brand" },
+        brands: [
           {
-            id: "store_test_001",
-            name: "测试品牌门店",
-            brand: "测试品牌",
-            location: "上海市",
-            district: "静安区",
-            subarea: "测试",
-            coordinates: { lat: 0, lng: 0 },
-            positions: [],
+            id: "test_brand",
+            name: "测试品牌",
+            stores: [
+              {
+                id: "store_test_001",
+                name: "测试品牌门店",
+                brandId: "test_brand",
+                location: "上海市",
+                district: "静安区",
+                subarea: "测试",
+                coordinates: { lat: 0, lng: 0 },
+                positions: [],
+              },
+            ],
           },
         ],
       };
@@ -236,25 +226,23 @@ describe("品牌同步和导入功能测试", () => {
           errors: [],
           duration: 1000,
           convertedData: {
-            city: "上海市",
-            defaultBrand: "必胜客",
-            brands: {
-              必胜客: {
-                templates: {
-                  initial_inquiry: ["必胜客默认话术"],
-                } as any,
-              },
-            },
-            stores: [
+            meta: { defaultBrandId: "pizzahut" },
+            brands: [
               {
-                id: "store_pizza_001",
-                name: "必胜客徐汇店",
-                brand: "必胜客",
-                location: "上海市徐汇区",
-                district: "徐汇区",
-                subarea: "徐家汇",
-                coordinates: { lat: 0, lng: 0 },
-                positions: [],
+                id: "pizzahut",
+                name: "必胜客",
+                stores: [
+                  {
+                    id: "store_pizza_001",
+                    name: "必胜客徐汇店",
+                    brandId: "pizzahut",
+                    location: "上海市徐汇区",
+                    district: "徐汇区",
+                    subarea: "徐家汇",
+                    coordinates: { lat: 0, lng: 0 },
+                    positions: [],
+                  },
+                ],
               },
             ],
           },
@@ -266,91 +254,64 @@ describe("品牌同步和导入功能测试", () => {
       const updatedData = mockUpdateBrandData.mock.calls[0][0] as ZhipinData;
 
       // 应该有2个品牌
-      expect(Object.keys(updatedData.brands)).toHaveLength(2);
-      expect(updatedData.brands["测试品牌"]).toBeDefined();
-      expect(updatedData.brands["必胜客"]).toBeDefined();
+      expect(updatedData.brands).toHaveLength(2);
+      expect(updatedData.brands.find((b: Brand) => b.name === "测试品牌")).toBeDefined();
+      expect(updatedData.brands.find((b: Brand) => b.name === "必胜客")).toBeDefined();
 
       // 测试品牌保持不变
-      expect(updatedData.brands["测试品牌"]).toEqual(existingBrandData.brands["测试品牌"]);
+      const testBrand = updatedData.brands.find((b: Brand) => b.name === "测试品牌");
+      const existingTestBrand = existingBrandData.brands.find((b: Brand) => b.name === "测试品牌");
+      expect(testBrand).toEqual(existingTestBrand);
 
       // 新品牌被正确添加
-      expect(updatedData.brands["必胜客"].templates.initial_inquiry).toEqual(["必胜客默认话术"]);
+      const pizzaBrand = updatedData.brands.find((b: Brand) => b.name === "必胜客");
+      expect(pizzaBrand).toBeDefined();
 
       // 门店数据正确
-      expect(updatedData.stores).toHaveLength(2);
-      expect(updatedData.stores.find((s: Store) => s.brand === "测试品牌")).toBeDefined();
-      expect(updatedData.stores.find((s: Store) => s.brand === "必胜客")).toBeDefined();
+      const allStores = getAllStores(updatedData);
+      expect(allStores).toHaveLength(2);
+      expect(allStores.find((s: Store) => s.brandId === "test_brand")).toBeDefined();
+      expect(allStores.find((s: Store) => s.brandId === "pizzahut")).toBeDefined();
     });
   });
 
   describe("手动导入场景", () => {
-    it("应该完全覆盖所有数据，包括话术模板", async () => {
+    it("应该完全覆盖所有数据", async () => {
       // 导入的新数据
       const importedData: ZhipinData = {
-        city: "北京市",
-        defaultBrand: "新品牌",
-        brands: {
-          新品牌: {
-            templates: {
-              initial_inquiry: ["新品牌的全新话术模板"],
-              location_inquiry: ["新品牌的位置询问模板"],
-              no_location_match: ["没有匹配位置的模板"],
-              interview_request: ["面试请求模板"],
-              salary_inquiry: ["薪资询问模板"],
-              schedule_inquiry: ["排班询问模板"],
-              general_chat: ["通用聊天模板"],
-              age_concern: ["年龄关注模板"],
-              insurance_inquiry: ["保险询问模板"],
-              followup_chat: ["跟进聊天模板"],
-              attendance_inquiry: ["考勤询问模板"],
-              flexibility_inquiry: ["灵活性询问模板"],
-              attendance_policy_inquiry: ["考勤政策询问模板"],
-              work_hours_inquiry: ["工时询问模板"],
-              availability_inquiry: ["可用性询问模板"],
-              part_time_support: ["兼职支持模板"],
-            },
-          },
-          扩展品牌: {
-            templates: {
-              initial_inquiry: ["扩展品牌话术"],
-              location_inquiry: ["扩展品牌位置询问"],
-              no_location_match: ["没有匹配位置"],
-              interview_request: ["面试请求"],
-              salary_inquiry: ["薪资询问"],
-              schedule_inquiry: ["排班询问"],
-              general_chat: ["通用聊天"],
-              age_concern: ["年龄关注"],
-              insurance_inquiry: ["保险询问"],
-              followup_chat: ["跟进聊天"],
-              attendance_inquiry: ["考勤询问"],
-              flexibility_inquiry: ["灵活性询问"],
-              attendance_policy_inquiry: ["考勤政策询问"],
-              work_hours_inquiry: ["工时询问"],
-              availability_inquiry: ["可用性询问"],
-              part_time_support: ["兼职支持"],
-            },
-          },
-        },
-        stores: [
+        meta: { defaultBrandId: "new_brand" },
+        brands: [
           {
-            id: "store_new_001",
-            name: "新品牌北京店",
-            brand: "新品牌",
-            location: "北京市朝阳区",
-            district: "朝阳区",
-            subarea: "三里屯",
-            coordinates: { lat: 0, lng: 0 },
-            positions: [],
+            id: "new_brand",
+            name: "新品牌",
+            stores: [
+              {
+                id: "store_new_001",
+                name: "新品牌北京店",
+                brandId: "new_brand",
+                location: "北京市朝阳区",
+                district: "朝阳区",
+                subarea: "三里屯",
+                coordinates: { lat: 0, lng: 0 },
+                positions: [],
+              },
+            ],
           },
           {
-            id: "store_ext_001",
-            name: "扩展品牌门店",
-            brand: "扩展品牌",
-            location: "北京市海淀区",
-            district: "海淀区",
-            subarea: "中关村",
-            coordinates: { lat: 0, lng: 0 },
-            positions: [],
+            id: "ext_brand",
+            name: "扩展品牌",
+            stores: [
+              {
+                id: "store_ext_001",
+                name: "扩展品牌门店",
+                brandId: "ext_brand",
+                location: "北京市海淀区",
+                district: "海淀区",
+                subarea: "中关村",
+                coordinates: { lat: 0, lng: 0 },
+                positions: [],
+              },
+            ],
           },
         ],
       };
@@ -363,30 +324,25 @@ describe("品牌同步和导入功能测试", () => {
       // 验证数据被完全覆盖
       const savedData = mockUpdateBrandData.mock.calls[0][0] as ZhipinData;
 
-      // 城市改变了
-      expect(savedData.city).toBe("北京市");
-      expect(savedData.defaultBrand).toBe("新品牌");
+      // 默认品牌 ID
+      expect(savedData.meta.defaultBrandId).toBe("new_brand");
 
       // 品牌完全替换
-      expect(Object.keys(savedData.brands)).toHaveLength(2);
-      expect(Object.keys(savedData.brands)).toEqual(["新品牌", "扩展品牌"]);
+      expect(savedData.brands).toHaveLength(2);
+      expect(savedData.brands.map((b: Brand) => b.name)).toEqual(["新品牌", "扩展品牌"]);
 
       // 旧品牌不存在了
-      expect(savedData.brands["肯德基"]).toBeUndefined();
-      expect(savedData.brands["测试品牌"]).toBeUndefined();
+      expect(savedData.brands.find((b: Brand) => b.name === "肯德基")).toBeUndefined();
+      expect(savedData.brands.find((b: Brand) => b.name === "测试品牌")).toBeUndefined();
 
       // 门店完全替换
-      expect(savedData.stores).toHaveLength(2);
+      const allStores = getAllStores(savedData);
+      expect(allStores).toHaveLength(2);
       expect(
-        savedData.stores.every(
+        allStores.every(
           (s: Store) => s.id.startsWith("store_new_") || s.id.startsWith("store_ext_")
         )
       ).toBe(true);
-
-      // 话术模板是新的
-      expect(savedData.brands["新品牌"].templates.initial_inquiry).toEqual([
-        "新品牌的全新话术模板",
-      ]);
     });
   });
 
@@ -415,16 +371,14 @@ describe("品牌同步和导入功能测试", () => {
   describe("部分成功策略", () => {
     it("应该跳过数据校验失败的岗位，继续同步其他岗位", async () => {
       const existingBrandData: ZhipinData = {
-        city: "上海市",
-        defaultBrand: "肯德基",
-        brands: {
-          肯德基: {
-            templates: {
-              initial_inquiry: ["肯德基话术模板"],
-            } as any,
+        meta: { defaultBrandId: "kfc" },
+        brands: [
+          {
+            id: "kfc",
+            name: "肯德基",
+            stores: [],
           },
-        },
-        stores: [],
+        ],
       };
 
       mockGetConfig.mockResolvedValue({
@@ -455,132 +409,117 @@ describe("品牌同步和导入功能测试", () => {
           ],
           duration: 1500,
           convertedData: {
-            city: "上海市",
-            defaultBrand: "肯德基",
-            brands: {
-              肯德基: {
-                templates: {} as any,
-              },
-            },
-            stores: [
+            meta: { defaultBrandId: "kfc" },
+            brands: [
               {
-                id: "store_kfc_001",
-                name: "肯德基浦东店",
-                brand: "肯德基",
-                location: "上海市浦东新区",
-                district: "浦东新区",
-                subarea: "陆家嘴",
-                coordinates: { lat: 0, lng: 0 },
-                positions: [
+                id: "kfc",
+                name: "肯德基",
+                stores: [
                   {
-                    id: "pos_002",
-                    name: "服务员",
-                    timeSlots: ["09:00~14:00"],
-                    salary: { base: 25, memo: "" },
-                    workHours: "5",
-                    benefits: { items: ["餐饮"] },
-                    requirements: ["工作认真负责"],
-                    urgent: false,
-                    scheduleType: "flexible",
-                    attendancePolicy: {
-                      punctualityRequired: false,
-                      lateToleranceMinutes: 15,
-                      attendanceTracking: "flexible",
-                      makeupShiftsAllowed: true,
-                    },
-                    availableSlots: [
+                    id: "store_kfc_001",
+                    name: "肯德基浦东店",
+                    brandId: "kfc",
+                    location: "上海市浦东新区",
+                    district: "浦东新区",
+                    subarea: "陆家嘴",
+                    coordinates: { lat: 0, lng: 0 },
+                    positions: [
                       {
-                        slot: "09:00~14:00",
-                        maxCapacity: 5,
-                        currentBooked: 2,
-                        isAvailable: true,
-                        priority: "medium",
+                        id: "pos_002",
+                        name: "服务员",
+                        sourceJobName: "服务员",
+                        jobCategory: null,
+                        laborForm: null,
+                        employmentForm: null,
+                        timeSlots: ["09:00~14:00"],
+                        salary: { base: 25, memo: "", unit: null },
+                        workHours: "5",
+                        benefits: { insurance: null, accommodation: null, catering: "餐饮", moreWelfares: null, memo: null, promotion: null },
+                        availableSlots: [
+                          {
+                            slot: "09:00~14:00",
+                            maxCapacity: 5,
+                            currentBooked: 2,
+                            isAvailable: true,
+                            priority: "medium",
+                          },
+                        ],
+                        minHoursPerWeek: null,
+                        maxHoursPerWeek: null,
+                        description: null,
+                        trainingRequired: null,
+                        probationRequired: null,
+                        perMonthMinWorkTime: null,
+                        perMonthMinWorkTimeUnit: null,
                       },
                     ],
-                    schedulingFlexibility: {
-                      canSwapShifts: true,
-                      advanceNoticeHours: 24,
-                      partTimeAllowed: true,
-                      weekendRequired: false,
-                      holidayRequired: false,
-                    },
-                  },
-                ],
-              },
-              {
-                id: "store_kfc_002",
-                name: "肯德基徐汇店",
-                brand: "肯德基",
-                location: "上海市徐汇区",
-                district: "徐汇区",
-                subarea: "徐家汇",
-                coordinates: { lat: 0, lng: 0 },
-                positions: [
-                  {
-                    id: "pos_004",
-                    name: "配送员",
-                    timeSlots: ["14:00~20:00"],
-                    salary: { base: 30, memo: "" },
-                    workHours: "6",
-                    benefits: { items: ["餐饮", "补贴"] },
-                    requirements: ["熟悉路线"],
-                    urgent: true,
-                    scheduleType: "fixed",
-                    attendancePolicy: {
-                      punctualityRequired: true,
-                      lateToleranceMinutes: 5,
-                      attendanceTracking: "strict",
-                      makeupShiftsAllowed: false,
-                    },
-                    availableSlots: [
-                      {
-                        slot: "14:00~20:00",
-                        maxCapacity: 3,
-                        currentBooked: 1,
-                        isAvailable: true,
-                        priority: "high",
-                      },
-                    ],
-                    schedulingFlexibility: {
-                      canSwapShifts: false,
-                      advanceNoticeHours: 48,
-                      partTimeAllowed: false,
-                      weekendRequired: true,
-                      holidayRequired: false,
-                    },
                   },
                   {
-                    id: "pos_005",
-                    name: "清洁员",
-                    timeSlots: ["06:00~10:00"],
-                    salary: { base: 22, memo: "" },
-                    workHours: "4",
-                    benefits: { items: ["餐饮"] },
-                    requirements: ["工作细心"],
-                    urgent: false,
-                    scheduleType: "flexible",
-                    attendancePolicy: {
-                      punctualityRequired: false,
-                      lateToleranceMinutes: 10,
-                      attendanceTracking: "flexible",
-                      makeupShiftsAllowed: true,
-                    },
-                    availableSlots: [
+                    id: "store_kfc_002",
+                    name: "肯德基徐汇店",
+                    brandId: "kfc",
+                    location: "上海市徐汇区",
+                    district: "徐汇区",
+                    subarea: "徐家汇",
+                    coordinates: { lat: 0, lng: 0 },
+                    positions: [
                       {
-                        slot: "06:00~10:00",
-                        maxCapacity: 2,
-                        currentBooked: 0,
-                        isAvailable: true,
-                        priority: "low",
+                        id: "pos_004",
+                        name: "配送员",
+                        sourceJobName: "配送员",
+                        jobCategory: null,
+                        laborForm: null,
+                        employmentForm: null,
+                        timeSlots: ["14:00~20:00"],
+                        salary: { base: 30, memo: "", unit: null },
+                        workHours: "6",
+                        benefits: { insurance: null, accommodation: null, catering: "餐饮", moreWelfares: ["补贴"], memo: null, promotion: null },
+                        availableSlots: [
+                          {
+                            slot: "14:00~20:00",
+                            maxCapacity: 3,
+                            currentBooked: 1,
+                            isAvailable: true,
+                            priority: "high",
+                          },
+                        ],
+                        minHoursPerWeek: null,
+                        maxHoursPerWeek: null,
+                        description: null,
+                        trainingRequired: null,
+                        probationRequired: null,
+                        perMonthMinWorkTime: null,
+                        perMonthMinWorkTimeUnit: null,
+                      },
+                      {
+                        id: "pos_005",
+                        name: "清洁员",
+                        sourceJobName: "清洁员",
+                        jobCategory: null,
+                        laborForm: null,
+                        employmentForm: null,
+                        timeSlots: ["06:00~10:00"],
+                        salary: { base: 22, memo: "", unit: null },
+                        workHours: "4",
+                        benefits: { insurance: null, accommodation: null, catering: "餐饮", moreWelfares: null, memo: null, promotion: null },
+                        availableSlots: [
+                          {
+                            slot: "06:00~10:00",
+                            maxCapacity: 2,
+                            currentBooked: 0,
+                            isAvailable: true,
+                            priority: "low",
+                          },
+                        ],
+                        minHoursPerWeek: null,
+                        maxHoursPerWeek: null,
+                        description: null,
+                        trainingRequired: null,
+                        probationRequired: null,
+                        perMonthMinWorkTime: null,
+                        perMonthMinWorkTimeUnit: null,
                       },
                     ],
-                    schedulingFlexibility: {
-                      canSwapShifts: true,
-                      advanceNoticeHours: 12,
-                      partTimeAllowed: true,
-                      weekendRequired: false,
-                      holidayRequired: false,
-                    },
                   },
                 ],
               },
@@ -594,10 +533,11 @@ describe("品牌同步和导入功能测试", () => {
       const updatedData = mockUpdateBrandData.mock.calls[0][0] as ZhipinData;
 
       // 验证门店数据
-      expect(updatedData.stores).toHaveLength(2);
+      const allStores = getAllStores(updatedData);
+      expect(allStores).toHaveLength(2);
 
       // 验证岗位数据 - 只有3个成功的岗位被同步
-      const allPositions = updatedData.stores.flatMap((s: Store) => s.positions || []);
+      const allPositions = allStores.flatMap((s: Store) => s.positions || []);
       expect(allPositions).toHaveLength(3);
       expect(allPositions.map(p => p.id)).toEqual(["pos_002", "pos_004", "pos_005"]);
 
@@ -643,57 +583,50 @@ describe("品牌同步和导入功能测试", () => {
 
     it("应该在再次同步时，成功同步之前失败的岗位（如果数据已修复）", async () => {
       const existingBrandData: ZhipinData = {
-        city: "上海市",
-        defaultBrand: "肯德基",
-        brands: {
-          肯德基: {
-            templates: {
-              initial_inquiry: ["肯德基话术"],
-            } as any,
-          },
-        },
-        stores: [
+        meta: { defaultBrandId: "kfc" },
+        brands: [
           {
-            id: "store_kfc_001",
-            name: "肯德基浦东店",
-            brand: "肯德基",
-            location: "上海市浦东新区",
-            district: "浦东新区",
-            subarea: "陆家嘴",
-            coordinates: { lat: 0, lng: 0 },
-            positions: [
+            id: "kfc",
+            name: "肯德基",
+            stores: [
               {
-                id: "pos_002",
-                name: "服务员",
-                timeSlots: ["09:00~14:00"],
-                salary: { base: 25, memo: "" },
-                workHours: "5",
-                benefits: { items: ["餐饮"] },
-                requirements: ["工作认真负责"],
-                urgent: false,
-                scheduleType: "flexible",
-                attendancePolicy: {
-                  punctualityRequired: false,
-                  lateToleranceMinutes: 15,
-                  attendanceTracking: "flexible",
-                  makeupShiftsAllowed: true,
-                },
-                availableSlots: [
+                id: "store_kfc_001",
+                name: "肯德基浦东店",
+                brandId: "kfc",
+                location: "上海市浦东新区",
+                district: "浦东新区",
+                subarea: "陆家嘴",
+                coordinates: { lat: 0, lng: 0 },
+                positions: [
                   {
-                    slot: "09:00~14:00",
-                    maxCapacity: 5,
-                    currentBooked: 2,
-                    isAvailable: true,
-                    priority: "medium",
+                    id: "pos_002",
+                    name: "服务员",
+                    sourceJobName: "服务员",
+                    jobCategory: null,
+                    laborForm: null,
+                    employmentForm: null,
+                    timeSlots: ["09:00~14:00"],
+                    salary: { base: 25, memo: "", unit: null },
+                    workHours: "5",
+                    benefits: { insurance: null, accommodation: null, catering: "餐饮", moreWelfares: null, memo: null, promotion: null },
+                    availableSlots: [
+                      {
+                        slot: "09:00~14:00",
+                        maxCapacity: 5,
+                        currentBooked: 2,
+                        isAvailable: true,
+                        priority: "medium",
+                      },
+                    ],
+                    minHoursPerWeek: null,
+                    maxHoursPerWeek: null,
+                    description: null,
+                    trainingRequired: null,
+                    probationRequired: null,
+                    perMonthMinWorkTime: null,
+                    perMonthMinWorkTimeUnit: null,
                   },
                 ],
-                schedulingFlexibility: {
-                  canSwapShifts: true,
-                  advanceNoticeHours: 24,
-                  partTimeAllowed: true,
-                  weekendRequired: false,
-                  holidayRequired: false,
-                },
               },
             ],
           },
@@ -725,88 +658,78 @@ describe("品牌同步和导入功能测试", () => {
           errors: [], // 没有错误
           duration: 1000,
           convertedData: {
-            city: "上海市",
-            defaultBrand: "肯德基",
-            brands: {
-              肯德基: {
-                templates: {} as any,
-              },
-            },
-            stores: [
+            meta: { defaultBrandId: "kfc" },
+            brands: [
               {
-                id: "store_kfc_001",
-                name: "肯德基浦东店",
-                brand: "肯德基",
-                location: "上海市浦东新区",
-                district: "浦东新区",
-                subarea: "陆家嘴",
-                coordinates: { lat: 0, lng: 0 },
-                positions: [
+                id: "kfc",
+                name: "肯德基",
+                stores: [
                   {
-                    id: "pos_001", // 之前失败的岗位
-                    name: "服务员-早班",
-                    timeSlots: ["06:00~12:00"],
-                    salary: { base: 26, memo: "" },
-                    workHours: "6",
-                    benefits: { items: ["餐饮", "早餐"] },
-                    requirements: ["早起", "准时"],
-                    urgent: true,
-                    scheduleType: "fixed",
-                    attendancePolicy: {
-                      punctualityRequired: true,
-                      lateToleranceMinutes: 5,
-                      attendanceTracking: "strict",
-                      makeupShiftsAllowed: false,
-                    },
-                    availableSlots: [
+                    id: "store_kfc_001",
+                    name: "肯德基浦东店",
+                    brandId: "kfc",
+                    location: "上海市浦东新区",
+                    district: "浦东新区",
+                    subarea: "陆家嘴",
+                    coordinates: { lat: 0, lng: 0 },
+                    positions: [
                       {
-                        slot: "06:00~12:00",
-                        maxCapacity: 4,
-                        currentBooked: 1,
-                        isAvailable: true,
-                        priority: "high",
+                        id: "pos_001", // 之前失败的岗位
+                        name: "服务员-早班",
+                        sourceJobName: "服务员-早班",
+                        jobCategory: null,
+                        laborForm: null,
+                        employmentForm: null,
+                        timeSlots: ["06:00~12:00"],
+                        salary: { base: 26, memo: "", unit: null },
+                        workHours: "6",
+                        benefits: { insurance: null, accommodation: null, catering: "餐饮", moreWelfares: ["早餐"], memo: null, promotion: null },
+                        availableSlots: [
+                          {
+                            slot: "06:00~12:00",
+                            maxCapacity: 4,
+                            currentBooked: 1,
+                            isAvailable: true,
+                            priority: "high",
+                          },
+                        ],
+                        minHoursPerWeek: null,
+                        maxHoursPerWeek: null,
+                        description: null,
+                        trainingRequired: null,
+                        probationRequired: null,
+                        perMonthMinWorkTime: null,
+                        perMonthMinWorkTimeUnit: null,
+                      },
+                      {
+                        id: "pos_003", // 之前失败的岗位
+                        name: "收银员-晚班",
+                        sourceJobName: "收银员-晚班",
+                        jobCategory: null,
+                        laborForm: null,
+                        employmentForm: null,
+                        timeSlots: ["18:00~23:00"],
+                        salary: { base: 28, memo: "", unit: null },
+                        workHours: "5",
+                        benefits: { insurance: null, accommodation: null, catering: "餐饮", moreWelfares: ["夜班补贴"], memo: null, promotion: null },
+                        availableSlots: [
+                          {
+                            slot: "18:00~23:00",
+                            maxCapacity: 2,
+                            currentBooked: 0,
+                            isAvailable: true,
+                            priority: "medium",
+                          },
+                        ],
+                        minHoursPerWeek: null,
+                        maxHoursPerWeek: null,
+                        description: null,
+                        trainingRequired: null,
+                        probationRequired: null,
+                        perMonthMinWorkTime: null,
+                        perMonthMinWorkTimeUnit: null,
                       },
                     ],
-                    schedulingFlexibility: {
-                      canSwapShifts: false,
-                      advanceNoticeHours: 24,
-                      partTimeAllowed: false,
-                      weekendRequired: true,
-                      holidayRequired: false,
-                    },
-                  },
-                  {
-                    id: "pos_003", // 之前失败的岗位
-                    name: "收银员-晚班",
-                    timeSlots: ["18:00~23:00"],
-                    salary: { base: 28, memo: "" },
-                    workHours: "5",
-                    benefits: { items: ["餐饮", "夜班补贴"] },
-                    requirements: ["细心", "数学好"],
-                    urgent: false,
-                    scheduleType: "fixed",
-                    attendancePolicy: {
-                      punctualityRequired: true,
-                      lateToleranceMinutes: 5,
-                      attendanceTracking: "strict",
-                      makeupShiftsAllowed: false,
-                    },
-                    availableSlots: [
-                      {
-                        slot: "18:00~23:00",
-                        maxCapacity: 2,
-                        currentBooked: 0,
-                        isAvailable: true,
-                        priority: "medium",
-                      },
-                    ],
-                    schedulingFlexibility: {
-                      canSwapShifts: false,
-                      advanceNoticeHours: 12,
-                      partTimeAllowed: false,
-                      weekendRequired: true,
-                      holidayRequired: false,
-                    },
                   },
                 ],
               },
@@ -820,9 +743,10 @@ describe("品牌同步和导入功能测试", () => {
       const updatedData = mockUpdateBrandData.mock.calls[0][0] as ZhipinData;
 
       // 验证之前失败的岗位现在被成功同步
-      const allPositions = updatedData.stores.flatMap((s: Store) => s.positions || []);
+      const allStores = getAllStores(updatedData);
+      const allPositions = allStores.flatMap((s: Store) => s.positions || []);
 
-      // 应该有3个岗位：1个原有的 + 2个新同步的
+      // 应该有之前失败的2个岗位（同步替换了整个品牌的门店数据）
       expect(allPositions.find(p => p.id === "pos_001")).toBeDefined();
       expect(allPositions.find(p => p.id === "pos_003")).toBeDefined();
 
@@ -838,25 +762,23 @@ describe("品牌同步和导入功能测试", () => {
 
     it("应该正确处理完全失败的场景（所有岗位都校验失败）", async () => {
       const existingBrandData: ZhipinData = {
-        city: "上海市",
-        defaultBrand: "必胜客",
-        brands: {
-          必胜客: {
-            templates: {
-              initial_inquiry: ["必胜客话术"],
-            } as any,
-          },
-        },
-        stores: [
+        meta: { defaultBrandId: "pizzahut" },
+        brands: [
           {
-            id: "store_pizza_001",
-            name: "必胜客徐汇店",
-            brand: "必胜客",
-            location: "上海市徐汇区",
-            district: "徐汇区",
-            subarea: "徐家汇",
-            coordinates: { lat: 0, lng: 0 },
-            positions: [],
+            id: "pizzahut",
+            name: "必胜客",
+            stores: [
+              {
+                id: "store_pizza_001",
+                name: "必胜客徐汇店",
+                brandId: "pizzahut",
+                location: "上海市徐汇区",
+                district: "徐汇区",
+                subarea: "徐家汇",
+                coordinates: { lat: 0, lng: 0 },
+                positions: [],
+              },
+            ],
           },
         ],
       };

@@ -14,6 +14,7 @@ vi.mock("@/lib/model-registry/dynamic-registry", () => ({
       stage: "job_consultation",
       subGoals: ["回答岗位问题", "推进下一步沟通"],
       needs: ["salary", "location"],
+      primaryNeed: "salary",
       riskFlags: [],
       confidence: 0.78,
       extractedInfo: {

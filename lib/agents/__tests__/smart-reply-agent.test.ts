@@ -1,337 +1,429 @@
 /**
- * Smart Reply Agent 单元测试
+ * Smart Reply Agent 适配层单元测试
  *
- * 测试智能回复 Agent 的核心功能
+ * 验证适配层正确委托给 @roll-agent/smart-reply-agent/pipeline
+ * 并补回 classification 兼容字段
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createMockTextGeneration, createMockObjectGeneration } from "@/lib/__tests__/test-utils/ai-mocks";
+import type {
+  SmartReplyAgentOptions as PipelineOptions,
+  SmartReplyAgentResult as PipelineResult,
+} from "@roll-agent/smart-reply-agent/pipeline";
+import { DEFAULT_MODEL_CONFIG } from "@/lib/config/models";
+import type { ZhipinData } from "@/types/zhipin";
 
-// Mock turn plan result
-const mockTurnPlan = {
-  stage: "job_consultation",
-  subGoals: ["回答岗位问题", "推进下一步沟通"],
-  needs: ["salary"],
-  riskFlags: [],
-  confidence: 0.8,
-  extractedInfo: {
-    mentionedBrand: null,
-    city: "成都",
-    mentionedLocations: [],
-    mentionedDistricts: [],
-    specificAge: null,
-    hasUrgency: false,
-    preferredSchedule: null,
-  },
-  reasoningText: "候选人询问薪资待遇，进入岗位咨询阶段",
-};
-
-// Mock the dynamic registry
-vi.mock("@/lib/model-registry/dynamic-registry", () => ({
-  getDynamicRegistry: vi.fn(() => ({
-    languageModel: vi.fn((modelId: string) => {
-      // Return different mocks based on model type
-      if (modelId.includes("classify")) {
-        return createMockObjectGeneration(mockTurnPlan);
-      }
-      return createMockTextGeneration("您好！我们的薪资待遇是综合薪资4000-6000元/月，包含底薪+提成+全勤奖励。");
-    }),
-  })),
-}));
-
-// Mock the planner function
-vi.mock("../classification-agent", () => ({
-  planTurn: vi.fn(async () => mockTurnPlan),
-}));
-
-// Mock 共享品牌别名服务（避免调用真实 Duliday API）
-vi.mock("@/lib/services/brand-alias/brand-alias.service", () => ({
-  getSharedBrandDictionary: vi.fn(async () => ({})),
-  getSharedBrandAliasMap: vi.fn(async () => new Map()),
-}));
-
-vi.mock("@/lib/services/eligibility/age-eligibility", () => ({
-  evaluateAgeEligibility: vi.fn(async ({ age }: { age?: number }) => ({
-    status: typeof age === "number" ? "pass" : "unknown",
-    summary: {
-      minAgeObserved: 18,
-      maxAgeObserved: 45,
-      matchedCount: 1,
-      total: 1,
+function createMockPipelineResult(): PipelineResult {
+  const turnPlan: PipelineResult["turnPlan"] = {
+    stage: "job_consultation" as const,
+    subGoals: ["回答岗位问题", "推进下一步沟通"],
+    needs: ["salary" as const],
+    primaryNeed: "salary" as const,
+    riskFlags: [],
+    confidence: 0.8,
+    extractedInfo: {
+      mentionedBrand: null,
+      city: "成都",
+      mentionedLocations: [],
+      mentionedDistricts: [],
+      specificAge: null,
+      hasUrgency: false,
+      preferredSchedule: null,
     },
-    appliedStrategy: {
-      enabled: true,
-      revealRange: false,
-      failStrategy: "礼貌说明不匹配，避免承诺",
-      unknownStrategy: "先核实年龄或资格条件",
-      passStrategy: "确认匹配后推进下一步",
-      allowRedirect: false,
-      redirectPriority: "low",
-      status: typeof age === "number" ? "pass" : "unknown",
-      strategy:
-        typeof age === "number" ? "确认匹配后推进下一步" : "先核实年龄或资格条件",
-    },
-  })),
-}));
+    reasoningText: "候选人询问薪资待遇，进入岗位咨询阶段",
+  };
 
-// Sample config data for testing (using 'as unknown as' to avoid complex type matching)
-// In real tests, you would use properly structured mock data
-const sampleConfigData = {
-  city: "成都",
-  defaultBrand: "蜀地源冒菜",
-  brands: {
-    "蜀地源冒菜": {
-      templates: {},
-      screening: {
-        ageRange: { min: 18, max: 45 },
+  return {
+    turnPlan,
+    suggestedReply: "您好！我们的薪资待遇很有竞争力，具体可以进一步沟通。",
+    confidence: 0.8,
+    shouldExchangeWechat: false,
+    factGateRewritten: false,
+    replyGateRewritten: false,
+    gateViolations: [],
+    contextInfo: "品牌：蜀地源冒菜\n当前品牌：蜀地源冒菜",
+    debugInfo: {
+      relevantStores: [],
+      storeCount: 1,
+      detailLevel: "minimal" as const,
+      resolvedBrand: "蜀地源冒菜",
+      turnPlan,
+      turnIndex: 1,
+      effectiveDisclosureMode: "minimal" as const,
+      primaryNeed: "salary" as const,
+      replyGateRewritten: false,
+      gateViolations: [],
+      aliasLookupError: undefined,
+      gateStatus: "unknown" as const,
+      appliedStrategy: {
+        enabled: true,
+        revealRange: false,
+        failStrategy: "礼貌说明不匹配，避免承诺",
+        unknownStrategy: "先核实年龄或资格条件",
+        passStrategy: "确认匹配后推进下一步",
+        allowRedirect: false,
+        redirectPriority: "low" as const,
+        status: "unknown" as const,
+        strategy: "先核实年龄或资格条件",
+      },
+      ageRangeSummary: {
+        minAgeObserved: null,
+        maxAgeObserved: null,
+        matchedCount: 0,
+        total: 0,
       },
     },
+    usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+    latencyMs: 1200,
+    error: undefined,
+  };
+}
+
+// Mock the npm package
+const mockGenerateSmartReply = vi.fn<(options: PipelineOptions) => Promise<PipelineResult>>();
+
+vi.mock("@roll-agent/smart-reply-agent/pipeline", () => ({
+  generateSmartReply: mockGenerateSmartReply,
+}));
+
+const sampleConfigData: ZhipinData = {
+  meta: {
+    defaultBrandId: "1",
+    syncedAt: new Date().toISOString(),
+    source: "test",
   },
-  stores: [
+  brands: [
     {
-      id: "store-1",
-      name: "蜀地源冒菜（春熙路店）",
-      brand: "蜀地源冒菜",
-      location: "成都市锦江区春熙路123号",
-      district: "锦江区",
-      subarea: "春熙路",
-      coordinates: { lat: 30.6571, lng: 104.0665 },
-      transportation: "地铁春熙路站",
-      positions: [],
+      id: "1",
+      name: "蜀地源冒菜",
+      stores: [
+        {
+          id: "store-1",
+          brandId: "1",
+          name: "蜀地源冒菜（春熙路店）",
+          city: "成都",
+          location: "成都市锦江区春熙路123号",
+          district: null,
+          subarea: null,
+          coordinates: { lat: 30.6571, lng: 104.0665 },
+          positions: [
+            {
+              id: "pos-1",
+              name: "服务员",
+              sourceJobName: "蜀地源冒菜-春熙路店-服务员-兼职",
+              brandId: "1",
+              brandName: "蜀地源冒菜",
+              projectId: "1",
+              projectName: "蜀地源冒菜",
+              jobCategory: null,
+              laborForm: "兼职",
+              employmentForm: "长期用工",
+              timeSlots: ["09:00~17:00"],
+              salary: {
+                base: null,
+                memo: null,
+                unit: null,
+              },
+              workHours: null,
+              benefits: {
+                insurance: null,
+                accommodation: null,
+                catering: null,
+                moreWelfares: null,
+                memo: null,
+                promotion: null,
+              },
+              availableSlots: [
+                {
+                  slot: "09:00~17:00",
+                  maxCapacity: 3,
+                  currentBooked: 1,
+                  isAvailable: true,
+                  priority: "medium",
+                },
+              ],
+              minHoursPerWeek: null,
+              maxHoursPerWeek: null,
+              attendanceRequirement: {
+                minimumDays: null,
+                description: null,
+              },
+              hiringRequirements: {
+                minAge: 18,
+                maxAge: 30,
+                genderRequirement: "不限",
+                education: "高中",
+                healthCertificate: "有健康证",
+              },
+              description: null,
+              trainingRequired: null,
+              probationRequired: null,
+              perMonthMinWorkTime: null,
+              perMonthMinWorkTimeUnit: null,
+            },
+          ],
+        },
+      ],
     },
   ],
-} as unknown as import("@/types/zhipin").ZhipinData;
+};
 
-describe("Smart Reply Pipeline", () => {
+function getFirstPipelineCall(): PipelineOptions | undefined {
+  return mockGenerateSmartReply.mock.calls[0]?.[0];
+}
+
+describe("Smart Reply Adapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGenerateSmartReply.mockResolvedValue(createMockPipelineResult());
   });
 
-  describe("generateSmartReply", () => {
-    it("should generate reply for salary inquiry", async () => {
-      const { generateSmartReply } = await import("../smart-reply-agent");
+  it("should delegate to npm pipeline and return result", async () => {
+    const { generateSmartReply } = await import("../smart-reply-agent");
+    const mockPipelineResult = createMockPipelineResult();
 
-      const result = await generateSmartReply({
-        candidateMessage: "你们工资多少钱一个月？",
-        conversationHistory: [],
-        configData: sampleConfigData,
-      });
-
-      expect(result).toBeDefined();
-      expect(result.suggestedReply).toContain("薪资");
-      expect(result.turnPlan).toBeDefined();
-      expect(result.turnPlan.stage).toBe("job_consultation");
-      expect(result.confidence).toBeGreaterThan(0);
+    const result = await generateSmartReply({
+      candidateMessage: "你们工资多少钱一个月？",
+      conversationHistory: [],
+      configData: sampleConfigData,
     });
 
-    it("should include classification reasoning", async () => {
-      const { generateSmartReply } = await import("../smart-reply-agent");
+    expect(mockGenerateSmartReply).toHaveBeenCalledOnce();
+    expect(result.suggestedReply).toBe(mockPipelineResult.suggestedReply);
+    expect(result.turnPlan.stage).toBe("job_consultation");
+    expect(result.confidence).toBe(0.8);
+  });
 
-      const result = await generateSmartReply({
-        candidateMessage: "请问还招人吗？",
-        conversationHistory: [],
-        configData: sampleConfigData,
-      });
+  it("should add classification compat field from turnPlan", async () => {
+    const { generateSmartReply } = await import("../smart-reply-agent");
+    const mockPipelineResult = createMockPipelineResult();
 
-      expect(result.turnPlan.reasoningText).toBeDefined();
-      expect(result.turnPlan.reasoningText.length).toBeGreaterThan(0);
+    const result = await generateSmartReply({
+      candidateMessage: "你们工资多少？",
+      conversationHistory: [],
+      configData: sampleConfigData,
     });
 
-    it("should use conversation history for context", async () => {
-      const { generateSmartReply } = await import("../smart-reply-agent");
+    expect(result.classification).toBeDefined();
+    expect(result.classification.replyType).toBe("salary_inquiry");
+    expect(result.classification.extractedInfo.city).toBe("成都");
+    expect(result.classification.reasoningText).toBe(mockPipelineResult.turnPlan.reasoningText);
+  });
 
-      const result = await generateSmartReply({
-        candidateMessage: "那具体是多少？",
-        conversationHistory: [
-          "候选人: 你好，请问薪资待遇怎么样？",
-          "HR: 我们的薪资待遇很有竞争力",
-        ],
-        configData: sampleConfigData,
-      });
+  it("should pass options through to pipeline with normalized modelConfig", async () => {
+    const { generateSmartReply } = await import("../smart-reply-agent");
+    const ageEligibilitySources: NonNullable<PipelineOptions["ageEligibilitySources"]> = [
+      {
+        name: "custom-source",
+        collect: vi.fn().mockResolvedValue([]),
+      },
+    ];
 
-      expect(result).toBeDefined();
-      expect(result.suggestedReply).toBeDefined();
+    const options = {
+      candidateMessage: "你们工资多少？",
+      conversationHistory: ["你好", "你好！"],
+      configData: sampleConfigData,
+      preferredBrand: "蜀地源冒菜",
+      toolBrand: "蜀地源",
+      brandPriorityStrategy: "smart" as const,
+      modelConfig: { replyModel: "qwen/qwen-plus-latest" },
+      defaultWechatId: "hr_123",
+      industryVoiceId: "default",
+      channelType: "public" as const,
+      ageEligibilitySources,
+    };
+
+    await generateSmartReply(options);
+
+    const calledOptions = getFirstPipelineCall();
+    const calledPosition = calledOptions?.configData.brands[0]?.stores[0]?.positions[0];
+
+    expect(calledOptions).toMatchObject({
+      candidateMessage: options.candidateMessage,
+      conversationHistory: options.conversationHistory,
+      preferredBrand: options.preferredBrand,
+      toolBrand: options.toolBrand,
+      brandPriorityStrategy: options.brandPriorityStrategy,
+      defaultWechatId: options.defaultWechatId,
+      industryVoiceId: options.industryVoiceId,
+      channelType: options.channelType,
+      ageEligibilitySources: options.ageEligibilitySources,
+      modelConfig: {
+        chatModel: DEFAULT_MODEL_CONFIG.chatModel,
+        classifyModel: DEFAULT_MODEL_CONFIG.classifyModel,
+        replyModel: "qwen/qwen-plus-latest",
+      },
     });
 
-    it("should use preferred brand when provided", async () => {
-      const { generateSmartReply } = await import("../smart-reply-agent");
+    expect(calledOptions?.configData.meta.defaultBrandId).toBe("1");
+    expect(calledOptions?.configData.brands[0]?.name).toBe("蜀地源冒菜");
+    expect(calledOptions?.configData.brands[0]?.stores[0]?.district).toBeNull();
+    expect(calledPosition?.salary.base).toBeNull();
+    expect(calledPosition?.salary.memo).toBeNull();
+    expect(calledPosition?.workHours).toBeNull();
+    expect(calledPosition?.laborForm).toBe("兼职");
+    expect(calledPosition?.employmentForm).toBe("长期用工");
+    expect(calledPosition?.hiringRequirements?.minAge).toBe(18);
+  });
 
-      const result = await generateSmartReply({
-        candidateMessage: "你们有多少家门店？",
-        conversationHistory: [],
-        preferredBrand: "蜀地源冒菜",
-        configData: sampleConfigData,
-      });
+  it("should pass through supported provider models and downgrade openrouter", async () => {
+    const { generateSmartReply } = await import("../smart-reply-agent");
 
-      expect(result).toBeDefined();
-      expect(result.contextInfo).toContain("蜀地源冒菜");
+    await generateSmartReply({
+      candidateMessage: "你好",
+      conversationHistory: [],
+      configData: sampleConfigData,
+      modelConfig: {
+        classifyModel: "openai/gpt-5-chat-latest",
+        replyModel: "openrouter/anthropic/claude-sonnet-4",
+      },
     });
 
-    it("should include candidate info in reply generation", async () => {
-      const { generateSmartReply } = await import("../smart-reply-agent");
-      const { evaluateAgeEligibility } = await import("@/lib/services/eligibility/age-eligibility");
+    const normalizedConfig = getFirstPipelineCall()?.modelConfig;
 
-      const result = await generateSmartReply({
-        candidateMessage: "有适合我的岗位吗？",
-        conversationHistory: [],
-        configData: sampleConfigData,
-        candidateInfo: {
-          name: "张三",
-          age: "25",
-          experience: "2年餐饮经验",
-          education: "高中",
-        },
-      });
+    // openai/* 是已注册 provider，直接透传
+    expect(normalizedConfig?.classifyModel).toBe("openai/gpt-5-chat-latest");
+    // openrouter/* 降级为同家直连模型
+    expect(normalizedConfig?.replyModel).toBe("anthropic/claude-sonnet-4-6");
+  });
 
-      expect(result).toBeDefined();
-      expect(result.suggestedReply).toBeDefined();
-      expect(vi.mocked(evaluateAgeEligibility)).toHaveBeenCalledWith(
-        expect.objectContaining({ age: 25 })
-      );
-      expect(result.debugInfo?.gateStatus).toBe("pass");
+  it("should inject host defaults when modelConfig is omitted", async () => {
+    const { generateSmartReply } = await import("../smart-reply-agent");
+
+    await generateSmartReply({
+      candidateMessage: "你好",
+      conversationHistory: [],
+      configData: sampleConfigData,
     });
 
-    it("should continue and expose context warning when alias lookup fails", async () => {
-      const { getSharedBrandAliasMap } = await import("@/lib/services/brand-alias/brand-alias.service");
-      vi.mocked(getSharedBrandAliasMap).mockRejectedValueOnce(new Error("alias timeout"));
-
-      const { generateSmartReply } = await import("../smart-reply-agent");
-      const result = await generateSmartReply({
-        candidateMessage: "肯德基有岗位吗？",
-        conversationHistory: [],
-        configData: sampleConfigData,
-      });
-
-      expect(result.suggestedReply.length).toBeGreaterThan(0);
-      expect(result.contextInfo).toContain("品牌别名服务暂不可用");
-      expect(result.debugInfo?.aliasLookupError).toContain("alias timeout");
-    });
-
-    it("should calculate confidence based on extracted info", async () => {
-      const { generateSmartReply } = await import("../smart-reply-agent");
-
-      const result = await generateSmartReply({
-        candidateMessage: "成都春熙路附近有门店吗？",
-        conversationHistory: [],
-        configData: sampleConfigData,
-      });
-
-      // Confidence should be between 0 and 1
-      expect(result.confidence).toBeGreaterThanOrEqual(0);
-      expect(result.confidence).toBeLessThanOrEqual(1);
-    });
-
-    it("should determine shouldExchangeWechat for interview requests", async () => {
-      // Override mock for this specific test
-      vi.doMock("../classification-agent", () => ({
-        planTurn: vi.fn(async () => ({
-          ...mockTurnPlan,
-          stage: "interview_scheduling",
-          needs: ["interview", "availability"],
-        })),
-      }));
-
-      // Re-import to get the updated mock
-      vi.resetModules();
-      const { generateSmartReply } = await import("../smart-reply-agent");
-
-      const result = await generateSmartReply({
-        candidateMessage: "我可以来面试吗？",
-        conversationHistory: [],
-        configData: sampleConfigData,
-      });
-
-      expect(result).toBeDefined();
-      expect(result.shouldExchangeWechat).toBe(true);
-    });
-
-    it("should use custom model config when provided", async () => {
-      const { generateSmartReply } = await import("../smart-reply-agent");
-
-      const result = await generateSmartReply({
-        candidateMessage: "你好",
-        conversationHistory: [],
-        configData: sampleConfigData,
-        modelConfig: {
-          classifyModel: "qwen/qwen-plus",
-          replyModel: "qwen/qwen-turbo",
-        },
-      });
-
-      expect(result).toBeDefined();
-    });
-
-    it("should include default wechat id when provided", async () => {
-      const { generateSmartReply } = await import("../smart-reply-agent");
-
-      const result = await generateSmartReply({
-        candidateMessage: "可以加微信吗？",
-        conversationHistory: [],
-        configData: sampleConfigData,
-        defaultWechatId: "hr_wechat_123",
-      });
-
-      expect(result).toBeDefined();
+    expect(getFirstPipelineCall()?.modelConfig).toEqual({
+      chatModel: DEFAULT_MODEL_CONFIG.chatModel,
+      classifyModel: DEFAULT_MODEL_CONFIG.classifyModel,
+      replyModel: DEFAULT_MODEL_CONFIG.replyModel,
     });
   });
 
-  describe("FactGate strict mode", () => {
-    it("should trigger rewrite when reply has fact claims but context lacks facts", async () => {
-      const { generateSmartReply } = await import("../smart-reply-agent");
-      const { DEFAULT_REPLY_POLICY } = await import("@/types/reply-policy");
+  it("should fall back to host defaults for unknown providers", async () => {
+    const { generateSmartReply } = await import("../smart-reply-agent");
 
-      // Mock reply contains "4000-6000元" (fact claim)
-      // mockTurnPlan.needs = ["salary"] (requires facts)
-      // sampleConfigData has empty positions (no salary facts in context)
-      // → FactGate violation should trigger rewrite
-      const result = await generateSmartReply({
-        candidateMessage: "你们工资多少？",
-        conversationHistory: [],
-        configData: sampleConfigData,
-        replyPolicy: DEFAULT_REPLY_POLICY,
-      });
-
-      expect(result).toBeDefined();
-      expect(result.suggestedReply).toBeDefined();
-      // latencyMs should be a valid number (not NaN), verifying the NaN fix
-      if (result.latencyMs !== undefined) {
-        expect(Number.isFinite(result.latencyMs)).toBe(true);
-      }
+    await generateSmartReply({
+      candidateMessage: "你好",
+      conversationHistory: [],
+      configData: sampleConfigData,
+      modelConfig: {
+        classifyModel: "xai/grok-3-beta",
+        replyModel: "custom-proxy/reply-model",
+      },
     });
 
-    it("should not trigger rewrite when no replyPolicy is provided", async () => {
-      const { generateSmartReply } = await import("../smart-reply-agent");
+    const normalizedConfig = getFirstPipelineCall()?.modelConfig;
 
-      const result = await generateSmartReply({
-        candidateMessage: "你们工资多少？",
-        conversationHistory: [],
-        configData: sampleConfigData,
-        // No replyPolicy → FactGate skipped
-      });
+    expect(normalizedConfig?.classifyModel).toBe(DEFAULT_MODEL_CONFIG.classifyModel);
+    expect(normalizedConfig?.replyModel).toBe(DEFAULT_MODEL_CONFIG.replyModel);
+  });
 
-      expect(result).toBeDefined();
-      expect(result.suggestedReply).toContain("薪资");
+  it("should adapt debugInfo with classification field", async () => {
+    const { generateSmartReply } = await import("../smart-reply-agent");
+
+    const result = await generateSmartReply({
+      candidateMessage: "有什么岗位？",
+      conversationHistory: [],
+      configData: sampleConfigData,
     });
 
-    it("should not trigger rewrite when FactGate mode is not strict", async () => {
-      const { generateSmartReply } = await import("../smart-reply-agent");
-      const { DEFAULT_REPLY_POLICY } = await import("@/types/reply-policy");
+    expect(result.debugInfo).toBeDefined();
+    expect(result.debugInfo?.classification).toBeDefined();
+    expect(result.debugInfo?.gateStatus).toBe("unknown");
+    expect(result.debugInfo?.storeCount).toBe(1);
+    expect(result.debugInfo?.resolvedBrand).toBe("蜀地源冒菜");
+    expect(result.debugInfo?.turnIndex).toBe(1);
+    expect(result.debugInfo?.primaryNeed).toBe("salary");
+  });
 
-      const nonStrictPolicy = {
-        ...DEFAULT_REPLY_POLICY,
-        factGate: { ...DEFAULT_REPLY_POLICY.factGate, mode: "balanced" as const },
-      };
+  it("should forward error from pipeline", async () => {
+    const baseResult = createMockPipelineResult();
+    const errorResult: PipelineResult = {
+      ...baseResult,
+      suggestedReply: "",
+      confidence: 0,
+      error: {
+        code: "LLM_GENERATION_FAILED",
+        message: "Model timeout",
+        userMessage: "回复生成超时",
+      } as NonNullable<PipelineResult["error"]>,
+    };
+    mockGenerateSmartReply.mockResolvedValueOnce(errorResult);
 
-      const result = await generateSmartReply({
-        candidateMessage: "你们工资多少？",
-        conversationHistory: [],
-        configData: sampleConfigData,
-        replyPolicy: nonStrictPolicy,
-      });
+    const { generateSmartReply } = await import("../smart-reply-agent");
 
-      expect(result).toBeDefined();
-      // Original reply preserved (contains fact claims, but mode is not strict)
-      expect(result.suggestedReply).toContain("薪资");
+    const result = await generateSmartReply({
+      candidateMessage: "你好",
+      conversationHistory: [],
+      configData: sampleConfigData,
     });
+
+    expect(result.error).toBeDefined();
+    expect(result.error?.code).toBe("LLM_GENERATION_FAILED");
+    expect(result.suggestedReply).toBe("");
+  });
+
+  it("should map interview_scheduling stage to shouldExchangeWechat", async () => {
+    const baseResult = createMockPipelineResult();
+    mockGenerateSmartReply.mockResolvedValueOnce({
+      ...baseResult,
+      turnPlan: { ...baseResult.turnPlan, stage: "interview_scheduling" as const },
+      shouldExchangeWechat: true,
+    });
+
+    const { generateSmartReply } = await import("../smart-reply-agent");
+
+    const result = await generateSmartReply({
+      candidateMessage: "我可以来面试吗？",
+      conversationHistory: [],
+      configData: sampleConfigData,
+    });
+
+    expect(result.shouldExchangeWechat).toBe(true);
+  });
+
+  it("should preserve gate metadata from pipeline result", async () => {
+    const baseResult = createMockPipelineResult();
+    mockGenerateSmartReply.mockResolvedValueOnce({
+      ...baseResult,
+      factGateRewritten: true,
+      replyGateRewritten: true,
+      gateViolations: ["too_many_questions"],
+    });
+
+    const { generateSmartReply } = await import("../smart-reply-agent");
+
+    const result = await generateSmartReply({
+      candidateMessage: "你好",
+      conversationHistory: [],
+      configData: sampleConfigData,
+    });
+
+    expect(result.factGateRewritten).toBe(true);
+    expect(result.replyGateRewritten).toBe(true);
+    expect(result.gateViolations).toEqual(["too_many_questions"]);
+  });
+
+  it("should handle undefined debugInfo gracefully", async () => {
+    const baseResult = createMockPipelineResult();
+    mockGenerateSmartReply.mockResolvedValueOnce({
+      ...baseResult,
+      debugInfo: undefined,
+    });
+
+    const { generateSmartReply } = await import("../smart-reply-agent");
+
+    const result = await generateSmartReply({
+      candidateMessage: "你好",
+      conversationHistory: [],
+      configData: sampleConfigData,
+    });
+
+    expect(result.debugInfo).toBeUndefined();
+    expect(result.classification).toBeDefined(); // classification still works
   });
 });

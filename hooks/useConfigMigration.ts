@@ -4,6 +4,7 @@ import {
   migrateFromHardcodedData,
   configService,
 } from "@/lib/services/config.service";
+import { getAllStores } from "@/types/zhipin";
 import { BrandSyncManager } from "@/lib/services/brand-sync-manager";
 import { useAuthStore } from "@/lib/stores/auth-store";
 import { useSyncStore } from "@/lib/stores/sync-store";
@@ -158,7 +159,7 @@ export function useConfigMigration() {
             replyPolicyCount: currentConfig
               ? Object.keys(currentConfig.replyPolicy || {}).length
               : 0,
-            storesCount: currentConfig?.brandData?.stores?.length || 0,
+            storesCount: currentConfig?.brandData ? getAllStores(currentConfig.brandData).length : 0,
           });
         } catch (debugError) {
           console.error("获取调试信息失败:", debugError);

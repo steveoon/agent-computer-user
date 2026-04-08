@@ -5,13 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, RefreshCw, Eye, Code2, Database, MessageSquare, Calendar } from "lucide-react";
-import { TemplateEditor } from "./template-editor";
+import { Save, RefreshCw, Eye, Code2, Database, Calendar } from "lucide-react";
 import { ScheduleEditor } from "./schedule-editor";
 import { SearchPagination } from "@/components/ui/search-pagination";
 import { useBrandEditorStore } from "@/lib/stores/brand-editor-store";
-import { BrandTemplateCopier } from "./brand-template-copier";
 import type { ZhipinData } from "@/types";
+import { getAllStores, getBrandById, getPrimaryCity } from "@/types";
 
 interface BrandDataEditorProps {
   data: ZhipinData | undefined;
@@ -43,85 +42,45 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
     updateJsonData,
     saveData,
     resetData,
-    updateTemplates,
   } = useBrandEditorStore();
 
-  // 处理品牌话术复制
-  const handleCopyTemplates = async (sourceBrand: string, targetBrand: string) => {
-    if (!localData?.brands[sourceBrand]?.templates) {
-      throw new Error(`源品牌 ${sourceBrand} 没有话术模板`);
-    }
-
-    const sourceTemplates = localData.brands[sourceBrand].templates;
-
-    // 深拷贝模板对象，确保每个品牌有独立的副本
-    const clonedTemplates = structuredClone(sourceTemplates);
-
-    // 更新目标品牌的模板
-    const updatedData = updateTemplates(targetBrand, clonedTemplates);
-
-    if (updatedData) {
-      await onSave(updatedData, {
-        customToast: {
-          title: "话术复制成功",
-          description: `成功将 ${sourceBrand} 的话术复制到 ${targetBrand}`,
-        },
-      });
-      console.log(`✅ 成功将 ${sourceBrand} 的话术复制到 ${targetBrand}`);
-    }
-  };
-
-  // 处理单个品牌话术更新
-  const handleBrandTemplateUpdate = async (data: ZhipinData, brandName?: string) => {
-    if (brandName) {
-      await onSave(data, {
-        customToast: {
-          title: `${brandName} 话术更新成功`,
-          description: `品牌话术模板已保存`,
-        },
-      });
-    } else {
-      await onSave(data);
-    }
-  };
-
-  // 初始化数据 - 当data变化时重新初始化
+  // Initialize data when data prop changes
   useEffect(() => {
     if (data) {
-      // 强制重新初始化，确保与最新的IndexedDB数据同步
       initializeData(data);
-      console.log("🔄 BrandDataEditor重新初始化数据", {
-        brands: Object.keys(data.brands).length,
-        stores: data.stores.length,
+      console.log("BrandDataEditor re-initialized data", {
+        brands: data.brands.length,
+        stores: getAllStores(data).length,
         timestamp: new Date().toISOString(),
       });
     }
   }, [data, initializeData]);
 
-  // 渲染概览信息
+  // Render overview
   const renderOverview = () => {
     if (!localData) return null;
 
-    const brandCount = Object.keys(localData.brands).length;
-    const storeCount = localData.stores.length;
+    const allStores = getAllStores(localData);
+    const brandCount = localData.brands.length;
+    const storeCount = allStores.length;
 
-    // 🏙️ 从门店推断覆盖城市（优先使用门店级别的 city 字段）
-    const storeCities = localData.stores
+    // Infer covered cities from stores
+    const storeCities = allStores
       .map(store => store.city)
       .filter((city): city is string => Boolean(city));
     const uniqueCities = Array.from(new Set(storeCities));
-    // 如果没有门店级别的城市，降级使用全局 city
+    const primaryCity = getPrimaryCity(localData);
     const cityInfo =
       uniqueCities.length > 0
         ? uniqueCities.length === 1
           ? uniqueCities[0]
           : `${uniqueCities.length}个城市`
-        : localData.city || "未设置";
+        : primaryCity || "未设置";
     const cityTooltip = uniqueCities.length > 1 ? uniqueCities.join("、") : undefined;
 
     return (
       <div className="space-y-6">
-        {/* 统计卡片 */}
+        {/* Stats cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="glass-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -163,7 +122,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
           </Card>
         </div>
 
-        {/* 品牌列表 */}
+        {/* Brand list */}
         <Card className="glass-card">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -171,7 +130,6 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
                 <CardTitle>品牌配置</CardTitle>
                 <CardDescription className="mt-1">当前配置的品牌及其基本信息</CardDescription>
               </div>
-              <BrandTemplateCopier data={localData} onCopy={handleCopyTemplates} />
             </div>
           </CardHeader>
           <CardContent>
@@ -179,7 +137,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-medium">
-                    编辑 {editingBrand} 品牌{editingType === "templates" ? "话术" : "排班"}
+                    编辑 {editingBrand} 品牌排班
                   </h3>
                   <Button
                     variant="outline"
@@ -192,34 +150,31 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
                     返回列表
                   </Button>
                 </div>
-                {editingType === "templates" && (
-                  <TemplateEditor
-                    brandName={editingBrand}
-                    onDataUpdate={handleBrandTemplateUpdate}
-                  />
-                )}
                 {editingType === "schedule" && (
                   <ScheduleEditor brandName={editingBrand} onDataUpdate={onSave} />
                 )}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Object.entries(localData.brands).map(([brandName, brandConfig]) => (
+                {localData.brands.map(brand => (
                   <div
-                    key={brandName}
+                    key={brand.id}
                     className="p-4 border rounded-lg bg-white/40 backdrop-blur-sm hover:bg-white/60 transition-colors"
                   >
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-medium">{brandName}</h3>
+                      <h3 className="font-medium">{brand.name}</h3>
                       <Badge variant="outline" className="bg-white/50">
-                        {localData.stores.filter(store => store.brand === brandName).length} 门店
+                        {brand.stores.length} 门店
                       </Badge>
                     </div>
                     <div className="text-sm text-muted-foreground space-y-1">
                       <div>
-                        模板：
-                        {brandConfig.templates ? Object.keys(brandConfig.templates).length : 0} 类
+                        岗位：
+                        {brand.stores.reduce((sum, s) => sum + s.positions.length, 0)} 个
                       </div>
+                      {brand.aliases && brand.aliases.length > 0 && (
+                        <div>别名：{brand.aliases.join("、")}</div>
+                      )}
                     </div>
                     <div className="flex gap-2 mt-3">
                       <Button
@@ -227,19 +182,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
                         size="sm"
                         className="flex-1 bg-white/50 hover:bg-white/80"
                         onClick={() => {
-                          setEditingBrand(brandName);
-                          setEditingType("templates");
-                        }}
-                      >
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        编辑话术
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 bg-white/50 hover:bg-white/80"
-                        onClick={() => {
-                          setEditingBrand(brandName);
+                          setEditingBrand(brand.name);
                           setEditingType("schedule");
                         }}
                       >
@@ -254,7 +197,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
           </CardContent>
         </Card>
 
-        {/* 门店列表 */}
+        {/* Store list */}
         <Card className="glass-card">
           <CardHeader>
             <CardTitle>所有品牌门店配置</CardTitle>
@@ -262,35 +205,38 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
           </CardHeader>
           <CardContent>
             <SearchPagination
-              data={localData.stores}
-              searchKeys={["name", "location", "district", "brand"]}
+              data={allStores}
+              searchKeys={["name", "location", "district", "brandId"]}
               itemsPerPageOptions={[10, 20, 50, 100]}
               defaultItemsPerPage={20}
-              placeholder="搜索门店名称、地址、区域或品牌..."
+              placeholder="搜索门店名称、地址、区域..."
               emptyMessage="暂无门店数据"
               searchEmptyMessage="未找到匹配的门店"
-              renderItem={store => (
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <h4 className="font-medium">{store.name}</h4>
-                      <p className="text-sm text-muted-foreground">{store.location}</p>
+              renderItem={store => {
+                const brand = getBrandById(localData, store.brandId);
+                return (
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h4 className="font-medium">{store.name}</h4>
+                        <p className="text-sm text-muted-foreground">{store.location}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="secondary">{brand?.name ?? store.brandId}</Badge>
+                        <p className="text-xs text-muted-foreground mt-1">{store.district ?? ""}</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <Badge variant="secondary">{store.brand}</Badge>
-                      <p className="text-xs text-muted-foreground mt-1">{store.district}</p>
+                    <div className="text-sm text-muted-foreground">
+                      <div>岗位：{store.positions.length} 个</div>
                     </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    <div>岗位：{store.positions.length} 个</div>
-                  </div>
-                </div>
-              )}
+                );
+              }}
             />
           </CardContent>
         </Card>
 
-        {/* 使用说明 */}
+        {/* Usage instructions */}
         <Card className="glass-card">
           <CardHeader>
             <CardTitle>编辑说明</CardTitle>
@@ -298,10 +244,10 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
           </CardHeader>
           <CardContent>
             <div className="text-sm space-y-2">
-              <p>• 切换到 "JSON编辑" 标签页可以直接编辑原始数据</p>
-              <p>• 修改后请点击 "保存" 按钮保存更改</p>
-              <p>• 支持添加新品牌、修改门店信息、调整筛选规则等</p>
-              <p>• 保存前请确保JSON格式正确，避免数据损坏</p>
+              <p>切换到 "JSON编辑" 标签页可以直接编辑原始数据</p>
+              <p>修改后请点击 "保存" 按钮保存更改</p>
+              <p>支持添加新品牌、修改门店信息、调整筛选规则等</p>
+              <p>保存前请确保JSON格式正确，避免数据损坏</p>
             </div>
           </CardContent>
         </Card>
@@ -330,7 +276,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
 
   return (
     <div className="space-y-6">
-      {/* 头部操作栏 */}
+      {/* Header action bar */}
       <Card className="glass-card">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -366,7 +312,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
         </CardHeader>
       </Card>
 
-      {/* 错误提示 */}
+      {/* Error display */}
       {error && (
         <Card className="border-destructive">
           <CardContent className="pt-6">
@@ -375,7 +321,7 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
         </Card>
       )}
 
-      {/* 编辑模式切换 */}
+      {/* Edit mode toggle */}
       <Tabs value={editMode} onValueChange={value => setEditMode(value as "overview" | "json")}>
         <TabsList className="grid w-full grid-cols-2 glass-tabs">
           <TabsTrigger value="overview" className="flex items-center gap-2 glass-tab-active">
@@ -388,10 +334,10 @@ export const BrandDataEditor: React.FC<BrandDataEditorProps> = ({ data, onSave }
           </TabsTrigger>
         </TabsList>
 
-        {/* 概览模式 */}
+        {/* Overview mode */}
         <TabsContent value="overview">{renderOverview()}</TabsContent>
 
-        {/* JSON编辑模式 */}
+        {/* JSON edit mode */}
         <TabsContent value="json">
           <Card className="glass-card">
             <CardHeader>

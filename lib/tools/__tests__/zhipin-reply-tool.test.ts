@@ -14,33 +14,16 @@ describe("zhipinReplyTool - 创建期 Schema 验证", () => {
   beforeEach(() => {
     validReplyPrompts = DEFAULT_REPLY_POLICY;
 
-    // 完整的 ZhipinData
-    // 注意：templates 的类型是 Record<ReplyContext, string[]>，而不是 ReplyPolicyConfig
+    // 完整的 ZhipinData（新结构：{ meta, brands[] }）
     validConfigData = {
-      city: "上海",
-      stores: [],
-      brands: {
-        测试品牌: {
-          templates: {
-            initial_inquiry: ["你好！我们正在招聘..."],
-            location_inquiry: ["请问您在哪个区域？"],
-            no_location_match: ["很抱歉，该区域暂无职位"],
-            schedule_inquiry: ["工作时间为..."],
-            interview_request: ["欢迎来面试！"],
-            general_chat: ["有什么可以帮到您？"],
-            salary_inquiry: ["薪资待遇为..."],
-            age_concern: ["年龄要求..."],
-            insurance_inquiry: ["我们提供五险一金"],
-            followup_chat: ["请问还有其他问题吗？"],
-            attendance_inquiry: ["出勤要求为..."],
-            flexibility_inquiry: ["排班较为灵活"],
-            attendance_policy_inquiry: ["考勤制度为..."],
-            work_hours_inquiry: ["每周工作..."],
-            availability_inquiry: ["目前有空缺..."],
-            part_time_support: ["支持兼职"],
-          },
+      meta: { defaultBrandId: "test_brand" },
+      brands: [
+        {
+          id: "test_brand",
+          name: "测试品牌",
+          stores: [],
         },
-      },
+      ],
     };
 
     baseContext = {
@@ -53,27 +36,9 @@ describe("zhipinReplyTool - 创建期 Schema 验证", () => {
   });
 
   describe("contextStrategy = error", () => {
-    it("缺少 stores 字段应抛出错误", () => {
-      const incompleteConfigData = {
-        city: "上海",
-        brands: validConfigData.brands,
-        // 缺少 stores
-      } as unknown as ZhipinData;
-
-      expect(() => {
-        createToolsWithStrategy(
-          ["zhipin_reply_generator"],
-          { ...baseContext, configData: incompleteConfigData },
-          {},
-          "error"
-        );
-      }).toThrow(/stores.*Required/);
-    });
-
     it("缺少 brands 字段应抛出错误", () => {
       const incompleteConfigData = {
-        city: "上海",
-        stores: [],
+        meta: { defaultBrandId: "test_brand" },
         // 缺少 brands
       } as unknown as ZhipinData;
 
@@ -87,11 +52,10 @@ describe("zhipinReplyTool - 创建期 Schema 验证", () => {
       }).toThrow(/brands.*Required/);
     });
 
-    it("缺少 city 字段应抛出错误", () => {
+    it("缺少 meta 字段应抛出错误", () => {
       const incompleteConfigData = {
-        stores: [],
-        brands: validConfigData.brands,
-        // 缺少 city
+        brands: [],
+        // 缺少 meta
       } as unknown as ZhipinData;
 
       expect(() => {
@@ -101,18 +65,17 @@ describe("zhipinReplyTool - 创建期 Schema 验证", () => {
           {},
           "error"
         );
-      }).toThrow(/city.*Required/);
+      }).toThrow(/meta.*Required/);
     });
 
-    it("brands 中缺少 templates 字段应抛出错误", () => {
+    it("brands 中缺少必需字段应抛出错误", () => {
       const incompleteConfigData: ZhipinData = {
-        city: "上海",
-        stores: [],
-        brands: {
-          测试品牌: {
-            // 缺少 templates
+        meta: {},
+        brands: [
+          {
+            // 缺少 id, name, stores
           } as never,
-        },
+        ],
       };
 
       expect(() => {
@@ -140,11 +103,10 @@ describe("zhipinReplyTool - 创建期 Schema 验证", () => {
   });
 
   describe("contextStrategy = skip", () => {
-    it("缺少 stores 字段应跳过工具", () => {
+    it("缺少 brands 字段应跳过工具", () => {
       const incompleteConfigData = {
-        city: "上海",
-        brands: validConfigData.brands,
-        // 缺少 stores
+        meta: { defaultBrandId: "test_brand" },
+        // 缺少 brands
       } as unknown as ZhipinData;
 
       const result = createToolsWithStrategy(
@@ -163,11 +125,10 @@ describe("zhipinReplyTool - 创建期 Schema 验证", () => {
       expect(result.skipped[0].structureErrors![0].field).toBe("configData");
     });
 
-    it("缺少 brands 字段应跳过工具", () => {
+    it("缺少 meta 字段应跳过工具", () => {
       const incompleteConfigData = {
-        city: "上海",
-        stores: [],
-        // 缺少 brands
+        brands: [],
+        // 缺少 meta
       } as unknown as ZhipinData;
 
       const result = createToolsWithStrategy(
@@ -197,11 +158,10 @@ describe("zhipinReplyTool - 创建期 Schema 验证", () => {
   });
 
   describe("contextStrategy = report", () => {
-    it("缺少 stores 字段应记录到验证报告", () => {
+    it("缺少 brands 字段应记录到验证报告", () => {
       const incompleteConfigData = {
-        city: "上海",
-        brands: validConfigData.brands,
-        // 缺少 stores
+        meta: { defaultBrandId: "test_brand" },
+        // 缺少 brands
       } as unknown as ZhipinData;
 
       const result = createToolsWithStrategy(
@@ -221,11 +181,10 @@ describe("zhipinReplyTool - 创建期 Schema 验证", () => {
       expect(result.validationReport?.tools[0].structureErrors).toHaveLength(1);
     });
 
-    it("缺少 brands 字段应记录到验证报告", () => {
+    it("缺少 meta 字段应记录到验证报告", () => {
       const incompleteConfigData = {
-        city: "上海",
-        stores: [],
-        // 缺少 brands
+        brands: [],
+        // 缺少 meta
       } as unknown as ZhipinData;
 
       const result = createToolsWithStrategy(
@@ -313,15 +272,15 @@ describe("zhipinReplyTool - 创建期 Schema 验证", () => {
   });
 
   describe("空数组的有效性", () => {
-    it("configData.stores 为空数组应成功创建工具", () => {
-      const configWithEmptyStores: ZhipinData = {
-        ...validConfigData,
-        stores: [], // 空数组是有效的
+    it("configData.brands 为空数组应成功创建工具", () => {
+      const configWithEmptyBrands: ZhipinData = {
+        meta: {},
+        brands: [], // 空数组是有效的
       };
 
       const result = createToolsWithStrategy(
         ["zhipin_reply_generator"],
-        { ...baseContext, configData: configWithEmptyStores },
+        { ...baseContext, configData: configWithEmptyBrands },
         {},
         "error"
       );

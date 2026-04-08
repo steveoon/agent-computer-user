@@ -104,14 +104,14 @@ export function MatchedStoresCard({
                 </div>
                 {!compact && (
                   <div className="text-gray-500 dark:text-gray-400 truncate">
-                    {store.district} - {store.location}
+                    {store.district ? `${store.district} - ${store.location}` : store.location}
                   </div>
                 )}
               </div>
 
               {/* 品牌标签 */}
               <span className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded text-xs shrink-0">
-                {store.brand}
+                {store.brandName ?? store.brandId}
               </span>
             </div>
           );

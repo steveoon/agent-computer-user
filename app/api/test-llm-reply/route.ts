@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateSmartReply } from "@/lib/agents";
 import { DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
 import { ChannelTypeSchema } from "@/types/reply-policy";
+import { getAllStores } from "@/types/zhipin";
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,9 +45,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const allStores = getAllStores(configData);
     console.log("✅ test-llm-reply API: 使用客户端传递的配置数据", {
-      brands: Object.keys(configData.brands),
-      stores: configData.stores.length,
+      brands: configData.brands.map((item: { name: string }) => item.name),
+      stores: allStores.length,
       hasReplyPolicy: !!replyPolicy,
     });
 

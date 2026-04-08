@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import { BackButton } from "@/components/ui/back-button";
 import { DropZone, DropZoneHint } from "@/components/ui/drop-zone";
 import { useConfigManager } from "@/hooks/useConfigManager";
 import { useRouter } from "next/navigation";
+import { getAllStores } from "@/types";
 
 // 编辑器组件骨架加载状态
 function EditorSkeleton() {
@@ -100,7 +101,7 @@ export default function AdminSettingsPage() {
 
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
-  const [currentTime, setCurrentTime] = useState<string>("");
+  const [currentTime] = useState(() => new Date().toLocaleString());
 
   const handleImportConfig = async () => {
     const pickerWindow: FilePickerWindow = window;
@@ -169,10 +170,6 @@ export default function AdminSettingsPage() {
     window.addEventListener("focus", cleanup, { once: true });
     input.click();
   };
-
-  useEffect(() => {
-    setCurrentTime(new Date().toLocaleString());
-  }, []);
 
   if (loading) {
     return (
@@ -319,20 +316,20 @@ export default function AdminSettingsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {config?.brandData ? Object.keys(config.brandData.brands).length : 0}
+                    {config?.brandData ? config.brandData.brands.length : 0}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    个品牌，共 {config?.brandData?.stores?.length || 0} 家门店
+                    个品牌，共 {config?.brandData ? getAllStores(config.brandData).length : 0} 家门店
                   </p>
                   <div className="mt-3 flex flex-wrap gap-1">
                     {config?.brandData &&
-                      Object.keys(config.brandData.brands).map(brand => (
+                      config.brandData.brands.map(brand => (
                         <Badge
-                          key={brand}
+                          key={brand.id}
                           variant="secondary"
                           className="text-xs bg-white/50 hover:bg-white/70"
                         >
-                          {brand}
+                          {brand.name}
                         </Badge>
                       ))}
                   </div>

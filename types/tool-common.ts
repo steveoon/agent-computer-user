@@ -4,11 +4,10 @@
  */
 
 import { z } from 'zod/v3';
-import type { UIMessage, UIMessagePart, UIDataTypes, UITools, Tool } from "ai";
+import type { UIMessagePart, UIDataTypes, UITools, Tool } from "ai";
 import type { ModelConfig } from "@/lib/config/models";
 import type { ZhipinData } from "./zhipin";
 import type { SystemPromptsConfig, ReplyPolicyConfig, BrandPriorityStrategy } from "./config";
-import type { StageGoals } from "./reply-policy";
 
 export interface ReplyPolicyPatchChange {
   module: string;
@@ -47,11 +46,6 @@ export interface ToolCreationContext {
   industryVoiceId?: string;
   dulidayToken?: string;
   defaultWechatId?: string; // 默认微信号
-  processedMessages?: UIMessage[]; // 完整对话消息，由工具内部转换为所需格式
-  userId?: string; // 用户 ID，通过 context.userId 注入
-  sessionId?: string; // 会话 ID，通过 context.sessionId 注入
-  stageGoals?: StageGoals; // 企微对话阶段目标，通过 toolContext.wework_plan_turn.stageGoals 注入
-  onJobsFetched?: (jobs: unknown[]) => void; // 工具获取到岗位数据后的回调，由预处理器注入
   channelType?: "public" | "private";
   replyPolicyDraftContext?: ReplyPolicyDraftRuntimeContext;
 }

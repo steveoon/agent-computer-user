@@ -31,6 +31,7 @@ export type GeocodingStats = z.infer<typeof GeocodingStatsSchema>;
  */
 export const SyncResultSchema = z
   .object({
+    organizationId: z.number().optional(),
     success: z.boolean(),
     totalRecords: z.number(),
     processedRecords: z.number(),

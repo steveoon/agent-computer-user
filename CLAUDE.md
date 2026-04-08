@@ -1,8 +1,10 @@
 # CLAUDE.md
 
+@AGENTS.md
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Environment:** Node.js 18.18+, pnpm 8+ recommended
+**Environment:** Node.js 20.9+, pnpm 8+ recommended
 
 ## Development Commands
 
@@ -57,11 +59,11 @@ Manage multiple Agent instances with isolated browser sessions. See [MULTI_AGENT
 
 ### Core Application Structure
 
-Next.js 15 AI recruitment assistant platform with AI SDK v6:
+Next.js 16 AI recruitment assistant platform with AI SDK v6:
 
 **Multi-Provider AI Integration:**
 - Primary: Anthropic Claude Sonnet for computer use
-- Secondary: Qwen models via `qwen-ai-provider` for smart reply
+- Smart Reply: Delegated to `@roll-agent/smart-reply-agent` npm package (supports OpenAI, Anthropic, Qwen, Google, DeepSeek, MoonshotAI)
 - Supports OpenAI, Google AI, OpenRouter (v2, native AI SDK v6 support) via AI SDK
 - Provider management: `lib/model-registry/`
 - Custom OpenRouter provider: `lib/model-registry/providers/openrouter-custom.ts` (Kimi K2 stream fix only)
@@ -73,10 +75,11 @@ Next.js 15 AI recruitment assistant platform with AI SDK v6:
 - Zustand stores for state management
 
 **Smart Reply System:**
-- Two-phase AI: Classification (generateObject) → Reply generation (generateText)
-- 16 reply scenarios (10 recruitment + 6 attendance)
-- Fallback to rule-based engine when LLM fails
-- Main function: `generateSmartReplyWithLLM()` in `lib/loaders/zhipin-data.loader.ts`
+- Core logic delegated to `@roll-agent/smart-reply-agent/pipeline` npm package
+- Local adapter in `lib/agents/smart-reply-agent.ts` adds `classification` compat field and model config normalization (openrouter downgrade, host defaults)
+- Pipeline: Turn planning (planTurn) → Needs-driven context → Policy-driven reply → FactGate/ReplyGate validation
+- Entry point: `generateSmartReply()` in `lib/agents/smart-reply-agent.ts`
+- `lib/loaders/zhipin-data.loader.ts` only handles data loading and brand resolution (context building moved to npm package)
 
 ### Core Design Patterns
 
@@ -108,7 +111,7 @@ z.string({ error: issue => issue.input === undefined ? "Required" : "Invalid" })
 ### File Organization
 
 - **Components**: `components/` with domain subdirectories
-- **API Routes**: `app/api/*/route.ts` (Next.js 15 App Router)
+- **API Routes**: `app/api/*/route.ts` (Next.js 16 App Router)
 - **Server Actions**: `actions/` for Next.js Server Actions
 - **Tools**: `lib/tools/` with tool-specific subdirectories
 - **Stores**: `lib/stores/` (Zustand)
@@ -344,7 +347,7 @@ catch (error) {
 ## Key Data Flows
 
 1. **Config**: 企微智能bot平台通过 `/api/v1/chat` context 传入 → Components (本地开发: `ConfigInitializer` → `configService.getConfig()`)
-2. **Smart Reply**: Message → Classification → Reply generation
+2. **Smart Reply**: Message → `@roll-agent/smart-reply-agent/pipeline` (turn planning → context → reply → gate validation) → adapter adds classification compat
 3. **Computer Use**: Action → E2B tools → Desktop → Screenshot/result
 4. **Brand Management**: Database → Server Actions → Zustand → Admin UI
 5. **LLM-Guided Config**: User chat → `reply_policy_read` → `reply_policy_ask` (HITL loop) → `reply_policy_save` → client-side IndexedDB write

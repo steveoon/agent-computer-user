@@ -51,6 +51,25 @@
         console.log("✅ 已移除 brandData.screening");
         hasChanges = true;
       }
+
+      // 将旧版顶层 stores 迁移到 brands[].stores 后，删除遗留字段
+      if ("stores" in config.brandData && Array.isArray(config.brandData.stores)) {
+        delete config.brandData.stores;
+        console.log("✅ 已移除 brandData.stores（旧版扁平结构）");
+        hasChanges = true;
+      }
+
+      if ("city" in config.brandData) {
+        delete config.brandData.city;
+        console.log("✅ 已移除 brandData.city（已由 brands[].stores.city 推导）");
+        hasChanges = true;
+      }
+
+      if ("defaultBrand" in config.brandData) {
+        delete config.brandData.defaultBrand;
+        console.log("✅ 已移除 brandData.defaultBrand（已迁移为 meta.defaultBrandId）");
+        hasChanges = true;
+      }
     }
 
     // 清理旧版 replyPrompts 字段（v2.0.0 迁移为 replyPolicy）
@@ -76,8 +95,10 @@
 
       // 显示清理统计
       console.log("\n📈 清理完成统计:");
-      console.log("- 品牌数量:", Object.keys(config.brandData.brands).length);
-      console.log("- 门店数量:", config.brandData.stores.length);
+      const brands = Array.isArray(config.brandData?.brands) ? config.brandData.brands : [];
+      const storeCount = brands.reduce((sum, brand) => sum + (brand.stores?.length || 0), 0);
+      console.log("- 品牌数量:", brands.length);
+      console.log("- 门店数量:", storeCount);
       console.log("- 回复策略阶段数:", config.replyPolicy?.stageGoals ? Object.keys(config.replyPolicy.stageGoals).length : "N/A");
       console.log("- 系统提示词数量:", Object.keys(config.systemPrompts).length);
 

@@ -1,11 +1,12 @@
 /**
  * 🎯 品牌数据编辑器状态管理 Store
- * 集中管理 brand-data-editor 和 template-editor 组件的状态
+ * 集中管理 brand-data-editor 相关的编辑状态
  */
 
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
-import type { ZhipinData, ScheduleType, SchedulingFlexibility } from "@/types";
+import type { ZhipinData } from "@/types";
+import { findBrandByNameOrAlias, getAllStores } from "@/types";
 
 interface BrandEditorState {
   // 核心数据
@@ -16,7 +17,7 @@ interface BrandEditorState {
   // UI 状态
   editMode: "overview" | "json";
   editingBrand: string | null;
-  editingType: "templates" | "schedule" | null;
+  editingType: "schedule" | null;
   isLoading: boolean;
   isSaving: boolean;
   error: string | null;
@@ -28,12 +29,11 @@ interface BrandEditorState {
   initializeData: (data: ZhipinData) => void;
   setEditMode: (mode: "overview" | "json") => void;
   setEditingBrand: (brand: string | null) => void;
-  setEditingType: (type: "templates" | "schedule" | null) => void;
-  updateTemplates: (brandName: string, templates: Record<string, string[]>) => ZhipinData | null;
-  updateSchedulingInfo: (
+  setEditingType: (type: "schedule" | null) => void;
+  updatePositionFields: (
     brandName: string,
-    scheduleType: ScheduleType,
-    schedulingFlexibility: SchedulingFlexibility,
+    laborForm: string | null,
+    employmentForm: string | null,
     targetType: "all" | "store",
     storeIndex?: number,
     positionIndex?: number
@@ -86,40 +86,11 @@ export const useBrandEditorStore = create<BrandEditorState>()(
         set({ editingType: type });
       },
 
-      // 更新品牌话术模板
-      updateTemplates: (brandName, templates) => {
-        const { localData } = get();
-        if (!localData) return null;
-
-        // 深拷贝模板以确保每个品牌有独立的副本
-        const clonedTemplates = structuredClone(templates);
-
-        const updatedData = {
-          ...localData,
-          brands: {
-            ...localData.brands,
-            [brandName]: {
-              ...localData.brands[brandName],
-              templates: clonedTemplates,
-            },
-          },
-        };
-
-        set({
-          localData: updatedData,
-          jsonData: JSON.stringify(updatedData, null, 2),
-          hasUnsavedChanges: true,
-        });
-
-        // 返回更新后的数据
-        return updatedData;
-      },
-
-      // 更新排班信息
-      updateSchedulingInfo: (
+      // 更新岗位用工信息
+      updatePositionFields: (
         brandName,
-        scheduleType,
-        schedulingFlexibility,
+        laborForm,
+        employmentForm,
         targetType,
         storeIndex,
         positionIndex
@@ -127,43 +98,47 @@ export const useBrandEditorStore = create<BrandEditorState>()(
         const { localData } = get();
         if (!localData) return null;
 
-        const updatedStores = [...localData.stores];
+        const updatedData = structuredClone(localData);
+        const brand = findBrandByNameOrAlias(updatedData, brandName);
+        if (!brand) return null;
+
+        const applyToPosition = (position: { laborForm: string | null; employmentForm: string | null }): void => {
+          position.laborForm = laborForm;
+          position.employmentForm = employmentForm;
+        };
 
         if (targetType === "all") {
-          // 批量更新该品牌下所有门店的所有岗位
-          updatedStores.forEach(store => {
-            if (store.brand === brandName) {
-              store.positions.forEach(position => {
-                position.scheduleType = scheduleType;
-                position.schedulingFlexibility = { ...schedulingFlexibility };
-              });
+          for (const b of updatedData.brands) {
+            if (b.id === brand.id) {
+              for (const store of b.stores) {
+                for (const position of store.positions) {
+                  applyToPosition(position);
+                }
+              }
             }
-          });
+          }
         } else if (targetType === "store" && storeIndex !== undefined) {
-          // 更新指定门店的所有岗位
-          if (positionIndex !== undefined) {
-            // 更新指定岗位
-            if (updatedStores[storeIndex]?.positions[positionIndex]) {
-              updatedStores[storeIndex].positions[positionIndex].scheduleType = scheduleType;
-              updatedStores[storeIndex].positions[positionIndex].schedulingFlexibility = {
-                ...schedulingFlexibility,
-              };
-            }
-          } else {
-            // 更新门店下所有岗位
-            if (updatedStores[storeIndex]) {
-              updatedStores[storeIndex].positions.forEach(position => {
-                position.scheduleType = scheduleType;
-                position.schedulingFlexibility = { ...schedulingFlexibility };
-              });
+          const allStoresFlat = getAllStores(updatedData);
+          const targetStore = allStoresFlat[storeIndex];
+          if (!targetStore) return null;
+
+          for (const b of updatedData.brands) {
+            for (const store of b.stores) {
+              if (store.id === targetStore.id) {
+                if (positionIndex !== undefined) {
+                  if (store.positions[positionIndex]) {
+                    applyToPosition(store.positions[positionIndex]);
+                  }
+                } else {
+                  for (const position of store.positions) {
+                    applyToPosition(position);
+                  }
+                }
+                break;
+              }
             }
           }
         }
-
-        const updatedData = {
-          ...localData,
-          stores: updatedStores,
-        };
 
         set({
           localData: updatedData,
@@ -223,8 +198,8 @@ export const useBrandEditorStore = create<BrandEditorState>()(
           }
 
           // 基本验证
-          if (!dataToSave.brands || !dataToSave.stores) {
-            throw new Error("数据格式不正确，必须包含 brands 和 stores 字段");
+          if (!dataToSave.brands || !dataToSave.meta) {
+            throw new Error("数据格式不正确，必须包含 meta 和 brands 字段");
           }
 
           // 调用保存函数

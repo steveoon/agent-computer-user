@@ -9,6 +9,7 @@ import { loadZhipinData } from "../loaders/zhipin-data.loader";
 import { generateSmartReply } from "@/lib/agents";
 import { activeConfig } from "./display-config";
 import type { Store } from "../../types/zhipin";
+import { getAllStores } from "../../types/zhipin";
 import type { ModelConfig } from "../config/models";
 import type { ZhipinData, ReplyPolicyConfig } from "@/types";
 
@@ -1114,12 +1115,14 @@ export const computerTool = (
             }
 
             // 生成回复 - 使用新的 Agent-based 智能回复
+            const effectiveConfigData = configData || (await loadZhipinData());
+
             const replyResult = await generateSmartReply({
               candidateMessage: candidate_message || "",
               conversationHistory: processedHistory,
               preferredBrand,
               modelConfig,
-              configData: configData!, // 配置数据
+              configData: effectiveConfigData,
               replyPolicy, // 回复指令
               defaultWechatId, // 默认微信号
             });
@@ -1131,8 +1134,8 @@ export const computerTool = (
             console.log(`📝 对话历史: ${processedHistory.length}条消息`);
             console.log(`⚙️ 自动输入: ${auto_input ? "是" : "否"}`);
 
-            // 为了显示统计信息，使用传入的配置数据或重新加载
-            const storeDatabase = configData || (await loadZhipinData());
+            // 为了显示统计信息，复用同一份配置数据
+            const storeDatabase = effectiveConfigData;
 
             let resultText = `✅ Boss直聘回复已生成：\n\n"${
               replyResult.suggestedReply
@@ -1141,8 +1144,8 @@ export const computerTool = (
             }\n• 阶段: ${replyResult.turnPlan.stage}\n• Needs: ${
               replyResult.turnPlan.needs.join("、") || "none"
             }\n• 对话历史: ${processedHistory.length}条消息\n• 使用数据: ${
-              storeDatabase.stores.length
-            }家门店，${storeDatabase.stores.reduce(
+              getAllStores(storeDatabase).length
+            }家门店，${getAllStores(storeDatabase).reduce(
               (sum: number, store: Store) => sum + store.positions.length,
               0
             )}个岗位`;

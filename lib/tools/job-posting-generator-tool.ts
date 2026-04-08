@@ -3,7 +3,7 @@ import { z } from "zod/v3";
 import { getDynamicRegistry } from "@/lib/model-registry/dynamic-registry";
 import { DEFAULT_PROVIDER_CONFIGS } from "@/lib/config/models";
 import { safeGenerateObject } from "@/lib/ai";
-import type { Store, Position, ZhipinData } from "@/types/zhipin";
+import { type Store, type Position, type ZhipinData, getDefaultBrand, findBrandByNameOrAlias, getStoresByBrandId, getAllStores } from "@/types/zhipin";
 
 // 岗位类型枚举 - 包含常见的零售和餐饮岗位
 const positionTypeSchema = z
@@ -56,13 +56,19 @@ export const jobPostingGeneratorTool = (preferredBrand?: string, configData?: Zh
         }
 
         // 确定使用的品牌 - 优先级：工具参数 > 用户选择的品牌 > 默认品牌
-        const targetBrand = brand || preferredBrand || configData.defaultBrand;
-        if (!targetBrand) {
+        const targetBrandName = brand || preferredBrand || getDefaultBrand(configData)?.name;
+        if (!targetBrandName) {
           return {
             type: "text" as const,
             text: "❌ 未指定品牌且没有默认品牌设置",
           };
         }
+
+        // 查找品牌对象并获取该品牌的门店
+        const targetBrandObj = findBrandByNameOrAlias(configData, targetBrandName);
+        const brandStores = targetBrandObj
+          ? getStoresByBrandId(configData, targetBrandObj.id)
+          : getAllStores(configData).filter(s => s.brandId === targetBrandName);
 
         // 筛选包含指定岗位的门店
         const matchingStores: Array<{
@@ -70,10 +76,7 @@ export const jobPostingGeneratorTool = (preferredBrand?: string, configData?: Zh
           position: Position;
         }> = [];
 
-        for (const store of configData.stores) {
-          // 只处理指定品牌的门店
-          if (store.brand !== targetBrand) continue;
-
+        for (const store of brandStores) {
           // 查找匹配的岗位
           for (const position of store.positions) {
             // 更灵活的匹配：检查岗位名称是否包含岗位类型关键词
@@ -87,7 +90,7 @@ export const jobPostingGeneratorTool = (preferredBrand?: string, configData?: Zh
         if (matchingStores.length === 0) {
           return {
             type: "text" as const,
-            text: `❌ 未找到${targetBrand}品牌下的${positionType}岗位空缺`,
+            text: `❌ 未找到${targetBrandName}品牌下的${positionType}岗位空缺`,
           };
         }
 
@@ -95,8 +98,8 @@ export const jobPostingGeneratorTool = (preferredBrand?: string, configData?: Zh
         const displayStores = matchingStores.slice(0, limit);
 
         // 获取基础薪资（假设所有同类岗位薪资相同）
-        const baseSalary = displayStores[0]?.position.salary.base || 24;
-        const salaryMemo = displayStores[0]?.position.salary.memo || "";
+        const baseSalary = displayStores[0]?.position.salary.base ?? 24;
+        const salaryMemo = displayStores[0]?.position.salary.memo ?? "";
 
         // 默认薪资信息
         const defaultStepSalary: z.infer<typeof stepSalarySchema> = {
@@ -144,7 +147,7 @@ export const jobPostingGeneratorTool = (preferredBrand?: string, configData?: Zh
         // 添加门店信息
         for (const { store, position } of displayStores) {
           const timeSlots = position.timeSlots.join("、");
-          message += `📍${store.district} - ${store.name}\n`;
+          message += `📍${store.district ? `${store.district} - ` : ""}${store.name}\n`;
           message += `时段：${timeSlots}\n\n`;
         }
 
