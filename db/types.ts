@@ -293,6 +293,7 @@ export const insertRecruitmentEventSchema = createInsertSchema(recruitmentEvents
   jobName: z.string().max(100).optional(),
   dataSource: z.string().max(20).optional(),
   apiSource: z.string().max(20).optional(),
+  idempotencyKey: z.string().max(128).optional(),
   unreadCountBeforeReply: z.number().int().optional(),
 });
 
@@ -481,6 +482,7 @@ export function createRecruitmentEventInput(params: {
   jobName?: string;
   dataSource?: DataSourceValue;
   apiSource?: ApiSourceValue;
+  idempotencyKey?: string;
 }): InsertRecruitmentEvent {
   const candidateKey = generateCandidateKey({
     platform: params.sourcePlatform || SourcePlatform.ZHIPIN,
@@ -508,5 +510,6 @@ export function createRecruitmentEventInput(params: {
     jobName: params.jobName,
     dataSource: params.dataSource || DataSource.TOOL_AUTO,
     apiSource: params.apiSource || ApiSource.WEB,
+    idempotencyKey: params.idempotencyKey,
   };
 }

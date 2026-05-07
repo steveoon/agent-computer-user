@@ -246,6 +246,9 @@ export const recruitmentEvents = appSchema.table(
 
     // API来源（web: 网页端, open_api: 开放接口）
     apiSource: varchar("api_source", { length: 20 }).default("web"),
+
+    // 外部调用幂等键（按 agent_id 隔离）
+    idempotencyKey: varchar("idempotency_key", { length: 128 }),
   },
   table => [
     // 查询优化索引
@@ -257,6 +260,11 @@ export const recruitmentEvents = appSchema.table(
 
     // 复合索引：支持 Dashboard 常见查询
     index("idx_re_agent_type_time").on(table.agentId, table.eventType, table.eventTime),
+
+    // 请求级幂等：只约束传入 idempotency_key 的开放接口事件
+    uniqueIndex("unique_re_idempotency")
+      .on(table.agentId, table.idempotencyKey)
+      .where(sql`${table.idempotencyKey} IS NOT NULL`),
   ]
 );
 

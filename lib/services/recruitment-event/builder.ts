@@ -23,6 +23,7 @@ import {
   type SourcePlatformValue,
   type EventDetails,
   type WechatExchangeTypeValue,
+  type DataSourceValue,
 } from "@/db/types";
 import { recruitmentContext } from "./context";
 import type { DrizzleInsertEvent } from "./repository";
@@ -156,6 +157,24 @@ export class RecruitmentEventBuilder {
   }
 
   /**
+   * Override data source.
+   *
+   * Open API writes use api_callback/manual, while tool-triggered events keep tool_auto.
+   */
+  withDataSource(dataSource: DataSourceValue): this {
+    this.data.dataSource = dataSource;
+    return this;
+  }
+
+  /**
+   * Set request idempotency key for Open API writes.
+   */
+  withIdempotencyKey(idempotencyKey?: string): this {
+    this.data.idempotencyKey = idempotencyKey;
+    return this;
+  }
+
+  /**
    * Create a MESSAGE_SENT event
    *
    * @param content - Message content
@@ -277,11 +296,17 @@ export class RecruitmentEventBuilder {
     eventDetails: EventDetails;
   }): DrizzleInsertEvent {
     const eventTime = this.data.eventTime || new Date();
+    const sourcePlatform = this.data.sourcePlatform;
+    const agentId = this.data.agentId;
+
+    if (!sourcePlatform || !agentId) {
+      throw new Error("[RecruitmentEventBuilder] Missing required context fields");
+    }
 
     // Generate candidateKey
     // Use this.data.sourcePlatform which may be overridden by forPlatform()
     const candidateKey = generateCandidateKey({
-      platform: this.data.sourcePlatform!,
+      platform: sourcePlatform,
       candidateName: this.data.candidateName || "unknown",
       candidatePosition: this.data.candidatePosition ?? undefined,
     });
@@ -290,7 +315,7 @@ export class RecruitmentEventBuilder {
     const sessionId = generateSessionId(this.context.agentId, candidateKey, eventTime);
 
     return {
-      agentId: this.data.agentId!,
+      agentId,
       candidateKey,
       sessionId,
       eventType: eventData.eventType,
@@ -315,6 +340,7 @@ export class RecruitmentEventBuilder {
       messageSequence: this.data.messageSequence,
       dataSource: this.data.dataSource,
       apiSource: this.data.apiSource,
+      idempotencyKey: this.data.idempotencyKey,
     };
   }
 }

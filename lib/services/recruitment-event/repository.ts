@@ -67,7 +67,11 @@ class RecruitmentEventsRepository {
    * @param event - The event to insert
    * @returns The inserted event or null if failed
    */
-  async insert(event: DrizzleInsertEvent): Promise<DrizzleSelectEvent | null> {
+  async insert(
+    event: DrizzleInsertEvent,
+    options: { markDirty?: boolean } = {}
+  ): Promise<DrizzleSelectEvent | null> {
+    const { markDirty = true } = options;
     const result = await withRetry(async () => {
       const db = getDb();
       const [inserted] = await db.insert(recruitmentEvents).values(event).returning();
@@ -76,7 +80,7 @@ class RecruitmentEventsRepository {
     }, "insert");
 
     // 标记统计数据为脏（需要重新聚合）
-    if (result) {
+    if (result && markDirty) {
       // 1. 始终标记汇总行（brand_id: null, job_id: null）为脏
       recruitmentStatsRepository
         .markDirty(result.agentId, result.eventTime, null, null)
@@ -100,6 +104,46 @@ class RecruitmentEventsRepository {
     }
 
     return result;
+  }
+
+  /**
+   * Insert a single recruitment event and let database errors bubble up.
+   *
+   * Used by Open API idempotent writes so unique-violation races can be
+   * translated to an "existing" result instead of being swallowed by retry.
+   */
+  async insertStrict(event: DrizzleInsertEvent): Promise<DrizzleSelectEvent> {
+    const db = getDb();
+    const [inserted] = await db.insert(recruitmentEvents).values(event).returning();
+    if (!inserted) {
+      throw new Error("Recruitment event insert returned no row");
+    }
+    console.log(`${LOG_PREFIX} Event inserted: ${inserted.id} (${inserted.eventType})`);
+    return inserted;
+  }
+
+  /**
+   * Find an event by Open API idempotency key.
+   */
+  async findByIdempotencyKey(
+    agentId: string,
+    idempotencyKey: string
+  ): Promise<DrizzleSelectEvent | null> {
+    const result = await withRetry(async () => {
+      const db = getDb();
+      return db
+        .select()
+        .from(recruitmentEvents)
+        .where(
+          and(
+            eq(recruitmentEvents.agentId, agentId),
+            eq(recruitmentEvents.idempotencyKey, idempotencyKey)
+          )
+        )
+        .limit(1);
+    }, "findByIdempotencyKey");
+
+    return result?.[0] ?? null;
   }
 
   /**
