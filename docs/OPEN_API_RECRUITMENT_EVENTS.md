@@ -19,6 +19,19 @@
 | 汇总查询 | `GET /api/v1/recruitment-stats/summary` | 查询 Dashboard 汇总 |
 | 趋势查询 | `GET /api/v1/recruitment-stats/trend` | 查询日趋势 |
 
+## 环境地址
+
+| 环境 | Base URL | 说明 |
+|---|---|---|
+| 生产 | `https://huajune.duliday.com` | 正式接入地址 |
+
+后续示例统一使用环境变量：
+
+```bash
+export OPEN_API_BASE_URL="https://huajune.duliday.com"
+export OPEN_API_TOKEN="<OPEN_API_TOKEN>"
+```
+
 ## 鉴权
 
 所有 `/api/v1/*` 请求都需要：
@@ -87,7 +100,7 @@ POST /api/v1/recruitment-events
 |---|---:|---|
 | `events` | 是 | 事件数组，最多 `100` 条 |
 | `idempotencyKey` | 建议 | 外部事件唯一键；同一 `agentId + idempotencyKey` 重复调用返回 `existing` |
-| `agentId` | 是 | Agent/账号标识，必须属于当前 token |
+| `agentId` | 是 | Agent/账号标识；当前阶段 token 只做有效性校验，暂不限制可访问的 `agentId` 范围 |
 | `sourcePlatform` | 否 | `zhipin`、`yupao`、`duliday`；默认 `zhipin` |
 | `dataSource` | 否 | `api_callback`、`manual`；默认 `api_callback` |
 | `eventType` | 是 | 事件类型，见下方事件清单 |
@@ -405,7 +418,7 @@ POST /api/v1/recruitment-events
 ## Curl 示例
 
 ```bash
-curl -X POST "https://your-domain.com/api/v1/recruitment-events" \
+curl -X POST "$OPEN_API_BASE_URL/api/v1/recruitment-events" \
   -H "Authorization: Bearer $OPEN_API_TOKEN" \
   -H "Content-Type: application/json" \
   --data '{
@@ -448,7 +461,7 @@ GET /api/v1/recruitment-stats/summary
 示例：
 
 ```bash
-curl "https://your-domain.com/api/v1/recruitment-stats/summary?agentId=siwen-zhipin-1&days=7&endDate=2026-05-07&jobNames=肯德基服务员&jobNames=麦当劳服务员" \
+curl "$OPEN_API_BASE_URL/api/v1/recruitment-stats/summary?agentId=siwen-zhipin-1&days=7&endDate=2026-05-07&jobNames=肯德基服务员&jobNames=麦当劳服务员" \
   -H "Authorization: Bearer $OPEN_API_TOKEN"
 ```
 
@@ -512,7 +525,7 @@ GET /api/v1/recruitment-stats/trend
 示例：
 
 ```bash
-curl "https://your-domain.com/api/v1/recruitment-stats/trend?agentId=siwen-zhipin-1&startDate=2026-05-01&endDate=2026-05-07&jobNames=肯德基服务员,麦当劳服务员" \
+curl "$OPEN_API_BASE_URL/api/v1/recruitment-stats/trend?agentId=siwen-zhipin-1&startDate=2026-05-01&endDate=2026-05-07&jobNames=肯德基服务员,麦当劳服务员" \
   -H "Authorization: Bearer $OPEN_API_TOKEN"
 ```
 
@@ -566,7 +579,7 @@ curl "https://your-domain.com/api/v1/recruitment-stats/trend?agentId=siwen-zhipi
 
 | 条件 | 规则 |
 |---|---|
-| `agentId` | 必须属于当前 API key 的 `allowedAgentIds` |
+| `agentId` | 当前阶段只校验 token 有效性，不限制 API key 可访问的 `agentId`；后续如开启数据范围控制，应改为校验 `key -> allowedAgentIds` |
 | `eventTime` | 不能晚于服务端当前时间 5 分钟，不能早于 90 天 |
 | `idempotencyKey` | 建议必填；缺失时不提供请求级幂等 |
 | 批量写入 | 非事务逐条处理，单条失败不回滚其他事件 |
@@ -576,3 +589,63 @@ curl "https://your-domain.com/api/v1/recruitment-stats/trend?agentId=siwen-zhipi
 ## 双写约束
 
 同一个 `agentId` 如果正在运行 zhipin 工具自动化，不应再通过 Open API 写同一渠道的 `message_received` / `message_sent`，否则会和工具内部埋点形成双写。Open API 主要用于非工具渠道、第三方回调、企微 bot 或人工后台补录。
+
+## 生产验证建议
+
+生产联调时建议使用独立测试 `agentId` 和唯一 `idempotencyKey`，避免污染真实业务 Agent：
+
+```bash
+SMOKE_ID="smoke-test-$(date -u +%Y%m%d%H%M%S)"
+
+curl -X POST "$OPEN_API_BASE_URL/api/v1/recruitment-events" \
+  -H "Authorization: Bearer $OPEN_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data "{
+    \"events\": [
+      {
+        \"idempotencyKey\": \"$SMOKE_ID\",
+        \"agentId\": \"openapi-smoke-test\",
+        \"sourcePlatform\": \"zhipin\",
+        \"dataSource\": \"api_callback\",
+        \"eventType\": \"candidate_contacted\",
+        \"candidate\": {
+          \"name\": \"接口测试候选人\",
+          \"position\": \"接口测试岗位\"
+        },
+        \"job\": {
+          \"jobId\": 990001,
+          \"jobName\": \"接口测试岗位\"
+        },
+        \"details\": {
+          \"testRun\": true
+        }
+      }
+    ]
+  }"
+```
+
+同一个请求再次发送时，预期返回：
+
+```json
+{
+  "success": true,
+  "data": {
+    "results": [
+      {
+        "idempotencyKey": "<SMOKE_ID>",
+        "status": "existing"
+      }
+    ]
+  }
+}
+```
+
+如需清理测试数据，可按测试 `agentId` 删除事件和对应聚合行：
+
+```sql
+delete from app_huajune.recruitment_events
+where agent_id = 'openapi-smoke-test';
+
+delete from app_huajune.recruitment_daily_stats
+where agent_id = 'openapi-smoke-test';
+```

@@ -15,6 +15,13 @@
 
 ## 配置
 
+### API 地址
+
+```bash
+export OPEN_API_BASE_URL="https://huajune.duliday.com"
+export OPEN_API_TOKEN="<OPEN_API_TOKEN>"
+```
+
 ### 环境变量
 
 ```bash
@@ -72,17 +79,21 @@ pnpm test:run __tests__/proxy.test.ts
 ### 手动测试
 
 ```bash
-# 成功请求（需要有效的 token）
-curl -H "Authorization: Bearer your-valid-token" \
+# 生产成功请求（需要有效的 token）
+curl -H "Authorization: Bearer $OPEN_API_TOKEN" \
+     "$OPEN_API_BASE_URL/api/v1/tools"
+
+# 本地成功请求（需要本地服务和有效的 token）
+curl -H "Authorization: Bearer $OPEN_API_TOKEN" \
      http://localhost:3000/api/v1/tools
 
 # 失败请求（无 token）
-curl http://localhost:3000/api/v1/tools
+curl "$OPEN_API_BASE_URL/api/v1/tools"
 # 返回 401
 
 # 失败请求（格式错误）
 curl -H "Authorization: InvalidFormat" \
-     http://localhost:3000/api/v1/tools
+     "$OPEN_API_BASE_URL/api/v1/tools"
 # 返回 401
 ```
 
