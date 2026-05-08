@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Info, ShieldAlert, X } from "lucide-react";
 import Link from "next/link";
 import { useSyncStore } from "@/lib/stores/sync-store";
+import { useAuthStore } from "@/lib/stores/auth-store";
 import { usePathname, useRouter } from "next/navigation";
+import { AuthDialog } from "@/components/auth-dialog";
 
 const DISMISS_KEY = "duliday_token_warning_dismissed";
 
@@ -20,11 +22,14 @@ export function ConfigInitializer() {
     if (typeof window === "undefined") return true;
     return localStorage.getItem(DISMISS_KEY) === "true";
   });
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const isMigrationBlocked = useSyncStore(state => state.isMigrationBlocked);
   const migrationBlockReason = useSyncStore(state => state.migrationBlockReason);
   const isSyncing = useSyncStore(state => state.isSyncing);
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const isAuthLoading = useAuthStore(state => state.isLoading);
 
   useEffect(() => {
     if (isSuccess) {
@@ -41,7 +46,24 @@ export function ConfigInitializer() {
     localStorage.setItem(DISMISS_KEY, "true");
   };
 
+  const requireAuth = (): boolean => {
+    if (isAuthenticated) return true;
+    setAuthDialogOpen(true);
+    return false;
+  };
+
+  const handleGoToSettings = () => {
+    if (!requireAuth()) return;
+    router.push("/admin/settings");
+  };
+
+  const handleGoToSync = () => {
+    if (!requireAuth()) return;
+    router.push("/admin/settings/sync");
+  };
+
   const handleResetAndSync = () => {
+    if (!requireAuth()) return;
     useSyncStore.getState().resetLocalBrandDataAndSync().catch(() => undefined);
     router.push("/admin/settings/sync");
   };
@@ -49,6 +71,11 @@ export function ConfigInitializer() {
   const allowMigrationBypass = pathname?.startsWith("/admin/settings");
 
   if (isMigrationBlocked && !allowMigrationBypass) {
+    const blockMessage = !isAuthenticated
+      ? "当前登录态已失效。为了执行数据版本升级产生的强制全量同步，请先登录。登录后可继续配置 Duliday Token、进入同步管理，或清空本地品牌数据并重新同步。"
+      : migrationBlockReason ||
+        "检测到旧版本配置，需要完成全量同步后才能继续使用。部分品牌失败不会阻断使用，可后续单独重试。";
+
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
         <div className="w-full max-w-xl mx-4 rounded-lg border bg-card p-6 shadow-lg">
@@ -56,29 +83,33 @@ export function ConfigInitializer() {
             <ShieldAlert className="h-5 w-5 text-red-500" />
             <h2 className="text-lg font-semibold text-foreground">数据迁移未完成</h2>
           </div>
-          <p className="mt-3 text-sm text-muted-foreground">
-            {migrationBlockReason ||
-              "检测到旧版本配置，需要完成全量同步后才能继续使用。部分品牌失败不会阻断使用，可后续单独重试。"}
-          </p>
+          <p className="mt-3 text-sm text-muted-foreground">{blockMessage}</p>
           <div className="mt-5 flex flex-col gap-2">
-            <Button variant="secondary" onClick={() => router.push("/admin/settings")}>
-              前往通用配置设置 Token
-            </Button>
-            <Button onClick={handleResetAndSync} disabled={isSyncing}>
-              {isSyncing ? "同步进行中..." : "清空本地品牌数据并重试同步"}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push("/admin/settings/sync")}
-              disabled={isSyncing}
-            >
-              前往同步管理
-            </Button>
+            {!isAuthenticated ? (
+              <Button onClick={() => setAuthDialogOpen(true)} disabled={isAuthLoading}>
+                {isAuthLoading ? "检查登录状态..." : "先登录后同步"}
+              </Button>
+            ) : (
+              <>
+                <Button variant="secondary" onClick={handleGoToSettings}>
+                  前往通用配置设置 Token
+                </Button>
+                <Button onClick={handleResetAndSync} disabled={isSyncing}>
+                  {isSyncing ? "同步进行中..." : "清空本地品牌数据并重试同步"}
+                </Button>
+                <Button variant="outline" onClick={handleGoToSync} disabled={isSyncing}>
+                  前往同步管理
+                </Button>
+              </>
+            )}
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
-            若仍无法同步，可手动清理浏览器存储（localStorage / IndexedDB）后刷新页面重试。
+            {isAuthenticated
+              ? "若仍无法同步，可手动清理浏览器存储（localStorage / IndexedDB）后刷新页面重试。"
+              : "登录成功后，此页面会继续显示强制同步操作。"}
           </p>
         </div>
+        <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
       </div>
     );
   }

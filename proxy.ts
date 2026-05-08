@@ -284,6 +284,6 @@ export const config = {
      *
      * 注意：/api/v1/* 路径会被匹配，但使用独立的鉴权逻辑
      */
-    "/((?!_next/static|_next/image|favicon.ico|api/auth-status|api/diagnose|api/sandbox-status|api/kill-desktop|api/pause-desktop).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/health|api/auth-status|api/diagnose|api/sandbox-status|api/kill-desktop|api/pause-desktop).*)",
   ],
 };

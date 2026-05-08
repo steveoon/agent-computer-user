@@ -6,7 +6,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import { proxy, clearTokenCache } from "../proxy";
+import { proxy, clearTokenCache, config } from "../proxy";
+import { isPublicApiRoute } from "../lib/config/routes";
 
 // Mock fetch 全局函数
 const mockFetch = vi.fn();
@@ -395,6 +396,16 @@ describe("Proxy - Open API 鉴权", () => {
       const response = await proxy(request);
       // 不应该返回 401
       expect(response?.status).not.toBe(401);
+    });
+  });
+
+  describe("健康检查路由", () => {
+    it("应该声明为公开 API 路由", () => {
+      expect(isPublicApiRoute("/api/health")).toBe(true);
+    });
+
+    it("应该在 Proxy matcher 中排除，避免触发 Supabase 会话检查", () => {
+      expect(config.matcher[0]).toContain("api/health");
     });
   });
 
