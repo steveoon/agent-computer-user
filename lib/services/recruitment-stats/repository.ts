@@ -153,6 +153,38 @@ class RecruitmentStatsRepository {
   }
 
   /**
+   * Mark multiple dirty dimensions after a batch event insert.
+   *
+   * The caller may pass duplicate records; this method normalizes and de-dupes
+   * by agent/date/brand/job before issuing upserts.
+   */
+  async markDirtyBatch(records: DirtyRecord[]): Promise<void> {
+    const uniqueRecords = new Map<string, DirtyRecord>();
+
+    for (const record of records) {
+      const statDate = toBeijingMidnight(record.statDate);
+      const key = [
+        record.agentId,
+        statDate.toISOString(),
+        record.brandId ?? "null",
+        record.jobId ?? "null",
+      ].join("|");
+      uniqueRecords.set(key, {
+        agentId: record.agentId,
+        statDate,
+        brandId: record.brandId ?? null,
+        jobId: record.jobId ?? null,
+      });
+    }
+
+    await Promise.all(
+      Array.from(uniqueRecords.values()).map(record =>
+        this.markDirty(record.agentId, record.statDate, record.brandId, record.jobId)
+      )
+    );
+  }
+
+  /**
    * 更新/插入聚合统计
    *
    * 使用 PostgreSQL ON CONFLICT DO UPDATE 实现原子 upsert

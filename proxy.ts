@@ -66,7 +66,12 @@ const AUTH_SERVICE_TIMEOUT = 5000; // 5秒超时
  * Token 缓存配置
  */
 const TOKEN_CACHE_TTL = 60_000; // 60秒缓存
-const tokenCache = new Map<string, number>(); // token -> expiresAt (ms)
+interface CachedTokenAuth {
+  expiresAt: number;
+  allowedAgentIds: string[];
+}
+
+const tokenCache = new Map<string, CachedTokenAuth>(); // token -> auth context
 
 // 导出清理缓存的函数（仅用于测试）
 export const clearTokenCache = () => {
@@ -78,8 +83,8 @@ export const clearTokenCache = () => {
  */
 function cleanupExpiredCache() {
   const now = Date.now();
-  for (const [token, expiresAt] of tokenCache.entries()) {
-    if (expiresAt <= now) {
+  for (const [token, auth] of tokenCache.entries()) {
+    if (auth.expiresAt <= now) {
       tokenCache.delete(token);
     }
   }
@@ -98,14 +103,14 @@ if (typeof globalThis !== "undefined" && !_globalCache.__cacheCleanupInterval) {
  * @param authorization Authorization header 值
  * @returns 是否验证通过
  */
-async function validateOpenApiToken(authorization: string): Promise<boolean> {
+async function validateOpenApiToken(authorization: string): Promise<string[] | null> {
   const now = Date.now();
 
   // 1. 检查缓存
-  const cachedExpiry = tokenCache.get(authorization);
-  if (cachedExpiry && cachedExpiry > now) {
+  const cached = tokenCache.get(authorization);
+  if (cached && cached.expiresAt > now) {
     console.log("[Open API Auth] Token validated from cache");
-    return true;
+    return cached.allowedAgentIds;
   }
 
   // 2. 调用外部鉴权服务
@@ -128,21 +133,31 @@ async function validateOpenApiToken(authorization: string): Promise<boolean> {
       const data = await response.json();
       // 验证成功响应格式 {"isSuccess": true, ...}
       if (data?.isSuccess === true) {
+        const allowedAgentIds = getOpenApiAllowedAgentIds();
         // 写入缓存
-        tokenCache.set(authorization, now + TOKEN_CACHE_TTL);
+        tokenCache.set(authorization, {
+          expiresAt: now + TOKEN_CACHE_TTL,
+          allowedAgentIds,
+        });
         console.log("[Open API Auth] Token validated and cached");
-        return true;
+        return allowedAgentIds;
       }
     }
 
     console.log(`[Open API Auth] Token validation failed: ${response.status}`);
-    return false;
+    return null;
   } catch (error) {
     // 网络错误或超时
     console.error("[Open API Auth] External auth service error:", error);
     // 安全优先：外部服务不可用时拒绝访问
-    return false;
+    return null;
   }
+}
+
+function getOpenApiAllowedAgentIds(): string[] {
+  // 当前外部鉴权服务只负责验证 key 是否有效，不提供业务授权范围。
+  // 为了先跑通 Open API，认证通过后暂时允许访问全部 agentId。
+  return ["*"];
 }
 
 /**
@@ -161,48 +176,56 @@ function createErrorResponse(
  * @param request Next.js 请求对象
  * @returns 如果鉴权失败返回错误响应，成功返回 null
  */
-async function handleOpenApiAuth(request: NextRequest): Promise<NextResponse | null> {
+async function handleOpenApiAuth(
+  request: NextRequest
+): Promise<{ response: NextResponse } | { allowedAgentIds: string[] }> {
   const auth = request.headers.get("authorization");
 
   // 1. 检查 Authorization header
   if (!auth) {
-    return createErrorResponse(
-      {
-        error: "Unauthorized",
-        message: "Missing authorization header",
-        statusCode: 401,
-      },
-      request
-    );
+    return {
+      response: createErrorResponse(
+        {
+          error: "Unauthorized",
+          message: "Missing authorization header",
+          statusCode: 401,
+        },
+        request
+      ),
+    };
   }
 
   // 2. 检查格式（Bearer token）
   if (!auth.startsWith("Bearer ")) {
-    return createErrorResponse(
-      {
-        error: "Unauthorized",
-        message: "Invalid authorization format. Use: Bearer <token>",
-        statusCode: 401,
-      },
-      request
-    );
+    return {
+      response: createErrorResponse(
+        {
+          error: "Unauthorized",
+          message: "Invalid authorization format. Use: Bearer <token>",
+          statusCode: 401,
+        },
+        request
+      ),
+    };
   }
 
   // 3. 验证 Token
-  const isValid = await validateOpenApiToken(auth);
-  if (!isValid) {
-    return createErrorResponse(
-      {
-        error: "Unauthorized",
-        message: "Invalid or expired API key",
-        statusCode: 401,
-      },
-      request
-    );
+  const allowedAgentIds = await validateOpenApiToken(auth);
+  if (!allowedAgentIds) {
+    return {
+      response: createErrorResponse(
+        {
+          error: "Unauthorized",
+          message: "Invalid or expired API key",
+          statusCode: 401,
+        },
+        request
+      ),
+    };
   }
 
   // 鉴权成功
-  return null;
+  return { allowedAgentIds };
 }
 
 // ========== 主 Proxy 函数 ==========
@@ -220,12 +243,21 @@ export async function proxy(request: NextRequest) {
   // 2. 检查是否是 Open API 路径
   if (pathname.startsWith("/api/v1/")) {
     // 对 Open API 路径进行特殊鉴权
-    const authError = await handleOpenApiAuth(request);
-    if (authError) {
-      return authError; // 错误响应已包含 CORS 头
+    const authResult = await handleOpenApiAuth(request);
+    if ("response" in authResult) {
+      return authResult.response; // 错误响应已包含 CORS 头
     }
     // 鉴权成功，继续处理请求，并添加 CORS 头
-    const response = NextResponse.next();
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set(
+      "x-open-api-allowed-agent-ids",
+      JSON.stringify(authResult.allowedAgentIds)
+    );
+    const response = NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
     return addCorsHeaders(response, request);
   }
 

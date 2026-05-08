@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+# [1.31.0-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.30.1...v1.31.0-develop.1) (2026-05-08)
+
+
+### Features
+
+* **recruitment:** add open api event ingestion ([dcee630](https://github.com/steveoon/agent-computer-user/commit/dcee6301e42b2193d063fe4e200ba99f1197e871))
+
 ## [1.30.1](https://github.com/steveoon/agent-computer-user/compare/v1.30.0...v1.30.1) (2026-04-08)
 
 

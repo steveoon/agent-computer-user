@@ -101,6 +101,7 @@ describe("RecruitmentEventService", () => {
     createdAt: new Date(),
     dataSource: mockEvent.dataSource ?? null,
     apiSource: mockEvent.apiSource ?? null,
+    idempotencyKey: null,
   };
 
   beforeEach(() => {

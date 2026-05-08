@@ -2,11 +2,11 @@
 
 ## 概述
 
-本项目的 Open API（`/api/v1/*`）使用外部鉴权服务进行 API Key 验证，通过 Next.js middleware 实现请求拦截和鉴权。
+本项目的 Open API（`/api/v1/*`）使用外部鉴权服务进行 API Key 验证，通过 Next.js 16 `proxy.ts` 实现请求拦截和鉴权。
 
 ## 鉴权流程
 
-1. **请求拦截**：所有 `/api/v1/*` 路径的请求都会被 middleware 拦截
+1. **请求拦截**：所有 `/api/v1/*` 路径的请求都会被 `proxy.ts` 拦截
 2. **Header 检查**：验证请求是否包含 `Authorization: Bearer <token>` 格式的认证头
 3. **缓存查询**：首先检查进程内内存缓存，如果 token 在缓存中且未过期，直接放行
 4. **外部验证**：缓存未命中时，调用外部鉴权服务进行验证
@@ -30,6 +30,10 @@ OPEN_API_AUTH_URL=https://wolian.cc/api/v1/validate-key
 - 从请求头读取 `Authorization`
 - 成功时返回 `200 OK` 和 JSON：`{"isSuccess": true, ...}`
 - 失败时返回非 2xx 状态码
+
+当前阶段暂不做 `key -> agentId` 数据范围控制。外部鉴权服务只负责判断 key 是否有效；认证通过后，`proxy.ts` 会临时注入 `allowedAgentIds: ["*"]`，业务路由允许访问任意 `agentId`。
+
+后续如果需要恢复细粒度授权，应在本项目内维护 `key -> allowedAgentIds` 映射，而不是要求 `OPEN_API_AUTH_URL` 承担业务授权逻辑。
 
 ## 缓存机制
 
@@ -61,8 +65,8 @@ OPEN_API_AUTH_URL=https://wolian.cc/api/v1/validate-key
 ### 单元测试
 
 ```bash
-# 运行 middleware 测试
-pnpm test:run __tests__/middleware.test.ts
+# 运行 proxy 测试
+pnpm test:run __tests__/proxy.test.ts
 ```
 
 ### 手动测试
@@ -121,7 +125,7 @@ OPEN_API_AUTH_URL=http://localhost:3001/api/validate-key
 
 ## 相关文件
 
-- `middleware.ts` - Middleware 实现
+- `proxy.ts` - Next.js 16 Proxy 实现（当前实际入口）
 - `lib/utils/api-response.ts` - 标准化响应工具
 - `app/api/v1/tools/route.ts` - 示例 API 端点
-- `__tests__/middleware.test.ts` - 测试文件
+- `__tests__/proxy.test.ts` - 测试文件

@@ -1,0 +1,2 @@
+ALTER TABLE "app_huajune"."recruitment_events" ADD COLUMN "idempotency_key" varchar(128);--> statement-breakpoint
+CREATE UNIQUE INDEX "unique_re_idempotency" ON "app_huajune"."recruitment_events" USING btree ("agent_id","idempotency_key") WHERE "app_huajune"."recruitment_events"."idempotency_key" IS NOT NULL;
