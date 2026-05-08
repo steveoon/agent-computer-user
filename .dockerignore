@@ -5,6 +5,9 @@ npm-debug.log
 README.md
 .next
 .next.cache
+dist
+build
+out
 docker
 .git
 .gitignore
@@ -26,6 +29,12 @@ docker
 # 日志文件
 logs
 *.log
+
+# 构建产物 - 不应该进入 Web Docker 镜像
+*.dmg
+*.exe
+*.zip
+*.blockmap
 
 # 临时文件
 *.tmp
