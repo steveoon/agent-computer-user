@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.31.4-develop.2](https://github.com/steveoon/agent-computer-user/compare/v1.31.4-develop.1...v1.31.4-develop.2) (2026-05-08)
+
+
+### Bug Fixes
+
+* propagate binary skip envs to builder stage ([c7e3110](https://github.com/steveoon/agent-computer-user/commit/c7e3110639b7a197c18b28c7286134256f1aafae))
+
 ## [1.31.4-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.31.3...v1.31.4-develop.1) (2026-05-08)
 
 
