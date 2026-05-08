@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RecruitmentEventType } from "@/db/types";
 import type { DrizzleInsertEvent, DrizzleSelectEvent } from "../repository";
 
@@ -69,6 +69,10 @@ describe("processOpenApiRecruitmentEvents", () => {
     mockInsertStrict.mockImplementation(async (event: DrizzleInsertEvent) =>
       selectFromInsert(event, `event-${event.idempotencyKey ?? "no-key"}`)
     );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("rejects unauthorized agentId per item", async () => {
