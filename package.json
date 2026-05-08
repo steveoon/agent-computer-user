@@ -1,12 +1,14 @@
 {
   "name": "ai-sdk-computer-use",
-  "version": "1.31.0",
+  "version": "1.31.1-develop.1",
   "private": true,
+  "packageManager": "pnpm@10.31.0",
   "main": "build/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "deploy:prod": "scripts/deploy.sh",
     "lint": "eslint .",
     "lint:sh": "shellcheck scripts/*.sh",
     "test": "vitest",

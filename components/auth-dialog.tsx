@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,10 +23,30 @@ interface AuthDialogProps {
 }
 
 type AuthMode = "login" | "register";
+const AUTH_REQUEST_TIMEOUT_MS = 15000;
+
+function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      reject(new Error(message));
+    }, AUTH_REQUEST_TIMEOUT_MS);
+
+    promise.then(
+      value => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      },
+      error => {
+        window.clearTimeout(timeoutId);
+        reject(error);
+      }
+    );
+  });
+}
 
 export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   const [mode, setMode] = useState<AuthMode>("login");
-  const [isPending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { setError, clearError } = useAuthStore();
   const router = useRouter();
 
@@ -35,56 +55,64 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     clearError();
 
     const formData = new FormData(event.currentTarget);
+    setIsSubmitting(true);
 
-    startTransition(async () => {
-      try {
-        if (mode === "login") {
-          // 使用客户端 Supabase 进行登录，确保 onAuthStateChange 能立即触发
-          const supabase = createClient();
+    try {
+      if (mode === "login") {
+        // 使用客户端 Supabase 进行登录，确保 onAuthStateChange 能立即触发
+        const supabase = createClient();
 
-          const { data, error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await withTimeout(
+          supabase.auth.signInWithPassword({
             email: formData.get("email") as string,
             password: formData.get("password") as string,
-          });
+          }),
+          "登录请求超时，请检查网络或稍后重试"
+        );
 
-          if (error) {
-            console.error("Client login error:", error);
-            setError(error.message || "登录失败");
-            toast.error(error.message || "登录失败");
-            return;
-          }
-
-          if (!data.user) {
-            setError("登录失败，未获取到用户信息");
-            toast.error("登录失败，未获取到用户信息");
-            return;
-          }
-
-          toast.success("登录成功！");
-          onOpenChange(false);
-
-          // 登录成功后 AuthProvider 会监听 SIGNED_IN 事件并更新 Zustand Store
-          // 刷新路由以确保服务器端中间件能读取到新的 session cookie
-          // 这解决了登录后立即跳转到受保护路由时中间件认证失败的问题
-          router.refresh();
-        } else {
-          // 使用 Server Action 进行注册（含验证逻辑）
-          const result = await signUpAction(formData);
-
-          if (result.success) {
-            toast.success("注册成功！请检查邮箱进行验证。");
-            setMode("login"); // 注册成功后切换到登录模式
-          } else {
-            setError(result.error || "注册失败");
-            toast.error(result.error || "注册失败");
-          }
+        if (error) {
+          console.error("Client login error:", error);
+          setError(error.message || "登录失败");
+          toast.error(error.message || "登录失败");
+          return;
         }
-      } catch (error) {
-        console.error("Auth error:", error);
-        setError("操作过程中发生错误");
-        toast.error("操作过程中发生错误");
+
+        if (!data.user) {
+          setError("登录失败，未获取到用户信息");
+          toast.error("登录失败，未获取到用户信息");
+          return;
+        }
+
+        toast.success("登录成功！");
+        onOpenChange(false);
+
+        // 登录成功后 AuthProvider 会监听 SIGNED_IN 事件并更新 Zustand Store
+        // 刷新路由以确保服务器端中间件能读取到新的 session cookie
+        // 这解决了登录后立即跳转到受保护路由时中间件认证失败的问题
+        router.refresh();
+      } else {
+        // 使用 Server Action 进行注册（含验证逻辑）
+        const result = await withTimeout(
+          signUpAction(formData),
+          "注册请求超时，请检查网络或稍后重试"
+        );
+
+        if (result.success) {
+          toast.success("注册成功！请检查邮箱进行验证。");
+          setMode("login"); // 注册成功后切换到登录模式
+        } else {
+          setError(result.error || "注册失败");
+          toast.error(result.error || "注册失败");
+        }
       }
-    });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "操作过程中发生错误";
+      console.error("Auth error:", error);
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const toggleMode = () => {
@@ -111,7 +139,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               type="email"
               placeholder="请输入邮箱地址"
               required
-              disabled={isPending}
+              disabled={isSubmitting}
             />
           </div>
 
@@ -123,7 +151,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               type="password"
               placeholder="请输入密码"
               required
-              disabled={isPending}
+              disabled={isSubmitting}
               minLength={6}
             />
           </div>
@@ -137,15 +165,15 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 type="password"
                 placeholder="请再次输入密码"
                 required
-                disabled={isPending}
+                disabled={isSubmitting}
                 minLength={6}
               />
             </div>
           )}
 
           <div className="space-y-2">
-            <Button type="submit" className="w-full" disabled={isPending}>
-              {isPending
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting
                 ? mode === "login"
                   ? "登录中..."
                   : "注册中..."
@@ -159,7 +187,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               variant="ghost"
               className="w-full"
               onClick={toggleMode}
-              disabled={isPending}
+              disabled={isSubmitting}
             >
               {mode === "login" ? "没有账户？点击注册" : "已有账户？点击登录"}
             </Button>

@@ -20,6 +20,7 @@ export const PROTECTED_ROUTES = [
  * 🌐 公开的API路由（不需要认证）
  */
 export const PUBLIC_API_ROUTES = [
+  "/api/health", // 健康检查，必须避免触发 Supabase 会话检查
   "/api/auth-status", // 认证状态检查
   "/api/diagnose", // 系统诊断
   "/api/sandbox-status", // 沙箱状态查询
