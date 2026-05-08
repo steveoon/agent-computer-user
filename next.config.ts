@@ -3,6 +3,18 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   output: "standalone",
+  outputFileTracingExcludes: {
+    "/*": [
+      "dist/**/*",
+      "build/**/*",
+      "coverage/**/*",
+      "logs/**/*",
+      "*.dmg",
+      "*.exe",
+      "*.zip",
+      "*.blockmap",
+    ],
+  },
   async headers() {
     return [
       {
