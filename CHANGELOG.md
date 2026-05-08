@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.31.2](https://github.com/steveoon/agent-computer-user/compare/v1.31.1...v1.31.2) (2026-05-08)
+
+
+### Bug Fixes
+
+* exclude build artifacts from standalone image ([a89655a](https://github.com/steveoon/agent-computer-user/commit/a89655a4b11e3c155c1e66a47d907323e672825b))
+
 ## [1.31.2-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.31.1...v1.31.2-develop.1) (2026-05-08)
 
 
