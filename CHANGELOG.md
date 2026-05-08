@@ -2,6 +2,14 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.31.1](https://github.com/steveoon/agent-computer-user/compare/v1.31.0...v1.31.1) (2026-05-08)
+
+
+### Bug Fixes
+
+* align pnpm setup with package manager ([e7f9cb0](https://github.com/steveoon/agent-computer-user/commit/e7f9cb0b940d0cb10eb0956b605ae83de7af6d23))
+* improve deployment and auth migration flow ([4d19915](https://github.com/steveoon/agent-computer-user/commit/4d19915a5b2f57cce985c5a0c59575521e4e57df))
+
 ## [1.31.1-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.31.0...v1.31.1-develop.1) (2026-05-08)
 
 
