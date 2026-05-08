@@ -2,6 +2,13 @@
 
 All notable changes to AI SDK Computer Use will be documented in this file.
 
+## [1.31.3-develop.1](https://github.com/steveoon/agent-computer-user/compare/v1.31.2...v1.31.3-develop.1) (2026-05-08)
+
+
+### Bug Fixes
+
+* preserve next runtime in standalone output ([dbed1e1](https://github.com/steveoon/agent-computer-user/commit/dbed1e1737900db38c78323d05c96f57684f778d))
+
 ## [1.31.2](https://github.com/steveoon/agent-computer-user/compare/v1.31.1...v1.31.2) (2026-05-08)
 
 
